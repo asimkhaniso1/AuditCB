@@ -6,14 +6,112 @@
 const state = {
     currentModule: 'dashboard',
     clients: [
-        { id: 1, name: 'Tech Solutions Ltd', standard: 'ISO 9001:2015', status: 'Active', nextAudit: '2024-03-15' },
-        { id: 2, name: 'Global Manufacturing', standard: 'ISO 14001:2015', status: 'Active', nextAudit: '2024-04-20' },
-        { id: 3, name: 'SecureData Corp', standard: 'ISO 27001:2022', status: 'Suspended', nextAudit: '2024-05-10' }
+        {
+            id: 1,
+            name: 'Tech Solutions Ltd',
+            standard: 'ISO 9001:2015',
+            status: 'Active',
+            nextAudit: '2024-03-15',
+            contactPerson: 'Alice Whitman',
+            email: 'alice@techsolutions.com',
+            phone: '+1-555-0101',
+            address: '123 Tech Park',
+            city: 'Silicon Valley',
+            country: 'USA',
+            employees: 150,
+            sites: 2,
+            shifts: 'No',
+            geotag: '37.3382, -121.8863'
+        },
+        {
+            id: 2,
+            name: 'Global Manufacturing',
+            standard: 'ISO 14001:2015',
+            status: 'Active',
+            nextAudit: '2024-04-20',
+            contactPerson: 'Bob Builder',
+            email: 'bob@globalmfg.com',
+            phone: '+1-555-0102',
+            address: '456 Industrial Way',
+            city: 'Detroit',
+            country: 'USA',
+            employees: 500,
+            sites: 1,
+            shifts: 'Yes',
+            geotag: '42.3314, -83.0458'
+        },
+        {
+            id: 3,
+            name: 'SecureData Corp',
+            standard: 'ISO 27001:2022',
+            status: 'Suspended',
+            nextAudit: '2024-05-10',
+            contactPerson: 'Charlie Root',
+            email: 'croot@securedata.com',
+            phone: '+1-555-0103',
+            address: '789 Cyber Lane',
+            city: 'Austin',
+            country: 'USA',
+            employees: 50,
+            sites: 1,
+            shifts: 'No',
+            geotag: '30.2672, -97.7431'
+        }
     ],
     auditors: [
-        { id: 1, name: 'John Smith', role: 'Lead Auditor', standards: ['ISO 9001', 'ISO 14001'] },
-        { id: 2, name: 'Sarah Johnson', role: 'Auditor', standards: ['ISO 27001'] },
-        { id: 3, name: 'Mike Chen', role: 'Technical Expert', standards: ['ISO 45001'] }
+        {
+            id: 1,
+            name: 'John Smith',
+            role: 'Lead Auditor',
+            standards: ['ISO 9001', 'ISO 14001'],
+            experience: 12,
+            domainExpertise: ['Quality Management', 'Environmental Management'],
+            industries: ['Manufacturing', 'Automotive'],
+            age: 45,
+            manDayRate: 800,
+            email: 'john.smith@auditors.com',
+            phone: '+1-555-1001',
+            location: 'New York, USA',
+            auditHistory: [
+                { client: 'Tech Solutions Ltd', date: '2024-01-15', type: 'Surveillance' },
+                { client: 'Global Manufacturing', date: '2023-11-10', type: 'Stage 2' }
+            ],
+            education: { degree: 'Master', fieldOfStudy: 'Industrial Engineering', specialization: 'Six Sigma Black Belt, ISO Lead Auditor' }
+        },
+        {
+            id: 2,
+            name: 'Sarah Johnson',
+            role: 'Auditor',
+            standards: ['ISO 27001'],
+            experience: 6,
+            domainExpertise: ['Information Security', 'IT Governance'],
+            industries: ['IT', 'Financial Services'],
+            age: 35,
+            manDayRate: 600,
+            email: 'sarah.j@auditors.com',
+            phone: '+1-555-1002',
+            location: 'Chicago, USA',
+            auditHistory: [
+                { client: 'SecureData Corp', date: '2024-02-20', type: 'Stage 1' }
+            ],
+            education: { degree: 'Master', fieldOfStudy: 'Information Security', specialization: 'CISSP, CISA certified' }
+        },
+        {
+            id: 3,
+            name: 'Mike Chen',
+            role: 'Technical Expert',
+            standards: ['ISO 45001'],
+            experience: 8,
+            domainExpertise: ['Occupational Health', 'Safety Systems'],
+            industries: ['Construction', 'Oil & Gas'],
+            age: 40,
+            manDayRate: 700,
+            email: 'mike.chen@auditors.com',
+            phone: '+1-555-1003',
+            location: 'Houston, USA',
+            auditHistory: [],
+            education: { degree: 'Bachelor', fieldOfStudy: 'Safety Engineering', specialization: 'NEBOSH certified' }
+        }
     ],
     auditPrograms: [],
     auditPlans: [],

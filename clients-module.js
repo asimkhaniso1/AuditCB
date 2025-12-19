@@ -152,7 +152,8 @@ function renderClientTab(client, tabName) {
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Client Details</h3>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                        <!-- Basic Info -->
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Company Name</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.name}</p>
@@ -161,13 +162,49 @@ function renderClientTab(client, tabName) {
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Standard</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.standard}</p>
                         </div>
+                        
+                        <!-- Contact Info -->
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Contact Person</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.contactPerson || '-'}</p>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Contact Details</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">
+                                <i class="fa-solid fa-envelope" style="color: var(--text-secondary); margin-right: 5px;"></i> ${client.email || '-'}<br>
+                                <i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i> ${client.phone || '-'}
+                            </p>
+                        </div>
+
+                        <!-- Address -->
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Address</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.address || '-'}</p>
+                            <p style="font-weight: 500;">${client.city || ''}, ${client.country || ''}</p>
+                        </div>
+                        <div>
+                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Geolocation</label>
+                             <p style="font-weight: 500; margin-top: 0.25rem;">
+                                <i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i> ${client.geotag || 'Not Validated'}
+                             </p>
+                        </div>
+
+                        <!-- Operational Data -->
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Operational Details</label>
+                            <div style="display: flex; gap: 1rem; margin-top: 0.25rem;">
+                                <span><i class="fa-solid fa-users" style="color: var(--text-secondary);"></i> <strong>${client.employees || 0}</strong> Employees</span>
+                                <span><i class="fa-solid fa-building" style="color: var(--text-secondary);"></i> <strong>${client.sites || 1}</strong> Site(s)</span>
+                            </div>
+                        </div>
+                        <div>
+                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Shift Work</label>
+                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.shifts === 'Yes' ? 'Yes (Multiple Shifts)' : 'No (General Shift Only)'}</p>
+                        </div>
+
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Next Audit Date</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.nextAudit}</p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Address</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">123 Business Rd, Tech City</p>
                         </div>
                     </div>
                 </div>
@@ -200,9 +237,12 @@ function openAddClientModal() {
 
     modalTitle.textContent = 'Add New Client';
     modalBody.innerHTML = `
-        <form id="client-form">
+        <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <!-- Basic Info -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
+            
             <div class="form-group">
-                <label>Company Name</label>
+                <label>Company Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="client-name" required>
             </div>
             <div class="form-group">
@@ -214,8 +254,69 @@ function openAddClientModal() {
                     <option>ISO 27001:2022</option>
                 </select>
             </div>
+
+            <!-- Contact Info -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Contact Details</div>
+
             <div class="form-group">
-                <label>Next Audit Date</label>
+                <label>Contact Person</label>
+                <input type="text" class="form-control" id="client-contact" placeholder="John Doe">
+            </div>
+             <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="form-control" id="client-email" placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" class="form-control" id="client-phone" placeholder="+1 234 567 8900">
+            </div>
+
+            <!-- Location -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Location</div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Address</label>
+                <input type="text" class="form-control" id="client-address" placeholder="Street Address">
+            </div>
+            <div class="form-group">
+                <label>City</label>
+                <input type="text" class="form-control" id="client-city" placeholder="City">
+            </div>
+            <div class="form-group">
+                <label>Country</label>
+                <input type="text" class="form-control" id="client-country" placeholder="Country">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Geotag (Lat, Long)</label>
+                <div style="display: flex; gap: 0.5rem;">
+                     <input type="text" class="form-control" id="client-geotag" placeholder="e.g. 37.7749, -122.4194" style="margin-bottom: 0;">
+                     <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                     </button>
+                </div>
+            </div>
+
+            <!-- Operational & Planning -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Planning Data</div>
+
+            <div class="form-group">
+                <label>Total Employees</label>
+                <input type="number" class="form-control" id="client-employees" min="1" value="10">
+            </div>
+            <div class="form-group">
+                <label>Number of Sites</label>
+                <input type="number" class="form-control" id="client-sites" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label>Shift Work?</label>
+                <select class="form-control" id="client-shifts">
+                    <option value="No">No (General Shift Only)</option>
+                    <option value="Yes">Yes (Multiple Shifts)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Next Audit Date <span style="color: var(--danger-color);">*</span></label>
                 <input type="date" class="form-control" id="client-next-audit" required>
             </div>
         </form>
@@ -228,13 +329,26 @@ function openAddClientModal() {
         const standard = document.getElementById('client-standard').value;
         const nextAudit = document.getElementById('client-next-audit').value;
 
+        // New Data
+        const contactPerson = document.getElementById('client-contact').value;
+        const email = document.getElementById('client-email').value;
+        const phone = document.getElementById('client-phone').value;
+        const address = document.getElementById('client-address').value;
+        const city = document.getElementById('client-city').value;
+        const country = document.getElementById('client-country').value;
+        const geotag = document.getElementById('client-geotag').value;
+        const employees = parseInt(document.getElementById('client-employees').value) || 0;
+        const sites = parseInt(document.getElementById('client-sites').value) || 1;
+        const shifts = document.getElementById('client-shifts').value;
+
         if (name && nextAudit) {
             const newClient = {
                 id: Date.now(),
-                name: name,
-                standard: standard,
+                name, standard, nextAudit,
                 status: 'Active',
-                nextAudit: nextAudit
+                contactPerson, email, phone,
+                address, city, country, geotag,
+                employees, sites, shifts
             };
 
             state.clients.push(newClient);

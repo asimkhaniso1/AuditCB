@@ -162,6 +162,27 @@ function openCreatePlanModal() {
                         Auto-Calculate
                     </button>
                 </div>
+                
+                <!-- Calculation Parameters (Hidden or Visible) -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">Employees</label>
+                        <input type="number" class="form-control" id="plan-employees" placeholder="Count">
+                    </div>
+                     <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">Sites</label>
+                        <input type="number" class="form-control" id="plan-sites" value="1">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">Risk/Complexity</label>
+                        <select class="form-control" id="plan-risk" style="padding: 0.4rem;">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label style="font-size: 0.85rem;">Total Man-Days</label>
@@ -219,6 +240,10 @@ function editAuditPlan(id) {
         document.getElementById('plan-type').value = plan.type || 'Surveillance';
         document.getElementById('plan-date').value = plan.date;
 
+        // Fill calculation inputs if available in plan or client (optional enhancement, for now just basic fields)
+        // If we saved calculation data, we would restore it here.
+        updateClientDetails(plan.client); // Auto-fill from client data again to ensure calc inputs are ready
+
         // Handle Lead Auditor
         const lead = plan.team[0];
         document.getElementById('plan-lead-auditor').value = lead;
@@ -259,32 +284,61 @@ function editAuditPlan(id) {
 }
 
 function updateClientDetails(clientName) {
-    // Mock functionality: In a real app, this would fetch client details like employee count to help with calculation
     const client = state.clients.find(c => c.name === clientName);
     if (client) {
-        // Auto-select standard if available in client data (mock)
-        // document.getElementById('plan-standard').value = client.standard || 'ISO 9001:2015';
+        // Auto-select standard
+        if (client.standard) {
+            const stdSelect = document.getElementById('plan-standard');
+            if (stdSelect) stdSelect.value = client.standard;
+        }
+
+        // Auto-fill calculation params
+        if (document.getElementById('plan-employees')) {
+            document.getElementById('plan-employees').value = client.employees || 0;
+        }
+        if (document.getElementById('plan-sites')) {
+            document.getElementById('plan-sites').value = client.sites || 1;
+        }
+
+        // Trigger calculation automatically if we have data
+        if (client.employees && window.calculateManDays) {
+            autoCalculateDays();
+        }
     }
 }
 
 function autoCalculateDays() {
-    // Mock integration: In a real app, this would use the client's employee count
-    // For now, we'll simulate a calculation based on a prompt or default
-    const employees = prompt("Enter number of employees for calculation:", "100");
-    if (employees) {
-        const results = calculateManDays(parseInt(employees), 1, 2, false, 'Medium');
+    const employees = parseInt(document.getElementById('plan-employees').value) || 0;
+    const risk = document.getElementById('plan-risk').value || 'Medium';
+
+    // Ensure the helper function exists (it's in advanced-modules.js, make sure it's loaded)
+    if (typeof calculateManDays !== 'function') {
+        // Simple fallback if advanced-module isn't loaded/exposed
+        console.warn('Advanced Man-Day Calculator not found, using simple fallback');
+        const simpleDays = employees < 50 ? 2 : employees < 500 ? 5 : 10;
+        document.getElementById('plan-mandays').value = simpleDays;
+        document.getElementById('plan-onsite-days').value = simpleDays * 0.8;
+        return;
+    }
+
+    if (employees > 0) {
+        // Signature: calculateManDays(employees, reductionFactor, sites, shiftWork, riskLevel)
+        // Assume default reduction (1) and shiftWork (false) for now unless added to UI
+        const results = calculateManDays(employees, 1, 1, false, risk);
 
         const type = document.getElementById('plan-type').value;
         let days = 0;
 
         if (type === 'Stage 1') days = results.stage1;
         else if (type === 'Stage 2') days = results.stage2;
-        else days = results.surveillance;
+        else days = results.surveillance; // Default
 
-        document.getElementById('plan-mandays').value = days;
-        document.getElementById('plan-onsite-days').value = Math.max(1, days * 0.8).toFixed(1); // Assume 80% onsite
+        document.getElementById('plan-mandays').value = days.toFixed(2);
+        document.getElementById('plan-onsite-days').value = (days * 0.8).toFixed(2);
 
-        window.showNotification(`Calculated ${days} man-days based on ${employees} employees.`, 'success');
+        window.showNotification(`Calculated ${days.toFixed(2)} days based on ${employees} employees.`, 'success');
+    } else {
+        window.showNotification('Please enter number of employees', 'warning');
     }
 }
 

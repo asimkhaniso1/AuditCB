@@ -153,7 +153,7 @@ function renderAuditorTab(auditor, tabName) {
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Personal Information</h3>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Full Name</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.name}</p>
@@ -163,12 +163,50 @@ function renderAuditorTab(auditor, tabName) {
                             <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.role}</p>
                         </div>
                         <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Age</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.age || '-'} years</p>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Experience</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.experience || 0} years</p>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Man-Day Rate</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem; color: var(--success-color);">$${auditor.manDayRate || 0}/day</p>
+                        </div>
+                         <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Location</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${auditor.location || '-'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;">Contact Details</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                        <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Email</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">auditor@example.com</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-envelope" style="margin-right: 5px;"></i>${auditor.email || '-'}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Phone</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">+1 234 567 8900</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-phone" style="margin-right: 5px;"></i>${auditor.phone || '-'}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;">Expertise & Industry</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Domain Expertise</label>
+                            <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                ${(auditor.domainExpertise || []).map(d => `<span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${d}</span>`).join('') || '<span style="color: var(--text-secondary);">-</span>'}
+                            </div>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Industries</label>
+                            <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                ${(auditor.industries || []).map(i => `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${i}</span>`).join('') || '<span style="color: var(--text-secondary);">-</span>'}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -222,10 +260,33 @@ function renderAuditorTab(auditor, tabName) {
             `;
             break;
         case 'history':
+            const historyRows = (auditor.auditHistory || []).length > 0
+                ? auditor.auditHistory.map(h => `
+                    <tr>
+                        <td>${h.client}</td>
+                        <td>${h.date}</td>
+                        <td><span class="status-badge status-completed">${h.type}</span></td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No audit history available yet.</td></tr>';
+
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Audit History</h3>
-                    <p style="color: var(--text-secondary);">No audit history available.</p>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Date</th>
+                                    <th>Audit Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${historyRows}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             `;
             break;
@@ -234,46 +295,266 @@ function renderAuditorTab(auditor, tabName) {
 
 function renderCompetenceMatrix() {
     const standards = ['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 45001'];
+    const industries = [
+        'Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services',
+        'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction',
+        'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'
+    ];
+
+    // Calculate statistics
+    const totalAuditors = state.auditors.length;
+    const leadAuditors = state.auditors.filter(a => a.role === 'Lead Auditor').length;
+    const avgExperience = state.auditors.length > 0
+        ? (state.auditors.reduce((sum, a) => sum + (a.experience || 0), 0) / state.auditors.length).toFixed(1)
+        : 0;
+
+    // Get experience level badge
+    const getExperienceBadge = (years) => {
+        if (!years) return '<span style="color: var(--text-secondary);">-</span>';
+        if (years < 3) return `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${years} yrs (Junior)</span>`;
+        if (years < 8) return `<span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${years} yrs (Mid)</span>`;
+        return `<span style="background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${years} yrs (Senior)</span>`;
+    };
+
+    // Get industry badges
+    const getIndustryBadges = (auditorIndustries) => {
+        if (!auditorIndustries || auditorIndustries.length === 0) {
+            return '<span style="color: var(--text-secondary);">Not specified</span>';
+        }
+        return auditorIndustries.map(ind =>
+            `<span style="background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin: 1px;">${ind}</span>`
+        ).join(' ');
+    };
 
     const html = `
         <div class="fade-in">
-            <div style="margin-bottom: 1.5rem;">
+            <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
                 <button class="btn btn-secondary" onclick="renderAuditorsEnhanced()">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Auditors
                 </button>
+                <button class="btn btn-primary" onclick="window.exportCompetenceMatrix()">
+                    <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export Matrix
+                </button>
             </div>
-            
-            <div class="card">
-                <h2 style="margin-bottom: 1.5rem;">Auditor Competence Matrix</h2>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Auditor Name</th>
-                                ${standards.map(std => `<th>${std}</th>`).join('')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${state.auditors.map(auditor => `
-                                <tr>
-                                    <td style="font-weight: 500;">${auditor.name}</td>
-                                    ${standards.map(std => {
-        const hasStd = auditor.standards.some(s => s.includes(std.split(' ')[1]));
-        return `<td style="text-align: center;">
-                                            ${hasStd ? '<i class="fa-solid fa-check-circle" style="color: var(--success-color); font-size: 1.2rem;"></i>' : '-'}
-                                        </td>`;
-    }).join('')}
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total Auditors</p>
+                    <p style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">${totalAuditors}</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Lead Auditors</p>
+                    <p style="font-size: 2rem; font-weight: 700; color: var(--success-color);">${leadAuditors}</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Avg Experience</p>
+                    <p style="font-size: 2rem; font-weight: 700; color: var(--info-color);">${avgExperience} yrs</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Standards Covered</p>
+                    <p style="font-size: 2rem; font-weight: 700; color: var(--warning-color);">${standards.length}</p>
                 </div>
             </div>
+
+            <!-- Tabs -->
+            <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
+                <button class="tab-btn active" data-matrix-tab="standards">Standards Competence</button>
+                <button class="tab-btn" data-matrix-tab="industries">Industry Experience</button>
+                <button class="tab-btn" data-matrix-tab="detailed">Detailed View</button>
+            </div>
+
+            <div id="matrix-content"></div>
         </div>
     `;
 
     contentArea.innerHTML = html;
+
+    // Tab switching
+    document.querySelectorAll('[data-matrix-tab]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('[data-matrix-tab]').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            renderMatrixTab(e.target.getAttribute('data-matrix-tab'), standards, industries, getExperienceBadge, getIndustryBadges);
+        });
+    });
+
+    // Render initial tab
+    renderMatrixTab('standards', standards, industries, getExperienceBadge, getIndustryBadges);
 }
+
+function renderMatrixTab(tabName, standards, industries, getExperienceBadge, getIndustryBadges) {
+    const matrixContent = document.getElementById('matrix-content');
+    const state = window.state;
+
+    switch (tabName) {
+        case 'standards':
+            matrixContent.innerHTML = `
+                <div class="card">
+                    <h3 style="margin-bottom: 1.5rem;">
+                        <i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                        Standards Qualification Matrix
+                    </h3>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 180px;">Auditor</th>
+                                    <th style="min-width: 100px;">Role</th>
+                                    <th style="min-width: 100px;">Experience</th>
+                                    ${standards.map(std => `<th style="text-align: center; min-width: 90px;">${std}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${state.auditors.map(auditor => `
+                                    <tr>
+                                        <td style="font-weight: 500;">${auditor.name}</td>
+                                        <td><span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span></td>
+                                        <td>${getExperienceBadge(auditor.experience)}</td>
+                                        ${standards.map(std => {
+                const hasStd = auditor.standards && auditor.standards.some(s => s.includes(std.split(' ')[1]));
+                return `<td style="text-align: center;">
+                                                ${hasStd
+                        ? '<i class="fa-solid fa-check-circle" style="color: var(--success-color); font-size: 1.2rem;"></i>'
+                        : '<span style="color: #cbd5e1;">-</span>'}
+                                            </td>`;
+            }).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'industries':
+            matrixContent.innerHTML = `
+                <div class="card">
+                    <h3 style="margin-bottom: 1.5rem;">
+                        <i class="fa-solid fa-industry" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                        Industry Experience Matrix
+                    </h3>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 180px;">Auditor</th>
+                                    <th style="min-width: 100px;">Experience</th>
+                                    ${industries.map(ind => `<th style="text-align: center; min-width: 80px; font-size: 0.75rem; writing-mode: vertical-rl; transform: rotate(180deg); height: 100px;">${ind}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${state.auditors.map(auditor => `
+                                    <tr>
+                                        <td style="font-weight: 500;">${auditor.name}</td>
+                                        <td>${getExperienceBadge(auditor.experience)}</td>
+                                        ${industries.map(ind => {
+                const hasInd = auditor.industries && auditor.industries.includes(ind);
+                return `<td style="text-align: center;">
+                                                ${hasInd
+                        ? '<i class="fa-solid fa-check" style="color: var(--success-color);"></i>'
+                        : '<span style="color: #e2e8f0;">-</span>'}
+                                            </td>`;
+            }).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Industry Coverage Summary -->
+                    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 1rem; font-size: 0.95rem;">Industry Coverage Summary</h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${industries.map(ind => {
+                const count = state.auditors.filter(a => a.industries && a.industries.includes(ind)).length;
+                const percentage = state.auditors.length > 0 ? Math.round((count / state.auditors.length) * 100) : 0;
+                const bgColor = percentage > 50 ? '#d1fae5' : percentage > 25 ? '#fef3c7' : '#fee2e2';
+                const textColor = percentage > 50 ? '#065f46' : percentage > 25 ? '#92400e' : '#991b1b';
+                return `<div style="background: ${bgColor}; color: ${textColor}; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem;">
+                                    <strong>${ind}</strong>: ${count} auditor${count !== 1 ? 's' : ''} (${percentage}%)
+                                </div>`;
+            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'detailed':
+            matrixContent.innerHTML = `
+                <div class="card">
+                    <h3 style="margin-bottom: 1.5rem;">
+                        <i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                        Detailed Auditor Competence
+                    </h3>
+                    <div style="display: grid; gap: 1rem;">
+                        ${state.auditors.map(auditor => `
+                            <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: #fafafa;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                                    <div>
+                                        <h4 style="margin: 0 0 0.25rem 0;">${auditor.name}</h4>
+                                        <span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span>
+                                    </div>
+                                    ${getExperienceBadge(auditor.experience)}
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i>Standards</p>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                            ${(auditor.standards || []).map(std =>
+                `<span style="background: var(--primary-color); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${std}</span>`
+            ).join('') || '<span style="color: var(--text-secondary);">None</span>'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-industry" style="margin-right: 0.5rem;"></i>Industries</p>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                            ${getIndustryBadges(auditor.industries)}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${auditor.domainExpertise && auditor.domainExpertise.length > 0 ? `
+                                <div style="margin-top: 1rem;">
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>Domain Expertise</p>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                        ${auditor.domainExpertise.map(exp =>
+                `<span style="background: #ede9fe; color: #5b21b6; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${exp}</span>`
+            ).join('')}
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                ${auditor.education && (auditor.education.degree || auditor.education.fieldOfStudy) ? `
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-graduation-cap" style="margin-right: 0.5rem;"></i>Academic Qualifications</p>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                                        ${auditor.education.degree ? `<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">${auditor.education.degree}</span>` : ''}
+                                        ${auditor.education.fieldOfStudy ? `<span style="background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem;">in ${auditor.education.fieldOfStudy}</span>` : ''}
+                                        ${auditor.education.specialization ? `<span style="color: var(--text-secondary); font-size: 0.75rem; font-style: italic;">| ${auditor.education.specialization}</span>` : ''}
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            break;
+    }
+}
+
+function exportCompetenceMatrix() {
+    window.showNotification('Competence Matrix export will be available soon.', 'info');
+}
+
+window.renderMatrixTab = renderMatrixTab;
+window.exportCompetenceMatrix = exportCompetenceMatrix;
+
+
 
 // ============================================
 // MAN-DAY CALCULATOR (ISO 17021-1)
@@ -538,9 +819,11 @@ function openAddAuditorModal() {
 
     modalTitle.textContent = 'Add New Auditor';
     modalBody.innerHTML = `
-        <form id="auditor-form">
+        <form id="auditor-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <!-- Basic Info -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Personal Details</div>
             <div class="form-group">
-                <label>Full Name</label>
+                <label>Full Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="auditor-name" required>
             </div>
             <div class="form-group">
@@ -552,15 +835,92 @@ function openAddAuditorModal() {
                 </select>
             </div>
             <div class="form-group">
-                <label>Qualified Standards (Hold Ctrl/Cmd to select multiple)</label>
+                <label>Age</label>
+                <input type="number" class="form-control" id="auditor-age" min="18" max="80" placeholder="e.g. 35">
+            </div>
+            <div class="form-group">
+                <label>Experience (Years)</label>
+                <input type="number" class="form-control" id="auditor-experience" min="0" placeholder="e.g. 10">
+            </div>
+
+            <!-- Contact Info -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Contact Information</div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="form-control" id="auditor-email" placeholder="auditor@example.com">
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" class="form-control" id="auditor-phone" placeholder="+1 234 567 8900">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Location</label>
+                <input type="text" class="form-control" id="auditor-location" placeholder="City, Country">
+            </div>
+
+            <!-- Academic Qualifications -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Academic Qualifications</div>
+            <div class="form-group">
+                <label>Highest Degree</label>
+                <select class="form-control" id="auditor-degree">
+                    <option value="">-- Select Degree --</option>
+                    <option value="Diploma">Diploma</option>
+                    <option value="Bachelor">Bachelor's Degree</option>
+                    <option value="Master">Master's Degree</option>
+                    <option value="PhD">PhD / Doctorate</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Field of Study</label>
+                <select class="form-control" id="auditor-field">
+                    <option value="">-- Select Field --</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Computer Science">Computer Science / IT</option>
+                    <option value="Business Administration">Business Administration</option>
+                    <option value="Quality Management">Quality Management</option>
+                    <option value="Environmental Science">Environmental Science</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Biology">Biology / Biotechnology</option>
+                    <option value="Food Science">Food Science</option>
+                    <option value="Healthcare">Healthcare / Medical</option>
+                    <option value="Finance">Finance / Accounting</option>
+                    <option value="Industrial Engineering">Industrial Engineering</option>
+                    <option value="Information Security">Information Security</option>
+                    <option value="Safety Engineering">Safety / Occupational Health</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Specialization / Additional Qualifications</label>
+                <input type="text" class="form-control" id="auditor-specialization" placeholder="e.g. ISO Lead Auditor certified, Six Sigma Black Belt">
+            </div>
+
+            <!-- Expertise & Rates -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Expertise & Rate</div>
+            <div class="form-group">
+                <label>Qualified Standards <span style="color: var(--danger-color);">*</span></label>
                 <select class="form-control" id="auditor-standards" multiple style="height: 100px;">
                     <option>ISO 9001</option>
                     <option>ISO 14001</option>
                     <option>ISO 27001</option>
                     <option>ISO 45001</option>
                 </select>
+                <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
+            </div>
+            <div class="form-group">
+                <label>Man-Day Rate (USD)</label>
+                <input type="number" class="form-control" id="auditor-rate" min="0" placeholder="e.g. 600">
+            </div>
+            <div class="form-group">
+                <label>Domain Expertise (comma-separated)</label>
+                <input type="text" class="form-control" id="auditor-domain" placeholder="e.g. Quality, Environmental">
+            </div>
+            <div class="form-group">
+                <label>Industries (comma-separated)</label>
+                <input type="text" class="form-control" id="auditor-industries" placeholder="e.g. Manufacturing, IT, Healthcare">
             </div>
         </form>
+
     `;
 
     window.openModal();
@@ -571,13 +931,31 @@ function openAddAuditorModal() {
         const standardsSelect = document.getElementById('auditor-standards');
         const standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
 
+        // New fields
+        const age = parseInt(document.getElementById('auditor-age').value) || null;
+        const experience = parseInt(document.getElementById('auditor-experience').value) || 0;
+        const email = document.getElementById('auditor-email').value;
+        const phone = document.getElementById('auditor-phone').value;
+        const location = document.getElementById('auditor-location').value;
+        const manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
+        const domainExpertise = document.getElementById('auditor-domain').value.split(',').map(s => s.trim()).filter(s => s);
+        const industries = document.getElementById('auditor-industries').value.split(',').map(s => s.trim()).filter(s => s);
+
+        // Academic qualifications
+        const degree = document.getElementById('auditor-degree').value;
+        const fieldOfStudy = document.getElementById('auditor-field').value;
+        const specialization = document.getElementById('auditor-specialization').value;
+
         if (name && standards.length > 0) {
             const newAuditor = {
                 id: Date.now(),
-                name: name,
-                role: role,
-                standards: standards
+                name, role, standards,
+                age, experience, email, phone, location,
+                manDayRate, domainExpertise, industries,
+                education: { degree, fieldOfStudy, specialization },
+                auditHistory: []
             };
+
 
             state.auditors.push(newAuditor);
             window.saveData();
