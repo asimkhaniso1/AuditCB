@@ -19,6 +19,7 @@ function renderClientsEnhanced() {
             <td><span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span></td>
             <td>${client.nextAudit}</td>
             <td>
+                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
             </td>
         </tr>
@@ -78,14 +79,19 @@ function renderClientsEnhanced() {
 
     document.querySelectorAll('.view-client, .client-row').forEach(el => {
         el.addEventListener('click', (e) => {
-            // Prevent triggering if clicking on buttons inside row (like view button which is handled by bubbling but we want to be safe)
-            // Actually, the view button is inside the row.
-            // If I click the view button, it bubbles to the row.
-            // I should handle it carefully.
-            // The view button has its own listener? No, I'm adding listener to both.
-            // Let's just use the row click and ignore if it's an edit button (if I add one).
-            const clientId = parseInt(el.getAttribute('data-client-id'));
-            renderClientDetail(clientId);
+            if (!e.target.closest('.edit-client')) {
+                const clientId = parseInt(el.getAttribute('data-client-id'));
+                renderClientDetail(clientId);
+            }
+        });
+    });
+
+    // Add event listeners for edit buttons
+    document.querySelectorAll('.edit-client').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const clientId = parseInt(btn.getAttribute('data-client-id'));
+            openEditClientModal(clientId);
         });
     });
 }
@@ -237,6 +243,68 @@ function openAddClientModal() {
     };
 }
 
+function openEditClientModal(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Edit Client';
+    modalBody.innerHTML = `
+        <form id="client-form">
+            <div class="form-group">
+                <label>Company Name</label>
+                <input type="text" class="form-control" id="client-name" value="${client.name}" required>
+            </div>
+            <div class="form-group">
+                <label>Standard</label>
+                <select class="form-control" id="client-standard">
+                    <option ${client.standard === 'ISO 9001:2015' ? 'selected' : ''}>ISO 9001:2015</option>
+                    <option ${client.standard === 'ISO 14001:2015' ? 'selected' : ''}>ISO 14001:2015</option>
+                    <option ${client.standard === 'ISO 45001:2018' ? 'selected' : ''}>ISO 45001:2018</option>
+                    <option ${client.standard === 'ISO 27001:2022' ? 'selected' : ''}>ISO 27001:2022</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select class="form-control" id="client-status">
+                    <option ${client.status === 'Active' ? 'selected' : ''}>Active</option>
+                    <option ${client.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                    <option ${client.status === 'Withdrawn' ? 'selected' : ''}>Withdrawn</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Next Audit Date</label>
+                <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit}" required>
+            </div>
+        </form>
+    `;
+
+    openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('client-name').value;
+        const standard = document.getElementById('client-standard').value;
+        const status = document.getElementById('client-status').value;
+        const nextAudit = document.getElementById('client-next-audit').value;
+
+        if (name && nextAudit) {
+            client.name = name;
+            client.standard = standard;
+            client.status = status;
+            client.nextAudit = nextAudit;
+
+            saveData();
+            closeModal();
+            renderClientsEnhanced();
+            showNotification('Client updated successfully');
+        }
+    };
+}
+
 window.renderClientsEnhanced = renderClientsEnhanced;
 window.renderClientDetail = renderClientDetail;
 window.openAddClientModal = openAddClientModal;
+window.openEditClientModal = openEditClientModal;

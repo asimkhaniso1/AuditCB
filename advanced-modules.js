@@ -82,6 +82,15 @@ function renderAuditorsEnhanced() {
             }
         });
     });
+
+    // Add event listeners for edit buttons
+    document.querySelectorAll('.edit-auditor').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const auditorId = parseInt(btn.getAttribute('data-auditor-id'));
+            openEditAuditorModal(auditorId);
+        });
+    });
 }
 
 function renderAuditorDetail(auditorId) {
@@ -578,6 +587,64 @@ function openAddAuditorModal() {
     };
 }
 
+function openEditAuditorModal(auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Edit Auditor';
+    modalBody.innerHTML = `
+        <form id="auditor-form">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" class="form-control" id="auditor-name" value="${auditor.name}" required>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select class="form-control" id="auditor-role">
+                    <option ${auditor.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
+                    <option ${auditor.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                    <option ${auditor.role === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Qualified Standards (Hold Ctrl/Cmd to select multiple)</label>
+                <select class="form-control" id="auditor-standards" multiple style="height: 100px;">
+                    <option ${auditor.standards.includes('ISO 9001') ? 'selected' : ''}>ISO 9001</option>
+                    <option ${auditor.standards.includes('ISO 14001') ? 'selected' : ''}>ISO 14001</option>
+                    <option ${auditor.standards.includes('ISO 27001') ? 'selected' : ''}>ISO 27001</option>
+                    <option ${auditor.standards.includes('ISO 45001') ? 'selected' : ''}>ISO 45001</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('auditor-name').value;
+        const role = document.getElementById('auditor-role').value;
+        const standardsSelect = document.getElementById('auditor-standards');
+        const standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
+
+        if (name && standards.length > 0) {
+            auditor.name = name;
+            auditor.role = role;
+            auditor.standards = standards;
+
+            saveData();
+            closeModal();
+            renderAuditorsEnhanced();
+            showNotification('Auditor updated successfully');
+        } else {
+            showNotification('Please fill in all required fields', 'error');
+        }
+    };
+}
+
 // Export functions to global scope
 window.renderAuditorsEnhanced = renderAuditorsEnhanced;
 window.renderAuditorDetail = renderAuditorDetail;
@@ -585,3 +652,4 @@ window.renderCompetenceMatrix = renderCompetenceMatrix;
 window.calculateManDays = calculateManDays;
 window.renderManDayCalculator = renderManDayCalculator;
 window.openAddAuditorModal = openAddAuditorModal;
+window.openEditAuditorModal = openEditAuditorModal;
