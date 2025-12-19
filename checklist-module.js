@@ -1,7 +1,7 @@
 // Checklist Library Module
 // Manages audit checklists organized by ISO standard with Global/Custom types
 
-const contentArea = document.getElementById('content-area');
+// DOM Elements retrieved locally to avoid collision with script.js
 
 // State for filtering
 let checklistFilterStandard = 'all';
@@ -9,6 +9,7 @@ let checklistFilterType = 'all';
 let checklistSearchTerm = '';
 
 function renderChecklistLibrary() {
+    const contentArea = document.getElementById('content-area');
     const isAdmin = state.settings?.isAdmin || false;
     const checklists = state.checklists || [];
 
@@ -499,6 +500,7 @@ function openEditChecklistModal(id) {
 }
 
 function viewChecklistDetail(id) {
+    const contentArea = document.getElementById('content-area');
     const checklist = state.checklists?.find(c => c.id === id);
     if (!checklist) return;
 
