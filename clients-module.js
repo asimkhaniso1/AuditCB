@@ -553,33 +553,104 @@ function openEditClientModal(clientId) {
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
 
+    const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
+    const contacts = client.contacts || [];
+    const sites = client.sites || [];
+
     modalTitle.textContent = 'Edit Client';
     modalBody.innerHTML = `
-        <form id="client-form">
-            <div class="form-group">
-                <label>Company Name</label>
-                <input type="text" class="form-control" id="client-name" value="${client.name}" required>
-            </div>
-            <div class="form-group">
-                <label>Standard</label>
-                <select class="form-control" id="client-standard">
-                    <option ${client.standard === 'ISO 9001:2015' ? 'selected' : ''}>ISO 9001:2015</option>
-                    <option ${client.standard === 'ISO 14001:2015' ? 'selected' : ''}>ISO 14001:2015</option>
-                    <option ${client.standard === 'ISO 45001:2018' ? 'selected' : ''}>ISO 45001:2018</option>
-                    <option ${client.standard === 'ISO 27001:2022' ? 'selected' : ''}>ISO 27001:2022</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <select class="form-control" id="client-status">
-                    <option ${client.status === 'Active' ? 'selected' : ''}>Active</option>
-                    <option ${client.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
-                    <option ${client.status === 'Withdrawn' ? 'selected' : ''}>Withdrawn</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Next Audit Date</label>
-                <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit}" required>
+        <form id="client-form" style="max-height: 70vh; overflow-y: auto;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <!-- Basic Info -->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Information</div>
+                
+                <div class="form-group">
+                    <label>Company Name <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" class="form-control" id="client-name" value="${client.name}" required>
+                </div>
+                <div class="form-group">
+                    <label>Industry</label>
+                    <select class="form-control" id="client-industry">
+                        <option value="">-- Select Industry --</option>
+                        ${industries.map(ind => `<option ${client.industry === ind ? 'selected' : ''}>${ind}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Standard</label>
+                    <select class="form-control" id="client-standard">
+                        <option ${client.standard === 'ISO 9001:2015' ? 'selected' : ''}>ISO 9001:2015</option>
+                        <option ${client.standard === 'ISO 14001:2015' ? 'selected' : ''}>ISO 14001:2015</option>
+                        <option ${client.standard === 'ISO 45001:2018' ? 'selected' : ''}>ISO 45001:2018</option>
+                        <option ${client.standard === 'ISO 27001:2022' ? 'selected' : ''}>ISO 27001:2022</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select class="form-control" id="client-status">
+                        <option ${client.status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option ${client.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                        <option ${client.status === 'Withdrawn' ? 'selected' : ''}>Withdrawn</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Website</label>
+                    <input type="url" class="form-control" id="client-website" value="${client.website || ''}" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>Next Audit Date</label>
+                    <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit || ''}">
+                </div>
+
+                <!-- Operational -->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Operational Details</div>
+                
+                <div class="form-group">
+                    <label>Number of Employees</label>
+                    <input type="number" class="form-control" id="client-employees" value="${client.employees || 0}" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Shift Work</label>
+                    <select class="form-control" id="client-shifts">
+                        <option ${client.shifts === 'No' ? 'selected' : ''}>No</option>
+                        <option ${client.shifts === 'Yes' ? 'selected' : ''}>Yes</option>
+                    </select>
+                </div>
+
+                <!-- Contacts & Sites Summary -->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Contacts & Sites</div>
+                
+                <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <strong><i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Contacts</strong>
+                            <span style="background: var(--primary-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">${contacts.length}</span>
+                        </div>
+                        ${contacts.length > 0 ? `
+                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary);">
+                                ${contacts.slice(0, 3).map(c => `<li>${c.name} (${c.designation || 'N/A'})</li>`).join('')}
+                                ${contacts.length > 3 ? `<li>...and ${contacts.length - 3} more</li>` : ''}
+                            </ul>
+                        ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No contacts added</p>'}
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
+                            <i class="fa-solid fa-info-circle"></i> Manage contacts from client detail page
+                        </p>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <strong><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem;"></i>Sites</strong>
+                            <span style="background: #059669; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">${sites.length}</span>
+                        </div>
+                        ${sites.length > 0 ? `
+                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary);">
+                                ${sites.slice(0, 3).map(s => `<li>${s.name} - ${s.city || 'N/A'}</li>`).join('')}
+                                ${sites.length > 3 ? `<li>...and ${sites.length - 3} more</li>` : ''}
+                            </ul>
+                        ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No sites added</p>'}
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
+                            <i class="fa-solid fa-info-circle"></i> Manage sites from client detail page
+                        </p>
+                    </div>
+                </div>
             </div>
         </form>
     `;
@@ -592,15 +663,19 @@ function openEditClientModal(clientId) {
         const status = document.getElementById('client-status').value;
         const nextAudit = document.getElementById('client-next-audit').value;
 
-        if (name && nextAudit) {
+        if (name) {
             client.name = name;
             client.standard = standard;
             client.status = status;
             client.nextAudit = nextAudit;
+            client.industry = document.getElementById('client-industry').value;
+            client.website = document.getElementById('client-website').value;
+            client.employees = parseInt(document.getElementById('client-employees').value) || 0;
+            client.shifts = document.getElementById('client-shifts').value;
 
             window.saveData();
             window.closeModal();
-            renderClientsEnhanced();
+            renderClientDetail(clientId);
             window.showNotification('Client updated successfully');
         }
     };

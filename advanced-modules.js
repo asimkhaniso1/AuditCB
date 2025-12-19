@@ -109,14 +109,45 @@ function renderAuditorDetail(auditorId) {
             </div>
             
             <div class="card" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2 style="margin-bottom: 0.5rem;">${auditor.name}</h2>
-                        <p style="color: var(--text-secondary);">${auditor.role}</p>
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 1.5rem;">
+                    <div style="display: flex; gap: 1.5rem; align-items: center;">
+                        <!-- Profile Photo -->
+                        <div style="flex-shrink: 0;">
+                            ${auditor.pictureUrl ? `
+                                <img src="${auditor.pictureUrl}" alt="${auditor.name}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-color);">
+                            ` : `
+                                <div style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: white; font-weight: 600;">
+                                    ${auditor.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                </div>
+                            `}
+                        </div>
+                        <!-- Info -->
+                        <div>
+                            <h2 style="margin-bottom: 0.25rem;">${auditor.name}</h2>
+                            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${auditor.role}</p>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                                ${auditor.standards ? auditor.standards.map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('') : ''}
+                            </div>
+                            <div style="display: flex; gap: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+                                ${auditor.email ? `<span><i class="fa-solid fa-envelope" style="margin-right: 0.25rem;"></i>${auditor.email}</span>` : ''}
+                                ${auditor.phone ? `<span><i class="fa-solid fa-phone" style="margin-right: 0.25rem;"></i>${auditor.phone}</span>` : ''}
+                                ${auditor.location ? `<span><i class="fa-solid fa-location-dot" style="margin-right: 0.25rem;"></i>${auditor.location}</span>` : ''}
+                            </div>
+                        </div>
                     </div>
-                    <button class="btn btn-primary edit-auditor" data-auditor-id="${auditor.id}">
-                        <i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Auditor
-                    </button>
+                    <div style="text-align: right;">
+                        <button class="btn btn-primary edit-auditor" data-auditor-id="${auditor.id}" style="margin-bottom: 0.5rem;">
+                            <i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Auditor
+                        </button>
+                        ${auditor.customerRating ? `
+                            <div style="margin-top: 0.5rem;">
+                                <span style="color: #fbbf24; font-size: 1.1rem;">
+                                    ${'★'.repeat(auditor.customerRating)}${'☆'.repeat(5 - auditor.customerRating)}
+                                </span>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">${auditor.customerRating}/5 Rating</span>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
 
@@ -1174,29 +1205,102 @@ function openEditAuditorModal(auditorId) {
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
 
+    const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
+    const auditorIndustries = auditor.industries || [];
+
     modalTitle.textContent = 'Edit Auditor';
     modalBody.innerHTML = `
-        <form id="auditor-form">
-            <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" class="form-control" id="auditor-name" value="${auditor.name}" required>
-            </div>
-            <div class="form-group">
-                <label>Role</label>
-                <select class="form-control" id="auditor-role">
-                    <option ${auditor.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
-                    <option ${auditor.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-                    <option ${auditor.role === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Qualified Standards (Hold Ctrl/Cmd to select multiple)</label>
-                <select class="form-control" id="auditor-standards" multiple style="height: 100px;">
-                    <option ${auditor.standards.includes('ISO 9001') ? 'selected' : ''}>ISO 9001</option>
-                    <option ${auditor.standards.includes('ISO 14001') ? 'selected' : ''}>ISO 14001</option>
-                    <option ${auditor.standards.includes('ISO 27001') ? 'selected' : ''}>ISO 27001</option>
-                    <option ${auditor.standards.includes('ISO 45001') ? 'selected' : ''}>ISO 45001</option>
-                </select>
+        <form id="auditor-form" style="max-height: 70vh; overflow-y: auto;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <!-- Basic Info -->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
+                
+                <div class="form-group">
+                    <label>Full Name <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" class="form-control" id="auditor-name" value="${auditor.name}" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select class="form-control" id="auditor-role">
+                        <option ${auditor.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
+                        <option ${auditor.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                        <option ${auditor.role === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-control" id="auditor-email" value="${auditor.email || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" class="form-control" id="auditor-phone" value="${auditor.phone || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" class="form-control" id="auditor-location" value="${auditor.location || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Profile Picture URL</label>
+                    <input type="url" class="form-control" id="auditor-picture" value="${auditor.pictureUrl || ''}" placeholder="https://...">
+                </div>
+
+                <!-- Qualifications -->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Qualifications & Experience</div>
+                
+                <div class="form-group">
+                    <label>Qualified Standards <span style="color: var(--danger-color);">*</span></label>
+                    <select class="form-control" id="auditor-standards" multiple style="height: 80px;">
+                        <option ${(auditor.standards || []).includes('ISO 9001') ? 'selected' : ''}>ISO 9001</option>
+                        <option ${(auditor.standards || []).includes('ISO 14001') ? 'selected' : ''}>ISO 14001</option>
+                        <option ${(auditor.standards || []).includes('ISO 27001') ? 'selected' : ''}>ISO 27001</option>
+                        <option ${(auditor.standards || []).includes('ISO 45001') ? 'selected' : ''}>ISO 45001</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Industries</label>
+                    <select class="form-control" id="auditor-industries" multiple style="height: 80px;">
+                        ${industries.map(ind => `<option ${auditorIndustries.includes(ind) ? 'selected' : ''}>${ind}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Experience (Years)</label>
+                    <input type="number" class="form-control" id="auditor-experience" value="${auditor.experience || 0}" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Man-Day Rate ($)</label>
+                    <input type="number" class="form-control" id="auditor-rate" value="${auditor.manDayRate || 0}" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Customer Rating (1-5)</label>
+                    <input type="number" class="form-control" id="auditor-rating" value="${auditor.customerRating || 0}" min="1" max="5">
+                </div>
+                <div class="form-group">
+                    <label>Date Joined</label>
+                    <input type="date" class="form-control" id="auditor-date-joined" value="${auditor.dateJoined || ''}">
+                </div>
+
+                <!-- Travel -->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Travel & Availability</div>
+                
+                <div class="form-group">
+                    <label>Has Valid Passport</label>
+                    <select class="form-control" id="auditor-passport">
+                        <option value="true" ${auditor.hasPassport ? 'selected' : ''}>Yes</option>
+                        <option value="false" ${!auditor.hasPassport ? 'selected' : ''}>No</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Willingness to Travel</label>
+                    <select class="form-control" id="auditor-travel">
+                        <option value="local" ${auditor.willingToTravel === 'local' ? 'selected' : ''}>Local Only</option>
+                        <option value="regional" ${auditor.willingToTravel === 'regional' ? 'selected' : ''}>Regional</option>
+                        <option value="international" ${auditor.willingToTravel === 'international' ? 'selected' : ''}>International</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Languages (comma-separated)</label>
+                    <input type="text" class="form-control" id="auditor-languages" value="${(auditor.languages || []).join(', ')}" placeholder="English, Spanish, French">
+                </div>
             </div>
         </form>
     `;
@@ -1208,15 +1312,29 @@ function openEditAuditorModal(auditorId) {
         const role = document.getElementById('auditor-role').value;
         const standardsSelect = document.getElementById('auditor-standards');
         const standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
+        const industriesSelect = document.getElementById('auditor-industries');
+        const selectedIndustries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
 
         if (name && standards.length > 0) {
             auditor.name = name;
             auditor.role = role;
             auditor.standards = standards;
+            auditor.industries = selectedIndustries;
+            auditor.email = document.getElementById('auditor-email').value;
+            auditor.phone = document.getElementById('auditor-phone').value;
+            auditor.location = document.getElementById('auditor-location').value;
+            auditor.pictureUrl = document.getElementById('auditor-picture').value;
+            auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
+            auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
+            auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
+            auditor.dateJoined = document.getElementById('auditor-date-joined').value;
+            auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
+            auditor.willingToTravel = document.getElementById('auditor-travel').value;
+            auditor.languages = document.getElementById('auditor-languages').value.split(',').map(l => l.trim()).filter(l => l);
 
             window.saveData();
             window.closeModal();
-            renderAuditorsEnhanced();
+            renderAuditorDetail(auditorId);
             window.showNotification('Auditor updated successfully');
         } else {
             window.showNotification('Please fill in all required fields', 'error');
@@ -1232,3 +1350,4 @@ window.calculateManDays = calculateManDays;
 window.renderManDayCalculator = renderManDayCalculator;
 window.openAddAuditorModal = openAddAuditorModal;
 window.openEditAuditorModal = openEditAuditorModal;
+
