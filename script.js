@@ -81,7 +81,9 @@ const state = {
             willingToTravel: 'international',
             languages: ['English', 'Spanish'],
             pictureUrl: 'https://randomuser.me/api/portraits/men/1.jpg',
-            customerRating: 5
+            customerRating: 5,
+            dateJoined: '2018-03-15',
+            softSkills: { communication: 'excellent', reportWriting: 'excellent', analyticalSkills: 'excellent', attentionToDetail: 'good', interviewingSkills: 'excellent', timeManagement: 'good' }
         },
         {
             id: 2,
@@ -104,7 +106,9 @@ const state = {
             willingToTravel: 'regional',
             languages: ['English', 'French'],
             pictureUrl: 'https://randomuser.me/api/portraits/women/2.jpg',
-            customerRating: 4
+            customerRating: 4,
+            dateJoined: '2020-07-01',
+            softSkills: { communication: 'good', reportWriting: 'excellent', analyticalSkills: 'excellent', attentionToDetail: 'excellent', interviewingSkills: 'good', timeManagement: 'excellent' }
         },
         {
             id: 3,
@@ -125,7 +129,9 @@ const state = {
             willingToTravel: 'international',
             languages: ['English', 'Mandarin', 'Cantonese'],
             pictureUrl: 'https://randomuser.me/api/portraits/men/3.jpg',
-            customerRating: 4
+            customerRating: 4,
+            dateJoined: '2019-11-20',
+            softSkills: { communication: 'good', reportWriting: 'good', analyticalSkills: 'excellent', attentionToDetail: 'excellent', interviewingSkills: 'average', timeManagement: 'good' }
         }
     ],
     auditPrograms: [],

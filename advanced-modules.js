@@ -584,7 +584,37 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                                         </div>
                                     </div>
                                     ` : ''}
+                                    
+                                    ${auditor.dateJoined ? `
+                                    <div style="margin-top: 1rem;">
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-calendar-check" style="margin-right: 0.5rem;"></i>Date Joined</p>
+                                        <span style="font-size: 0.85rem;">${new Date(auditor.dateJoined).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                    </div>
+                                    ` : ''}
                                 </div>
+                                
+                                <!-- Soft Skills -->
+                                ${auditor.softSkills ? `
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;"><i class="fa-solid fa-user-check" style="margin-right: 0.5rem;"></i>Soft Skills Assessment</p>
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                        ${Object.entries(auditor.softSkills).map(([skill, level]) => {
+                const skillName = skill.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                const levelColors = {
+                    'excellent': { bg: '#d1fae5', color: '#065f46' },
+                    'good': { bg: '#dbeafe', color: '#1e40af' },
+                    'average': { bg: '#fef3c7', color: '#92400e' },
+                    'needs-improvement': { bg: '#fee2e2', color: '#991b1b' }
+                };
+                const colors = levelColors[level] || { bg: '#f1f5f9', color: '#475569' };
+                return `<div style="background: ${colors.bg}; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                                                <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 0.25rem;">${skillName}</div>
+                                                <div style="font-size: 0.75rem; color: ${colors.color}; font-weight: 500;">${level.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                                            </div>`;
+            }).join('')}
+                                    </div>
+                                </div>
+                                ` : ''}
                             </div>
                         `).join('')}
                     </div>
@@ -889,6 +919,67 @@ function openAddAuditorModal() {
                 <label>Experience (Years)</label>
                 <input type="number" class="form-control" id="auditor-experience" min="0" placeholder="e.g. 10">
             </div>
+            <div class="form-group">
+                <label>Date Joined</label>
+                <input type="date" class="form-control" id="auditor-joined">
+            </div>
+
+            <!-- Soft Skills -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Soft Skills & Competencies</div>
+            <div class="form-group">
+                <label>Communication</label>
+                <select class="form-control" id="auditor-communication">
+                    <option value="excellent">Excellent</option>
+                    <option value="good" selected>Good</option>
+                    <option value="average">Average</option>
+                    <option value="needs-improvement">Needs Improvement</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Report Writing</label>
+                <select class="form-control" id="auditor-writing">
+                    <option value="excellent">Excellent</option>
+                    <option value="good" selected>Good</option>
+                    <option value="average">Average</option>
+                    <option value="needs-improvement">Needs Improvement</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Analytical Skills</label>
+                <select class="form-control" id="auditor-analytical">
+                    <option value="excellent">Excellent</option>
+                    <option value="good" selected>Good</option>
+                    <option value="average">Average</option>
+                    <option value="needs-improvement">Needs Improvement</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Attention to Detail</label>
+                <select class="form-control" id="auditor-attention">
+                    <option value="excellent">Excellent</option>
+                    <option value="good" selected>Good</option>
+                    <option value="average">Average</option>
+                    <option value="needs-improvement">Needs Improvement</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Interviewing Skills</label>
+                <select class="form-control" id="auditor-interviewing">
+                    <option value="excellent">Excellent</option>
+                    <option value="good" selected>Good</option>
+                    <option value="average">Average</option>
+                    <option value="needs-improvement">Needs Improvement</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Time Management</label>
+                <select class="form-control" id="auditor-time-management">
+                    <option value="excellent">Excellent</option>
+                    <option value="good" selected>Good</option>
+                    <option value="average">Average</option>
+                    <option value="needs-improvement">Needs Improvement</option>
+                </select>
+            </div>
 
             <!-- Contact Info -->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Contact Information</div>
@@ -1038,6 +1129,19 @@ function openAddAuditorModal() {
         const pictureUrl = document.getElementById('auditor-picture').value;
         const customerRating = parseInt(document.getElementById('auditor-rating').value) || null;
 
+        // Joining date
+        const dateJoined = document.getElementById('auditor-joined').value;
+
+        // Soft Skills
+        const softSkills = {
+            communication: document.getElementById('auditor-communication').value,
+            reportWriting: document.getElementById('auditor-writing').value,
+            analyticalSkills: document.getElementById('auditor-analytical').value,
+            attentionToDetail: document.getElementById('auditor-attention').value,
+            interviewingSkills: document.getElementById('auditor-interviewing').value,
+            timeManagement: document.getElementById('auditor-time-management').value
+        };
+
         if (name && standards.length > 0) {
             const newAuditor = {
                 id: Date.now(),
@@ -1046,6 +1150,7 @@ function openAddAuditorModal() {
                 manDayRate, domainExpertise, industries,
                 education: { degree, fieldOfStudy, specialization },
                 hasPassport, willingToTravel, languages, pictureUrl, customerRating,
+                dateJoined, softSkills,
                 auditHistory: []
             };
 
