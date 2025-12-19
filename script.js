@@ -146,9 +146,84 @@ const state = {
         { client: 'Global Manufacturing', standard: 'ISO 14001:2015', date: '2024-02-10', decision: 'Granted' }
     ],
     documents: [],
+    checklists: [
+        {
+            id: 1,
+            name: 'ISO 9001 Core Requirements Checklist',
+            standard: 'ISO 9001:2015',
+            type: 'global',
+            createdBy: 'System Admin',
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-15',
+            items: [
+                { clause: '4.1', requirement: 'Understanding the organization and its context' },
+                { clause: '4.2', requirement: 'Understanding the needs and expectations of interested parties' },
+                { clause: '4.3', requirement: 'Determining the scope of the QMS' },
+                { clause: '4.4', requirement: 'Quality management system and its processes' },
+                { clause: '5.1', requirement: 'Leadership and commitment' },
+                { clause: '5.2', requirement: 'Quality Policy' },
+                { clause: '5.3', requirement: 'Organizational roles, responsibilities and authorities' },
+                { clause: '6.1', requirement: 'Actions to address risks and opportunities' },
+                { clause: '6.2', requirement: 'Quality objectives and planning to achieve them' },
+                { clause: '7.1', requirement: 'Resources' },
+                { clause: '7.2', requirement: 'Competence' },
+                { clause: '7.5', requirement: 'Documented information' },
+                { clause: '8.1', requirement: 'Operational planning and control' },
+                { clause: '9.1', requirement: 'Monitoring, measurement, analysis and evaluation' },
+                { clause: '9.2', requirement: 'Internal audit' },
+                { clause: '9.3', requirement: 'Management review' },
+                { clause: '10.1', requirement: 'Improvement - General' },
+                { clause: '10.2', requirement: 'Nonconformity and corrective action' }
+            ]
+        },
+        {
+            id: 2,
+            name: 'ISO 14001 Environmental Management Checklist',
+            standard: 'ISO 14001:2015',
+            type: 'global',
+            createdBy: 'System Admin',
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-10',
+            items: [
+                { clause: '4.1', requirement: 'Understanding the organization and its context' },
+                { clause: '4.2', requirement: 'Understanding the needs and expectations of interested parties' },
+                { clause: '4.3', requirement: 'Determining the scope of the EMS' },
+                { clause: '6.1.2', requirement: 'Environmental aspects' },
+                { clause: '6.1.3', requirement: 'Compliance obligations' },
+                { clause: '6.2', requirement: 'Environmental objectives and planning' },
+                { clause: '7.4', requirement: 'Communication' },
+                { clause: '8.1', requirement: 'Operational planning and control' },
+                { clause: '8.2', requirement: 'Emergency preparedness and response' },
+                { clause: '9.1.2', requirement: 'Evaluation of compliance' }
+            ]
+        },
+        {
+            id: 3,
+            name: 'ISO 27001 Information Security Checklist',
+            standard: 'ISO 27001:2022',
+            type: 'global',
+            createdBy: 'System Admin',
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-20',
+            items: [
+                { clause: '4.1', requirement: 'Understanding the organization and its context' },
+                { clause: '4.2', requirement: 'Understanding the needs and expectations of interested parties' },
+                { clause: '5.1', requirement: 'Leadership and commitment' },
+                { clause: '5.2', requirement: 'Information Security Policy' },
+                { clause: '6.1.2', requirement: 'Information security risk assessment' },
+                { clause: '6.1.3', requirement: 'Information security risk treatment' },
+                { clause: '6.2', requirement: 'Information security objectives' },
+                { clause: 'A.5', requirement: 'Organizational controls' },
+                { clause: 'A.6', requirement: 'People controls' },
+                { clause: 'A.7', requirement: 'Physical controls' },
+                { clause: 'A.8', requirement: 'Technological controls' }
+            ]
+        }
+    ],
     settings: {
         standards: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'],
-        roles: ['Lead Auditor', 'Auditor', 'Technical Expert']
+        roles: ['Lead Auditor', 'Auditor', 'Technical Expert'],
+        isAdmin: true  // Toggle for admin privileges (simulated)
     }
 };
 
@@ -287,6 +362,7 @@ async function renderModule(moduleName) {
         'auditors': 'Auditor Management',
         'audit-programs': 'Audit Programs',
         'audit-planning': 'Audit Planning',
+        'checklists': 'Checklist Library',
         'manday-calculator': 'Man-Day Calculator',
         'audit-execution': 'Execution & Reports',
         'certification': 'Certification Decisions',
@@ -305,6 +381,7 @@ async function renderModule(moduleName) {
             'auditors': ['advanced-modules.js', 'export-module.js'],
             'audit-programs': ['programs-module.js', 'export-module.js'],
             'audit-planning': ['advanced-modules.js', 'planning-module.js'],
+            'checklists': ['checklist-module.js'],
             'audit-execution': ['execution-module.js'],
             'manday-calculator': ['advanced-modules.js'],
             'documents': ['documents-module.js'],
@@ -375,6 +452,13 @@ async function renderModule(moduleName) {
             case 'documents':
                 if (typeof renderDocumentsEnhanced === 'function') {
                     renderDocumentsEnhanced();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
+            case 'checklists':
+                if (typeof renderChecklistLibrary === 'function') {
+                    renderChecklistLibrary();
                 } else {
                     renderPlaceholder(moduleName);
                 }

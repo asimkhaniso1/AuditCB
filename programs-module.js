@@ -270,12 +270,13 @@ function openAddProgramModal() {
         <form id="program-form">
             <div class="form-group">
                 <label>Client</label>
-                <select class="form-control" id="program-client" required>
+                <select class="form-control" id="program-client" required onchange="updateProgramClientDetails(this.value)">
                     <option value="">-- Select Client --</option>
-                    ${state.clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                    ${state.clients.map(c => `<option value="${c.name}">${c.name} (${c.industry || 'N/A'})</option>`).join('')}
                 </select>
                 ${state.clients.length === 0 ? '<small style="color: var(--danger-color);">No clients available. Please add a client first.</small>' : ''}
             </div>
+            <div id="program-client-info" style="display: none; background: #f0f9ff; padding: 0.75rem; border-radius: var(--radius-md); margin-bottom: 1rem; font-size: 0.85rem;"></div>
             <div class="form-group">
                 <label>Standard</label>
                 <select class="form-control" id="program-standard">
@@ -400,9 +401,38 @@ function openEditProgramModal(programId) {
     };
 }
 
+// Helper function to auto-fill program details from client
+function updateProgramClientDetails(clientName) {
+    const client = state.clients.find(c => c.name === clientName);
+    if (client) {
+        // Auto-select standard from client
+        if (client.standard) {
+            const stdSelect = document.getElementById('program-standard');
+            if (stdSelect) stdSelect.value = client.standard;
+        }
+
+        // Show client info
+        const infoPanel = document.getElementById('program-client-info');
+        if (infoPanel) {
+            const sitesCount = (client.sites && client.sites.length) || 1;
+            const primaryContact = (client.contacts && client.contacts[0]) || {};
+            infoPanel.innerHTML = `
+                <strong>${client.name}</strong><br>
+                Industry: ${client.industry || '-'} | 
+                Employees: ${client.employees || 0} | 
+                Sites: ${sitesCount} | 
+                Contact: ${primaryContact.name || '-'}
+            `;
+            infoPanel.style.display = 'block';
+        }
+    }
+}
+
 // Export functions
 window.renderAuditProgramsEnhanced = renderAuditProgramsEnhanced;
 window.renderTimelineVisualization = renderTimelineVisualization;
 window.renderProgramDetail = renderProgramDetail;
 window.openAddProgramModal = openAddProgramModal;
 window.openEditProgramModal = openEditProgramModal;
+window.updateProgramClientDetails = updateProgramClientDetails;
+
