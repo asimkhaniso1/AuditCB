@@ -437,41 +437,27 @@ const modalFunctionCache = {};
 
 async function lazyLoadModal(modulePath, functionName) {
     // Load the module if not already loaded
-    await loadScript(modulePath);
+    try {
+        await loadScript(modulePath);
 
-    // The module exports the actual function to window
-    // Call it directly
-    if (typeof window[functionName] === 'function') {
-        window[functionName]();
-    } else {
+        // Retry finding the function for up to 1 second
+        let retries = 10;
+        while (retries > 0) {
+            if (typeof window[functionName] === 'function') {
+                window[functionName]();
+                return;
+            }
+            await new Promise(r => setTimeout(r, 100)); // Wait 100ms
+            retries--;
+        }
+
         console.error(`Function ${functionName} not found after loading ${modulePath}`);
+        showNotification(`Error loading ${functionName}. Please refresh the page.`, 'error');
+    } catch (error) {
+        console.error(`Error loading module ${modulePath}:`, error);
+        showNotification(`Failed to load module: ${error.message}`, 'error');
     }
 }
-
-// Create wrapper functions for each modal
-window.openAddClientModal = async function () {
-    await lazyLoadModal('clients-module.js', 'openAddClientModal');
-};
-
-window.openAddAuditorModal = async function () {
-    await lazyLoadModal('advanced-modules.js', 'openAddAuditorModal');
-};
-
-window.openAddProgramModal = async function () {
-    await lazyLoadModal('programs-module.js', 'openAddProgramModal');
-};
-
-window.openCreatePlanModal = async function () {
-    await lazyLoadModal('planning-module.js', 'openCreatePlanModal');
-};
-
-window.openUploadModal = async function () {
-    await lazyLoadModal('documents-module.js', 'openUploadModal');
-};
-
-window.openAddUserModal = async function () {
-    await lazyLoadModal('settings-module.js', 'openAddUserModal');
-};
 
 // Initial Render
 renderModule('dashboard');
