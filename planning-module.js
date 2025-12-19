@@ -13,14 +13,14 @@ function renderAuditPlanningEnhanced() {
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
-                <div style="font-weight: 500;">${plan.client}</div>
+                <a href="#" onclick="window.viewAuditPlan(${plan.id}); return false;" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${plan.standard || 'ISO 9001:2015'}</div>
             </td>
             <td>${plan.type || 'Surveillance'}</td>
             <td>${plan.date}</td>
             <td>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    ${plan.team.map(auditor => `
+                    ${(plan.team || (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(auditor => `
                         <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
                             <i class="fa-solid fa-user" style="font-size: 0.7rem; color: var(--text-secondary); margin-right: 4px;"></i>${auditor}
                         </span>
