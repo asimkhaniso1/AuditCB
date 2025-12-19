@@ -561,7 +561,7 @@ function openAddAuditorModal() {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const name = document.getElementById('auditor-name').value;
@@ -578,12 +578,12 @@ function openAddAuditorModal() {
             };
 
             state.auditors.push(newAuditor);
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderAuditorsEnhanced();
-            showNotification('Auditor added successfully');
+            window.showNotification('Auditor added successfully');
         } else {
-            showNotification('Please fill in all required fields', 'error');
+            window.showNotification('Please fill in all required fields', 'error');
         }
     };
 }
@@ -623,7 +623,7 @@ function openEditAuditorModal(auditorId) {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const name = document.getElementById('auditor-name').value;
@@ -636,12 +636,12 @@ function openEditAuditorModal(auditorId) {
             auditor.role = role;
             auditor.standards = standards;
 
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderAuditorsEnhanced();
-            showNotification('Auditor updated successfully');
+            window.showNotification('Auditor updated successfully');
         } else {
-            showNotification('Please fill in all required fields', 'error');
+            window.showNotification('Please fill in all required fields', 'error');
         }
     };
 }

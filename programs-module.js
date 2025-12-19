@@ -294,7 +294,7 @@ function openAddProgramModal() {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const client = document.getElementById('program-client').value;
@@ -303,7 +303,7 @@ function openAddProgramModal() {
         const end = document.getElementById('program-end').value;
 
         if (!client) {
-            showNotification('Please select a client', 'error');
+            window.showNotification('Please select a client', 'error');
             return;
         }
 
@@ -318,12 +318,12 @@ function openAddProgramModal() {
             };
 
             state.auditPrograms.push(newProgram);
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderAuditProgramsEnhanced();
-            showNotification('Audit Program created successfully');
+            window.showNotification('Audit Program created successfully');
         } else {
-            showNotification('Please fill in all required fields', 'error');
+            window.showNotification('Please fill in all required fields', 'error');
         }
     };
 }
@@ -374,7 +374,7 @@ function openEditProgramModal(programId) {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const standard = document.getElementById('program-standard').value;
@@ -388,12 +388,12 @@ function openEditProgramModal(programId) {
             program.cycleStart = start;
             program.cycleEnd = end;
 
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderAuditProgramsEnhanced();
-            showNotification('Audit Program updated successfully');
+            window.showNotification('Audit Program updated successfully');
         } else {
-            showNotification('Please fill in all required fields', 'error');
+            window.showNotification('Please fill in all required fields', 'error');
         }
     };
 }

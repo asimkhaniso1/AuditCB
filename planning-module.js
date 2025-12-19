@@ -180,7 +180,7 @@ function openCreatePlanModal() {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         saveAuditPlan();
@@ -231,10 +231,10 @@ function editAuditPlan(id) {
                 plan.standard = updatedStandard;
                 plan.team = updatedTeam;
 
-                saveData();
-                closeModal();
+                window.saveData();
+                window.closeModal();
                 renderAuditPlanningEnhanced();
-                showNotification('Audit Plan updated successfully');
+                window.showNotification('Audit Plan updated successfully');
             }
         };
     }, 50);
@@ -266,7 +266,7 @@ function autoCalculateDays() {
         document.getElementById('plan-mandays').value = days;
         document.getElementById('plan-onsite-days').value = Math.max(1, days * 0.8).toFixed(1); // Assume 80% onsite
 
-        showNotification(`Calculated ${days} man-days based on ${employees} employees.`, 'success');
+        window.showNotification(`Calculated ${days} man-days based on ${employees} employees.`, 'success');
     }
 }
 
@@ -294,17 +294,17 @@ function saveAuditPlan() {
         };
 
         state.auditPlans.push(newPlan);
-        saveData();
-        closeModal();
+        window.saveData();
+        window.closeModal();
         renderAuditPlanningEnhanced();
-        showNotification('Audit Plan created successfully');
+        window.showNotification('Audit Plan created successfully');
     } else {
-        showNotification('Please fill in all required fields (Client, Date, Lead Auditor)', 'error');
+        window.showNotification('Please fill in all required fields (Client, Date, Lead Auditor)', 'error');
     }
 }
 
 function viewAuditPlan(id) {
-    showNotification('View details functionality coming soon.', 'info');
+    window.showNotification('View details functionality coming soon.', 'info');
 }
 
 // Export functions

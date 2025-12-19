@@ -106,7 +106,7 @@ function openCreateReportModal() {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const planId = document.getElementById('report-plan').value;
@@ -125,12 +125,12 @@ function openCreateReportModal() {
 
             if (!state.auditReports) state.auditReports = [];
             state.auditReports.push(newReport);
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderAuditExecutionEnhanced();
-            showNotification('Audit Report created. Now you can fill the checklist.', 'success');
+            window.showNotification('Audit Report created. Now you can fill the checklist.', 'success');
         } else {
-            showNotification('Please fill in all required fields', 'error');
+            window.showNotification('Please fill in all required fields', 'error');
         }
     };
 }
@@ -165,7 +165,7 @@ function openEditReportModal(reportId) {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const date = document.getElementById('report-date').value;
@@ -175,10 +175,10 @@ function openEditReportModal(reportId) {
             report.date = date;
             report.status = status;
 
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderAuditExecutionEnhanced();
-            showNotification('Report info updated successfully');
+            window.showNotification('Report info updated successfully');
         }
     };
 }

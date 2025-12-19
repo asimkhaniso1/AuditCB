@@ -219,7 +219,7 @@ function openAddClientModal() {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const name = document.getElementById('client-name').value;
@@ -236,10 +236,10 @@ function openAddClientModal() {
             };
 
             state.clients.push(newClient);
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderClientsEnhanced();
-            showNotification('Client added successfully');
+            window.showNotification('Client added successfully');
         }
     };
 }
@@ -283,7 +283,7 @@ function openEditClientModal(clientId) {
         </form>
     `;
 
-    openModal();
+    window.openModal();
 
     modalSave.onclick = () => {
         const name = document.getElementById('client-name').value;
@@ -297,10 +297,10 @@ function openEditClientModal(clientId) {
             client.status = status;
             client.nextAudit = nextAudit;
 
-            saveData();
-            closeModal();
+            window.saveData();
+            window.closeModal();
             renderClientsEnhanced();
-            showNotification('Client updated successfully');
+            window.showNotification('Client updated successfully');
         }
     };
 }
