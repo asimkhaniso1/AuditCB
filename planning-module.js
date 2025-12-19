@@ -428,6 +428,7 @@ function saveAuditPlan() {
 }
 
 function viewAuditPlan(id) {
+    const state = window.state;
     const plan = state.auditPlans.find(p => p.id == id);
     if (!plan) return;
 
