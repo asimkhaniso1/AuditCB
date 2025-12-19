@@ -12,16 +12,17 @@ const state = {
             standard: 'ISO 9001:2015',
             status: 'Active',
             nextAudit: '2024-03-15',
-            contactPerson: 'Alice Whitman',
-            email: 'alice@techsolutions.com',
-            phone: '+1-555-0101',
-            address: '123 Tech Park',
-            city: 'Silicon Valley',
-            country: 'USA',
+            website: 'https://techsolutions.com',
+            contacts: [
+                { name: 'Alice Whitman', designation: 'Quality Manager', phone: '+1-555-0101', email: 'alice@techsolutions.com' },
+                { name: 'David Chen', designation: 'CEO', phone: '+1-555-0110', email: 'david@techsolutions.com' }
+            ],
+            sites: [
+                { name: 'Head Office', address: '123 Tech Park', city: 'Silicon Valley', country: 'USA', geotag: '37.3382, -121.8863' },
+                { name: 'R&D Center', address: '456 Innovation Blvd', city: 'San Francisco', country: 'USA', geotag: '37.7749, -122.4194' }
+            ],
             employees: 150,
-            sites: 2,
             shifts: 'No',
-            geotag: '37.3382, -121.8863',
             industry: 'IT'
         },
         {
@@ -30,16 +31,15 @@ const state = {
             standard: 'ISO 14001:2015',
             status: 'Active',
             nextAudit: '2024-04-20',
-            contactPerson: 'Bob Builder',
-            email: 'bob@globalmfg.com',
-            phone: '+1-555-0102',
-            address: '456 Industrial Way',
-            city: 'Detroit',
-            country: 'USA',
+            website: 'https://globalmfg.com',
+            contacts: [
+                { name: 'Bob Builder', designation: 'Plant Manager', phone: '+1-555-0102', email: 'bob@globalmfg.com' }
+            ],
+            sites: [
+                { name: 'Main Plant', address: '456 Industrial Way', city: 'Detroit', country: 'USA', geotag: '42.3314, -83.0458' }
+            ],
             employees: 500,
-            sites: 1,
             shifts: 'Yes',
-            geotag: '42.3314, -83.0458',
             industry: 'Manufacturing'
         },
         {
@@ -48,16 +48,17 @@ const state = {
             standard: 'ISO 27001:2022',
             status: 'Suspended',
             nextAudit: '2024-05-10',
-            contactPerson: 'Charlie Root',
-            email: 'croot@securedata.com',
-            phone: '+1-555-0103',
-            address: '789 Cyber Lane',
-            city: 'Austin',
-            country: 'USA',
+            website: 'https://securedata.com',
+            contacts: [
+                { name: 'Charlie Root', designation: 'CISO', phone: '+1-555-0103', email: 'croot@securedata.com' },
+                { name: 'Sarah Admin', designation: 'IT Manager', phone: '+1-555-0104', email: 'sadmin@securedata.com' }
+            ],
+            sites: [
+                { name: 'HQ', address: '789 Cyber Lane', city: 'Austin', country: 'USA', geotag: '30.2672, -97.7431' },
+                { name: 'Data Center', address: '101 Server Road', city: 'Dallas', country: 'USA', geotag: '32.7767, -96.7970' }
+            ],
             employees: 50,
-            sites: 1,
             shifts: 'No',
-            geotag: '30.2672, -97.7431',
             industry: 'Financial Services'
         }
     ],

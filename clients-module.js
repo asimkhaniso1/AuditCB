@@ -103,6 +103,12 @@ function renderClientDetail(clientId) {
     const client = state.clients.find(c => c.id === clientId);
     if (!client) return;
 
+    // Calculate performance metrics
+    const totalAudits = state.auditPlans.filter(p => p.client === client.name).length;
+    const completedAudits = state.auditPlans.filter(p => p.client === client.name && p.status === 'Completed').length;
+    const pendingAudits = state.auditPlans.filter(p => p.client === client.name && (p.status === 'Draft' || p.status === 'Confirmed')).length;
+    const certificationStatus = client.status === 'Active' ? 'Certified' : client.status;
+
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
@@ -111,13 +117,37 @@ function renderClientDetail(clientId) {
                 </button>
             </div>
             
+            <!-- Header Card with Client Info -->
             <div class="card" style="margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div>
                         <h2 style="margin-bottom: 0.5rem;">${client.name}</h2>
-                        <p style="color: var(--text-secondary);">${client.standard}</p>
+                        <p style="color: var(--text-secondary);">
+                            ${client.standard}
+                            ${client.industry ? `<span style="margin-left: 1rem; background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-industry" style="margin-right: 4px;"></i>${client.industry}</span>` : ''}
+                        </p>
                     </div>
                     <span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span>
+                </div>
+            </div>
+
+            <!-- Performance Analytics Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <p style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 0.5rem;">Certification</p>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0;">${certificationStatus}</p>
+                </div>
+                <div class="card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <p style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Audits</p>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0;">${totalAudits}</p>
+                </div>
+                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <p style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 0.5rem;">Completed</p>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0;">${completedAudits}</p>
+                </div>
+                <div class="card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <p style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 0.5rem;">Pending</p>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0;">${pendingAudits}</p>
                 </div>
             </div>
 
@@ -154,20 +184,20 @@ function renderClientTab(client, tabName) {
                 a.industries && a.industries.includes(client.industry)
             );
 
-            // Calculate performance metrics (mock data for now)
-            const totalAudits = state.auditPlans.filter(p => p.client === client.name).length;
-            const completedAudits = state.auditPlans.filter(p => p.client === client.name && p.status === 'Completed').length;
-            const ncCount = Math.floor(Math.random() * 5); // Mock NC count
-            const certificationStatus = client.status === 'Active' ? 'Certified' : client.status;
-
             tabContent.innerHTML = `
                 <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Client Details</h3>
+                    <h3 style="margin-bottom: 1rem;">Company Information</h3>
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
                         <!-- Basic Info -->
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Company Name</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.name}</p>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Website</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">
+                                ${client.website ? `<a href="${client.website}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-globe" style="margin-right: 5px;"></i>${client.website}</a>` : '-'}
+                            </p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Standard</label>
@@ -181,46 +211,20 @@ function renderClientTab(client, tabName) {
                                 </span>
                             </p>
                         </div>
-                        
-                        <!-- Contact Info -->
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Contact Person</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.contactPerson || '-'}</p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Contact Details</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">
-                                <i class="fa-solid fa-envelope" style="color: var(--text-secondary); margin-right: 5px;"></i> ${client.email || '-'}<br>
-                                <i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i> ${client.phone || '-'}
-                            </p>
-                        </div>
-
-                        <!-- Address -->
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Address</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.address || '-'}</p>
-                            <p style="font-weight: 500;">${client.city || ''}, ${client.country || ''}</p>
-                        </div>
-                        <div>
-                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Geolocation</label>
-                             <p style="font-weight: 500; margin-top: 0.25rem;">
-                                <i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i> ${client.geotag || 'Not Validated'}
-                             </p>
-                        </div>
 
                         <!-- Operational Data -->
                         <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Operational Details</label>
-                            <div style="display: flex; gap: 1rem; margin-top: 0.25rem;">
-                                <span><i class="fa-solid fa-users" style="color: var(--text-secondary);"></i> <strong>${client.employees || 0}</strong> Employees</span>
-                                <span><i class="fa-solid fa-building" style="color: var(--text-secondary);"></i> <strong>${client.sites || 1}</strong> Site(s)</span>
-                            </div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Employees</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i> ${client.employees || 0}</p>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Sites</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-building" style="color: var(--text-secondary); margin-right: 5px;"></i> ${(client.sites && client.sites.length) || 1}</p>
                         </div>
                         <div>
                              <label style="color: var(--text-secondary); font-size: 0.875rem;">Shift Work</label>
                              <p style="font-weight: 500; margin-top: 0.25rem;">${client.shifts === 'Yes' ? 'Yes (Multiple Shifts)' : 'No (General Shift Only)'}</p>
                         </div>
-
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Next Audit Date</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.nextAudit}</p>
@@ -228,27 +232,78 @@ function renderClientTab(client, tabName) {
                     </div>
                 </div>
 
-                <!-- Performance Analytics -->
+                <!-- Sites / Locations -->
                 <div class="card" style="margin-top: 1.5rem;">
-                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Performance Analytics</h3>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
-                            <p style="font-size: 0.8rem; opacity: 0.9;">Certification Status</p>
-                            <p style="font-size: 1.5rem; font-weight: 700;">${certificationStatus}</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
-                            <p style="font-size: 0.8rem; opacity: 0.9;">Total Audits</p>
-                            <p style="font-size: 1.5rem; font-weight: 700;">${totalAudits}</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
-                            <p style="font-size: 0.8rem; opacity: 0.9;">Completed Audits</p>
-                            <p style="font-size: 1.5rem; font-weight: 700;">${completedAudits}</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
-                            <p style="font-size: 0.8rem; opacity: 0.9;">Open NCs</p>
-                            <p style="font-size: 1.5rem; font-weight: 700;">${ncCount}</p>
-                        </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="addSite(${client.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
+                        </button>
                     </div>
+                    ${(client.sites && client.sites.length > 0) ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Site Name</th>
+                                        <th>Address</th>
+                                        <th>City</th>
+                                        <th>Geotag</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${client.sites.map(s => `
+                                        <tr>
+                                            <td style="font-weight: 500;">${s.name}</td>
+                                            <td>${s.address || '-'}</td>
+                                            <td>${s.city || '-'}, ${s.country || ''}</td>
+                                            <td>
+                                                ${s.geotag ? `<a href="https://maps.google.com/?q=${s.geotag}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${s.geotag}</a>` : '-'}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No sites added yet.</p>
+                    `}
+                </div>
+
+                <!-- Contact Persons -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Contact
+                        </button>
+                    </div>
+                    ${(client.contacts && client.contacts.length > 0) ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Designation</th>
+                                        <th>Phone</th>
+                                        <th>Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${client.contacts.map(c => `
+                                        <tr>
+                                            <td style="font-weight: 500;">${c.name}</td>
+                                            <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.designation || '-'}</span></td>
+                                            <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${c.phone || '-'}</td>
+                                            <td><a href="mailto:${c.email}" style="color: var(--primary-color); text-decoration: none;">${c.email || '-'}</a></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No contact persons added yet.</p>
+                    `}
                 </div>
 
                 <!-- Matching Auditors -->
@@ -350,21 +405,29 @@ function openAddClientModal() {
                     <option>Education</option>
                 </select>
             </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Company Website</label>
+                <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
+            </div>
 
-            <!-- Contact Info -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Contact Details</div>
+            <!-- Primary Contact -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
 
             <div class="form-group">
-                <label>Contact Person</label>
-                <input type="text" class="form-control" id="client-contact" placeholder="John Doe">
+                <label>Contact Name</label>
+                <input type="text" class="form-control" id="client-contact-name" placeholder="John Doe">
             </div>
-             <div class="form-group">
-                <label>Email</label>
-                <input type="email" class="form-control" id="client-email" placeholder="john@example.com">
+            <div class="form-group">
+                <label>Designation</label>
+                <input type="text" class="form-control" id="client-contact-designation" placeholder="Quality Manager">
             </div>
             <div class="form-group">
                 <label>Phone</label>
-                <input type="text" class="form-control" id="client-phone" placeholder="+1 234 567 8900">
+                <input type="text" class="form-control" id="client-contact-phone" placeholder="+1 234 567 8900">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="form-control" id="client-contact-email" placeholder="john@example.com">
             </div>
 
             <!-- Location -->
@@ -425,27 +488,52 @@ function openAddClientModal() {
         const standard = document.getElementById('client-standard').value;
         const nextAudit = document.getElementById('client-next-audit').value;
 
-        // New Data
-        const contactPerson = document.getElementById('client-contact').value;
-        const email = document.getElementById('client-email').value;
-        const phone = document.getElementById('client-phone').value;
+        // Contact
+        const contactName = document.getElementById('client-contact-name').value;
+        const contactDesignation = document.getElementById('client-contact-designation').value;
+        const contactPhone = document.getElementById('client-contact-phone').value;
+        const contactEmail = document.getElementById('client-contact-email').value;
+        const website = document.getElementById('client-website').value;
+
+        // Location
         const address = document.getElementById('client-address').value;
         const city = document.getElementById('client-city').value;
         const country = document.getElementById('client-country').value;
         const geotag = document.getElementById('client-geotag').value;
+
+        // Operational
         const employees = parseInt(document.getElementById('client-employees').value) || 0;
-        const sites = parseInt(document.getElementById('client-sites').value) || 1;
+        const siteCount = parseInt(document.getElementById('client-sites').value) || 1;
         const shifts = document.getElementById('client-shifts').value;
         const industry = document.getElementById('client-industry').value;
+
+        // Build contacts array
+        const contacts = [];
+        if (contactName) {
+            contacts.push({
+                name: contactName,
+                designation: contactDesignation,
+                phone: contactPhone,
+                email: contactEmail
+            });
+        }
+
+        // Build sites array (primary site from form, more can be added later)
+        const sites = [{
+            name: 'Head Office',
+            address: address,
+            city: city,
+            country: country,
+            geotag: geotag
+        }];
 
         if (name && nextAudit) {
             const newClient = {
                 id: Date.now(),
-                name, standard, nextAudit,
+                name, standard, nextAudit, industry,
                 status: 'Active',
-                contactPerson, email, phone,
-                address, city, country, geotag,
-                employees, sites, shifts, industry
+                website, contacts, sites,
+                employees, shifts
             };
 
             state.clients.push(newClient);
@@ -518,7 +606,123 @@ function openEditClientModal(clientId) {
     };
 }
 
+// Add Contact Person Modal
+function addContactPerson(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Add Contact Person';
+    modalBody.innerHTML = `
+        <form id="contact-form">
+            <div class="form-group">
+                <label>Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="contact-name" required>
+            </div>
+            <div class="form-group">
+                <label>Designation</label>
+                <input type="text" class="form-control" id="contact-designation" placeholder="e.g. Quality Manager">
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" class="form-control" id="contact-phone" placeholder="+1 234 567 8900">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="form-control" id="contact-email" placeholder="name@example.com">
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('contact-name').value;
+        const designation = document.getElementById('contact-designation').value;
+        const phone = document.getElementById('contact-phone').value;
+        const email = document.getElementById('contact-email').value;
+
+        if (name) {
+            if (!client.contacts) client.contacts = [];
+            client.contacts.push({ name, designation, phone, email });
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            window.showNotification('Contact added successfully');
+        } else {
+            window.showNotification('Name is required', 'error');
+        }
+    };
+}
+
+// Add Site Modal
+function addSite(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Add Site Location';
+    modalBody.innerHTML = `
+        <form id="site-form">
+            <div class="form-group">
+                <label>Site Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="site-name" placeholder="e.g. Main Plant" required>
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <input type="text" class="form-control" id="site-address" placeholder="Street Address">
+            </div>
+            <div class="form-group">
+                <label>City</label>
+                <input type="text" class="form-control" id="site-city" placeholder="City">
+            </div>
+            <div class="form-group">
+                <label>Country</label>
+                <input type="text" class="form-control" id="site-country" placeholder="Country">
+            </div>
+            <div class="form-group">
+                <label>Geotag (Lat, Long)</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" class="form-control" id="site-geotag" placeholder="e.g. 37.7749, -122.4194">
+                    <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('site-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('site-name').value;
+        const address = document.getElementById('site-address').value;
+        const city = document.getElementById('site-city').value;
+        const country = document.getElementById('site-country').value;
+        const geotag = document.getElementById('site-geotag').value;
+
+        if (name) {
+            if (!client.sites) client.sites = [];
+            client.sites.push({ name, address, city, country, geotag });
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            window.showNotification('Site added successfully');
+        } else {
+            window.showNotification('Site name is required', 'error');
+        }
+    };
+}
+
 window.renderClientsEnhanced = renderClientsEnhanced;
 window.renderClientDetail = renderClientDetail;
 window.openAddClientModal = openAddClientModal;
 window.openEditClientModal = openEditClientModal;
+window.addContactPerson = addContactPerson;
+window.addSite = addSite;
