@@ -6,6 +6,7 @@
 // ============================================
 
 function renderAuditorsEnhanced() {
+    const state = window.state;
     const searchTerm = state.auditorSearchTerm || '';
     const filterRole = state.auditorFilterRole || 'All';
 
@@ -42,7 +43,7 @@ function renderAuditorsEnhanced() {
                         <i class="fa-solid fa-table" style="margin-right: 0.5rem;"></i> Competence Matrix
                     </button>
                 </div>
-                <button class="btn btn-primary" onclick="openAddAuditorModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>
+                <button class="btn btn-primary" onclick="window.openAddAuditorModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>
             </div>
             <div class="table-container">
                 <table>

@@ -28,6 +28,14 @@ const state = {
     }
 };
 
+// Global Exports for Modules
+window.state = state;
+window.saveData = saveState;
+window.showNotification = showNotification;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.renderModule = renderModule;
+
 // State Management
 function saveState() {
     localStorage.setItem('auditCB360State', JSON.stringify(state));
@@ -81,6 +89,14 @@ const contentArea = document.getElementById('content-area');
 const pageTitle = document.getElementById('page-title');
 const navItems = document.querySelectorAll('.main-nav li');
 
+// Export important items to window for modules to access
+window.state = state;
+window.saveData = saveState;
+window.showNotification = showNotification;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.renderModule = renderModule;
+
 // Navigation Handler
 navItems.forEach(item => {
     item.addEventListener('click', () => {
@@ -107,8 +123,8 @@ function loadScript(src) {
             return;
         }
         const script = document.createElement('script');
-        // Add timestamp to prevent caching issues
-        script.src = `${src}?v=${Date.now()}`;
+        // Add timestamp to prevent caching issues - bust cache once per session
+        script.src = `${src}?v=${window.appTimestamp || (window.appTimestamp = Date.now())}`;
         script.onload = () => {
             loadedModules.add(src);
             resolve();
@@ -144,7 +160,7 @@ async function renderModule(moduleName) {
             'dashboard': ['dashboard-module.js', 'export-module.js'],
             'auditors': ['advanced-modules.js', 'export-module.js'],
             'audit-programs': ['programs-module.js', 'export-module.js'],
-            'audit-planning': ['planning-module.js'],
+            'audit-planning': ['advanced-modules.js', 'planning-module.js'],
             'audit-execution': ['execution-module.js'],
             'manday-calculator': ['advanced-modules.js'],
             'documents': ['documents-module.js'],

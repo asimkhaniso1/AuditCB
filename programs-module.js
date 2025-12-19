@@ -3,6 +3,7 @@
 // ============================================
 
 function renderAuditProgramsEnhanced() {
+    const state = window.state;
     const searchTerm = state.programSearchTerm || '';
 
     // Filter programs
@@ -56,7 +57,7 @@ function renderAuditProgramsEnhanced() {
                         <option value="completed">Completed</option>
                     </select>
                 </div>
-                <button class="btn btn-primary" onclick="openAddProgramModal()">
+                <button class="btn btn-primary" onclick="window.openAddProgramModal()">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Program
                 </button>
             </div>

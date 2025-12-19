@@ -3,6 +3,7 @@
 // ============================================
 
 function renderAuditPlanningEnhanced() {
+    const state = window.state;
     const searchTerm = state.planningSearchTerm || '';
 
     let filteredPlans = state.auditPlans.filter(plan => {
@@ -50,7 +51,7 @@ function renderAuditPlanningEnhanced() {
                         <option value="Completed">Completed</option>
                     </select>
                 </div>
-                <button class="btn btn-primary" onclick="openCreatePlanModal()">
+                <button class="btn btn-primary" onclick="window.openCreatePlanModal()">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Audit Plan
                 </button>
             </div>

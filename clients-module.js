@@ -3,6 +3,7 @@
 // ============================================
 
 function renderClientsEnhanced() {
+    const state = window.state; // Use global state
     const searchTerm = state.clientSearchTerm || '';
     const filterStatus = state.clientFilterStatus || 'All';
 
@@ -39,7 +40,7 @@ function renderClientsEnhanced() {
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     ${window.addExportButtons ? window.addExportButtons('clients') : ''}
-                    <button class="btn btn-primary" onclick="openAddClientModal()">
+                    <button class="btn btn-primary" onclick="window.openAddClientModal()">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                 </div>
