@@ -187,6 +187,21 @@ function renderExecutionDetail(reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
+    // Calculate Progress
+    const plan = state.auditPlans.find(p => p.client === report.client);
+    let totalItems = 0;
+    if (plan && plan.selectedChecklists) {
+        plan.selectedChecklists.forEach(id => {
+            const cl = state.checklists.find(c => c.id === id);
+            if (cl && cl.items) totalItems += cl.items.length;
+        });
+    }
+    // Add custom items
+    totalItems += (report.customItems || []).length;
+
+    const completedItems = (report.checklistProgress || []).filter(p => p.status && p.status !== '').length;
+    const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
@@ -196,14 +211,27 @@ function renderExecutionDetail(reportId) {
             </div>
             
             <div class="card" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
                         <h2 style="margin-bottom: 0.5rem;">Audit Execution: ${report.client}</h2>
                         <p style="color: var(--text-secondary);">Audit Date: ${report.date} | Status: ${report.status}</p>
                     </div>
-                    <button class="btn btn-primary">
+                    <button class="btn btn-primary" onclick="window.generateAuditReport(${report.id})">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report
                     </button>
+                </div>
+                
+                 <!-- Progress Bar -->
+                <div>
+                     <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                        <strong>Checklist Completion</strong>
+                        <strong style="color: var(--primary-color);">${progress}%</strong>
+                     </div>
+                     <div style="height: 1.2rem; background: #f1f5f9; border-radius: 1rem; overflow: hidden; border: 1px solid #e2e8f0;">
+                        <div style="width: ${progress}%; background: linear-gradient(90deg, var(--primary-color), #3b82f6); height: 100%; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: bold;">
+                             ${progress > 5 ? `${completedItems}/${totalItems}` : ''}
+                        </div>
+                     </div>
                 </div>
             </div>
 
@@ -283,6 +311,7 @@ function renderExecutionTab(report, tabName) {
                                      <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
                                         <option value="minor" ${saved.ncrType === 'minor' ? 'selected' : ''}>Minor</option>
                                         <option value="major" ${saved.ncrType === 'major' ? 'selected' : ''}>Major</option>
+                                        <option value="observation" ${saved.ncrType === 'observation' ? 'selected' : ''}>Observation</option>
                                      </select>
                                  </div>
                                  <div style="display: flex; align-items: flex-end;">
@@ -836,5 +865,141 @@ window.updateChecklistStatus = updateChecklistStatus;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
 window.createCAPA = createCAPA;
+// Generate Printable Report
+window.generateAuditReport = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    const plan = state.auditPlans.find(p => p.client === report.client) || {};
+    const ncrCount = (report.ncrs || []).length;
+    const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
+
+    // Build Checklist Rows (Only showing non-conformities or items with comments for brevity in main report, or full list)
+    // Let's show full list but compact
+    const checklistRows = (report.checklistProgress || []).map(item => {
+        let statusLabel = item.status === 'conform' ? 'Conform' :
+            item.status === 'minor' ? 'Minor NC' :
+                item.status === 'major' ? 'Major NC' :
+                    item.status === 'na' ? 'N/A' : '-';
+        let statusColor = item.status === 'conform' ? 'green' :
+            item.status === 'na' ? 'gray' : 'red';
+
+        // Find clause/req if possible, we only stored ID/Index, so we might need lookups if we want full text.
+        // For simplicity in this view, we'll assume we rely on the saved comment/status mostly or just skip details.
+        // Better: Just listing significant items (NCs).
+        return `
+            <tr>
+               <td>${item.isCustom ? 'Custom' : 'Clause Ref'}</td>
+               <td style="color: ${statusColor}; font-weight: bold;">${statusLabel}</td>
+               <td>${item.comment || ''}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const ncrRows = (report.ncrs || []).map((ncr, i) => `
+        <div style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; page-break-inside: avoid;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                <strong>NCR #${String(i + 1).padStart(3, '0')}</strong>
+                <span style="color: red; font-weight: bold;">${ncr.type.toUpperCase()}</span>
+            </div>
+            <p><strong>Clause:</strong> ${ncr.clause}</p>
+            <p><strong>Description:</strong> ${ncr.description}</p>
+            <p><strong>Evidence:</strong> ${ncr.evidence || 'None provided'}</p>
+            <p><strong>Status:</strong> ${ncr.status}</p>
+        </div>
+    `).join('');
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Audit Report - ${report.client}</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #333; max-width: 900px; margin: 0 auto; }
+                h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                .header { text-align: center; margin-bottom: 40px; }
+                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                .meta-table td { padding: 10px; border: 1px solid #ddd; }
+                .meta-table td:first-child { background: #f9f9f9; font-weight: bold; width: 200px; }
+                .summary-box { background: #f8f9fa; padding: 20px; border-left: 5px solid #0056b3; margin-bottom: 30px; }
+                .badge { padding: 5px 10px; color: white; border-radius: 4px; font-size: 0.9em; }
+                .bg-green { background-color: #28a745; }
+                .bg-red { background-color: #dc3545; }
+                .bg-yellow { background-color: #ffc107; color: black; }
+                @media print {
+                    button { display: none; }
+                    body { padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div style="text-align: right;">
+                <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #0056b3; color: white; border: none; border-radius: 4px;">Print Report</button>
+            </div>
+            <div class="header">
+                <h1>Audit Certification Report</h1>
+                <p>Generated by AuditCB360 Platform</p>
+            </div>
+
+            <table class="meta-table">
+                <tr><td>Client Name</td><td>${report.client}</td></tr>
+                <tr><td>Audit Standard</td><td>${plan.standard || 'N/A'}</td></tr>
+                <tr><td>Audit Date</td><td>${report.date}</td></tr>
+                <tr><td>Report ID</td><td>REP-${report.id}</td></tr>
+                <tr><td>Lead Auditor</td><td>${state.auditors.find(a => plan.auditors?.includes(a.id))?.name || 'Unknown'}</td></tr>
+            </table>
+
+            <h2>1. Executive Summary</h2>
+            <div class="summary-box">
+                <p><strong>Conclusion:</strong> ${report.conclusion || 'No conclusion recorded.'}</p>
+                <p><strong>Recommendation:</strong> ${report.recommendation || 'Pending'}</p>
+            </div>
+
+            <h2>2. Findings Summary</h2>
+            <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+                <div style="flex: 1; padding: 20px; background: #e8f5e9; text-align: center; border-radius: 8px;">
+                    <div style="font-size: 2em; color: #2e7d32; font-weight: bold;">${report.conformities || 0}</div>
+                    <div>Conformities</div>
+                </div>
+                <div style="flex: 1; padding: 20px; background: #ffebee; text-align: center; border-radius: 8px;">
+                    <div style="font-size: 2em; color: #c62828; font-weight: bold;">${ncrCount}</div>
+                    <div>Non-Conformities</div>
+                </div>
+            </div>
+
+            <h2>3. Non-Conformity Reports (NCRs)</h2>
+            ${ncrRows || '<p>No non-conformities raised.</p>'}
+
+            <h2>4. Audit Evidence Log</h2>
+            <p><em>(Showing items with specific auditor comments or findings)</em></p>
+            <table class="meta-table" style="font-size: 0.9em;">
+                <thead>
+                    <tr style="background: #eee;">
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Auditor Comments / Evidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${checklistRows}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 20px; display: flex; justify-content: space-between;">
+                <div>
+                    <p>_________________________</p>
+                    <p>Lead Auditor Signature</p>
+                </div>
+                <div>
+                    <p>_________________________</p>
+                    <p>Client Representative</p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
+
 window.openCreateReportModal = openCreateReportModal;
 window.openEditReportModal = openEditReportModal;
