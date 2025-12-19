@@ -13,7 +13,7 @@ function renderAuditPlanningEnhanced() {
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
-                <a href="#" class="plan-title-link" data-plan-id="${plan.id}" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
+                <a href="javascript:void(0)" onclick="window.viewAuditPlan('${plan.id}')" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${plan.standard || 'ISO 9001:2015'}</div>
             </td>
             <td>${plan.type || 'Surveillance'}</td>
@@ -32,7 +32,7 @@ function renderAuditPlanningEnhanced() {
                 <button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
                     <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
                 </button>
-                <button class="btn btn-sm view-plan-btn" data-plan-id="${plan.id}" title="View Details">
+                <button class="btn btn-sm" onclick="window.viewAuditPlan('${plan.id}')" title="View Details">
                     <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                 </button>
             </td>
@@ -428,7 +428,7 @@ function saveAuditPlan() {
 }
 
 function viewAuditPlan(id) {
-    const plan = state.auditPlans.find(p => p.id === id);
+    const plan = state.auditPlans.find(p => p.id == id);
     if (!plan) return;
 
     const client = state.clients.find(c => c.name === plan.client);
@@ -515,9 +515,14 @@ function viewAuditPlan(id) {
                     <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Configuration Checklists</h3>
-                            <button class="btn btn-sm btn-secondary" onclick="openChecklistSelectionModal(${plan.id})">
-                                <i class="fa-solid fa-cog" style="margin-right: 0.25rem;"></i> Configure
-                            </button>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" style="margin-right: 0.5rem;" onclick="window.printAuditPlan('${plan.id}')">
+                                    <i class="fa-solid fa-print"></i> Print
+                                </button>
+                                <button class="btn btn-sm btn-secondary" onclick="openChecklistSelectionModal(${plan.id})">
+                                    <i class="fa-solid fa-cog" style="margin-right: 0.25rem;"></i> Configure
+                                </button>
+                            </div>
                         </div>
                         ${checklistListHTML}
                         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
@@ -620,7 +625,7 @@ function viewAuditPlan(id) {
 }
 
 window.printAuditPlan = function (planId) {
-    const plan = state.auditPlans.find(p => p.id === planId);
+    const plan = state.auditPlans.find(p => p.id == planId);
     if (!plan) return;
     const report = (state.auditReports || []).find(r => r.planId === planId);
     const checklists = state.checklists || [];
@@ -635,13 +640,15 @@ window.printAuditPlan = function (planId) {
     const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
     const statusColor = { 'conform': 'green', 'minor': 'orange', 'major': 'red', 'na': 'gray', '': 'black' };
 
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
+
     let content = `
         <html>
         <head>
             <title>Audit Checklist Report - ${plan.client}</title>
             <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; }
-                .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; padding: 20px; }
+                .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; position: relative; }
                 .section { margin-bottom: 2rem; page-break-inside: avoid; }
                 h2 { background: #f2f2f2; padding: 0.5rem; border-left: 5px solid #333; margin-top: 0; }
                 table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
@@ -651,6 +658,9 @@ window.printAuditPlan = function (planId) {
         </head>
         <body>
             <div class="header">
+                <div style="position: absolute; top: 0; right: 0;">
+                    <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
+                </div>
                 <h1>Audit Checklist Execution Report</h1>
                 <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${plan.date}</p>
                 <p><strong>Auditor(s):</strong> ${plan.team.join(', ')} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>

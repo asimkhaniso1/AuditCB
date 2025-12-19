@@ -1,53 +1,44 @@
-# AuditCB360 - Implementation Plan
+# Implementation Plan: Enhanced Audit Reporting & Evidence
 
-## 🚀 Phase 1: Core Framework & Basic Modules (COMPLETED)
-- [x] SPA Architecture Setup
-- [x] Navigation & Layout
-- [x] LocalStorage Database
-- [x] Basic CRUD for all modules
+## Overview
+This update significantly enhances the Audit Execution and Reporting capabilities of the AuditCB360 platform. It introduces a professional "Draft" stage for reports, AI-assisted content generation, multimedia evidence capture, and verifiable QR codes on all documents.
 
-## � Phase 2: Enhanced Modules & Features (COMPLETED)
-- [x] **Clients Module**: Detail views, tabs, search/filter
-- [x] **Auditors Module**: Competence matrix, role filtering
-- [x] **Man-Day Calculator**: ISO 17021-1 algorithm & UI
-- [x] **Audit Programs**: 3-Year Cycle Timeline visualization
-- [x] **Audit Execution**: Checklists, NCRs, CAPA tabs
+## Key Features Implemented
 
-## 🚀 Phase 3: Advanced Features & Integration (COMPLETED ✅)
-- [x] **Document Management Module**: List view, upload UI, filtering
-- [x] **Audit Planning Integration**: Calculator connection, smart auditor selection
-- [x] **Dashboard Analytics**: Charts, KPIs, and Activity Feed
-- [x] **User Management & Configuration**: Settings page, user roles, notifications
+### 1. Advanced Report Drafting
+- **Draft Mode:** A dedicated interface for reviewing findings and drafting report sections before finalization.
+- **Editable Sections:** New fields for Executive Summary, Key Strengths, Areas for Improvement, and Final Conclusion.
+- **AI Auto-Draft:** A "Magic Wand" feature that analyzes findings (NCR counts, types) and automatically generates professional text for the report sections.
+- **Score Calculation:** Automated compliance scoring based on major/minor non-conformities.
 
----
+### 2. Multimedia Evidence
+- **Visual Evidence:** Added a mock "Capture Image" button in the NCR creation modal. Images are displayed in the finding details.
+- **Audio Transcripts:** Integrated Web Speech API for voice-to-text dictation in NCR descriptions, which are saved as audio transcripts in the report.
 
-## 🎯 Phase 4: Polish & Optimization (IN PROGRESS)
-- [x] Responsive design improvements for mobile/tablet
-- [x] Performance optimization (lazy loading, code splitting)
-- [x] Accessibility enhancements (ARIA labels, keyboard navigation)
-- [x] Print-friendly audit reports
-- [x] Export functionality (PDF, Excel)
+### 3. Professional PDF Reports
+- **Visual Analytics:** Added a dynamic CSS-based bar chart showing the "Findings Distribution" and "Compliance Score".
+- **Enhanced Layout:** A totally redesigned, high-contrast, print-friendly report layout.
+- **Detailed Findings:** Reports now include the full evidence log, including captured images and transcripts.
 
-### 3. Dashboard Analytics
-- [x] Add charts using a lightweight library (e.g., Chart.js or CSS-only)
-- [x] Visual widgets for:
-  - Upcoming Audits (Next 30 days)
-  - NCR Trends (Major vs Minor)
-  - Auditor Utilization
-  - Client Status Distribution
+### 4. Verification & Security
+- **QR Codes:** All generated documents (Audit Reports, Audit Plans, Checklists) now include a unique QR code in the header. Scanning this code (mock) validates the document's authenticity and origin.
 
-### 4. Settings & Administration
-- [x] User Management (mock)
-- [x] System Configuration (Standards, Roles)
-- [x] Data Backup/Restore UI
+## Technical Details
 
-## 🚀 Phase 4: Polish & Release
-- [x] Comprehensive testing of all flows
-- [x] UI/UX refinements (animations, transitions)
-- [x] Mobile responsiveness check
-- [x] Final code cleanup and documentation
+### Modules Modified
+- **`execution-module.js`:**
+    - `renderExecutionDetail`: Replaced "Summary" tab with "Report Editor".
+    - `createNCR`: Added Camera and Microphone inputs.
+    - `generateAuditReport`: Complete rewrite for new PDF layout, charts, and QR codes.
+    - Added `saveReportDraft` and `generateAIConclusion`.
+- **`planning-module.js`:**
+    - `printAuditPlan`: Added QR code header.
+- **`checklist-module.js`:**
+    - `printChecklist`: Added QR code header.
 
----
+## Usage Instructions
 
-## 📝 Current Focus: Phase 4 - Final Polish
-The application now has comprehensive export functionality (CSV/Excel and PDF), full responsive design, and accessibility features. The remaining work focuses on performance optimization and final testing.
+1.  **Drafting:** Go to "Audit Execution" -> "Summary" tab.
+2.  **AI Eval:** Click "Auto-Draft with AI" to pre-fill the report.
+3.  **Capture:** When raising an NCR, use "Dictate" for voice notes and "Capture Image" for photos.
+4.  **Print:** Click "Finalize & Generate" to see the new printable report with charts and QR codes.

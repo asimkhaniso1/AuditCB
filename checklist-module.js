@@ -111,6 +111,9 @@ function renderChecklistLibrary() {
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
+                                            <button class="btn btn-sm" onclick="window.printChecklist('${c.id}')" style="margin-right: 0.25rem;" title="Print">
+                                                <i class="fa-solid fa-print"></i>
+                                            </button>
                                             ${isAdmin ? `
                                                 <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                     <i class="fa-solid fa-edit"></i>
@@ -161,6 +164,9 @@ function renderChecklistLibrary() {
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                 <i class="fa-solid fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm" onclick="window.printChecklist('${c.id}')" style="margin-right: 0.25rem;" title="Print">
+                                                <i class="fa-solid fa-print"></i>
                                             </button>
                                             <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                 <i class="fa-solid fa-edit"></i>
@@ -654,9 +660,82 @@ function deleteChecklist(id) {
     }
 }
 
+function printChecklist(id) {
+    const checklist = state.checklists.find(c => c.id == id);
+    if (!checklist) return;
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`CHECKLIST-${checklist.id}|${checklist.name}|${checklist.standard}`)}`;
+
+    let content = `
+        <html>
+        <head>
+            <title>Checklist: ${checklist.name}</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; max-width: 900px; margin: 0 auto; }
+                .header { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; position: relative; }
+                h1 { color: #0f172a; margin: 0 0 10px 0; }
+                p { margin: 5px 0; color: #64748b; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { padding: 12px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+                th { background: #f8fafc; font-weight: 600; color: #475569; }
+                td.clause { font-weight: 600; background: #f1f5f9; width: 80px; }
+                @media print {
+                    button { display: none; }
+                    body { padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="no-print" style="text-align: right;">
+                <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #0056b3; color: white; border: none; border-radius: 4px;">Print Checklist</button>
+            </div>
+            <div class="header">
+                 <div style="position: absolute; top: 0; right: 0;">
+                    <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
+                </div>
+                <h1>${checklist.name}</h1>
+                <p><strong>Standard:</strong> ${checklist.standard}</p>
+                <p><strong>Type:</strong> ${checklist.type === 'global' ? 'Global (Standard)' : 'Custom'}</p>
+                <p><strong>Items:</strong> ${checklist.items?.length || 0}</p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Clause</th>
+                        <th>Requirement / Check Item</th>
+                        <th style="width: 150px;">Status</th> <!-- Space for writing -->
+                        <th style="width: 200px;">Remarks</th> <!-- Space for writing -->
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(checklist.items || []).map(item => `
+                        <tr>
+                            <td class="clause">${item.clause || ''}</td>
+                            <td>${item.requirement}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 40px; font-size: 0.8rem; color: #94a3b8; text-align: center;">
+                Generated by AuditCB360 Platform
+            </div>
+        </body>
+        </html>
+    `;
+
+    const win = window.open('', '_blank');
+    win.document.write(content);
+    win.document.close();
+}
+
 // Export functions
 window.renderChecklistLibrary = renderChecklistLibrary;
 window.openAddChecklistModal = openAddChecklistModal;
 window.openEditChecklistModal = openEditChecklistModal;
 window.viewChecklistDetail = viewChecklistDetail;
 window.deleteChecklist = deleteChecklist;
+window.printChecklist = printChecklist;
