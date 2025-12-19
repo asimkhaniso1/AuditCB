@@ -292,7 +292,12 @@ function renderExecutionTab(report, tabName) {
                                      <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="if(this.files.length) alert('Image selected (mock)')">
                                  </div>
                              </div>
-                             <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Dictate/Type short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
+                             <div style="position: relative;">
+                                <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Dictate/Type short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
+                                <button type="button" class="btn btn-sm btn-light" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 5px; top: 5px; color: var(--primary-color); border: 1px solid #ddd;" title="Dictate (10s limit)">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                             </div>
                          </div>
                     </div>
                 `;
@@ -605,6 +610,71 @@ window.saveChecklist = function (reportId) {
     report.checklistProgress = checklistData;
     window.saveData();
     window.showNotification('Checklist progress saved successfully');
+};
+
+window.startDictation = function (uniqueId) {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Voice dictation is not supported in this browser. Please use Chrome or Edge.');
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    const micBtn = document.getElementById('mic-btn-' + uniqueId);
+    const textarea = document.getElementById('ncr-desc-' + uniqueId);
+
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true; // Use interim to show real-time transcription if possible, or false for simplicity
+
+    // Visual feedback
+    const originalIcon = '<i class="fa-solid fa-microphone"></i>';
+    micBtn.innerHTML = '<i class="fa-solid fa-circle-dot fa-fade" style="color: red;"></i>';
+    micBtn.setAttribute('disabled', 'true');
+
+    recognition.start();
+
+    let finalTranscript = '';
+
+    // Auto-stop after 10 seconds
+    const timeout = setTimeout(() => {
+        recognition.stop();
+        window.showNotification('Recording limit (10s) reached.', 'info');
+    }, 10000);
+
+    recognition.onresult = function (event) {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+    };
+
+    recognition.onend = function () {
+        clearTimeout(timeout);
+        // Append result to textarea
+        if (finalTranscript) {
+            const currentVal = textarea.value;
+            textarea.value = currentVal ? currentVal + ' ' + finalTranscript : finalTranscript;
+        }
+
+        micBtn.innerHTML = originalIcon;
+        micBtn.removeAttribute('disabled');
+    };
+
+    recognition.onerror = function (event) {
+        console.error('Speech recognition error', event.error);
+        if (event.error !== 'no-speech') {
+            window.showNotification('Error recording audio: ' + event.error, 'error');
+        }
+        micBtn.innerHTML = originalIcon;
+        micBtn.removeAttribute('disabled');
+        clearTimeout(timeout);
+    };
 };
 
 function createNCR(reportId) {

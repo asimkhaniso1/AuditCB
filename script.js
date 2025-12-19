@@ -139,8 +139,86 @@ const state = {
         }
     ],
     auditPrograms: [],
-    auditPlans: [],
-    auditReports: [],
+    auditPlans: [
+        {
+            id: 1,
+            client: "Tech Solutions Ltd",
+            standard: "ISO 9001:2015",
+            date: "2024-02-15",
+            cost: 2400,
+            auditors: [1],
+            manDays: 3,
+            status: "Completed",
+            selectedChecklists: [1],
+            objectives: "Verify ongoing compliance with ISO 9001:2015",
+            scope: "Software Development and IT Services"
+        },
+        {
+            id: 2,
+            client: "Global Manufacturing",
+            standard: "ISO 14001:2015",
+            date: "2024-03-20",
+            cost: 3200,
+            auditors: [1, 3],
+            manDays: 4,
+            status: "Approved",
+            selectedChecklists: [2],
+            objectives: "Stage 2 Certification Audit",
+            scope: "Manufacturing of Auto Parts"
+        },
+        {
+            id: 3,
+            client: "SecureData Corp",
+            standard: "ISO 27001:2022",
+            date: "2025-01-10",
+            cost: 4000,
+            auditors: [2],
+            manDays: 5,
+            status: "Planned",
+            selectedChecklists: [4],
+            objectives: "Initial Certification Audit",
+            scope: "Data Center Operations"
+        }
+    ],
+    auditReports: [
+        {
+            id: 101,
+            client: "Tech Solutions Ltd",
+            date: "2024-02-15",
+            status: "Finalized",
+            findings: 2,
+            ncrs: [
+                { type: "minor", clause: "7.5", description: "Document control procedure not fully followed for obsolete documents.", evidence: "Old version of Employee Handbook found in break room.", status: "Closed" },
+                { type: "minor", clause: "8.4", description: "Supplier re-evaluation criteria not clearly defined.", evidence: "Supplier list does not show last evaluation date.", status: "Open" }
+            ],
+            capas: [
+                { linkedNCR: "NCR-001", rootCause: "Communication gap", actionPlan: "Remove old copies.", status: "Completed" }
+            ],
+            checklistProgress: [
+                { checklistId: "1", itemIdx: "0", status: "conform", comment: "Verified internal issues list." },
+                { checklistId: "1", itemIdx: "1", status: "conform", comment: "Stakeholder matrix reviewed." },
+                { checklistId: "1", itemIdx: "13", status: "nc", ncrType: "minor", ncrDescription: "Document control issue.", comment: "See NCR-001" }
+            ],
+            conclusion: "The QMS is generally effective. Recommended for continued certification subject to closure of minor NC.",
+            recommendation: "Recommend Certification",
+            conformities: 18,
+            finalizedAt: "2024-02-16T10:00:00.000Z"
+        },
+        {
+            id: 102,
+            client: "Global Manufacturing",
+            date: "2024-03-20",
+            status: "In Progress",
+            findings: 1,
+            ncrs: [
+                { type: "major", clause: "6.1.2", description: "Significant environmental aspects not identified for new painting line.", evidence: "Impact assessment register missing new line.", status: "Open" }
+            ],
+            checklistProgress: [
+                { checklistId: "2", itemIdx: "0", status: "conform", comment: "Context established." },
+                { checklistId: "2", itemIdx: "4", status: "nc", ncrType: "major", ncrDescription: "Aspects missing.", comment: "Major issue found." }
+            ]
+        }
+    ],
     certificationDecisions: [
         { client: 'Tech Solutions Ltd', standard: 'ISO 9001:2015', date: '2024-01-15', decision: 'Granted' },
         { client: 'Global Manufacturing', standard: 'ISO 14001:2015', date: '2024-02-10', decision: 'Granted' }
