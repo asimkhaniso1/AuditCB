@@ -76,7 +76,12 @@ const state = {
                 { client: 'Tech Solutions Ltd', date: '2024-01-15', type: 'Surveillance' },
                 { client: 'Global Manufacturing', date: '2023-11-10', type: 'Stage 2' }
             ],
-            education: { degree: 'Master', fieldOfStudy: 'Industrial Engineering', specialization: 'Six Sigma Black Belt, ISO Lead Auditor' }
+            education: { degree: 'Master', fieldOfStudy: 'Industrial Engineering', specialization: 'Six Sigma Black Belt, ISO Lead Auditor' },
+            hasPassport: true,
+            willingToTravel: 'international',
+            languages: ['English', 'Spanish'],
+            pictureUrl: 'https://randomuser.me/api/portraits/men/1.jpg',
+            customerRating: 5
         },
         {
             id: 2,
@@ -94,7 +99,12 @@ const state = {
             auditHistory: [
                 { client: 'SecureData Corp', date: '2024-02-20', type: 'Stage 1' }
             ],
-            education: { degree: 'Master', fieldOfStudy: 'Information Security', specialization: 'CISSP, CISA certified' }
+            education: { degree: 'Master', fieldOfStudy: 'Information Security', specialization: 'CISSP, CISA certified' },
+            hasPassport: true,
+            willingToTravel: 'regional',
+            languages: ['English', 'French'],
+            pictureUrl: 'https://randomuser.me/api/portraits/women/2.jpg',
+            customerRating: 4
         },
         {
             id: 3,
@@ -110,7 +120,12 @@ const state = {
             phone: '+1-555-1003',
             location: 'Houston, USA',
             auditHistory: [],
-            education: { degree: 'Bachelor', fieldOfStudy: 'Safety Engineering', specialization: 'NEBOSH certified' }
+            education: { degree: 'Bachelor', fieldOfStudy: 'Safety Engineering', specialization: 'NEBOSH certified' },
+            hasPassport: true,
+            willingToTravel: 'international',
+            languages: ['English', 'Mandarin', 'Cantonese'],
+            pictureUrl: 'https://randomuser.me/api/portraits/men/3.jpg',
+            customerRating: 4
         }
     ],
     auditPrograms: [],

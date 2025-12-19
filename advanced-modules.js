@@ -493,9 +493,18 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                         ${state.auditors.map(auditor => `
                             <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: #fafafa;">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                                    <div>
-                                        <h4 style="margin: 0 0 0.25rem 0;">${auditor.name}</h4>
-                                        <span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span>
+                                    <div style="display: flex; gap: 1rem; align-items: center;">
+                                        ${auditor.pictureUrl ? `
+                                            <img src="${auditor.pictureUrl}" alt="${auditor.name}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
+                                        ` : `
+                                            <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 600;">
+                                                ${auditor.name.split(' ').map(n => n[0]).join('')}
+                                            </div>
+                                        `}
+                                        <div>
+                                            <h4 style="margin: 0 0 0.25rem 0;">${auditor.name}</h4>
+                                            <span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span>
+                                        </div>
                                     </div>
                                     ${getExperienceBadge(auditor.experience)}
                                 </div>
@@ -538,6 +547,44 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                                     </div>
                                 </div>
                                 ` : ''}
+                                
+                                <!-- Travel & Languages -->
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                                        <div>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-passport" style="margin-right: 0.5rem;"></i>Passport</p>
+                                            ${auditor.hasPassport !== undefined ? `
+                                                <span style="background: ${auditor.hasPassport ? '#d1fae5' : '#fee2e2'}; color: ${auditor.hasPassport ? '#065f46' : '#991b1b'}; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem;">
+                                                    ${auditor.hasPassport ? '✓ Valid' : '✗ No'}
+                                                </span>
+                                            ` : '<span style="color: var(--text-secondary); font-size: 0.75rem;">Not specified</span>'}
+                                        </div>
+                                        <div>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-plane" style="margin-right: 0.5rem;"></i>Travel</p>
+                                            ${auditor.willingToTravel ? `
+                                                <span style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem;">
+                                                    ${auditor.willingToTravel === 'international' ? '🌍 International' : auditor.willingToTravel === 'regional' ? '🗺️ Regional' : auditor.willingToTravel === 'local' ? '📍 Local' : '❌ Not Available'}
+                                                </span>
+                                            ` : '<span style="color: var(--text-secondary); font-size: 0.75rem;">Not specified</span>'}
+                                        </div>
+                                        <div>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-star" style="margin-right: 0.5rem;"></i>Rating</p>
+                                            ${auditor.customerRating ? `
+                                                <span style="color: #f59e0b; font-size: 0.9rem;">
+                                                    ${'⭐'.repeat(auditor.customerRating)}${'☆'.repeat(5 - auditor.customerRating)}
+                                                </span>
+                                            ` : '<span style="color: var(--text-secondary); font-size: 0.75rem;">No rating</span>'}
+                                        </div>
+                                    </div>
+                                    ${auditor.languages && auditor.languages.length > 0 ? `
+                                    <div style="margin-top: 1rem;">
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-language" style="margin-right: 0.5rem;"></i>Languages</p>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                            ${auditor.languages.map(lang => `<span style="background: #f0fdf4; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${lang}</span>`).join('')}
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                </div>
                             </div>
                         `).join('')}
                     </div>
@@ -888,11 +935,49 @@ function openAddAuditorModal() {
                     <option value="Information Security">Information Security</option>
                     <option value="Safety Engineering">Safety / Occupational Health</option>
                     <option value="Other">Other</option>
-                </select>
             </div>
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>Specialization / Additional Qualifications</label>
                 <input type="text" class="form-control" id="auditor-specialization" placeholder="e.g. ISO Lead Auditor certified, Six Sigma Black Belt">
+            </div>
+
+            <!-- Travel & Availability -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Travel & Availability</div>
+            <div class="form-group">
+                <label>Valid Passport</label>
+                <select class="form-control" id="auditor-passport">
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Willing to Travel</label>
+                <select class="form-control" id="auditor-travel">
+                    <option value="international">International</option>
+                    <option value="regional">Regional Only</option>
+                    <option value="local">Local Only</option>
+                    <option value="no">Not Available</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Languages (comma-separated)</label>
+                <input type="text" class="form-control" id="auditor-languages" placeholder="e.g. English, Arabic, French, Spanish">
+            </div>
+            <div class="form-group">
+                <label>Profile Picture URL</label>
+                <input type="url" class="form-control" id="auditor-picture" placeholder="https://example.com/photo.jpg">
+                <small style="color: var(--text-secondary);">Enter URL of profile photo</small>
+            </div>
+            <div class="form-group">
+                <label>Customer Rating (1-5)</label>
+                <select class="form-control" id="auditor-rating">
+                    <option value="">-- No Rating Yet --</option>
+                    <option value="5">⭐⭐⭐⭐⭐ Excellent (5)</option>
+                    <option value="4">⭐⭐⭐⭐ Very Good (4)</option>
+                    <option value="3">⭐⭐⭐ Good (3)</option>
+                    <option value="2">⭐⭐ Fair (2)</option>
+                    <option value="1">⭐ Needs Improvement (1)</option>
+                </select>
             </div>
 
             <!-- Expertise & Rates -->
@@ -946,6 +1031,13 @@ function openAddAuditorModal() {
         const fieldOfStudy = document.getElementById('auditor-field').value;
         const specialization = document.getElementById('auditor-specialization').value;
 
+        // Travel & Availability
+        const hasPassport = document.getElementById('auditor-passport').value === 'yes';
+        const willingToTravel = document.getElementById('auditor-travel').value;
+        const languages = document.getElementById('auditor-languages').value.split(',').map(s => s.trim()).filter(s => s);
+        const pictureUrl = document.getElementById('auditor-picture').value;
+        const customerRating = parseInt(document.getElementById('auditor-rating').value) || null;
+
         if (name && standards.length > 0) {
             const newAuditor = {
                 id: Date.now(),
@@ -953,6 +1045,7 @@ function openAddAuditorModal() {
                 age, experience, email, phone, location,
                 manDayRate, domainExpertise, industries,
                 education: { degree, fieldOfStudy, specialization },
+                hasPassport, willingToTravel, languages, pictureUrl, customerRating,
                 auditHistory: []
             };
 
