@@ -29,10 +29,10 @@ function renderAuditPlanningEnhanced() {
             </td>
             <td><span class="status-badge status-${plan.status.toLowerCase()}">${plan.status}</span></td>
             <td>
-                <button class="btn btn-sm" onclick="editAuditPlan(${plan.id})" title="Edit Plan">
+                <button class="btn btn-sm" onclick="window.editAuditPlan(${plan.id})" title="Edit Plan">
                     <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
                 </button>
-                <button class="btn btn-sm" onclick="viewAuditPlan(${plan.id})" title="View Details">
+                <button class="btn btn-sm" onclick="window.viewAuditPlan(${plan.id})" title="View Details">
                     <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                 </button>
             </td>
@@ -187,6 +187,59 @@ function openCreatePlanModal() {
     };
 }
 
+function editAuditPlan(id) {
+    const plan = state.auditPlans.find(p => p.id === id);
+    if (!plan) return;
+
+    openCreatePlanModal();
+
+    // Fill data
+    setTimeout(() => {
+        document.getElementById('modal-title').textContent = 'Edit Audit Plan';
+        document.getElementById('plan-client').value = plan.client;
+        document.getElementById('plan-standard').value = plan.standard || '';
+        document.getElementById('plan-type').value = plan.type || 'Surveillance';
+        document.getElementById('plan-date').value = plan.date;
+
+        // Handle Lead Auditor
+        const lead = plan.team[0];
+        document.getElementById('plan-lead-auditor').value = lead;
+
+        // Handle Team Members
+        const teamSelect = document.getElementById('plan-team');
+        const teamMembers = plan.team.slice(1);
+        Array.from(teamSelect.options).forEach(option => {
+            option.selected = teamMembers.includes(option.value);
+        });
+
+        // Update save handler to update instead of create
+        document.getElementById('modal-save').onclick = () => {
+            const updatedClient = document.getElementById('plan-client').value;
+            const updatedDate = document.getElementById('plan-date').value;
+            const updatedLead = document.getElementById('plan-lead-auditor').value;
+            const updatedType = document.getElementById('plan-type').value;
+            const updatedStandard = document.getElementById('plan-standard').value;
+
+            const teamSelect = document.getElementById('plan-team');
+            const updatedTeam = Array.from(teamSelect.selectedOptions).map(option => option.value);
+            if (updatedLead) updatedTeam.unshift(updatedLead);
+
+            if (updatedClient && updatedDate && updatedLead) {
+                plan.client = updatedClient;
+                plan.date = updatedDate;
+                plan.type = updatedType;
+                plan.standard = updatedStandard;
+                plan.team = updatedTeam;
+
+                saveData();
+                closeModal();
+                renderAuditPlanningEnhanced();
+                showNotification('Audit Plan updated successfully');
+            }
+        };
+    }, 50);
+}
+
 function updateClientDetails(clientName) {
     // Mock functionality: In a real app, this would fetch client details like employee count to help with calculation
     const client = state.clients.find(c => c.name === clientName);
@@ -248,10 +301,6 @@ function saveAuditPlan() {
     } else {
         showNotification('Please fill in all required fields (Client, Date, Lead Auditor)', 'error');
     }
-}
-
-function editAuditPlan(id) {
-    showNotification('Edit functionality would open the same modal with pre-filled data.', 'info');
 }
 
 function viewAuditPlan(id) {

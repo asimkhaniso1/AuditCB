@@ -41,6 +41,7 @@ function renderAuditProgramsEnhanced() {
             </td>
             <td><span class="status-badge status-${program.status.toLowerCase()}">${program.status}</span></td>
             <td>
+                <button class="btn btn-sm edit-program" data-program-id="${program.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn btn-sm view-program" data-program-id="${program.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
             </td>
         </tr>
@@ -108,8 +109,18 @@ function renderAuditProgramsEnhanced() {
 
     document.querySelectorAll('.view-program, .program-row').forEach(el => {
         el.addEventListener('click', (e) => {
-            const programId = parseInt(el.getAttribute('data-program-id'));
-            renderProgramDetail(programId);
+            if (!e.target.closest('.edit-program')) {
+                const programId = parseInt(el.getAttribute('data-program-id'));
+                renderProgramDetail(programId);
+            }
+        });
+    });
+
+    document.querySelectorAll('.edit-program').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const programId = parseInt(btn.getAttribute('data-program-id'));
+            openEditProgramModal(programId);
         });
     });
 }
@@ -193,7 +204,12 @@ function renderProgramDetail(programId) {
                         <h2 style="margin-bottom: 0.5rem;">${program.client} - ${program.standard}</h2>
                         <p style="color: var(--text-secondary);">Cycle: ${program.cycleStart} to ${program.cycleEnd}</p>
                     </div>
-                    <span class="status-badge status-${program.status.toLowerCase()}">${program.status}</span>
+                    <div>
+                        <button class="btn btn-primary" onclick="window.openEditProgramModal(${program.id})" style="margin-right: 0.5rem;">
+                            <i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Program
+                        </button>
+                        <span class="status-badge status-${program.status.toLowerCase()}">${program.status}</span>
+                    </div>
                 </div>
             </div>
 
@@ -312,8 +328,79 @@ function openAddProgramModal() {
     };
 }
 
+function openEditProgramModal(programId) {
+    const program = state.auditPrograms.find(p => p.id === programId);
+    if (!program) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Edit Audit Program';
+    modalBody.innerHTML = `
+        <form id="program-form">
+            <div class="form-group">
+                <label>Client</label>
+                <select class="form-control" id="program-client" required disabled>
+                    <option value="${program.client}">${program.client}</option>
+                </select>
+                <small>Client cannot be changed for an existing program.</small>
+            </div>
+            <div class="form-group">
+                <label>Standard</label>
+                <select class="form-control" id="program-standard">
+                    <option ${program.standard === 'ISO 9001:2015' ? 'selected' : ''}>ISO 9001:2015</option>
+                    <option ${program.standard === 'ISO 14001:2015' ? 'selected' : ''}>ISO 14001:2015</option>
+                    <option ${program.standard === 'ISO 45001:2018' ? 'selected' : ''}>ISO 45001:2018</option>
+                    <option ${program.standard === 'ISO 27001:2022' ? 'selected' : ''}>ISO 27001:2022</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select class="form-control" id="program-status">
+                    <option ${program.status === 'Active' ? 'selected' : ''}>Active</option>
+                    <option ${program.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                    <option ${program.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Cycle Start Date</label>
+                <input type="date" class="form-control" id="program-start" value="${program.cycleStart}" required>
+            </div>
+            <div class="form-group">
+                <label>Cycle End Date</label>
+                <input type="date" class="form-control" id="program-end" value="${program.cycleEnd}" required>
+            </div>
+        </form>
+    `;
+
+    openModal();
+
+    modalSave.onclick = () => {
+        const standard = document.getElementById('program-standard').value;
+        const status = document.getElementById('program-status').value;
+        const start = document.getElementById('program-start').value;
+        const end = document.getElementById('program-end').value;
+
+        if (start && end) {
+            program.standard = standard;
+            program.status = status;
+            program.cycleStart = start;
+            program.cycleEnd = end;
+
+            saveData();
+            closeModal();
+            renderAuditProgramsEnhanced();
+            showNotification('Audit Program updated successfully');
+        } else {
+            showNotification('Please fill in all required fields', 'error');
+        }
+    };
+}
+
 // Export functions
 window.renderAuditProgramsEnhanced = renderAuditProgramsEnhanced;
 window.renderTimelineVisualization = renderTimelineVisualization;
 window.renderProgramDetail = renderProgramDetail;
 window.openAddProgramModal = openAddProgramModal;
+window.openEditProgramModal = openEditProgramModal;

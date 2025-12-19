@@ -3,6 +3,7 @@
 // ============================================
 
 function renderAuditExecutionEnhanced() {
+    const state = window.state;
     const searchTerm = state.executionSearchTerm || '';
 
     let filteredReports = state.auditReports.filter(report => {
@@ -16,6 +17,7 @@ function renderAuditExecutionEnhanced() {
             <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.findings}</span></td>
             <td><span style="background: ${report.status === 'Finalized' ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
             <td>
+                <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
             </td>
         </tr>
@@ -27,7 +29,7 @@ function renderAuditExecutionEnhanced() {
                 <div style="display: flex; gap: 1rem; flex: 1;">
                     <input type="text" id="execution-search" placeholder="Search by client..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
                 </div>
-                <button class="btn btn-primary"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Report</button>
+                <button class="btn btn-primary" onclick="window.openCreateReportModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Report</button>
             </div>
             <div class="table-container">
                 <table>
@@ -58,10 +60,127 @@ function renderAuditExecutionEnhanced() {
 
     document.querySelectorAll('.view-execution, .execution-row').forEach(el => {
         el.addEventListener('click', (e) => {
-            const reportId = parseInt(el.getAttribute('data-report-id'));
-            renderExecutionDetail(reportId);
+            if (!e.target.closest('.edit-execution')) {
+                const reportId = parseInt(el.getAttribute('data-report-id'));
+                renderExecutionDetail(reportId);
+            }
         });
     });
+
+    document.querySelectorAll('.edit-execution').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const reportId = parseInt(btn.getAttribute('data-report-id'));
+            openEditReportModal(reportId);
+        });
+    });
+}
+
+function openCreateReportModal() {
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Create Audit Report';
+    modalBody.innerHTML = `
+        <form id="report-form">
+            <div class="form-group">
+                <label>Audit Plan</label>
+                <select class="form-control" id="report-plan" required>
+                    <option value="">-- Select Audit Plan --</option>
+                    ${state.auditPlans.map(p => `<option value="${p.id}">${p.client} - ${p.date}</option>`).join('')}
+                </select>
+                ${state.auditPlans.length === 0 ? '<small style="color: var(--danger-color);">No audit plans available. Please create a plan first.</small>' : ''}
+            </div>
+            <div class="form-group">
+                <label>Audit Date</label>
+                <input type="date" class="form-control" id="report-date" required>
+            </div>
+            <div class="form-group">
+                <label>Initial Status</label>
+                <select class="form-control" id="report-status">
+                    <option>In Progress</option>
+                    <option>Draft</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    openModal();
+
+    modalSave.onclick = () => {
+        const planId = document.getElementById('report-plan').value;
+        const date = document.getElementById('report-date').value;
+        const status = document.getElementById('report-status').value;
+
+        if (planId && date) {
+            const plan = state.auditPlans.find(p => p.id == planId);
+            const newReport = {
+                id: Date.now(),
+                client: plan.client,
+                date: date,
+                findings: 0,
+                status: status
+            };
+
+            if (!state.auditReports) state.auditReports = [];
+            state.auditReports.push(newReport);
+            saveData();
+            closeModal();
+            renderAuditExecutionEnhanced();
+            showNotification('Audit Report created. Now you can fill the checklist.', 'success');
+        } else {
+            showNotification('Please fill in all required fields', 'error');
+        }
+    };
+}
+
+function openEditReportModal(reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Edit Report Basic Info';
+    modalBody.innerHTML = `
+        <form id="report-form">
+            <div class="form-group">
+                <label>Client</label>
+                <input type="text" class="form-control" value="${report.client}" disabled>
+            </div>
+            <div class="form-group">
+                <label>Audit Date</label>
+                <input type="date" class="form-control" id="report-date" value="${report.date}" required>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select class="form-control" id="report-status">
+                    <option ${report.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                    <option ${report.status === 'Draft' ? 'selected' : ''}>Draft</option>
+                    <option ${report.status === 'Finalized' ? 'selected' : ''}>Finalized</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    openModal();
+
+    modalSave.onclick = () => {
+        const date = document.getElementById('report-date').value;
+        const status = document.getElementById('report-status').value;
+
+        if (date) {
+            report.date = date;
+            report.status = status;
+
+            saveData();
+            closeModal();
+            renderAuditExecutionEnhanced();
+            showNotification('Report info updated successfully');
+        }
+    };
 }
 
 function renderExecutionDetail(reportId) {
@@ -375,3 +494,5 @@ window.updateChecklistStatus = updateChecklistStatus;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
 window.createCAPA = createCAPA;
+window.openCreateReportModal = openCreateReportModal;
+window.openEditReportModal = openEditReportModal;

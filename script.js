@@ -17,6 +17,7 @@ const state = {
     ],
     auditPrograms: [],
     auditPlans: [],
+    auditReports: [],
     certificationDecisions: [
         { client: 'Tech Solutions Ltd', standard: 'ISO 9001:2015', date: '2024-01-15', decision: 'Granted' },
         { client: 'Global Manufacturing', standard: 'ISO 14001:2015', date: '2024-02-10', decision: 'Granted' }
