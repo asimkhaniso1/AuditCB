@@ -1215,7 +1215,7 @@ window.generateAuditReport = function (reportId) {
                     </div>
                 </div>
 
-                <h1>3. Strengths & Opportunities</h1>
+                <h1>3. Strengths and Opportunities</h1>
                 <div class="grid-2">
                     <div>
                         <h3><i class="fa-solid fa-thumbs-up" style="color: #10b981; margin-right: 8px;"></i> Key Strengths</h3>
@@ -1231,7 +1231,7 @@ window.generateAuditReport = function (reportId) {
                     </div>
                 </div>
 
-                <h1>4. Detailed Findings & Evidence</h1>
+                <h1>4. Detailed Findings and Evidence</h1>
                 ${ncrCount === 0 ? '<p>No non-conformities were raised during this audit. The system was found to be in full compliance.</p>' : ''}
                 ${(report.ncrs || []).map((ncr, i) => `
                     <div class="finding-box ${ncr.type === 'major' ? 'finding-major' : 'finding-minor'}">
@@ -1269,7 +1269,7 @@ window.generateAuditReport = function (reportId) {
                     </div>
                 `).join('')}
 
-                <h1>5. Conclusion & Recommendation</h1>
+                <h1>5. Conclusion and Recommendation</h1>
                 <p><strong>Auditor Conclusion:</strong></p>
                 <div style="margin-bottom: 30px; background: #fff; border-left: 4px solid #3b82f6; padding: 15px;">
                     ${(report.conclusion || '').replace(/\n/g, '<br>')}
