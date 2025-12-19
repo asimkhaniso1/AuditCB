@@ -13,7 +13,7 @@ function renderAuditPlanningEnhanced() {
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
-                <a href="#" onclick="window.viewAuditPlan(${plan.id}); return false;" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
+                <a href="#" class="plan-title-link" data-plan-id="${plan.id}" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${plan.standard || 'ISO 9001:2015'}</div>
             </td>
             <td>${plan.type || 'Surveillance'}</td>
@@ -98,6 +98,15 @@ function renderAuditPlanningEnhanced() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const planId = parseInt(btn.getAttribute('data-plan-id'));
+            viewAuditPlan(planId);
+        });
+    });
+
+    document.querySelectorAll('.plan-title-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const planId = parseInt(link.getAttribute('data-plan-id'));
             viewAuditPlan(planId);
         });
     });
