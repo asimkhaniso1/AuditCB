@@ -252,8 +252,10 @@ function openAddProgramModal() {
             <div class="form-group">
                 <label>Client</label>
                 <select class="form-control" id="program-client" required>
+                    <option value="">-- Select Client --</option>
                     ${state.clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
                 </select>
+                ${state.clients.length === 0 ? '<small style="color: var(--danger-color);">No clients available. Please add a client first.</small>' : ''}
             </div>
             <div class="form-group">
                 <label>Standard</label>
@@ -283,6 +285,11 @@ function openAddProgramModal() {
         const start = document.getElementById('program-start').value;
         const end = document.getElementById('program-end').value;
 
+        if (!client) {
+            showNotification('Please select a client', 'error');
+            return;
+        }
+
         if (client && start && end) {
             const newProgram = {
                 id: Date.now(),
@@ -298,6 +305,8 @@ function openAddProgramModal() {
             closeModal();
             renderAuditProgramsEnhanced();
             showNotification('Audit Program created successfully');
+        } else {
+            showNotification('Please fill in all required fields', 'error');
         }
     };
 }

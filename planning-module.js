@@ -261,3 +261,7 @@ function viewAuditPlan(id) {
 window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
 window.openCreatePlanModal = openCreatePlanModal;
 window.autoCalculateDays = autoCalculateDays;
+window.updateClientDetails = updateClientDetails;
+window.saveAuditPlan = saveAuditPlan;
+window.editAuditPlan = editAuditPlan;
+window.viewAuditPlan = viewAuditPlan;
