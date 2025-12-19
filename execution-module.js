@@ -1074,25 +1074,34 @@ window.createCAPA = createCAPA;
 // Generate Printable Report
 window.generateAuditReport = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
-    if (!report) return;
+    if (!report) {
+        window.showNotification('Report not found', 'error');
+        return;
+    }
 
-    const plan = state.auditPlans.find(p => p.client === report.client) || {};
-    const ncrCount = (report.ncrs || []).length;
-    const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
-    const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
+    try {
+        const plan = state.auditPlans.find(p => p.client === report.client) || {};
+        const ncrCount = (report.ncrs || []).length;
+        const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
+        const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
 
-    // QR Code URL
-    const qrData = `REP-${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}%`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+        // QR Code URL
+        const qrData = `REP-${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}%`;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
 
-    // Mock Compliance Score Logic
-    const complianceScore = Math.max(0, 100 - (majorCount * 15) - (minorCount * 5));
-    const conformHeight = complianceScore;
-    const majorHeight = Math.min(100, majorCount * 15 + 10);
-    const minorHeight = Math.min(100, minorCount * 10 + 10);
+        // Mock Compliance Score Logic
+        const complianceScore = Math.max(0, 100 - (majorCount * 15) - (minorCount * 5));
+        const conformHeight = complianceScore;
+        const majorHeight = Math.min(100, majorCount * 15 + 10);
+        const minorHeight = Math.min(100, minorCount * 10 + 10);
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+        const printWindow = window.open('', '_blank');
+
+        if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
+            window.showNotification('Popup blocked! Please allow popups for this site and try again.', 'error');
+            return;
+        }
+        printWindow.document.write(`
         <html>
         <head>
             <title>Audit Report - ${report.client}</title>
@@ -1277,7 +1286,11 @@ window.generateAuditReport = function (reportId) {
         </body>
         </html>
     `);
-    printWindow.document.close();
+        printWindow.document.close();
+    } catch (error) {
+        console.error('Error generating audit report:', error);
+        window.showNotification('Failed to generate report: ' + error.message, 'error');
+    }
 };
 
 window.openCreateReportModal = openCreateReportModal;
