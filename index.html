@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditCB360 – ISO CB Auditor & Audit Management</title>
+    <meta name="description"
+        content="Manage ISO Certification Body operations including clients, auditors, audits, and certification decisions.">
+    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Modal Z-Index Fix to prevent sidebar overlap -->
+    <style>
+        .modal-overlay {
+            z-index: 9999 !important;
+        }
+
+        .modal-content {
+            z-index: 10000 !important;
+            position: relative !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#content-area" class="skip-to-main">Skip to main content</a>
+
+    <!-- Mobile menu toggle -->
+    <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <!-- Mobile overlay -->
+    <div class="mobile-overlay" id="mobile-overlay"></div>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="logo-container">
+                <i class="fa-solid fa-certificate"></i>
+                <h1>AuditCB360</h1>
+            </div>
+            <nav class="main-nav" role="navigation" aria-label="Main navigation">
+                <ul>
+                    <li class="active" data-module="dashboard" role="button" tabindex="0" aria-label="Dashboard"><i
+                            class="fa-solid fa-chart-line"></i> Dashboard</li>
+                    <li data-module="clients" role="button" tabindex="0" aria-label="Clients"><i
+                            class="fa-solid fa-building"></i> Clients</li>
+                    <li data-module="auditors" role="button" tabindex="0" aria-label="Auditors"><i
+                            class="fa-solid fa-user-tie"></i> Auditors</li>
+                    <li data-module="audit-programs" role="button" tabindex="0" aria-label="Audit Programs"><i
+                            class="fa-solid fa-calendar-alt"></i> Audit Programs</li>
+                    <li data-module="audit-planning" role="button" tabindex="0" aria-label="Audit Planning"><i
+                            class="fa-solid fa-clipboard-list"></i> Audit Planning</li>
+                    <li data-module="manday-calculator" role="button" tabindex="0" aria-label="Man-Day Calculator"><i
+                            class="fa-solid fa-calculator"></i> Man-Day Calculator</li>
+                    <li data-module="audit-execution" role="button" tabindex="0" aria-label="Execution & Reports"><i
+                            class="fa-solid fa-tasks"></i> Execution & Reports</li>
+                    <li data-module="certification" role="button" tabindex="0" aria-label="Certification"><i
+                            class="fa-solid fa-stamp"></i> Certification</li>
+                    <li data-module="documents" role="button" tabindex="0" aria-label="Documents"><i
+                            class="fa-solid fa-folder-open"></i> Documents</li>
+                    <li data-module="settings"
+                        style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"
+                        role="button" tabindex="0" aria-label="Settings"><i class="fa-solid fa-cog"></i> Settings</li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="page-title">Dashboard</h2>
+                <div class="user-profile">
+                    <span>Admin User</span>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                </div>
+            </header>
+
+            <div id="content-area" role="main">
+                <!-- Dynamic Content Loaded Here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h3 id="modal-title">Modal Title</h3>
+                <button id="modal-close" class="close-btn" aria-label="Close modal"><i
+                        class="fa-solid fa-times"></i></button>
+            </header>
+            <div id="modal-body" class="modal-body">
+                <!-- Dynamic Form Content -->
+            </div>
+            <footer class="modal-footer">
+                <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="modal-save" class="btn btn-primary">Save</button>
+            </footer>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
