@@ -58,7 +58,7 @@ function renderAuditProgramsEnhanced() {
                         <option value="completed">Completed</option>
                     </select>
                 </div>
-                <button class="btn btn-primary" onclick="window.openAddProgramModal()">
+                <button id="btn-new-program" class="btn btn-primary">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Program
                 </button>
             </div>
@@ -102,6 +102,8 @@ function renderAuditProgramsEnhanced() {
     contentArea.innerHTML = html;
 
     // Event listeners
+    document.getElementById('btn-new-program')?.addEventListener('click', openAddProgramModal);
+
     document.getElementById('program-search')?.addEventListener('input', (e) => {
         state.programSearchTerm = e.target.value;
         renderAuditProgramsEnhanced();

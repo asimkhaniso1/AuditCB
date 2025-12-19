@@ -43,7 +43,7 @@ function renderAuditorsEnhanced() {
                         <i class="fa-solid fa-table" style="margin-right: 0.5rem;"></i> Competence Matrix
                     </button>
                 </div>
-                <button class="btn btn-primary" onclick="window.openAddAuditorModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>
+                <button id="btn-add-auditor" class="btn btn-primary"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>
             </div>
             <div class="table-container">
                 <table>
@@ -65,6 +65,8 @@ function renderAuditorsEnhanced() {
     contentArea.innerHTML = html;
 
     // Event listeners
+    document.getElementById('btn-add-auditor')?.addEventListener('click', openAddAuditorModal);
+
     document.getElementById('auditor-search')?.addEventListener('input', (e) => {
         state.auditorSearchTerm = e.target.value;
         renderAuditorsEnhanced();

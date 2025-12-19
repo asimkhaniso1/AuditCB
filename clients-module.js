@@ -40,7 +40,7 @@ function renderClientsEnhanced() {
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     ${window.addExportButtons ? window.addExportButtons('clients') : ''}
-                    <button class="btn btn-primary" onclick="window.openAddClientModal()">
+                    <button id="btn-new-client" class="btn btn-primary">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                 </div>
@@ -68,6 +68,8 @@ function renderClientsEnhanced() {
     contentArea.innerHTML = html;
 
     // Event listeners
+    document.getElementById('btn-new-client')?.addEventListener('click', openAddClientModal);
+
     document.getElementById('client-search')?.addEventListener('input', (e) => {
         state.clientSearchTerm = e.target.value;
         renderClientsEnhanced();

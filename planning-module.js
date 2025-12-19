@@ -29,10 +29,10 @@ function renderAuditPlanningEnhanced() {
             </td>
             <td><span class="status-badge status-${plan.status.toLowerCase()}">${plan.status}</span></td>
             <td>
-                <button class="btn btn-sm" onclick="window.editAuditPlan(${plan.id})" title="Edit Plan">
+                <button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
                     <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
                 </button>
-                <button class="btn btn-sm" onclick="window.viewAuditPlan(${plan.id})" title="View Details">
+                <button class="btn btn-sm view-plan-btn" data-plan-id="${plan.id}" title="View Details">
                     <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                 </button>
             </td>
@@ -51,7 +51,7 @@ function renderAuditPlanningEnhanced() {
                         <option value="Completed">Completed</option>
                     </select>
                 </div>
-                <button class="btn btn-primary" onclick="window.openCreatePlanModal()">
+                <button id="btn-create-plan" class="btn btn-primary">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Audit Plan
                 </button>
             </div>
@@ -79,9 +79,27 @@ function renderAuditPlanningEnhanced() {
     contentArea.innerHTML = html;
 
     // Event listeners
+    document.getElementById('btn-create-plan')?.addEventListener('click', openCreatePlanModal);
+
     document.getElementById('plan-search')?.addEventListener('input', (e) => {
         state.planningSearchTerm = e.target.value;
         renderAuditPlanningEnhanced();
+    });
+
+    document.querySelectorAll('.edit-plan-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const planId = parseInt(btn.getAttribute('data-plan-id'));
+            editAuditPlan(planId);
+        });
+    });
+
+    document.querySelectorAll('.view-plan-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const planId = parseInt(btn.getAttribute('data-plan-id'));
+            viewAuditPlan(planId);
+        });
     });
 }
 

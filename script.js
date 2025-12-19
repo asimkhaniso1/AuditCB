@@ -39,21 +39,30 @@ window.renderModule = renderModule;
 
 // State Management
 function saveState() {
-    localStorage.setItem('auditCB360State', JSON.stringify(state));
+    try {
+        localStorage.setItem('auditCB360State', JSON.stringify(state));
+    } catch (e) {
+        console.warn('LocalStorage not available:', e);
+    }
 }
 
 function loadState() {
-    const saved = localStorage.getItem('auditCB360State');
-    if (saved) {
-        const data = JSON.parse(saved);
-        Object.assign(state, data);
+    try {
+        const saved = localStorage.getItem('auditCB360State');
+        if (saved) {
+            const data = JSON.parse(saved);
+            Object.assign(state, data);
+        }
+    } catch (e) {
+        console.warn('LocalStorage not available:', e);
     }
 }
 
 loadState();
 
-// Helper functions
+// Helper functions (Safe ID Generation)
 function getNextId(collection) {
+    if (!state[collection]) return 1;
     const items = state[collection];
     return items.length > 0 ? Math.max(...items.map(item => item.id)) + 1 : 1;
 }
@@ -124,13 +133,24 @@ function loadScript(src) {
             return;
         }
         const script = document.createElement('script');
-        // Add timestamp to prevent caching issues - bust cache once per session
-        script.src = `${src}?v=${window.appTimestamp || (window.appTimestamp = Date.now())}`;
+
+        // Handle file protocol (avoid query params for local files if strict)
+        const isFileProtocol = window.location.protocol === 'file:';
+        if (isFileProtocol) {
+            script.src = src;
+        } else {
+            // Add timestamp to prevent caching issues on web servers
+            script.src = `${src}?v=${window.appTimestamp || (window.appTimestamp = Date.now())}`;
+        }
+
         script.onload = () => {
             loadedModules.add(src);
             resolve();
         };
-        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        script.onerror = () => {
+            console.error(`Failed to load script: ${src}`);
+            reject(new Error(`Failed to load ${src}`));
+        };
         document.body.appendChild(script);
     });
 }
