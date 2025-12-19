@@ -237,120 +237,120 @@ function renderExecutionTab(report, tabName) {
 
     switch (tabName) {
         case 'checklist':
-            // Use dynamic checklists if assigned to the plan
             const plan = state.auditPlans.find(p => p.client === report.client);
             const planChecklists = plan?.selectedChecklists || [];
             const checklists = state.checklists || [];
             const assignedChecklists = planChecklists.map(clId => checklists.find(c => c.id === clId)).filter(c => c);
+            const customItems = report.customItems || [];
 
             // Create lookup for saved progress
             const progressMap = {};
             (report.checklistProgress || []).forEach(p => {
-                progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
+                const key = p.isCustom ? `custom-${p.itemIdx}` : `${p.checklistId}-${p.itemIdx}`;
+                progressMap[key] = p;
             });
 
-            const statusColors = {
-                'conform': 'var(--success-color)',
-                'minor': 'var(--warning-color)',
-                'major': 'var(--danger-color)',
-                'na': 'var(--secondary-color)'
+            // Helper to render row
+            const renderRow = (item, checklistId, idx, isCustom = false) => {
+                const uniqueId = isCustom ? `custom-${idx}` : `${checklistId}-${idx}`;
+                const saved = progressMap[uniqueId] || {};
+                const s = saved.status || ''; // 'conform', 'nc', 'na' or ''
+
+                return `
+                    <div class="card checklist-item" id="row-${uniqueId}" style="margin-bottom: 0.5rem; padding: 1rem; border-left: 4px solid #e2e8f0;">
+                         <div style="display: grid; grid-template-columns: 80px 1fr 180px; gap: 1rem; align-items: start;">
+                            <div style="font-weight: bold; color: var(--primary-color);">${item.clause || 'N/A'}</div>
+                            <div>
+                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${item.requirement}</div>
+                                <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${saved.comment || ''}" style="margin-bottom: 0;">
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <button type="button" class="btn-icon btn-na ${s === 'na' ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', 'na')" title="Not Applicable">N/A</button>
+                                <button type="button" class="btn-icon btn-ok ${s === 'conform' ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', 'conform')" title="Conformity"><i class="fa fa-check"></i></button>
+                                <button type="button" class="btn-icon btn-nc ${s === 'nc' ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', 'nc')" title="Non-Conformity"><i class="fa fa-times"></i></button>
+                            </div>
+                         </div>
+                         
+                         <!-- Hidden status input -->
+                         <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" id="status-${uniqueId}" value="${s}">
+                         
+                         <!-- NCR Panel (Conditional) -->
+                         <div id="ncr-panel-${uniqueId}" class="ncr-panel" style="display: ${s === 'nc' ? 'block' : 'none'}; background: #fff1f2; border: 1px solid #fecaca; padding: 1rem; margin-top: 1rem; border-radius: 6px;">
+                             <h5 style="color: var(--danger-color); margin-bottom: 0.5rem; display: flex; align-items: center;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem;"></i> Non-Conformity Details</h5>
+                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
+                                 <div>
+                                     <label style="font-size: 0.8rem;">Severity</label>
+                                     <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
+                                        <option value="minor" ${saved.ncrType === 'minor' ? 'selected' : ''}>Minor</option>
+                                        <option value="major" ${saved.ncrType === 'major' ? 'selected' : ''}>Major</option>
+                                     </select>
+                                 </div>
+                                 <div style="display: flex; align-items: flex-end;">
+                                     <button class="btn btn-sm btn-outline-secondary" style="width: 100%; border-style: dashed;" onclick="document.getElementById('img-${uniqueId}').click()">
+                                         <i class="fa-solid fa-camera"></i> Capture Evidence
+                                     </button>
+                                     <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="if(this.files.length) alert('Image selected (mock)')">
+                                 </div>
+                             </div>
+                             <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Dictate/Type short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
+                         </div>
+                    </div>
+                `;
             };
 
             let checklistHTML = '';
 
             if (assignedChecklists.length > 0) {
-                // Render assigned checklists
                 checklistHTML = assignedChecklists.map(checklist => `
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-                            <div>
-                                <h4 style="margin: 0; color: var(--primary-color);">${checklist.name}</h4>
-                                <span style="font-size: 0.8rem; color: var(--text-secondary);">${checklist.items?.length || 0} items • ${checklist.type === 'global' ? 'Global' : 'Custom'}</span>
-                            </div>
-                        </div>
-                        ${(checklist.items || []).map((item, idx) => {
-                    const key = `${checklist.id}-${idx}`;
-                    const saved = progressMap[key] || {};
-                    const s = saved.status || '';
-                    const c = saved.comment || '';
-                    const style = s ? `background: ${statusColors[s]}; color: white;` : '';
-
-                    return `
-                            <div style="padding: 0.75rem; border-left: 3px solid var(--border-color); margin-bottom: 0.5rem; background: #f8fafc;">
-                                <div style="display: grid; grid-template-columns: 100px 2fr 150px 2fr; gap: 0.75rem; align-items: center;">
-                                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--primary-color);">${item.clause || `${idx + 1}`}</div>
-                                    <div style="font-size: 0.875rem;">${item.requirement || '-'}</div>
-                                    <div>
-                                        <select class="checklist-status" data-report="${report.id}" data-checklist="${checklist.id}" data-item="${idx}" style="margin-bottom: 0; font-size: 0.8rem; ${style}" onchange="updateChecklistStatus(this)">
-                                            <option value="" ${s === '' ? 'selected' : ''}>Not Checked</option>
-                                            <option value="conform" ${s === 'conform' ? 'selected' : ''}>✓ Conform</option>
-                                            <option value="minor" ${s === 'minor' ? 'selected' : ''}>⚠ Minor NC</option>
-                                            <option value="major" ${s === 'major' ? 'selected' : ''}>✗ Major NC</option>
-                                            <option value="na" ${s === 'na' ? 'selected' : ''}>N/A</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <input type="text" class="checklist-comment" data-report="${report.id}" data-checklist="${checklist.id}" data-item="${idx}" value="${c}" placeholder="Evidence / Comments..." style="margin-bottom: 0; font-size: 0.8rem;">
-                                    </div>
-                                </div>
-                            </div>
-                            `;
-                }).join('')}
+                    <div style="margin-bottom: 2rem;">
+                        <h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--primary-color);">
+                            ${checklist.name}
+                        </h4>
+                        ${(checklist.items || []).map((item, idx) => renderRow(item, checklist.id, idx, false)).join('')}
                     </div>
-                `).join('');
+                 `).join('');
             } else {
-                // Fallback to hardcoded ISO 9001 if no checklists assigned
-                const iso9001Clauses = [
-                    { number: '4', title: 'Context of the Organization', subclauses: ['4.1 Understanding the organization', '4.2 Understanding stakeholders', '4.3 Scope of QMS', '4.4 QMS and processes'] },
-                    { number: '5', title: 'Leadership', subclauses: ['5.1 Leadership and commitment', '5.2 Policy', '5.3 Roles and responsibilities'] },
-                    { number: '6', title: 'Planning', subclauses: ['6.1 Risk and opportunities', '6.2 Quality objectives', '6.3 Planning of changes'] },
-                    { number: '7', title: 'Support', subclauses: ['7.1 Resources', '7.2 Competence', '7.3 Awareness', '7.4 Communication', '7.5 Documented information'] },
-                    { number: '8', title: 'Operation', subclauses: ['8.1 Operational planning', '8.2 Customer requirements', '8.3 Design and development', '8.4 External providers', '8.5 Production', '8.6 Release of products', '8.7 Nonconformity control'] },
-                    { number: '9', title: 'Performance Evaluation', subclauses: ['9.1 Monitoring and measurement', '9.2 Internal audit', '9.3 Management review'] },
-                    { number: '10', title: 'Improvement', subclauses: ['10.1 General', '10.2 Nonconformity and corrective action', '10.3 Continual improvement'] }
-                ];
+                checklistHTML = `<div class="alert alert-warning">No configured checklists found.</div>`;
+            }
 
-                checklistHTML = `
-                    <div style="background: #fef3c7; padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem;">
-                        <p style="margin: 0; color: #d97706;"><i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>No checklists assigned to this audit plan. Using default ISO 9001 template. <a href="#" onclick="window.renderModule('audit-planning')">Assign checklists</a></p>
+            // Custom Items Section
+            if (customItems.length > 0) {
+                checklistHTML += `
+                    <div style="margin-bottom: 2rem; margin-top: 2rem;">
+                         <h4 style="border-bottom: 2px solid var(--warning-color); padding-bottom: 0.5rem; margin-bottom: 1rem; color: #d97706;">
+                            <i class="fa-solid fa-pen-to-square"></i> Custom Audit Questions
+                        </h4>
+                        ${customItems.map((item, idx) => renderRow(item, 'custom', idx, true)).join('')}
                     </div>
-                ` + iso9001Clauses.map(clause => `
-                    <div class="card" style="margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem;">
-                            <h4 style="color: var(--primary-color);">Clause ${clause.number}: ${clause.title}</h4>
-                        </div>
-                        ${clause.subclauses.map((sub, idx) => `
-                            <div style="padding: 0.75rem; border-left: 3px solid var(--border-color); margin-bottom: 0.5rem; background: #f8fafc;">
-                                <div style="display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 1rem; align-items: center;">
-                                    <div style="font-size: 0.875rem; font-weight: 500;">${sub}</div>
-                                    <div>
-                                        <select style="margin-bottom: 0; font-size: 0.875rem;" onchange="updateChecklistStatus(this)">
-                                            <option value="">Not Checked</option>
-                                            <option value="conform">✓ Conform</option>
-                                            <option value="minor">⚠ Minor NC</option>
-                                            <option value="major">✗ Major NC</option>
-                                            <option value="na">N/A</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <input type="text" placeholder="Comments / Evidence..." style="margin-bottom: 0; font-size: 0.875rem;">
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `).join('');
+                `;
             }
 
             tabContent.innerHTML = `
+                <style>
+                    .btn-icon { border: 1px solid #d1d5db; background: white; width: 32px; height: 32px; border-radius: 4px; color: #6b7280; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; transition: all 0.2s; }
+                    .btn-icon:hover { background: #f3f4f6; }
+                    .btn-icon.active { transform: scale(1.1); font-weight: bold; border-color: transparent; }
+                    .btn-icon.btn-ok.active { background: var(--success-color); color: white; }
+                    .btn-icon.btn-nc.active { background: var(--danger-color); color: white; }
+                    .btn-icon.btn-na.active { background: #9ca3af; color: white; }
+                    .checklist-item:focus-within { border-color: var(--primary-color) !important; background: #f0f9ff !important; }
+                </style>
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <h3>${assignedChecklists.length > 0 ? 'Audit Checklists' : 'ISO 9001:2015 Audit Checklist'}</h3>
-                        <button class="btn btn-primary" onclick="saveChecklist(${report.id})">
+                   
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem; position: sticky; top: 0; background: rgba(255,255,255,0.9); padding: 10px; z-index: 100; backdrop-filter: blur(5px); border-bottom: 1px solid #eee;">
+                         <button class="btn btn-secondary" onclick="window.addCustomQuestion(${report.id})">
+                            <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Custom Question
+                        </button>
+                        <button class="btn btn-primary" onclick="window.saveChecklist(${report.id})">
                             <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                         </button>
                     </div>
+
                     ${checklistHTML}
+                    
+                    <div style="text-align: center; margin-top: 2rem; padding: 2rem; background: #f8fafc; border-radius: 8px;">
+                        <button class="btn btn-primary btn-lg" onclick="window.saveChecklist(${report.id})">Save All Progress</button>
+                    </div>
                 </div>
             `;
             break;
@@ -529,45 +529,83 @@ function renderExecutionTab(report, tabName) {
 }
 
 // Helper functions for execution module
-function updateChecklistStatus(selectEl) {
-    const status = selectEl.value;
-    const statusColors = {
-        'conform': 'var(--success-color)',
-        'minor': 'var(--warning-color)',
-        'major': 'var(--danger-color)',
-        'na': 'var(--secondary-color)'
-    };
-    if (status) {
-        selectEl.style.background = statusColors[status] || '';
-        selectEl.style.color = '#fff';
-    } else {
-        selectEl.style.background = '';
-        selectEl.style.color = '';
-    }
-}
+// Helper functions for execution module
 
-function saveChecklist(reportId) {
+window.setChecklistStatus = function (uniqueId, status) {
+    const row = document.getElementById('row-' + uniqueId);
+    if (!row) return;
+
+    // Update buttons
+    row.querySelectorAll('.btn-icon').forEach(btn => btn.classList.remove('active'));
+
+    let activeBtnClass = '';
+    if (status === 'conform') activeBtnClass = '.btn-ok';
+    else if (status === 'nc') activeBtnClass = '.btn-nc';
+    else if (status === 'na') activeBtnClass = '.btn-na';
+
+    if (activeBtnClass) row.querySelector(activeBtnClass)?.classList.add('active');
+
+    // Show/Hide NCR Panel
+    const panel = document.getElementById('ncr-panel-' + uniqueId);
+    if (panel) {
+        if (status === 'nc') {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    // Update hidden input
+    document.getElementById('status-' + uniqueId).value = status;
+};
+
+window.addCustomQuestion = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
-    // Collect all checklist statuses and comments
-    const checklistData = [];
-    document.querySelectorAll('.checklist-status').forEach(select => {
-        const checklistId = select.getAttribute('data-checklist');
-        const itemIdx = select.getAttribute('data-item');
-        const status = select.value;
-        const commentInput = document.querySelector(`.checklist-comment[data-checklist="${checklistId}"][data-item="${itemIdx}"]`);
-        const comment = commentInput?.value || '';
+    const clause = prompt("Enter Clause Number (e.g. 'New 1.1'):");
+    if (!clause) return;
+    const req = prompt("Enter Requirement Question:");
+    if (!req) return;
 
-        if (status || comment) {
-            checklistData.push({ checklistId, itemIdx, status, comment });
+    if (!report.customItems) report.customItems = [];
+    report.customItems.push({ clause, requirement: req });
+
+    window.saveData();
+    window.renderExecutionDetail(reportId);
+};
+
+window.saveChecklist = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    const checklistData = [];
+    document.querySelectorAll('.status-input').forEach(input => {
+        const uniqueId = input.id.replace('status-', '');
+
+        const status = input.value;
+        const comment = document.getElementById('comment-' + uniqueId)?.value || '';
+        const ncrDesc = document.getElementById('ncr-desc-' + uniqueId)?.value || '';
+        const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
+
+        // Only save if interacted with
+        if (status || comment || ncrDesc) {
+            checklistData.push({
+                checklistId: input.dataset.checklist,
+                itemIdx: input.dataset.item,
+                isCustom: input.dataset.custom === 'true',
+                status: status,
+                comment: comment,
+                ncrDescription: ncrDesc,
+                ncrType: ncrType
+            });
         }
     });
 
     report.checklistProgress = checklistData;
     window.saveData();
     window.showNotification('Checklist progress saved successfully');
-}
+};
 
 function createNCR(reportId) {
     const report = state.auditReports.find(r => r.id === reportId);

@@ -223,6 +223,65 @@ function renderChecklistLibrary() {
     });
 }
 
+
+function setupCSVUpload() {
+    const csvInput = document.getElementById('csv-upload-input');
+    const btnImport = document.getElementById('btn-import-csv');
+
+    if (!csvInput || !btnImport) return;
+
+    btnImport.addEventListener('click', () => {
+        csvInput.click();
+    });
+
+    csvInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split(/\r\n|\n/);
+            const tbody = document.getElementById('checklist-items-body');
+
+            let addedCount = 0;
+            lines.forEach(line => {
+                if (!line.trim()) return;
+
+                // Simple CSV split (Clause, Requirement)
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const clause = parts[0].trim();
+                    // Join the rest in case description has commas
+                    const requirement = parts.slice(1).join(',').trim();
+
+                    // Basic header detection validation
+                    if (clause && requirement && clause.toLowerCase() !== 'clause') {
+                        const newRow = document.createElement('tr');
+                        newRow.className = 'checklist-item-row';
+                        newRow.innerHTML = `
+                            <td><input type="text" class="form-control item-clause" value="${clause}" style="margin: 0;"></td>
+                            <td><input type="text" class="form-control item-requirement" value="${requirement}" style="margin: 0;"></td>
+                            <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                        `;
+                        tbody.appendChild(newRow);
+                        addedCount++;
+                    }
+                }
+            });
+
+            attachRemoveRowListeners();
+            if (addedCount > 0) {
+                window.showNotification(`Imported ${addedCount} items from CSV`);
+            } else {
+                window.showNotification('No valid items found in CSV', 'warning');
+            }
+            csvInput.value = ''; // Reset
+        };
+        reader.readAsText(file);
+    });
+}
+
 function openAddChecklistModal() {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
@@ -257,9 +316,15 @@ function openAddChecklistModal() {
             <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items</h4>
-                    <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
-                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Row
-                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
+                            <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i> Import CSV
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Row
+                        </button>
+                    </div>
                 </div>
 
                 <div id="checklist-items-container" style="max-height: 300px; overflow-y: auto;">
@@ -302,6 +367,7 @@ function openAddChecklistModal() {
     `;
 
     window.openModal();
+    setupCSVUpload();
 
     // Add row functionality
     document.getElementById('add-item-row')?.addEventListener('click', () => {
@@ -421,9 +487,15 @@ function openEditChecklistModal(id) {
             <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items (${checklist.items?.length || 0})</h4>
-                    <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
-                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Row
-                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
+                            <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i> Import CSV
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Row
+                        </button>
+                    </div>
                 </div>
 
                 <div id="checklist-items-container" style="max-height: 300px; overflow-y: auto;">
@@ -451,6 +523,7 @@ function openEditChecklistModal(id) {
     `;
 
     window.openModal();
+    setupCSVUpload();
 
     document.getElementById('add-item-row')?.addEventListener('click', () => {
         const tbody = document.getElementById('checklist-items-body');

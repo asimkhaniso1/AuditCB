@@ -425,143 +425,301 @@ function viewAuditPlan(id) {
     const client = state.clients.find(c => c.name === plan.client);
     const checklists = state.checklists || [];
     const planChecklists = plan.selectedChecklists || [];
+    const report = (state.auditReports || []).find(r => r.planId === plan.id);
 
-    // Filter checklists by plan's standard
-    const matchingChecklists = checklists.filter(c => c.standard === plan.standard);
-    const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
-    const customChecklists = matchingChecklists.filter(c => c.type === 'custom');
+    // Calculate Progress
+    let progress = 0;
+    let completedItems = 0;
+    let totalItems = 0;
+
+    // Sum total items from assigned checklists
+    planChecklists.forEach(clId => {
+        const cl = checklists.find(c => c.id === clId);
+        if (cl && cl.items) totalItems += cl.items.length;
+    });
+
+    if (report && report.checklistProgress && totalItems > 0) {
+        completedItems = report.checklistProgress.filter(p => p.status && p.status !== '').length;
+        progress = Math.round((completedItems / totalItems) * 100);
+    }
+
+    // Helper to render checklist list
+    const checklistListHTML = planChecklists.length > 0 ? planChecklists.map(clId => {
+        const cl = checklists.find(c => c.id === clId);
+        if (!cl) return '';
+        return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
+                <div>
+                    <p style="font-weight: 500; margin: 0;">${cl.name}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
+                </div>
+                <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
+                    <i class="fa-solid fa-eye"></i>
+                </button>
+            </div>
+        `;
+    }).join('') : '<p style="color: var(--text-secondary); font-style: italic;">No checklists assigned.</p>';
 
     const html = `
         <div class="fade-in">
-            <div style="margin-bottom: 1.5rem;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
-                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Planning
+                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back
                 </button>
-            </div>
-
-            <!-- Plan Header -->
-            <div class="card" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem;">
-                    <div>
-                        <h2 style="margin-bottom: 0.5rem;">${plan.client}</h2>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
-                            <span style="background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">${plan.standard}</span>
-                            <span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">${plan.type}</span>
-                            <span class="status-badge status-${plan.status.toLowerCase()}">${plan.status}</span>
-                        </div>
-                        <p style="color: var(--text-secondary); margin: 0;">
-                            <i class="fa-solid fa-calendar" style="margin-right: 0.25rem;"></i> ${plan.date}
-                        </p>
-                    </div>
-                    <div>
-                        <button class="btn btn-primary" onclick="editAuditPlan(${plan.id})">
-                            <i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Plan
-                        </button>
-                    </div>
+                <div style="display: flex; gap: 1rem;">
+                     ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan(${plan.id})"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Checklist</button>` : ''}
+                     <button class="btn btn-primary" onclick="editAuditPlan(${plan.id})"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Plan</button>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                <!-- Left Column -->
-                <div>
-                    <!-- Client Info -->
-                    ${client ? `
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Client Information</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.9rem;">
-                                <div><strong>Industry:</strong> ${client.industry || '-'}</div>
-                                <div><strong>Employees:</strong> ${client.employees || 0}</div>
-                                <div><strong>Sites:</strong> ${(client.sites && client.sites.length) || 1}</div>
-                                <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
-                                ${client.website ? `<div style="grid-column: 1 / -1;"><strong>Website:</strong> <a href="${client.website}" target="_blank">${client.website}</a></div>` : ''}
-                            </div>
-                        </div>
-                    ` : ''}
+            <!-- Title & Status -->
+            <div style="margin-bottom: 2rem;">
+                 <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">${plan.client} <span style="font-weight: 300; color: var(--text-secondary);">Audit Plan</span></h2>
+                 <div style="display: flex; gap: 1rem; align-items: center;">
+                    <span class="status-badge status-${plan.status.toLowerCase()}">${plan.status}</span>
+                    <span style="color: var(--text-secondary);"><i class="fa-solid fa-calendar" style="margin-right: 0.25rem;"></i> ${plan.date}</span>
+                    <span style="color: var(--text-secondary);"><i class="fa-solid fa-book" style="margin-right: 0.25rem;"></i> ${plan.standard}</span>
+                 </div>
+            </div>
 
-                    <!-- Audit Team -->
-                    <div class="card">
-                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-users" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Team</h3>
-                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            ${plan.team.map((member, idx) => `
-                                <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; background: #f8fafc; border-radius: var(--radius-md);">
-                                    <div style="width: 40px; height: 40px; background: ${idx === 0 ? 'var(--primary-color)' : '#e2e8f0'}; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                        <i class="fa-solid fa-user" style="color: ${idx === 0 ? 'white' : 'var(--text-secondary)'};"></i>
-                                    </div>
-                                    <div>
-                                        <p style="font-weight: 500; margin: 0;">${member}</p>
-                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${idx === 0 ? 'Lead Auditor' : 'Team Member'}</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
+            <!-- Progress Bar -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <strong>Audit Progress</strong>
+                    <strong>${progress}%</strong>
                 </div>
-
-                <!-- Right Column - Checklists -->
-                <div>
+                <div style="height: 1.5rem; background: #e2e8f0; border-radius: 1rem; overflow: hidden;">
+                    <div style="width: ${progress}%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); height: 100%; transition: width 0.5s ease; text-align: center; color: white; font-size: 0.8rem; line-height: 1.5rem;">${progress > 5 ? progress + '%' : ''}</div>
+                </div>
+                <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+                    <i class="fa-solid fa-check-circle" style="margin-right: 0.25rem;"></i> ${completedItems} / ${totalItems} checklist items verified
+                </p>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+                
+                <!-- Left Column Main Content -->
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+                    
+                    <!-- Configuration Checklist Block -->
                     <div class="card">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h3 style="margin: 0;">
-                                <i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                                Assigned Checklists
-                            </h3>
+                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Configuration Checklists</h3>
                             <button class="btn btn-sm btn-secondary" onclick="openChecklistSelectionModal(${plan.id})">
                                 <i class="fa-solid fa-cog" style="margin-right: 0.25rem;"></i> Configure
                             </button>
                         </div>
+                        ${checklistListHTML}
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                            <strong>${totalItems}</strong> total items assigned
+                        </div>
+                    </div>
 
-                        ${planChecklists.length > 0 ? `
-                            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                ${planChecklists.map(clId => {
-        const cl = checklists.find(c => c.id === clId);
-        if (!cl) return '';
-        return `
-                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'};">
-                                            <div>
-                                                <p style="font-weight: 500; margin: 0;">${cl.name}</p>
-                                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
-                                            </div>
-                                            <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                    `;
-    }).join('')}
+                    <!-- Execution Block -->
+                    <div class="card" style="border-left: 5px solid var(--success-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                             <h3 style="margin: 0;"><i class="fa-solid fa-play" style="margin-right: 0.5rem; color: var(--success-color);"></i> Audit Execution</h3>
+                        </div>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Manage the execution phase, verify checklists, raise NCRs, and collect evidence.</p>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="window.renderModule('audit-execution')">
+                            Go to Execution Panel <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Reporting Block -->
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-file-lines" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Reporting</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                            <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md);">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: var(--danger-color);">${report?.ncrs?.length || 0}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">NCRs Raised</div>
                             </div>
-                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center;">
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0;">
-                                    <strong>${planChecklists.reduce((sum, clId) => {
-        const cl = checklists.find(c => c.id === clId);
-        return sum + (cl?.items?.length || 0);
-    }, 0)}</strong> total checklist items
-                                </p>
+                             <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md);">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning-color);">${report?.capas?.length || 0}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">CAPAs Required</div>
                             </div>
-                        ` : `
-                            <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: var(--radius-md);">
-                                <i class="fa-solid fa-clipboard-list" style="font-size: 2rem; color: var(--text-secondary); margin-bottom: 0.5rem;"></i>
-                                <p style="color: var(--text-secondary); margin: 0;">No checklists assigned yet.</p>
-                                <button class="btn btn-primary btn-sm" style="margin-top: 1rem;" onclick="openChecklistSelectionModal(${plan.id})">
-                                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Assign Checklists
-                                </button>
-                            </div>
-                        `}
-
-                        <!-- Available Checklists Info -->
-                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
-                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
-                                <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
-                                ${matchingChecklists.length} checklists available for ${plan.standard}
-                                (${globalChecklists.length} global, ${customChecklists.length} custom)
+                        </div>
+                         <div style="padding: 1rem; background: #f1f5f9; border-radius: var(--radius-md);">
+                            <strong>Final Conclusion:</strong>
+                            <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-style: italic;">
+                                ${report?.conclusion || 'No conclusion finalized yet.'}
                             </p>
                         </div>
                     </div>
+
+                    <!-- Closing Block -->
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-check-double" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Closing</h3>
+                         ${plan.status === 'Completed' ? `
+                            <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); text-align: center;">
+                                <i class="fa-solid fa-certificate" style="font-size: 2rem; color: var(--success-color); margin-bottom: 0.5rem;"></i>
+                                <h4 style="margin: 0; color: var(--success-color);">Audit Closed Successfully</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">Certificate Issued on ${plan.date}</p>
+                                <button class="btn btn-sm btn-outline-primary" onclick="window.showNotification('Certificate generated (mock)')">
+                                    <i class="fa-solid fa-file-pdf"></i> View Certificate
+                                </button>
+                            </div>
+                        ` : `
+                            <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                                    ${report?.status === 'Finalized'
+            ? 'Audit report is finalized. Ready to close audit.'
+            : 'Waiting for report finalization.'}
+                                </p>
+                                <button class="btn btn-success" ${report?.status !== 'Finalized' ? 'disabled' : ''} onclick="closeAuditPlan(${plan.id})">
+                                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> Close Audit Loop
+                                </button>
+                            </div>
+                        `}
+                    </div>
                 </div>
+
+                <!-- Right Column Side Info -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                     <!-- Client Info -->
+                     <div class="card">
+                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Client</h3>
+                        <p style="margin-bottom: 0.5rem;"><strong>${client?.name}</strong></p>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div><i class="fa-solid fa-industry" style="width: 20px;"></i> ${client?.industry || '-'}</div>
+                            <div><i class="fa-solid fa-users" style="width: 20px;"></i> ${client?.employees || 0} employees</div>
+                            <div><i class="fa-solid fa-map-marker-alt" style="width: 20px;"></i> ${client?.sites?.length || 1} sites</div>
+                        </div>
+                     </div>
+
+                     <!-- Audit Team -->
+                     <div class="card">
+                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-users-gear" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Team</h3>
+                         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${plan.team.map((m, i) => `
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="width: 30px; height: 30px; background: ${i === 0 ? 'var(--primary-color)' : '#e2e8f0'}; color: ${i === 0 ? 'white' : 'var(--text-secondary)'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
+                                        <i class="fa-solid fa-user"></i>
+                                    </div>
+                                    <span style="font-size: 0.9rem;">${m}</span>
+                                </div>
+                            `).join('')}
+                         </div>
+                     </div>
+                </div>
+
             </div>
         </div>
     `;
-
     contentArea.innerHTML = html;
 }
+
+window.printAuditPlan = function (planId) {
+    const plan = state.auditPlans.find(p => p.id === planId);
+    if (!plan) return;
+    const report = (state.auditReports || []).find(r => r.planId === planId);
+    const checklists = state.checklists || [];
+    const planChecklists = plan.selectedChecklists || [];
+
+    // Map progress
+    const progressMap = {};
+    if (report && report.checklistProgress) {
+        report.checklistProgress.forEach(p => progressMap[`${p.checklistId}-${p.itemIdx}`] = p);
+    }
+
+    const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
+    const statusColor = { 'conform': 'green', 'minor': 'orange', 'major': 'red', 'na': 'gray', '': 'black' };
+
+    let content = `
+        <html>
+        <head>
+            <title>Audit Checklist Report - ${plan.client}</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; }
+                .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; }
+                .section { margin-bottom: 2rem; page-break-inside: avoid; }
+                h2 { background: #f2f2f2; padding: 0.5rem; border-left: 5px solid #333; margin-top: 0; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f8f8f8; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Audit Checklist Execution Report</h1>
+                <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${plan.date}</p>
+                <p><strong>Auditor(s):</strong> ${plan.team.join(', ')} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
+            </div>
+    `;
+
+    planChecklists.forEach(clId => {
+        const cl = checklists.find(c => c.id === clId);
+        if (!cl) return;
+
+        content += `
+            <div class="section">
+                <h2>${cl.name}</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="10%">Clause</th>
+                            <th width="40%">Requirement</th>
+                            <th width="15%">Status</th>
+                            <th width="35%">Auditor Comments / Evidence</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        if (cl.items) {
+            cl.items.forEach((item, idx) => {
+                const key = `${cl.id}-${idx}`;
+                const prog = progressMap[key] || {};
+                const s = prog.status || '';
+                const c = prog.comment || '-';
+
+                content += `
+                    <tr>
+                        <td>${item.clause || ''}</td>
+                        <td>${item.requirement || ''}</td>
+                        <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
+                        <td>${c}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        content += `</tbody></table></div>`;
+    });
+
+    if (report && report.ncrs && report.ncrs.length > 0) {
+        content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
+        report.ncrs.forEach(ncr => {
+            content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
+        });
+        content += `</ul></div>`;
+    }
+
+    content += `
+        <div style="margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 1rem;">
+            Generated by AuditCB360 on ${new Date().toLocaleDateString()}
+        </div>
+        </body></html>
+    `;
+
+    const win = window.open('', '_blank');
+    win.document.write(content);
+    win.document.close();
+    // setTimeout(() => win.print(), 500); // Allow render
+};
+
+window.closeAuditPlan = function (planId) {
+    const plan = state.auditPlans.find(p => p.id === planId);
+    if (!plan) return;
+
+    if (confirm('Are you sure you want to close this audit? This represents the completion of the audit cycle and issuance of the certificate.')) {
+        plan.status = 'Completed';
+        window.saveData();
+        viewAuditPlan(planId);
+        window.showNotification('Audit closed and certificate issued successfully.');
+    }
+};
 
 // Checklist Selection Modal for Audit Plan
 function openChecklistSelectionModal(planId) {
