@@ -149,6 +149,17 @@ function renderClientTab(client, tabName) {
 
     switch (tabName) {
         case 'info':
+            // Find auditors that match this client's industry
+            const matchingAuditors = state.auditors.filter(a =>
+                a.industries && a.industries.includes(client.industry)
+            );
+
+            // Calculate performance metrics (mock data for now)
+            const totalAudits = state.auditPlans.filter(p => p.client === client.name).length;
+            const completedAudits = state.auditPlans.filter(p => p.client === client.name && p.status === 'Completed').length;
+            const ncCount = Math.floor(Math.random() * 5); // Mock NC count
+            const certificationStatus = client.status === 'Active' ? 'Certified' : client.status;
+
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Client Details</h3>
@@ -161,6 +172,14 @@ function renderClientTab(client, tabName) {
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Standard</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.standard}</p>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Industry</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">
+                                <span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-industry" style="margin-right: 5px;"></i>${client.industry || 'Not Specified'}
+                                </span>
+                            </p>
                         </div>
                         
                         <!-- Contact Info -->
@@ -208,6 +227,63 @@ function renderClientTab(client, tabName) {
                         </div>
                     </div>
                 </div>
+
+                <!-- Performance Analytics -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Performance Analytics</h3>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                            <p style="font-size: 0.8rem; opacity: 0.9;">Certification Status</p>
+                            <p style="font-size: 1.5rem; font-weight: 700;">${certificationStatus}</p>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                            <p style="font-size: 0.8rem; opacity: 0.9;">Total Audits</p>
+                            <p style="font-size: 1.5rem; font-weight: 700;">${totalAudits}</p>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                            <p style="font-size: 0.8rem; opacity: 0.9;">Completed Audits</p>
+                            <p style="font-size: 1.5rem; font-weight: 700;">${completedAudits}</p>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                            <p style="font-size: 0.8rem; opacity: 0.9;">Open NCs</p>
+                            <p style="font-size: 1.5rem; font-weight: 700;">${ncCount}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Matching Auditors -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;">
+                        <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
+                        Auditors with ${client.industry || 'Matching'} Industry Experience
+                    </h3>
+                    ${matchingAuditors.length > 0 ? `
+                        <div style="display: grid; gap: 0.75rem;">
+                            ${matchingAuditors.map(a => `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                    <div style="display: flex; align-items: center; gap: 1rem;">
+                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                                            ${a.name.split(' ').map(n => n[0]).join('')}
+                                        </div>
+                                        <div>
+                                            <p style="font-weight: 500; margin: 0;">${a.name}</p>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${a.role} • ${a.experience || 0} years exp</p>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+                            <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                            No auditors found with ${client.industry || 'this'} industry experience. 
+                            <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
+                        </p>
+                    `}
+                </div>
             `;
             break;
         case 'audits':
@@ -252,6 +328,26 @@ function openAddClientModal() {
                     <option>ISO 14001:2015</option>
                     <option>ISO 45001:2018</option>
                     <option>ISO 27001:2022</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Industry</label>
+                <select class="form-control" id="client-industry">
+                    <option value="">-- Select Industry --</option>
+                    <option>Manufacturing</option>
+                    <option>Automotive</option>
+                    <option>Aerospace</option>
+                    <option>IT</option>
+                    <option>Financial Services</option>
+                    <option>Healthcare</option>
+                    <option>Pharmaceutical</option>
+                    <option>Food & Beverage</option>
+                    <option>Construction</option>
+                    <option>Chemicals</option>
+                    <option>Oil & Gas</option>
+                    <option>Logistics</option>
+                    <option>Retail</option>
+                    <option>Education</option>
                 </select>
             </div>
 
@@ -340,6 +436,7 @@ function openAddClientModal() {
         const employees = parseInt(document.getElementById('client-employees').value) || 0;
         const sites = parseInt(document.getElementById('client-sites').value) || 1;
         const shifts = document.getElementById('client-shifts').value;
+        const industry = document.getElementById('client-industry').value;
 
         if (name && nextAudit) {
             const newClient = {
@@ -348,7 +445,7 @@ function openAddClientModal() {
                 status: 'Active',
                 contactPerson, email, phone,
                 address, city, country, geotag,
-                employees, sites, shifts
+                employees, sites, shifts, industry
             };
 
             state.clients.push(newClient);

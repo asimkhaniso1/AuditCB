@@ -21,7 +21,8 @@ const state = {
             employees: 150,
             sites: 2,
             shifts: 'No',
-            geotag: '37.3382, -121.8863'
+            geotag: '37.3382, -121.8863',
+            industry: 'IT'
         },
         {
             id: 2,
@@ -38,7 +39,8 @@ const state = {
             employees: 500,
             sites: 1,
             shifts: 'Yes',
-            geotag: '42.3314, -83.0458'
+            geotag: '42.3314, -83.0458',
+            industry: 'Manufacturing'
         },
         {
             id: 3,
@@ -55,7 +57,8 @@ const state = {
             employees: 50,
             sites: 1,
             shifts: 'No',
-            geotag: '30.2672, -97.7431'
+            geotag: '30.2672, -97.7431',
+            industry: 'Financial Services'
         }
     ],
     auditors: [
