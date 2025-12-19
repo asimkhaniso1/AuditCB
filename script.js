@@ -107,7 +107,8 @@ function loadScript(src) {
             return;
         }
         const script = document.createElement('script');
-        script.src = src;
+        // Add timestamp to prevent caching issues
+        script.src = `${src}?v=${Date.now()}`;
         script.onload = () => {
             loadedModules.add(src);
             resolve();
