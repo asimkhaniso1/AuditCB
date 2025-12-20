@@ -1,0 +1,90 @@
+-- ==========================================
+-- SUPABASE DATABASE SCHEMA DEFINITION
+-- Application: AuditCB360
+-- Purpose: Authentication, User Roles, and Core Data
+-- ==========================================
+
+-- 1. Enable UUID Extension
+create extension if not exists "uuid-ossp";
+
+-- 2. Define User Roles Enum
+-- Matches 'window.CONSTANTS.ROLES' in JavaScript application
+create type app_role as enum (
+  'Lead Auditor',
+  'Auditor',
+  'Technical Expert',
+  'Certification Manager',
+  'Admin'
+);
+
+-- 3. Create Profiles Table 
+-- This table extends the default 'auth.users' table in Supabase.
+-- It stores application-specific user data like Name and Role.
+create table public.profiles (
+  id uuid references auth.users on delete cascade not null primary key,
+  email text unique not null,
+  full_name text,
+  role app_role default 'Auditor', -- Default role for new signups
+  avatar_url text,
+  qualification_standards text[], -- Array of strings e.g. ['ISO 9001', 'ISO 14001']
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+comment on table public.profiles is 'Extends auth.users with app roles and profile info.';
+comment on column public.profiles.role is 'Determines access permissions (e.g. Certification Manager can Approve Reports).';
+
+-- 4. Enable Row Level Security (RLS)
+alter table public.profiles enable row level security;
+
+-- 5. Define Security Policies
+
+-- Policy: Profile View Access
+-- "Authenticated users can view all auditor profiles (for team selection)."
+create policy "Profiles are viewable by authenticated users"
+  on profiles for select
+  to authenticated
+  using ( true );
+
+-- Policy: Profile Update Access
+-- "Users can only update their own profile."
+create policy "Users can update own profile"
+  on profiles for update
+  using ( auth.uid() = id );
+
+-- 6. Trigger for New User Handling
+-- Automatically creates a profile entry when a user signs up via Supabase Auth.
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, full_name, role)
+  values (
+    new.id, 
+    new.email, 
+    coalesce(new.raw_user_meta_data->>'full_name', new.email),
+    'Auditor' -- Default role (Can be updated by Admin later)
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- ==========================================
+-- FUTURE TABLES (For Full Migration)
+-- ==========================================
+/*
+create table public.clients (...);
+create table public.audit_plans (...);
+create table public.audit_reports (...);
+create table public.findings (
+  id uuid default uuid_generate_v4() primary key,
+  report_id uuid references public.audit_reports(id),
+  type text check (type in ('major', 'minor', 'observation')),
+  clause text,
+  description text,
+  status text default 'Open'
+);
+*/
