@@ -61,8 +61,7 @@
                             class="fa-solid fa-clipboard-list"></i> Audit Planning</li>
                     <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
                             class="fa-solid fa-list-check"></i> Checklist Library</li>
-                    <li data-module="manday-calculator" role="button" tabindex="0" aria-label="Man-Day Calculator"><i
-                            class="fa-solid fa-calculator"></i> Man-Day Calculator</li>
+
                     <li data-module="audit-execution" role="button" tabindex="0" aria-label="Execution & Reports"><i
                             class="fa-solid fa-tasks"></i> Execution & Reports</li>
                     <li data-module="certification" role="button" tabindex="0" aria-label="Certification"><i
@@ -79,6 +78,11 @@
         <main class="main-content">
             <header class="top-bar">
                 <h2 id="page-title">Dashboard</h2>
+                <button class="btn btn-outline-primary"
+                    onclick="document.querySelectorAll('.main-nav li').forEach(el => el.classList.remove('active')); window.renderModule('manday-calculator')"
+                    style="margin-right: 1rem; border: none; background: transparent; color: var(--primary-color);">
+                    <i class="fa-solid fa-calculator"></i> <span style="font-weight: 500;">Man-Day Calculator</span>
+                </button>
                 <div class="user-profile">
                     <span>Admin User</span>
                     <div class="avatar"><i class="fa-solid fa-user"></i></div>

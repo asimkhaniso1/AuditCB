@@ -87,7 +87,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Sites</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.clients.reduce((acc, c) => acc + (c.sites || 1), 0)}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.clients.reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
                     </div>
                 </div>
             </div>
@@ -429,10 +429,52 @@ function renderClientTab(client, tabName) {
             `;
             break;
         case 'documents':
+            const docs = client.documents || [];
             tabContent.innerHTML = `
                 <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Documents</h3>
-                    <p style="color: var(--text-secondary);">No documents uploaded.</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Documents</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">
+                            <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
+                        </button>
+                    </div>
+                    
+                    ${docs.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Document Name</th>
+                                        <th>Type</th>
+                                        <th>Date Uploaded</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${docs.map(doc => `
+                                        <tr>
+                                            <td>
+                                                <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
+                                                ${doc.name}
+                                            </td>
+                                            <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${doc.category || 'General'}</span></td>
+                                            <td>${doc.date}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${doc.name} (Simulated)')"><i class="fa-solid fa-download"></i></button>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${doc.id}')"><i class="fa-solid fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
+                            <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
+                            <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
+                        </div>
+                    `}
                 </div>
             `;
             break;
@@ -905,6 +947,111 @@ function addSite(clientId) {
         }
     };
 }
+
+// Upload Document Modal
+window.openUploadDocumentModal = function (clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Upload Document';
+    modalBody.innerHTML = `
+        <form id="upload-form">
+            <div class="form-group">
+                <label>Document Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="doc-name" required placeholder="e.g. ISO 9001 Certificate">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select class="form-control" id="doc-category">
+                    <option>Contract / Agreement</option>
+                    <option>Audit Report</option>
+                    <option>Certificate</option>
+                    <option>Corrective Action Plan</option>
+                    <option>Correspondence</option>
+                    <option>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>File Select</label>
+                <div style="border: 2px dashed var(--border-color); padding: 1.5rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 0.5rem;"></i>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">Click to browse files</p>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #94a3b8;">(Simulated upload)</p>
+                </div>
+                <!-- Hidden file input for visual completeness -->
+                <input type="file" id="doc-file" style="display: none;" onchange="if(this.files[0]) { 
+                    if(this.files[0].size > 5242880) { 
+                        alert('File is too large! Max limit is 5MB.'); 
+                        this.value = ''; 
+                        document.getElementById('doc-name').value = '';
+                    } else {
+                        document.getElementById('doc-name').value = this.files[0].name; 
+                    }
+                }">
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('doc-name').value;
+        const category = document.getElementById('doc-category').value;
+        const fileInput = document.getElementById('doc-file');
+
+        if (name) {
+            // Final validation before save
+            if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
+                alert('File is too large! Max limit is 5MB.');
+                return;
+            }
+
+            if (!client.documents) client.documents = [];
+
+            const newDoc = {
+                id: Date.now().toString(),
+                name: name,
+                category: category,
+                type: name.split('.').pop().toUpperCase() || 'FILE',
+                date: new Date().toISOString().split('T')[0],
+                size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+            };
+
+            client.documents.push(newDoc);
+
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId); // Refresh to show new doc in tab
+            // Force switch back to documents tab
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="documents"]')?.click();
+            }, 100);
+            window.showNotification('Document uploaded successfully');
+        } else {
+            alert('Please enter a document name');
+        }
+    };
+}
+
+// Delete Document Helper
+window.deleteDocument = function (clientId, docId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.documents) return;
+
+    if (confirm('Are you sure you want to delete this document?')) {
+        client.documents = client.documents.filter(d => d.id !== docId);
+        window.saveData();
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="documents"]')?.click();
+        }, 100);
+        window.showNotification('Document deleted');
+    }
+};
 
 window.renderClientsEnhanced = renderClientsEnhanced;
 window.renderClientDetail = renderClientDetail;

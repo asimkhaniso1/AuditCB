@@ -50,7 +50,7 @@ function renderAuditProgramsEnhanced() {
 
     const html = `
         <div class="fade-in">
-        <div class="fade-in">
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Programs</h2>
                  <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -173,14 +173,14 @@ function renderAuditProgramsEnhanced() {
             openEditProgramModal(programId);
         });
     });
-});
 
-// Helper for toggle
-window.toggleProgramAnalytics = function () {
-    if (state.showProgramAnalytics === undefined) state.showProgramAnalytics = true;
-    state.showProgramAnalytics = !state.showProgramAnalytics;
-    renderAuditProgramsEnhanced();
-};
+
+    // Helper for toggle
+    window.toggleProgramAnalytics = function () {
+        if (state.showProgramAnalytics === undefined) state.showProgramAnalytics = true;
+        state.showProgramAnalytics = !state.showProgramAnalytics;
+        renderAuditProgramsEnhanced();
+    };
 }
 
 function renderTimelineVisualization(programs) {

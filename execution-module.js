@@ -132,14 +132,14 @@ function renderAuditExecutionEnhanced() {
             openEditReportModal(reportId);
         });
     });
-});
 
-// Helper for toggle
-window.toggleExecutionAnalytics = function () {
-    if (state.showExecutionAnalytics === undefined) state.showExecutionAnalytics = true;
-    state.showExecutionAnalytics = !state.showExecutionAnalytics;
-    renderAuditExecutionEnhanced();
-};
+
+    // Helper for toggle
+    window.toggleExecutionAnalytics = function () {
+        if (state.showExecutionAnalytics === undefined) state.showExecutionAnalytics = true;
+        state.showExecutionAnalytics = !state.showExecutionAnalytics;
+        renderAuditExecutionEnhanced();
+    };
 }
 
 function openCreateReportModal() {

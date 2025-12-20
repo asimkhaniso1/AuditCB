@@ -478,3 +478,10 @@ window.printCertificateRegister = function () {
     `);
     printWindow.document.close();
 };
+
+// Helper for toggle
+window.toggleCertAnalytics = function () {
+    if (window.state.showCertAnalytics === undefined) window.state.showCertAnalytics = true;
+    window.state.showCertAnalytics = !window.state.showCertAnalytics;
+    renderCertificationModule();
+};

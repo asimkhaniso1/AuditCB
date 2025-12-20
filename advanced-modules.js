@@ -497,8 +497,8 @@ function renderAuditorTab(auditor, tabName) {
                             `).join('')}
                         </div>
                     ` : '<p style="color: var(--text-secondary);">No documents uploaded.</p>'}
-                    <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openUploadDocumentModal(${auditor.id})">
-                        <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i> Upload Document
+                    <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openAuditorUploadModal(${auditor.id})">
+                        <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                     </button>
                 </div>
             `;
@@ -1686,3 +1686,112 @@ window.clearAuditorUpcomingFilters = function (auditorId) {
         item.style.display = 'flex';
     });
 };
+
+// ============================================
+// DOCUMENT UPLOAD HELPERS (Auditors)
+// ============================================
+
+window.openAuditorUploadModal = function (auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Upload Auditor Document';
+    modalBody.innerHTML = `
+        <form id="upload-form">
+            <div class="form-group">
+                <label>Document Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="doc-name" required placeholder="e.g. ISO 9001 Certificate">
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select class="form-control" id="doc-type">
+                    <option value="pdf">PDF Document</option>
+                    <option value="image">Image / Scan</option>
+                    <option value="doc">Word / Text</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>File Select</label>
+                <div style="border: 2px dashed var(--border-color); padding: 1.5rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 0.5rem;"></i>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">Click to browse files</p>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #94a3b8;">(Simulated upload)</p>
+                </div>
+                <!-- Hidden file input for visual completeness -->
+                <input type="file" id="doc-file" style="display: none;" onchange="if(this.files[0]) { 
+                    if(this.files[0].size > 5242880) { 
+                        alert('File is too large! Max limit is 5MB.'); 
+                        this.value = ''; 
+                        document.getElementById('doc-name').value = '';
+                    } else {
+                        document.getElementById('doc-name').value = this.files[0].name; 
+                    }
+                }">
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('doc-name').value;
+        const type = document.getElementById('doc-type').value;
+        const fileInput = document.getElementById('doc-file');
+
+        if (name) {
+            // Final validation before save
+            if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
+                alert('File is too large! Max limit is 5MB.');
+                return;
+            }
+
+            if (!auditor.documents) auditor.documents = [];
+
+            const newDoc = {
+                id: Date.now().toString(),
+                name: name,
+                type: type,
+                date: new Date().toISOString().split('T')[0],
+                size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+            };
+
+            auditor.documents.push(newDoc);
+
+            // Note: Since 'state' is global, we just need to re-render.
+            // If there's a specific saveData function (mock), call it.
+            if (window.saveData) window.saveData();
+
+            window.closeModal();
+            renderAuditorDetail(auditorId); // Refresh view
+            // Force switch back to documents tab
+            setTimeout(() => {
+                const btn = document.querySelector('.tab-btn[data-tab="documents"]');
+                if (btn) btn.click();
+            }, 100);
+
+            if (window.showNotification) window.showNotification('Document uploaded successfully');
+        } else {
+            alert('Please enter a document name');
+        }
+    };
+};
+
+window.deleteAuditorDocument = function (auditorId, docId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor || !auditor.documents) return;
+
+    if (confirm('Are you sure you want to delete this document?')) {
+        auditor.documents = auditor.documents.filter(d => d.id !== docId);
+        if (window.saveData) window.saveData();
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            const btn = document.querySelector('.tab-btn[data-tab="documents"]');
+            if (btn) btn.click();
+        }, 100);
+        if (window.showNotification) window.showNotification('Document deleted');
+    }
+}
