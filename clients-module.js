@@ -257,6 +257,16 @@ function renderClientTab(client, tabName) {
                 a.industries && a.industries.includes(client.industry)
             );
 
+            // Calculate total employees: sum of site employees if they exist, otherwise use company level
+            let totalEmployees = client.employees || 0;
+            if (client.sites && client.sites.length > 0) {
+                const siteEmployeesSum = client.sites.reduce((sum, site) => sum + (site.employees || 0), 0);
+                // If sites have employee data, use that sum; otherwise use company level
+                if (siteEmployeesSum > 0) {
+                    totalEmployees = siteEmployeesSum;
+                }
+            }
+
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Company Information</h3>
@@ -287,8 +297,8 @@ function renderClientTab(client, tabName) {
 
                         <!-- Operational Data -->
                         <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Employees</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i> ${client.employees || 0}</p>
+                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Total Employees</label>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i> ${totalEmployees}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Sites</label>
