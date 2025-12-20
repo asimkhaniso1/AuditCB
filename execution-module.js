@@ -1067,7 +1067,6 @@ Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'hi
 // Export functions
 window.renderAuditExecutionEnhanced = renderAuditExecutionEnhanced;
 window.renderExecutionDetail = renderExecutionDetail;
-window.updateChecklistStatus = updateChecklistStatus;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
 window.createCAPA = createCAPA;
