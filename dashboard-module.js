@@ -177,13 +177,17 @@ function renderDashboardEnhanced() {
                 <!-- Audit Trends Chart -->
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-area" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Activity Trends</h3>
-                    <canvas id="auditTrendsChart" height="100"></canvas>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="auditTrendsChart"></canvas>
+                    </div>
                 </div>
 
                 <!-- NCR Distribution Chart -->
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-pie" style="color: var(--warning-color); margin-right: 0.5rem;"></i>NCR Distribution</h3>
-                    <canvas id="ncrDistributionChart" height="100"></canvas>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="ncrDistributionChart"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -192,13 +196,17 @@ function renderDashboardEnhanced() {
                 <!-- Industry Distribution -->
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-industry" style="color: var(--success-color); margin-right: 0.5rem;"></i>Clients by Industry</h3>
-                    <canvas id="industryChart" height="120"></canvas>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="industryChart"></canvas>
+                    </div>
                 </div>
 
                 <!-- Standards Distribution -->
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-certificate" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Certification Standards</h3>
-                    <canvas id="standardsChart" height="120"></canvas>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="standardsChart"></canvas>
+                    </div>
                 </div>
             </div>
 
