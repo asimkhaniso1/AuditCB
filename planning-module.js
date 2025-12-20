@@ -1348,3 +1348,13 @@ window.printAuditPlanDetails = function (planId) {
     printWin.document.close();
 };
 
+// Toggle Planning Analytics Dashboard
+function togglePlanningAnalytics() {
+    const state = window.state;
+    state.showPlanningAnalytics = state.showPlanningAnalytics === false ? true : false;
+    window.saveData();
+    renderAuditPlanningEnhanced();
+}
+
+window.togglePlanningAnalytics = togglePlanningAnalytics;
+
