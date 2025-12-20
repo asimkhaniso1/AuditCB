@@ -632,6 +632,7 @@ function viewAuditPlan(id) {
                 </button>
                 <div style="display: flex; gap: 1rem;">
                      ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan(${plan.id})"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Checklist</button>` : ''}
+                     <button class="btn btn-secondary" onclick="printAuditPlanDetails(${plan.id})"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
                      <button class="btn btn-primary" onclick="editAuditPlan(${plan.id})"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Plan</button>
                 </div>
             </div>
@@ -798,6 +799,131 @@ function viewAuditPlan(id) {
     `;
     window.contentArea.innerHTML = html;
 }
+
+window.printAuditPlanDetails = function (planId) {
+    const plan = state.auditPlans.find(p => p.id == planId);
+    if (!plan) return;
+
+    const client = state.clients.find(c => c.name === plan.client);
+
+    // Calculate breakdowns
+    let totalEmployees = 0;
+    const siteDetails = (plan.selectedSites || []).map(s => {
+        // Find site object in client data to get employees
+        const siteData = (client?.sites || []).find(cs => cs.name === s.name);
+        const emps = siteData?.employees || 0;
+        totalEmployees += emps;
+        return { ...s, employees: emps, address: siteData?.address || '' };
+    });
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
+
+    let content = `
+        <html>
+        <head>
+            <title>Audit Plan - ${plan.client}</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; padding: 40px; }
+                .header { border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+                .logo { font-size: 24px; font-weight: bold; color: #0f172a; }
+                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                .meta-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; width: 50%; vertical-align: top; }
+                .meta-label { font-weight: bold; color: #64748b; font-size: 0.9em; display: block; margin-bottom: 4px; }
+                .section-title { background: #f1f5f9; padding: 10px 15px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0f172a; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em; }
+                th { background: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
+                td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+                .footer { margin-top: 50px; font-size: 0.8em; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <div class="logo">AUDIT PLAN</div>
+                    <div>Ref: P-${plan.id}</div>
+                </div>
+                <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
+            </div>
+
+            <table class="meta-table">
+                <tr>
+                    <td><span class="meta-label">Client</span>${plan.client}</td>
+                    <td><span class="meta-label">Audit Standard</span>${plan.standard}</td>
+                </tr>
+                <tr>
+                    <td><span class="meta-label">Planned Date</span>${plan.date}</td>
+                    <td><span class="meta-label">Audit Type</span>${plan.type}</td>
+                </tr>
+                 <tr>
+                    <td><span class="meta-label">Lead Auditor</span>${(plan.team || [])[0] || '-'}</td>
+                    <td><span class="meta-label">Audit Team</span>${(plan.team || []).slice(1).join(', ') || 'None'}</td>
+                </tr>
+                 <tr>
+                    <td><span class="meta-label">Total Man-Days</span>${plan.manDays} days (${plan.onsiteDays} onsite)</td>
+                    <td><span class="meta-label">Risk Level</span>Medium (Standard)</td>
+                </tr>
+            </table>
+
+            <div class="section-title">AUDIT SCOPE & MAN-DAYS DISTRIBUTION</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Site Name</th>
+                        <th>Address</th>
+                        <th style="text-align: right;">Employees</th>
+                        <th style="text-align: right;">Allocated Man-Days</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${siteDetails.map(site => {
+        // Calculate proportional man-days
+        // If total employees is 0 (missing data), split evenly
+        let allocatedDays = 0;
+        if (totalEmployees > 0) {
+            allocatedDays = (site.employees / totalEmployees) * plan.manDays;
+        } else {
+            allocatedDays = plan.manDays / siteDetails.length;
+        }
+        return `
+                        <tr>
+                            <td>${site.name} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
+                            <td>${site.address || '-'}</td>
+                            <td style="text-align: right;">${site.employees}</td>
+                            <td style="text-align: right; font-weight: bold;">${allocatedDays.toFixed(2)}</td>
+                        </tr>
+                        `;
+    }).join('')}
+                    <tr style="background: #f8fafc; font-weight: bold;">
+                        <td colspan="2">TOTAL</td>
+                        <td style="text-align: right;">${totalEmployees}</td>
+                        <td style="text-align: right;">${plan.manDays.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="section-title">AUDIT OBJECTIVES</div>
+            <ul style="margin-top: 0; padding-left: 20px; color: #333;">
+                <li>Determine conformity of the management system with audit criteria.</li>
+                <li>Evaluate the ability of the management system to ensure likely compliance with statutory, regulatory and contractual requirements.</li>
+                <li>Evaluate the effectiveness of the management system in meeting its specified objectives.</li>
+                <li>Identify areas for potential improvement.</li>
+            </ul>
+
+            <div class="footer">
+                Generated by AuditCB • ${new Date().toLocaleString()} • Page 1 of 1
+            </div>
+
+            <script>
+                window.onload = function() { window.print(); }
+            </script>
+        </body>
+        </html>
+    `;
+
+    const printWin = window.open('', '', 'width=900,height=800');
+    printWin.document.write(content);
+    printWin.document.close();
+};
 
 window.printAuditPlan = function (planId) {
     const plan = state.auditPlans.find(p => p.id == planId);
@@ -1018,4 +1144,141 @@ window.saveAuditPlan = saveAuditPlan;
 window.editAuditPlan = editAuditPlan;
 window.viewAuditPlan = viewAuditPlan;
 window.openChecklistSelectionModal = openChecklistSelectionModal;
+
+window.printAuditPlanDetails = function (planId) {
+    const plan = state.auditPlans.find(p => p.id == planId);
+    if (!plan) return;
+
+    const client = state.clients.find(c => c.name === plan.client);
+
+    // Resolve team names
+    const teamNames = ((plan.team && Array.isArray(plan.team))
+        ? plan.team
+        : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown'));
+
+    const leadAuditor = teamNames[0] || 'Unknown';
+    const otherMembers = teamNames.slice(1);
+
+    // Calculate breakdowns
+    let totalEmployees = 0;
+    const siteDetails = (plan.selectedSites || []).map(s => {
+        const siteData = (client?.sites || []).find(cs => cs.name === s.name);
+        const emps = siteData?.employees || 0;
+        totalEmployees += emps;
+        return { ...s, employees: emps, address: siteData?.address || '' };
+    });
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
+
+    let content = `
+        <html>
+        <head>
+            <title>Audit Plan - ${plan.client}</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; padding: 40px; }
+                .header { border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+                .logo { font-size: 24px; font-weight: bold; color: #0f172a; }
+                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                .meta-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; width: 50%; vertical-align: top; }
+                .meta-label { font-weight: bold; color: #64748b; font-size: 0.9em; display: block; margin-bottom: 4px; }
+                .section-title { background: #f1f5f9; padding: 10px 15px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0f172a; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em; }
+                th { background: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
+                td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+                .footer { margin-top: 50px; font-size: 0.8em; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <div class="logo">AUDIT PLAN</div>
+                    <div>Ref: P-${plan.id}</div>
+                </div>
+                <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
+            </div>
+
+            <table class="meta-table">
+                <tr>
+                    <td><span class="meta-label">Client</span>${plan.client}</td>
+                    <td><span class="meta-label">Audit Standard</span>${plan.standard}</td>
+                </tr>
+                <tr>
+                    <td><span class="meta-label">Planned Date</span>${plan.date}</td>
+                    <td><span class="meta-label">Audit Type</span>${plan.type}</td>
+                </tr>
+                 <tr>
+                    <td><span class="meta-label">Lead Auditor</span>${leadAuditor}</td>
+                    <td><span class="meta-label">Audit Team</span>${otherMembers.join(', ') || 'None'}</td>
+                </tr>
+                 <tr>
+                    <td><span class="meta-label">Total Man-Days</span>${plan.manDays} days (${plan.onsiteDays} onsite)</td>
+                    <td><span class="meta-label">Risk Level</span>Medium (Standard)</td>
+                </tr>
+            </table>
+
+            <div class="section-title">AUDIT SCOPE, MAN-DAYS & ALLOCATION</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Site Name</th>
+                        <th>Address</th>
+                        <th style="text-align: right;">Employees</th>
+                        <th style="text-align: right;">Auditor(s)</th>
+                        <th style="text-align: right;">Days</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${siteDetails.map((site, index) => {
+        let allocatedDays = 0;
+        if (totalEmployees > 0) {
+            allocatedDays = (site.employees / totalEmployees) * plan.manDays;
+        } else {
+            allocatedDays = plan.manDays / siteDetails.length;
+        }
+
+        // Simple distribution logic: Lead Auditor on first/largest site, others distributed
+        const auditorAssigned = index === 0 ? `<b>${leadAuditor}</b>` : (otherMembers[index - 1] || 'Assigned Team');
+
+        return `
+                        <tr>
+                            <td>${site.name} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
+                            <td>${site.address || '-'}</td>
+                            <td style="text-align: right;">${site.employees}</td>
+                            <td style="text-align: right;">${auditorAssigned}</td>
+                            <td style="text-align: right; font-weight: bold;">${allocatedDays.toFixed(2)}</td>
+                        </tr>
+                        `;
+    }).join('')}
+                    <tr style="background: #f8fafc; font-weight: bold;">
+                        <td colspan="2">TOTAL</td>
+                        <td style="text-align: right;">${totalEmployees}</td>
+                        <td style="text-align: right;">-</td>
+                        <td style="text-align: right;">${plan.manDays.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="section-title">AUDIT OBJECTIVES</div>
+            <ul style="margin-top: 0; padding-left: 20px; color: #333;">
+                <li>Determine conformity of the management system with audit criteria.</li>
+                <li>Evaluate the ability of the management system to ensure likely compliance with statutory, regulatory and contractual requirements.</li>
+                <li>Evaluate the effectiveness of the management system in meeting its specified objectives.</li>
+                <li>Identify areas for potential improvement.</li>
+            </ul>
+
+            <div class="footer">
+                Generated by AuditCB • ${new Date().toLocaleString()} • Page 1 of 1
+            </div>
+
+            <script>
+                window.onload = function() { window.print(); }
+            </script>
+        </body>
+        </html>
+    `;
+
+    const printWin = window.open('', '', 'width=900,height=800');
+    printWin.document.write(content);
+    printWin.document.close();
+};
 

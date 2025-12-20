@@ -337,8 +337,9 @@ function renderExecutionTab(report, tabName) {
                              <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">
                              
                              <div style="position: relative;">
-                                <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Dictate/Type short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
-                                <button type="button" class="btn btn-sm btn-light" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 5px; top: 5px; color: var(--primary-color); border: 1px solid #ddd;" title="Dictate (10s limit)">
+                                <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
+                                <textarea id="ncr-transcript-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Voice Transcript..." style="margin-top: 5px; background: #f8fafc; font-family: monospace; font-size: 0.85rem;">${saved.transcript || ''}</textarea>
+                                <button type="button" class="btn btn-sm btn-light" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 5px; bottom: 5px; color: var(--primary-color); border: 1px solid #ddd;" title="Dictate (10s limit)">
                                     <i class="fa-solid fa-microphone"></i>
                                 </button>
                              </div>
@@ -686,6 +687,7 @@ window.saveChecklist = function (reportId) {
         const status = input.value;
         const comment = document.getElementById('comment-' + uniqueId)?.value || '';
         const ncrDesc = document.getElementById('ncr-desc-' + uniqueId)?.value || '';
+        const transcript = document.getElementById('ncr-transcript-' + uniqueId)?.value || '';
         const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
 
         // Get evidence image data
@@ -703,6 +705,7 @@ window.saveChecklist = function (reportId) {
                 status: status,
                 comment: comment,
                 ncrDescription: ncrDesc,
+                transcript: transcript,
                 ncrType: ncrType,
                 evidenceImage: evidenceImage,
                 evidenceSize: evidenceSize
@@ -725,7 +728,7 @@ window.startDictation = function (uniqueId) {
     const recognition = new SpeechRecognition();
 
     const micBtn = document.getElementById('mic-btn-' + uniqueId);
-    const textarea = document.getElementById('ncr-desc-' + uniqueId);
+    const textarea = document.getElementById('ncr-transcript-' + uniqueId);
 
     recognition.lang = 'en-US';
     recognition.continuous = false;
@@ -1484,7 +1487,7 @@ window.generateAuditReport = function (reportId) {
                             ${ncr.evidenceImage ? `
                                 <div style="font-weight: 600; color: #555;">Visual Evidence:</div>
                                 <div>
-                                    <img src="${ncr.evidenceImage}" alt="Captured Evidence" style="max-width: 100%; max-height: 300px; border: 2px solid #cbd5e1; border-radius: 6px; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <img src="${ncr.evidenceImage}" alt="Captured Evidence" style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #cbd5e1; border-radius: 6px; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open(this.src)">
                                 </div>
                             ` : ''}
                             
