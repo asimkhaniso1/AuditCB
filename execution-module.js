@@ -459,10 +459,10 @@ function renderExecutionTab(report, tabName) {
                                      <label style="font-size: 0.8rem;">Severity</label>
                                      <div style="display: flex; gap: 5px;">
                                          <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
-                                             <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${!saved.ncrType || saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>Flagged (Pending Classification)</option>
-                                             <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor</option>
-                                             <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major</option>
-                                             <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${!saved.ncrType || saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation (OBS)</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor NC</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>Pending Classification</option>
                                          </select>
                                          <button type="button" class="btn btn-sm btn-info" onclick="const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'" title="View Classification Matrix (ISO 17021-1)">
                                             <i class="fa-solid fa-scale-balanced"></i>
@@ -490,6 +490,18 @@ function renderExecutionTab(report, tabName) {
                                          </button>
                                      </div>
                                      <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
+                                 </div>
+                             </div>
+                             
+                             <!-- Cross-Reference: Designation & Department -->
+                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
+                                 <div>
+                                     <label style="font-size: 0.8rem;">Interviewee Designation</label>
+                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" placeholder="e.g., Quality Manager" value="${saved.designation || ''}">
+                                 </div>
+                                 <div>
+                                     <label style="font-size: 0.8rem;">Department</label>
+                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" placeholder="e.g., Production" value="${saved.department || ''}">
                                  </div>
                              </div>
                              
@@ -770,6 +782,10 @@ window.saveChecklist = function (reportId) {
         const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
         const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
 
+        // Get designation and department
+        const designation = document.getElementById('ncr-designation-' + uniqueId)?.value || '';
+        const department = document.getElementById('ncr-department-' + uniqueId)?.value || '';
+
         // Only save if interacted with
         if (status || comment || ncrDesc || evidenceImage) {
             checklistData.push({
@@ -782,7 +798,9 @@ window.saveChecklist = function (reportId) {
                 transcript: transcript,
                 ncrType: ncrType,
                 evidenceImage: evidenceImage,
-                evidenceSize: evidenceSize
+                evidenceSize: evidenceSize,
+                designation: designation,
+                department: department
             });
         }
     });
@@ -871,10 +889,10 @@ function createNCR(reportId) {
             <div class="form-group">
                 <label>Type <span style="color: var(--danger-color);">*</span></label>
                 <select class="form-control" id="ncr-type" required>
-                    <option value="${window.CONSTANTS.NCR_TYPES.PENDING}">Flagged (Pending Classification)</option>
+                    <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}">Observation (OBS)</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.MINOR}">Minor NC</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}">Major NC</option>
-                    <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}">Observation</option>
+                    <option value="${window.CONSTANTS.NCR_TYPES.PENDING}">Pending Classification</option>
                 </select>
             </div>
             <div class="form-group">
@@ -893,6 +911,18 @@ function createNCR(reportId) {
             <div class="form-group">
                 <label>Evidence / Objective Evidence</label>
                 <textarea class="form-control" id="ncr-evidence" rows="2" placeholder="What evidence supports this finding?"></textarea>
+            </div>
+            
+            <!-- Cross-Reference Fields -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Interviewee Designation</label>
+                    <input type="text" class="form-control" id="ncr-designation" placeholder="e.g., Quality Manager">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Department</label>
+                    <input type="text" class="form-control" id="ncr-department" placeholder="e.g., Production">
+                </div>
             </div>
             
             <div class="form-group" style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1;">
@@ -963,19 +993,8 @@ function createNCR(reportId) {
         const description = document.getElementById('ncr-description').value;
         const evidence = document.getElementById('ncr-evidence').value;
         const evidenceImage = document.getElementById('ncr-evidence-image-url').value;
-
-        // We can capture the transcript separately if needed, but here it's appended to description.
-        // If we want a separate 'transcript' field, we'd need another hidden input populated by the mic.
-        // For now, appending to description is fine, or we can assume description IS the transcript.
-
-        // Let's create a separate transcript field if the user wants "transcript" specifically in report.
-        // Actually, I'll store it as 'transcript' only if it came from mic? No, hard to track.
-        // I'll just use the description as the primary text. The user asked for "transcript to be part of report".
-        // I added 'ncr.transcript' in the generateReport function. I should save it.
-        // Let's assume description IS the transcript for simplicity, or add a specific field.
-        // To support `ncr.transcript` field I added in report, I'll save a copy of description there?
-        // Let's just save description. In the report generator I used `ncr.transcript`. I should change report generator to use `ncr.description` mostly, or `ncr.transcript` if distinct.
-        // I will save `transcript: description` as well to be safe for the report template I just wrote.
+        const designation = document.getElementById('ncr-designation').value;
+        const department = document.getElementById('ncr-department').value;
 
         if (description) {
             if (!report.ncrs) report.ncrs = [];
@@ -984,8 +1003,10 @@ function createNCR(reportId) {
                 clause,
                 description,
                 evidence,
-                evidenceImage, // New Field
-                transcript: description, // Mapping description to transcript for the report template
+                evidenceImage,
+                transcript: description,
+                designation,
+                department,
                 status: 'Open',
                 createdAt: new Date().toISOString()
             });
