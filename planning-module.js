@@ -126,7 +126,7 @@ function openCreatePlanModal() {
 
     modalTitle.textContent = 'Create Audit Plan';
     modalBody.innerHTML = `
-    < form id = "plan-form" >
+        <form id="plan-form">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                 <!-- Client Selection -->
                 <div class="form-group">
