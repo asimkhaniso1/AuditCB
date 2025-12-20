@@ -1133,11 +1133,11 @@ function openChecklistSelectionModal(planId) {
             ${globalChecklists.length > 0 ? `
                 <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
                     ${globalChecklists.map(cl => `
-                        <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); cursor: pointer; border: 2px solid ${selectedIds.includes(cl.id) ? 'var(--primary-color)' : 'transparent'};">
-                            <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${selectedIds.includes(cl.id) ? 'checked' : ''}>
-                            <div style="flex: 1;">
-                                <p style="font-weight: 500; margin: 0;">${cl.name}</p>
-                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items</p>
+                        <label style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; gap: 1rem; padding: 1rem; background: #fff; border-radius: var(--radius-md); cursor: pointer; border: 1px solid ${selectedIds.includes(cl.id) ? 'var(--primary-color)' : 'var(--border-color)'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${selectedIds.includes(cl.id) ? 'checked' : ''} style="margin: 0; min-width: 18px; min-height: 18px; cursor: pointer;">
+                            <div style="flex: 1; text-align: left;">
+                                <p style="font-weight: 600; margin: 0; color: var(--text-primary);">${cl.name}</p>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0;">${cl.items?.length || 0} items</p>
                             </div>
                         </label>
                     `).join('')}
@@ -1154,11 +1154,11 @@ function openChecklistSelectionModal(planId) {
             ${customChecklists.length > 0 ? `
                 <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
                     ${customChecklists.map(cl => `
-                        <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); cursor: pointer; border: 2px solid ${selectedIds.includes(cl.id) ? 'var(--primary-color)' : 'transparent'};">
-                            <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${selectedIds.includes(cl.id) ? 'checked' : ''}>
-                            <div style="flex: 1;">
-                                <p style="font-weight: 500; margin: 0;">${cl.name}</p>
-                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items • by ${cl.createdBy || 'Unknown'}</p>
+                        <label style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; gap: 1rem; padding: 1rem; background: #fff; border-radius: var(--radius-md); cursor: pointer; border: 1px solid ${selectedIds.includes(cl.id) ? 'var(--primary-color)' : 'var(--border-color)'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${selectedIds.includes(cl.id) ? 'checked' : ''} style="margin: 0; min-width: 18px; min-height: 18px; cursor: pointer;">
+                            <div style="flex: 1; text-align: left;">
+                                <p style="font-weight: 600; margin: 0; color: var(--text-primary);">${cl.name}</p>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0;">${cl.items?.length || 0} items • by ${cl.createdBy || 'Unknown'}</p>
                             </div>
                         </label>
                     `).join('')}
