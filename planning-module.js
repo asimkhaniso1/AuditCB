@@ -1490,6 +1490,32 @@ window.printAuditPlanDetails = function (planId) {
                 </tbody>
             </table>
 
+            ${plan.agenda && plan.agenda.length > 0 ? `
+            <div class="section-title">AUDIT AGENDA / ITINERARY</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%">Day</th>
+                        <th style="width: 15%">Time</th>
+                        <th style="width: 25%">Activity / Clause</th>
+                        <th style="width: 20%">Dept/Auditee</th>
+                        <th style="width: 20%">Auditor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${plan.agenda.map(item => `
+                        <tr>
+                            <td>${item.day}</td>
+                            <td>${item.time}</td>
+                            <td>${item.item}</td>
+                            <td>${item.dept}</td>
+                            <td>${item.auditor}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            ` : ''}
+
             <div class="section-title">AUDIT OBJECTIVES</div>
             <ul style="margin-top: 0; padding-left: 20px; color: #333;">
                 <li>Determine conformity of the management system with audit criteria.</li>
