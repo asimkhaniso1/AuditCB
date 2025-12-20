@@ -173,6 +173,11 @@ function renderAuditorDetail(auditorId) {
         });
     });
 
+    // Add event listener for Edit Auditor button
+    document.querySelector('.edit-auditor')?.addEventListener('click', () => {
+        openEditAuditorModal(auditor.id);
+    });
+
     renderAuditorTab(auditor, 'info');
 }
 
@@ -272,8 +277,26 @@ function renderAuditorTab(auditor, tabName) {
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Training Records</h3>
-                    <p style="color: var(--text-secondary);">No training records available.</p>
-                    <button class="btn btn-primary" style="margin-top: 1rem;">
+                    ${(auditor.trainings && auditor.trainings.length > 0) ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr><th>Course</th><th>Provider</th><th>Date</th><th>Certificate</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${auditor.trainings.map(t => `
+                                        <tr>
+                                            <td>${t.course}</td>
+                                            <td>${t.provider}</td>
+                                            <td>${t.date}</td>
+                                            <td>${t.certificate ? '<i class="fa-solid fa-file-pdf" style="color: var(--danger-color);"></i> View' : '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : '<p style="color: var(--text-secondary);">No training records available.</p>'}
+                    <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openAddTrainingModal(${auditor.id})">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Training
                     </button>
                 </div>
@@ -283,8 +306,23 @@ function renderAuditorTab(auditor, tabName) {
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Documents & Attachments</h3>
-                    <p style="color: var(--text-secondary);">No documents uploaded.</p>
-                    <button class="btn btn-primary" style="margin-top: 1rem;">
+                    ${(auditor.documents && auditor.documents.length > 0) ? `
+                        <div style="display: grid; gap: 0.5rem;">
+                            ${auditor.documents.map(d => `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <i class="fa-solid fa-file-${d.type === 'pdf' ? 'pdf' : d.type === 'image' ? 'image' : 'alt'}" style="font-size: 1.5rem; color: ${d.type === 'pdf' ? 'var(--danger-color)' : 'var(--primary-color)'};"></i>
+                                        <div>
+                                            <p style="font-weight: 500; margin: 0;">${d.name}</p>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Uploaded: ${d.date}</p>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-download"></i></button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p style="color: var(--text-secondary);">No documents uploaded.</p>'}
+                    <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openUploadDocumentModal(${auditor.id})">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i> Upload Document
                     </button>
                 </div>
@@ -1341,6 +1379,116 @@ function openEditAuditorModal(auditorId) {
         }
     };
 }
+// Add Training Modal
+function openAddTrainingModal(auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Add Training Record';
+    modalBody.innerHTML = `
+        <form id="training-form">
+            <div class="form-group">
+                <label>Course Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="training-course" placeholder="e.g. ISO 9001 Lead Auditor" required>
+            </div>
+            <div class="form-group">
+                <label>Training Provider</label>
+                <input type="text" class="form-control" id="training-provider" placeholder="e.g. IRCA, Exemplar Global">
+            </div>
+            <div class="form-group">
+                <label>Completion Date</label>
+                <input type="date" class="form-control" id="training-date">
+            </div>
+            <div class="form-group">
+                <label>Certificate Number</label>
+                <input type="text" class="form-control" id="training-certificate" placeholder="e.g. IRCA-12345">
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const course = document.getElementById('training-course').value;
+        const provider = document.getElementById('training-provider').value;
+        const date = document.getElementById('training-date').value;
+        const certificate = document.getElementById('training-certificate').value;
+
+        if (course) {
+            if (!auditor.trainings) auditor.trainings = [];
+            auditor.trainings.push({ course, provider, date, certificate });
+            window.saveData();
+            window.closeModal();
+            renderAuditorDetail(auditorId);
+            window.showNotification('Training record added successfully');
+        } else {
+            window.showNotification('Course name is required', 'error');
+        }
+    };
+}
+
+// Upload Document Modal
+function openUploadDocumentModal(auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Upload Document';
+    modalBody.innerHTML = `
+        <form id="document-form">
+            <div class="form-group">
+                <label>Document Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="doc-name" placeholder="e.g. Lead Auditor Certificate" required>
+            </div>
+            <div class="form-group">
+                <label>Document Type</label>
+                <select class="form-control" id="doc-type">
+                    <option value="pdf">PDF Document</option>
+                    <option value="image">Image</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Document File <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
+                <input type="file" class="form-control" id="doc-file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                <small style="color: var(--text-secondary);">Accepted: PDF, Images, Word documents</small>
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('doc-name').value;
+        const type = document.getElementById('doc-type').value;
+        const fileInput = document.getElementById('doc-file');
+        const file = fileInput.files[0];
+
+        if (name) {
+            if (!auditor.documents) auditor.documents = [];
+            // Store document metadata (file would need proper backend storage in production)
+            auditor.documents.push({
+                name: name,
+                type: type,
+                date: new Date().toISOString().split('T')[0],
+                fileName: file ? file.name : null
+            });
+            window.saveData();
+            window.closeModal();
+            renderAuditorDetail(auditorId);
+            window.showNotification('Document added successfully');
+        } else {
+            window.showNotification('Document name is required', 'error');
+        }
+    };
+}
 
 // Export functions to global scope
 window.renderAuditorsEnhanced = renderAuditorsEnhanced;
@@ -1350,4 +1498,5 @@ window.calculateManDays = calculateManDays;
 window.renderManDayCalculator = renderManDayCalculator;
 window.openAddAuditorModal = openAddAuditorModal;
 window.openEditAuditorModal = openEditAuditorModal;
-
+window.openAddTrainingModal = openAddTrainingModal;
+window.openUploadDocumentModal = openUploadDocumentModal;

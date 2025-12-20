@@ -139,7 +139,38 @@ const state = {
             softSkills: { communication: 'good', reportWriting: 'good', analyticalSkills: 'excellent', attentionToDetail: 'excellent', interviewingSkills: 'average', timeManagement: 'good' }
         }
     ],
-    auditPrograms: [],
+    auditPrograms: [
+        {
+            id: 1,
+            name: 'ISO 9001 Quality Management Program',
+            standard: 'ISO 9001:2015',
+            type: 'Certification',
+            clientId: 1,
+            status: 'Active',
+            createdDate: '2024-01-15',
+            description: 'Comprehensive QMS audit program covering all core processes and quality management principles.'
+        },
+        {
+            id: 2,
+            name: 'ISO 14001 Environmental Program',
+            standard: 'ISO 14001:2015',
+            type: 'Certification',
+            clientId: 2,
+            status: 'Active',
+            createdDate: '2024-02-20',
+            description: 'Environmental management system audit program for manufacturing operations.'
+        },
+        {
+            id: 3,
+            name: 'ISO 27001 ISMS Surveillance',
+            standard: 'ISO 27001:2022',
+            type: 'Surveillance',
+            clientId: 3,
+            status: 'Pending',
+            createdDate: '2024-03-10',
+            description: 'Information security management surveillance audit program.'
+        }
+    ],
     auditPlans: [
         {
             id: 1,
