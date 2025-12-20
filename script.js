@@ -793,6 +793,7 @@ function closeModal() {
     document.getElementById('modal-title').textContent = 'Modal Title';
     document.getElementById('modal-body').innerHTML = '';
     document.getElementById('modal-save').onclick = null;
+    document.getElementById('modal-save').textContent = 'Save'; // Reset button text
 }
 
 // Export to window for global access

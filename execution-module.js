@@ -148,15 +148,128 @@ function openCreateReportModal() {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
+    const availablePlans = state.auditPlans.filter(p => !p.reportId);
 
-    modalTitle.textContent = 'Create Audit Report';
-    modalBody.innerHTML = `
+    modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
+
+    // UI: List of Plans + Selected Confirmation
+    const renderTable = () => {
+        if (availablePlans.length === 0) return '<div class="alert alert-warning">No approved audit plans available to execute.</div>';
+
+        return `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Select an audit plan reference to proceed:</p>
+            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 1;">
+                        <tr>
+                            <th style="padding: 8px; text-align: left;">Ref</th>
+                            <th style="padding: 8px; text-align: left;">Client</th>
+                            <th style="padding: 8px; text-align: left;">Standard</th>
+                            <th style="padding: 8px; text-align: left;">Date</th>
+                            <th style="padding: 8px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${availablePlans.map(p => `
+                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                <td style="padding: 8px; font-weight: 600;">PLN-${p.id}</td>
+                                <td style="padding: 8px;">${p.client}</td>
+                                <td style="padding: 8px;">${p.standard}</td>
+                                <td style="padding: 8px;">${p.date}</td>
+                                <td style="padding: 8px; text-align: center;">
+                                    <button class="btn btn-sm btn-outline-primary select-plan-btn" 
+                                        onclick="document.getElementById('report-plan').value='${p.id}'; 
+                                                 document.getElementById('report-date').value='${p.date}';
+                                                 document.getElementById('plan-display').textContent='PLN-${p.id}: ${p.client}';
+                                                 document.querySelectorAll('.select-plan-btn').forEach(b => {b.className='btn btn-sm btn-outline-primary'; b.textContent='Select'});
+                                                 this.className='btn btn-sm btn-success'; this.textContent='Selected';
+                                                 document.getElementById('confirm-section').style.display='block';">
+                                        Select
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="confirm-section" style="display: none; border-top: 1px solid #e2e8f0; padding-top: 1rem; animation: fadeIn 0.3s;">
+            <div style="background: #f0fdf4; padding: 0.75rem; border-radius: 6px; border: 1px solid #bbf7d0; margin-bottom: 1rem;">
+                <i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i> Ready to start audit for <strong id="plan-display"></strong>
+            </div>
+            
+            <input type="hidden" id="report-plan">
+            
+            <div class="form-group">
+                <label>Confirm Execution Date</label>
+                <input type="date" class="form-control" id="report-date" required>
+            </div>
+            
+            <div class="form-group">
+                 <label>Initial Status</label>
+                 <select class="form-control" id="report-status">
+                    <option>${window.CONSTANTS.STATUS.IN_PROGRESS}</option>
+                    <option>${window.CONSTANTS.STATUS.DRAFT}</option>
+                </select>
+            </div>
+        </div>
+        `;
+    };
+
+    modalBody.innerHTML = renderTable();
+    window.openModal();
+
+    // Update button text to 'Start Audit'
+    document.getElementById('modal-save').textContent = 'Start Audit';
+
+    modalSave.onclick = () => {
+        const planId = document.getElementById('report-plan').value;
+        const date = document.getElementById('report-date').value;
+        const status = document.getElementById('report-status')?.value || window.CONSTANTS.STATUS.IN_PROGRESS;
+
+        if (planId && date) {
+            const plan = state.auditPlans.find(p => p.id == planId);
+            const newReport = {
+                id: Date.now(),
+                planId: plan.id, // Link to plan
+                client: plan.client,
+                date: date,
+                findings: 0,
+                status: status
+            };
+
+            if (!state.auditReports) state.auditReports = [];
+            state.auditReports.push(newReport);
+
+            // Mark plan as executed
+            plan.reportId = newReport.id;
+
+            window.saveData();
+            window.closeModal();
+            renderAuditExecutionEnhanced();
+            window.showNotification('Audit Initiated! Checklist loaded from Plan.', 'success');
+        } else {
+            window.showNotification('Please select an Audit Plan from the list', 'error');
+        }
+    };
+}
+const modalTitle = document.getElementById('modal-title');
+const modalBody = document.getElementById('modal-body');
+const modalSave = document.getElementById('modal-save');
+
+modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
+modalBody.innerHTML = `
         <form id="report-form">
             <div class="form-group">
-                <label>Audit Plan</label>
-                <select class="form-control" id="report-plan" required>
-                    <option value="">-- Select Audit Plan --</option>
-                    ${state.auditPlans.map(p => `<option value="${p.id}">${p.client} - ${p.date}</option>`).join('')}
+                <label style="font-weight: 600;">Select Approved Audit Plan</label>
+                <select class="form-control" id="report-plan" required onchange="
+                    const p = state.auditPlans.find(x => x.id == this.value);
+                    if(p) document.getElementById('report-date').value = p.date;
+                ">
+                    <option value="">-- Select Audit Plan to Execute --</option>
+                    ${state.auditPlans.filter(p => !p.reportId).map(p => `<option value="${p.id}">${p.client} - ${p.standard} (${p.date})</option>`).join('')}
                 </select>
                 ${state.auditPlans.length === 0 ? '<small style="color: var(--danger-color);">No audit plans available. Please create a plan first.</small>' : ''}
             </div>
@@ -174,33 +287,39 @@ function openCreateReportModal() {
         </form>
     `;
 
-    window.openModal();
+window.openModal();
+document.getElementById('modal-save').textContent = 'Start Audit';
 
-    modalSave.onclick = () => {
-        const planId = document.getElementById('report-plan').value;
-        const date = document.getElementById('report-date').value;
-        const status = document.getElementById('report-status').value;
+modalSave.onclick = () => {
+    const planId = document.getElementById('report-plan').value;
+    const date = document.getElementById('report-date').value;
+    const status = document.getElementById('report-status').value;
 
-        if (planId && date) {
-            const plan = state.auditPlans.find(p => p.id == planId);
-            const newReport = {
-                id: Date.now(),
-                client: plan.client,
-                date: date,
-                findings: 0,
-                status: status
-            };
+    if (planId && date) {
+        const plan = state.auditPlans.find(p => p.id == planId);
+        const newReport = {
+            id: Date.now(),
+            planId: plan.id, // Link to plan
+            client: plan.client,
+            date: date,
+            findings: 0,
+            status: status
+        };
 
-            if (!state.auditReports) state.auditReports = [];
-            state.auditReports.push(newReport);
-            window.saveData();
-            window.closeModal();
-            renderAuditExecutionEnhanced();
-            window.showNotification('Audit Report created. Now you can fill the checklist.', 'success');
-        } else {
-            window.showNotification('Please fill in all required fields', 'error');
-        }
-    };
+        if (!state.auditReports) state.auditReports = [];
+        state.auditReports.push(newReport);
+
+        // Mark plan as executed (optional, but good for filtering)
+        plan.reportId = newReport.id;
+
+        window.saveData();
+        window.closeModal();
+        renderAuditExecutionEnhanced();
+        window.showNotification('Audit Initiated! Checklist loaded from Plan.', 'success');
+    } else {
+        window.showNotification('Please select an Audit Plan', 'error');
+    }
+};
 }
 
 function openEditReportModal(reportId) {
@@ -256,7 +375,8 @@ function renderExecutionDetail(reportId) {
     if (!report) return;
 
     // Calculate Progress
-    const plan = state.auditPlans.find(p => p.client === report.client);
+    // Calculate Progress
+    const plan = report.planId ? state.auditPlans.find(p => p.id == report.planId) : state.auditPlans.find(p => p.client === report.client);
     let totalItems = 0;
     if (plan && plan.selectedChecklists) {
         plan.selectedChecklists.forEach(id => {
@@ -333,7 +453,7 @@ function renderExecutionTab(report, tabName) {
 
     switch (tabName) {
         case 'checklist':
-            const plan = state.auditPlans.find(p => p.client === report.client);
+            const plan = report.planId ? state.auditPlans.find(p => p.id == report.planId) : state.auditPlans.find(p => p.client === report.client);
             const planChecklists = plan?.selectedChecklists || [];
             const checklists = state.checklists || [];
             const assignedChecklists = planChecklists.map(clId => checklists.find(c => c.id === clId)).filter(c => c);
