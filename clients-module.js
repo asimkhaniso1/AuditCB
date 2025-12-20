@@ -16,7 +16,11 @@ function renderClientsEnhanced() {
     const rows = filteredClients.map(client => `
         <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;">
             <td>${client.name}</td>
-            <td>${client.standard}</td>
+            <td>
+                ${(client.standard || '').split(',').map(s =>
+        `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.75em;">${s.trim()}</span>`
+    ).join('')}
+            </td>
             <td><span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span></td>
             <td>${client.nextAudit}</td>
             <td>
@@ -122,12 +126,17 @@ function renderClientDetail(clientId) {
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div>
                         <h2 style="margin-bottom: 0.5rem;">${client.name}</h2>
-                        <p style="color: var(--text-secondary);">
-                            ${client.standard}
-                            ${client.industry ? `<span style="margin-left: 1rem; background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-industry" style="margin-right: 4px;"></i>${client.industry}</span>` : ''}
+                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            ${(client.standard || '').split(',').map(s =>
+        `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.85em;">${s.trim()}</span>`
+    ).join('')}
+                        </div>
+                         <p style="color: var(--text-secondary);">
+                            ${client.industry ? `<span style="background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-industry" style="margin-right: 4px;"></i>${client.industry}</span>` : ''}
                         </p>
                     </div>
                     <span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span>
+                </div>
                 </div>
             </div>
 
@@ -413,6 +422,15 @@ function openAddClientModal() {
                     <option>Education</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>Standard(s)</label>
+                <select class="form-control" id="client-standard" multiple style="height: 100px;">
+                    ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+        `<option value="${std}">${std}</option>`
+    ).join('')}
+                </select>
+                <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
+            </div>
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>Company Website</label>
                 <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
@@ -493,7 +511,7 @@ function openAddClientModal() {
 
     modalSave.onclick = () => {
         const name = document.getElementById('client-name').value;
-        const standard = document.getElementById('client-standard').value;
+        const standard = Array.from(document.getElementById('client-standard').selectedOptions).map(o => o.value).join(', ');
         const nextAudit = document.getElementById('client-next-audit').value;
 
         // Contact
@@ -584,13 +602,13 @@ function openEditClientModal(clientId) {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Standard</label>
-                    <select class="form-control" id="client-standard">
-                        <option ${client.standard === 'ISO 9001:2015' ? 'selected' : ''}>ISO 9001:2015</option>
-                        <option ${client.standard === 'ISO 14001:2015' ? 'selected' : ''}>ISO 14001:2015</option>
-                        <option ${client.standard === 'ISO 45001:2018' ? 'selected' : ''}>ISO 45001:2018</option>
-                        <option ${client.standard === 'ISO 27001:2022' ? 'selected' : ''}>ISO 27001:2022</option>
+                    <label>Standard(s)</label>
+                    <select class="form-control" id="client-standard" multiple style="height: 100px;">
+                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+        `<option value="${std}" ${(client.standard || '').split(', ').includes(std) ? 'selected' : ''}>${std}</option>`
+    ).join('')}
                     </select>
+                    <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
                 </div>
                 <div class="form-group">
                     <label>Status</label>
@@ -667,7 +685,7 @@ function openEditClientModal(clientId) {
 
     modalSave.onclick = () => {
         const name = document.getElementById('client-name').value;
-        const standard = document.getElementById('client-standard').value;
+        const standard = Array.from(document.getElementById('client-standard').selectedOptions).map(o => o.value).join(', ');
         const status = document.getElementById('client-status').value;
         const nextAudit = document.getElementById('client-next-audit').value;
 
