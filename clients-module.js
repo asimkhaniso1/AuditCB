@@ -179,24 +179,26 @@ function renderClientDetail(clientId) {
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
                 <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
-                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Clients
                 </button>
             </div>
             
             <!-- Header Card with Client Info -->
             <div class="card" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <div>
-                        <h2 style="margin-bottom: 0.5rem;">${client.name}</h2>
-                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">
-                            ${(client.standard || '').split(',').map(s =>
-        `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.85em;">${s.trim()}</span>`
-    ).join('')}
-                        </div>
-                         <p style="color: var(--text-secondary);">
-                            ${client.industry ? `<span style="background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-industry" style="margin-right: 4px;"></i>${client.industry}</span>` : ''}
-                        </p>
-                    </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h2 style="margin: 0;">${client.name}</h2>
+                    <p style="color: var(--text-secondary); margin: 0.25rem 0;">${client.industry || 'N/A'} • ${client.standard || 'N/A'}</p>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient('${client.name}')">
+                        <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
+                    </button>
+                    <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.renderClientsEnhanced()">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
                     <span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span>
                 </div>
                 </div>
@@ -1243,3 +1245,28 @@ window.deleteContact = function (clientId, contactIndex) {
         window.showNotification('Contact deleted');
     }
 };
+
+// Helper function to initiate audit planning from client detail page
+window.initiateAuditPlanFromClient = function (clientName) {
+    // Navigate to Audit Planning module
+    window.renderModule('planning');
+
+    // Wait for the module to load, then open the create plan modal with client pre-selected
+    setTimeout(() => {
+        if (typeof window.openCreatePlanModal === 'function') {
+            window.openCreatePlanModal();
+
+            // Pre-select the client after modal opens
+            setTimeout(() => {
+                const clientSelect = document.getElementById('plan-client');
+                if (clientSelect) {
+                    clientSelect.value = clientName;
+                    // Trigger change event to populate client details
+                    const event = new Event('change');
+                    clientSelect.dispatchEvent(event);
+                }
+            }, 100);
+        }
+    }, 200);
+};
+
