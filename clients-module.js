@@ -1611,6 +1611,17 @@ function generateCompanyProfile(clientId) {
 
     // Simulated AI generation (in production, this would call an API)
     setTimeout(() => {
+        // Save previous version to history
+        if (client.profile) {
+            if (!client.profileHistory) client.profileHistory = [];
+            client.profileHistory.push({
+                content: client.profile,
+                updatedAt: client.profileUpdated || new Date().toISOString(),
+                updatedBy: 'System',
+                method: 'Manual'
+            });
+        }
+
         // Generate a professional company profile based on available data
         const parts = [];
 

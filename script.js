@@ -765,13 +765,31 @@ function showNotification(message, type = 'success') {
 }
 
 // Modal Helpers
-function openModal() {
+function openModal(title, body, onSave) {
+    if (title) {
+        document.getElementById('modal-title').textContent = title;
+    }
+    if (body) {
+        document.getElementById('modal-body').innerHTML = body;
+    }
+    if (onSave) {
+        const saveBtn = document.getElementById('modal-save');
+        saveBtn.onclick = onSave;
+    }
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
 function closeModal() {
     document.getElementById('modal-overlay').classList.add('hidden');
+    // Reset modal content
+    document.getElementById('modal-title').textContent = 'Modal Title';
+    document.getElementById('modal-body').innerHTML = '';
+    document.getElementById('modal-save').onclick = null;
 }
+
+// Export to window for global access
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
