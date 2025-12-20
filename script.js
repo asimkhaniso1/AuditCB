@@ -354,6 +354,7 @@ const state = {
 
 // Global Exports for Modules
 window.state = state;
+console.log('✅ window.state initialized:', window.state ? 'SUCCESS' : 'FAILED');
 window.saveData = saveState;
 window.showNotification = showNotification;
 window.openModal = openModal;

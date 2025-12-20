@@ -1,8 +1,13 @@
+```javascript
 // ============================================
 // AUDIT PLANNING MODULE
 // ============================================
 
 function renderAuditPlanningEnhanced() {
+    if (!window.state) {
+        alert('CRITICAL ERROR: window.state is undefined! Script loading failed.');
+        return;
+    }
     const state = window.state;
     const searchTerm = state.planningSearchTerm || '';
 
@@ -11,7 +16,7 @@ function renderAuditPlanningEnhanced() {
     });
 
     const rows = filteredPlans.map(plan => `
-        <tr class="plan-row" style="cursor: pointer;">
+    < tr class="plan-row" style = "cursor: pointer;" >
             <td>
                 <a href="javascript:void(0)" onclick="try { window.viewAuditPlan(${plan.id}); } catch(e) { alert('Error: ' + e.message); }" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${plan.standard || 'ISO 9001:2015'}</div>
@@ -36,11 +41,11 @@ function renderAuditPlanningEnhanced() {
                     <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                 </button>
             </td>
-        </tr>
+        </tr >
     `).join('');
 
     const html = `
-        <div class="fade-in">
+    < div class="fade-in" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Planning <span style="font-size: 0.8rem; color: var(--text-secondary);">(v5.1)</span></h2>
             </div>
@@ -76,7 +81,7 @@ function renderAuditPlanningEnhanced() {
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div >
     `;
 
     contentArea.innerHTML = html;
@@ -122,7 +127,7 @@ function openCreatePlanModal() {
 
     modalTitle.textContent = 'Create Audit Plan';
     modalBody.innerHTML = `
-        <form id="plan-form">
+    < form id = "plan-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                 <!-- Client Selection -->
                 <div class="form-group">
@@ -243,7 +248,7 @@ function openCreatePlanModal() {
                 <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
             </div>
         </form>
-    `;
+`;
 
     window.openModal();
 
@@ -333,7 +338,7 @@ function updateClientDetails(clientName) {
         const siteSelect = document.getElementById('plan-site-select');
         if (siteSelect && client.sites && client.sites.length > 0) {
             siteSelect.innerHTML = client.sites.map((s, i) =>
-                `<option value="${i}">${s.name} - ${s.city || 'N/A'}</option>`
+                `< option value = "${i}" > ${ s.name } - ${ s.city || 'N/A' }</option > `
             ).join('');
             siteSelect.style.display = 'block';
         }
@@ -343,15 +348,15 @@ function updateClientDetails(clientName) {
         if (clientInfoPanel) {
             const primaryContact = (client.contacts && client.contacts[0]) || {};
             clientInfoPanel.innerHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+    < div style = "display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;" >
                     <div><strong>Industry:</strong> ${client.industry || '-'}</div>
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
                     <div><strong>Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
                     <div><strong>Contact:</strong> ${primaryContact.name || '-'} (${primaryContact.designation || ''})</div>
                     <div><strong>Website:</strong> ${client.website ? `<a href="${client.website}" target="_blank">${client.website}</a>` : '-'}</div>
-                </div>
-            `;
+                </div >
+    `;
             clientInfoPanel.style.display = 'block';
         }
 
@@ -391,7 +396,7 @@ function autoCalculateDays() {
         document.getElementById('plan-mandays').value = days.toFixed(2);
         document.getElementById('plan-onsite-days').value = (days * 0.8).toFixed(2);
 
-        window.showNotification(`Calculated ${days.toFixed(2)} days based on ${employees} employees.`, 'success');
+        window.showNotification(`Calculated ${ days.toFixed(2) } days based on ${ employees } employees.`, 'success');
     } else {
         window.showNotification('Please enter number of employees', 'warning');
     }
@@ -461,7 +466,7 @@ function viewAuditPlan(id) {
         const cl = checklists.find(c => c.id === clId);
         if (!cl) return '';
         return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
+    < div style = "display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;" >
                 <div>
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
@@ -469,13 +474,13 @@ function viewAuditPlan(id) {
                 <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
                     <i class="fa-solid fa-eye"></i>
                 </button>
-            </div>
-        `;
+            </div >
+    `;
     }).join('') : '<p style="color: var(--text-secondary); font-style: italic;">No checklists assigned.</p>';
 
     const html = `
-        <div class="fade-in">
-            <!-- Header -->
+    < div class="fade-in" >
+            < !--Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back
@@ -486,7 +491,7 @@ function viewAuditPlan(id) {
                 </div>
             </div>
 
-            <!-- Title & Status -->
+            <!--Title & Status-- >
             <div style="margin-bottom: 2rem;">
                  <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">${plan.client} <span style="font-weight: 300; color: var(--text-secondary);">Audit Plan</span></h2>
                  <div style="display: flex; gap: 1rem; align-items: center;">
@@ -496,7 +501,7 @@ function viewAuditPlan(id) {
                  </div>
             </div>
 
-            <!-- Progress Bar -->
+            <!--Progress Bar-- >
             <div class="card" style="margin-bottom: 2rem;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                     <strong>Audit Progress</strong>
@@ -623,7 +628,7 @@ function viewAuditPlan(id) {
                 </div>
 
             </div>
-        </div>
+        </div >
     `;
     contentArea.innerHTML = html;
 }
@@ -638,7 +643,7 @@ window.printAuditPlan = function (planId) {
     // Map progress
     const progressMap = {};
     if (report && report.checklistProgress) {
-        report.checklistProgress.forEach(p => progressMap[`${p.checklistId}-${p.itemIdx}`] = p);
+        report.checklistProgress.forEach(p => progressMap[`${ p.checklistId } -${ p.itemIdx } `] = p);
     }
 
     const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
@@ -646,7 +651,7 @@ window.printAuditPlan = function (planId) {
 
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
 
-    let content = `
+let content = `
         <html>
         <head>
             <title>Audit Checklist Report - ${plan.client}</title>
@@ -671,11 +676,11 @@ window.printAuditPlan = function (planId) {
             </div>
     `;
 
-    planChecklists.forEach(clId => {
-        const cl = checklists.find(c => c.id === clId);
-        if (!cl) return;
+planChecklists.forEach(clId => {
+    const cl = checklists.find(c => c.id === clId);
+    if (!cl) return;
 
-        content += `
+    content += `
             <div class="section">
                 <h2>${cl.name}</h2>
                 <table>
@@ -690,14 +695,14 @@ window.printAuditPlan = function (planId) {
                     <tbody>
         `;
 
-        if (cl.items) {
-            cl.items.forEach((item, idx) => {
-                const key = `${cl.id}-${idx}`;
-                const prog = progressMap[key] || {};
-                const s = prog.status || '';
-                const c = prog.comment || '-';
+    if (cl.items) {
+        cl.items.forEach((item, idx) => {
+            const key = `${cl.id}-${idx}`;
+            const prog = progressMap[key] || {};
+            const s = prog.status || '';
+            const c = prog.comment || '-';
 
-                content += `
+            content += `
                     <tr>
                         <td>${item.clause || ''}</td>
                         <td>${item.requirement || ''}</td>
@@ -705,30 +710,30 @@ window.printAuditPlan = function (planId) {
                         <td>${c}</td>
                     </tr>
                 `;
-            });
-        }
-
-        content += `</tbody></table></div>`;
-    });
-
-    if (report && report.ncrs && report.ncrs.length > 0) {
-        content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
-        report.ncrs.forEach(ncr => {
-            content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
         });
-        content += `</ul></div>`;
     }
 
-    content += `
+    content += `</tbody></table></div>`;
+});
+
+if (report && report.ncrs && report.ncrs.length > 0) {
+    content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
+    report.ncrs.forEach(ncr => {
+        content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
+    });
+    content += `</ul></div>`;
+}
+
+content += `
         <div style="margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 1rem;">
             Generated by AuditCB360 on ${new Date().toLocaleDateString()}
         </div>
         </body></html>
     `;
 
-    const win = window.open('', '_blank');
-    win.document.write(content);
-    win.document.close();
+const win = window.open('', '_blank');
+win.document.write(content);
+win.document.close();
     // setTimeout(() => win.print(), 500); // Allow render
 };
 
