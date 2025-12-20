@@ -1,3 +1,4 @@
+
 // ============================================
 // AUDIT PROGRAMS MODULE - 3-Year Cycle & Timeline
 // ============================================
@@ -204,7 +205,12 @@ function renderProgramDetail(programId) {
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div>
                         <h2 style="margin-bottom: 0.5rem;">${program.client} - ${program.standard}</h2>
-                        <p style="color: var(--text-secondary);">Cycle: ${program.cycleStart} to ${program.cycleEnd}</p>
+                        <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Cycle: ${program.cycleStart} to ${program.cycleEnd}</p>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.85rem; background: #f1f5f9; padding: 4px 10px; border-radius: 4px;">
+                                <i class="fa-solid fa-building" style="color: var(--primary-color);"></i> Client ID: ${program.clientId || 'N/A'}
+                            </span>
+                        </div>
                     </div>
                     <div>
                         <button class="btn btn-primary" onclick="window.openEditProgramModal(${program.id})" style="margin-right: 0.5rem;">
@@ -272,11 +278,13 @@ function openAddProgramModal() {
                 <label>Client</label>
                 <select class="form-control" id="program-client" required onchange="updateProgramClientDetails(this.value)">
                     <option value="">-- Select Client --</option>
-                    ${state.clients.map(c => `<option value="${c.name}">${c.name} (${c.industry || 'N/A'})</option>`).join('')}
+                    ${state.clients.map(c => `<option value="${c.id}">${c.name} (${c.industry || 'N/A'})</option>`).join('')}
                 </select>
                 ${state.clients.length === 0 ? '<small style="color: var(--danger-color);">No clients available. Please add a client first.</small>' : ''}
             </div>
+            
             <div id="program-client-info" style="display: none; background: #f0f9ff; padding: 0.75rem; border-radius: var(--radius-md); margin-bottom: 1rem; font-size: 0.85rem;"></div>
+            
             <div class="form-group">
                 <label>Standard</label>
                 <select class="form-control" id="program-standard">
@@ -300,20 +308,24 @@ function openAddProgramModal() {
     window.openModal();
 
     modalSave.onclick = () => {
-        const client = document.getElementById('program-client').value;
+        const clientId = document.getElementById('program-client').value;
         const standard = document.getElementById('program-standard').value;
         const start = document.getElementById('program-start').value;
         const end = document.getElementById('program-end').value;
 
-        if (!client) {
+        if (!clientId) {
             window.showNotification('Please select a client', 'error');
             return;
         }
 
-        if (client && start && end) {
+        const clientObj = state.clients.find(c => c.id == clientId);
+        if (!clientObj) return;
+
+        if (start && end) {
             const newProgram = {
                 id: Date.now(),
-                client: client,
+                clientId: clientObj.id,
+                client: clientObj.name,
                 standard: standard,
                 cycleStart: start,
                 cycleEnd: end,
@@ -344,11 +356,9 @@ function openEditProgramModal(programId) {
         <form id="program-form">
             <div class="form-group">
                 <label>Client</label>
-                <select class="form-control" id="program-client" required disabled>
-                    <option value="${program.client}">${program.client}</option>
-                </select>
-                <small>Client cannot be changed for an existing program.</small>
+                <input type="text" class="form-control" value="${program.client}" disabled>
             </div>
+            
             <div class="form-group">
                 <label>Standard</label>
                 <select class="form-control" id="program-standard">
@@ -402,8 +412,10 @@ function openEditProgramModal(programId) {
 }
 
 // Helper function to auto-fill program details from client
-function updateProgramClientDetails(clientName) {
-    const client = state.clients.find(c => c.name === clientName);
+function updateProgramClientDetails(clientId) {
+    const client = state.clients.find(c => c.id == clientId); // Note: using loose equality for string/number ID match
+    const infoPanel = document.getElementById('program-client-info');
+
     if (client) {
         // Auto-select standard from client
         if (client.standard) {
@@ -412,19 +424,18 @@ function updateProgramClientDetails(clientName) {
         }
 
         // Show client info
-        const infoPanel = document.getElementById('program-client-info');
         if (infoPanel) {
-            const sitesCount = (client.sites && client.sites.length) || 1;
             const primaryContact = (client.contacts && client.contacts[0]) || {};
             infoPanel.innerHTML = `
                 <strong>${client.name}</strong><br>
                 Industry: ${client.industry || '-'} | 
                 Employees: ${client.employees || 0} | 
-                Sites: ${sitesCount} | 
                 Contact: ${primaryContact.name || '-'}
             `;
             infoPanel.style.display = 'block';
         }
+    } else {
+        if (infoPanel) infoPanel.style.display = 'none';
     }
 }
 
@@ -435,4 +446,3 @@ window.renderProgramDetail = renderProgramDetail;
 window.openAddProgramModal = openAddProgramModal;
 window.openEditProgramModal = openEditProgramModal;
 window.updateProgramClientDetails = updateProgramClientDetails;
-

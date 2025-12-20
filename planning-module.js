@@ -153,13 +153,13 @@ function openCreatePlanModal() {
                     <p style="color: var(--text-secondary); text-align: center; margin: 0;">Select a client to view details</p>
                 </div>
 
-                <!-- Site Selection -->
-                <div class="form-group">
-                    <label>Audit Site</label>
-                    <select class="form-control" id="plan-site-select" style="display: none;">
-                        <option value="">-- Select Site --</option>
-                    </select>
-                    <small style="color: var(--text-secondary);">Site to audit (for multi-site clients)</small>
+                <!-- Site Selection (Multi-select with checkboxes) -->
+                <div class="form-group" id="site-selection-group" style="grid-column: 1 / -1; display: none;">
+                    <label><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Site(s) <span style="font-weight: normal; color: var(--text-secondary);">(select sites in scope)</span></label>
+                    <div id="site-checkboxes" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); background: white;">
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.85rem;">Select a client to view available sites</p>
+                    </div>
+                    <small style="color: var(--text-secondary);">Selected sites affect man-day calculation and auditor recommendations</small>
                 </div>
 
                 <!-- Audit Type -->
@@ -286,6 +286,21 @@ function editAuditPlan(id) {
             option.selected = otherMembers.includes(option.value);
         });
 
+        // Restore site selection after a short delay (after updateClientDetails populates checkboxes)
+        setTimeout(() => {
+            if (plan.selectedSites && plan.selectedSites.length > 0) {
+                const selectedSiteNames = plan.selectedSites.map(s => s.name);
+                document.querySelectorAll('.site-checkbox').forEach(cb => {
+                    cb.checked = selectedSiteNames.includes(cb.dataset.name);
+                });
+                // Update site count
+                const count = document.querySelectorAll('.site-checkbox:checked').length;
+                if (document.getElementById('plan-sites')) {
+                    document.getElementById('plan-sites').value = count;
+                }
+            }
+        }, 100);
+
         // Update save handler to update instead of create
         document.getElementById('modal-save').onclick = () => {
             const updatedClient = document.getElementById('plan-client').value;
@@ -293,6 +308,17 @@ function editAuditPlan(id) {
             const updatedLead = document.getElementById('plan-lead-auditor').value;
             const updatedType = document.getElementById('plan-type').value;
             const updatedStandard = document.getElementById('plan-standard').value;
+            const updatedManDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
+            const updatedOnsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
+
+            // Get selected sites
+            const updatedSites = [];
+            document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
+                updatedSites.push({
+                    name: cb.dataset.name,
+                    geotag: cb.dataset.geotag || null
+                });
+            });
 
             const teamSelect = document.getElementById('plan-team');
             const updatedTeam = Array.from(teamSelect.selectedOptions).map(option => option.value);
@@ -304,6 +330,9 @@ function editAuditPlan(id) {
                 plan.type = updatedType;
                 plan.standard = updatedStandard;
                 plan.team = updatedTeam;
+                plan.selectedSites = updatedSites;
+                plan.manDays = updatedManDays;
+                plan.onsiteDays = updatedOnsiteDays;
 
                 window.saveData();
                 window.closeModal();
@@ -316,6 +345,9 @@ function editAuditPlan(id) {
 
 function updateClientDetails(clientName) {
     const client = state.clients.find(c => c.name === clientName);
+    const siteGroup = document.getElementById('site-selection-group');
+    const siteCheckboxes = document.getElementById('site-checkboxes');
+
     if (client) {
         // Auto-select standard
         if (client.standard) {
@@ -334,13 +366,39 @@ function updateClientDetails(clientName) {
             document.getElementById('plan-sites').value = sitesCount;
         }
 
-        // Populate site selection dropdown if exists
-        const siteSelect = document.getElementById('plan-site-select');
-        if (siteSelect && client.sites && client.sites.length > 0) {
-            siteSelect.innerHTML = client.sites.map((s, i) =>
-                `<option value="${i}">${s.name} - ${s.city || 'N/A'}</option>`
-            ).join('');
-            siteSelect.style.display = 'block';
+        // Populate site selection checkboxes
+        if (siteGroup && siteCheckboxes && client.sites && client.sites.length > 0) {
+            siteGroup.style.display = 'block';
+            siteCheckboxes.innerHTML = client.sites.map((s, i) => `
+                <div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-weight: normal;">
+                        <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" checked style="margin-top: 3px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500;">${s.name}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                                <i class="fa-solid fa-location-dot"></i> ${s.address || ''}, ${s.city || ''}
+                                ${s.geotag ? `<span style="margin-left: 0.5rem; color: #0369a1;"><i class="fa-solid fa-map-pin"></i> GPS</span>` : ''}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            `).join('');
+
+            // Add event listener to update site count when checkboxes change
+            siteCheckboxes.querySelectorAll('.site-checkbox').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const count = document.querySelectorAll('.site-checkbox:checked').length;
+                    if (document.getElementById('plan-sites')) {
+                        document.getElementById('plan-sites').value = count;
+                    }
+                    // Optionally auto-recalculate
+                    if (typeof autoCalculateDays === 'function') {
+                        autoCalculateDays();
+                    }
+                });
+            });
+        } else if (siteGroup) {
+            siteGroup.style.display = 'none';
         }
 
         // Show client info panel
@@ -351,12 +409,12 @@ function updateClientDetails(clientName) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
                     <div><strong>Industry:</strong> ${client.industry || '-'}</div>
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
-                    <div><strong>Sites:</strong> ${sitesCount}</div>
+                    <div><strong>Total Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
                     <div><strong>Contact:</strong> ${primaryContact.name || '-'} (${primaryContact.designation || ''})</div>
                     <div><strong>Website:</strong> ${client.website ? `<a href="${client.website}" target="_blank">${client.website}</a>` : '-'}</div>
                 </div>
-    `;
+            `;
             clientInfoPanel.style.display = 'block';
         }
 
@@ -364,6 +422,8 @@ function updateClientDetails(clientName) {
         if (client.employees && window.calculateManDays) {
             autoCalculateDays();
         }
+    } else {
+        if (siteGroup) siteGroup.style.display = 'none';
     }
 }
 
@@ -408,6 +468,17 @@ function saveAuditPlan() {
     const lead = document.getElementById('plan-lead-auditor').value;
     const type = document.getElementById('plan-type').value;
     const standard = document.getElementById('plan-standard').value;
+    const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
+    const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
+
+    // Get selected sites
+    const selectedSites = [];
+    document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
+        selectedSites.push({
+            name: cb.dataset.name,
+            geotag: cb.dataset.geotag || null
+        });
+    });
 
     // Get multiple selected team members
     const teamSelect = document.getElementById('plan-team');
@@ -422,6 +493,9 @@ function saveAuditPlan() {
             type: type,
             standard: standard,
             team: team,
+            selectedSites: selectedSites, // Store selected sites with geotags
+            manDays: manDays,
+            onsiteDays: onsiteDays,
             status: 'Draft'
         };
 
@@ -620,8 +694,28 @@ function viewAuditPlan(id) {
                         <div style="font-size: 0.9rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.5rem;">
                             <div><i class="fa-solid fa-industry" style="width: 20px;"></i> ${client?.industry || '-'}</div>
                             <div><i class="fa-solid fa-users" style="width: 20px;"></i> ${client?.employees || 0} employees</div>
-                            <div><i class="fa-solid fa-map-marker-alt" style="width: 20px;"></i> ${client?.sites?.length || 1} sites</div>
+                            <div><i class="fa-solid fa-map-marker-alt" style="width: 20px;"></i> ${client?.sites?.length || 1} sites total</div>
                         </div>
+                     </div>
+
+                     <!-- Audit Sites (Scope) -->
+                     <div class="card">
+                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Sites <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">(in scope)</span></h3>
+                        ${(plan.selectedSites && plan.selectedSites.length > 0) ? `
+                            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                ${plan.selectedSites.map(site => `
+                                    <div style="padding: 0.5rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
+                                        <div style="font-weight: 500; font-size: 0.9rem;">${site.name}</div>
+                                        ${site.geotag ? `<div style="font-size: 0.75rem; color: #0369a1;"><i class="fa-solid fa-map-pin"></i> GPS: ${site.geotag}</div>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div style="margin-top: 0.75rem; padding: 0.5rem; background: #e0f2fe; border-radius: var(--radius-sm); text-align: center; font-size: 0.85rem;">
+                                <strong>${plan.selectedSites.length}</strong> site(s) in audit scope
+                            </div>
+                        ` : `
+                            <p style="color: var(--text-secondary); font-style: italic; margin: 0;">All sites (legacy plan)</p>
+                        `}
                      </div>
 
                      <!-- Audit Team -->
