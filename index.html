@@ -106,10 +106,10 @@
         </div>
     </div>
 
-    <!-- Load core script FIRST to initialize window.state -->
-    <script src="script.js?v=7"></script>
+    <!-- Load core script FIRST synchronously to initialize window.state -->
+    <script src="script.js?v=8"></script>
 
-    <!-- Core Modules (loaded after state is initialized) -->
+    <!-- Core Modules load after state is initialized -->
     <script src="advanced-modules.js"></script>
     <script src="planning-module.js"></script>
     <script src="execution-module.js"></script>
