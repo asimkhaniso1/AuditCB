@@ -500,25 +500,7 @@ async function renderModule(moduleName) {
     contentArea.innerHTML = '<div class="fade-in" style="text-align: center; padding: 3rem;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 3rem; color: var(--primary-color);"></i></div>';
 
     try {
-        // Load required scripts dynamically
-        const scriptMap = {
-            'dashboard': ['dashboard-module.js', 'export-module.js'],
-            'auditors': ['advanced-modules.js', 'export-module.js'],
-            'audit-programs': ['programs-module.js', 'export-module.js'],
-            'audit-planning': ['advanced-modules.js', 'planning-module.js'],
-            'checklists': ['checklist-module.js'],
-            'audit-execution': ['execution-module.js'],
-            'manday-calculator': ['advanced-modules.js'],
-            'documents': ['documents-module.js'],
-            'settings': ['settings-module.js'],
-            'clients': ['clients-module.js', 'export-module.js']
-        };
-
-        if (scriptMap[moduleName]) {
-            for (const script of scriptMap[moduleName]) {
-                await loadScript(script);
-            }
-        }
+        // Scripts are now pre-loaded in index.html, no need for dynamic loading
 
         // Render Specific Content
         switch (moduleName) {
