@@ -372,12 +372,16 @@ function updateClientDetails(clientName) {
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
                 <div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-weight: normal;">
-                        <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" checked style="margin-top: 3px;">
+                        <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" checked style="margin-top: 3px;">
                         <div style="flex: 1;">
                             <div style="font-weight: 500;">${s.name}</div>
-                            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">
                                 <i class="fa-solid fa-location-dot"></i> ${s.address || ''}, ${s.city || ''}
                                 ${s.geotag ? `<span style="margin-left: 0.5rem; color: #0369a1;"><i class="fa-solid fa-map-pin"></i> GPS</span>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                ${s.employees ? `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem;"><i class="fa-solid fa-users" style="margin-right: 3px;"></i>${s.employees} emp</span>` : ''}
+                                ${s.shift ? `<span style="background: ${s.shift === 'Yes' ? '#fef3c7' : '#f1f5f9'}; color: ${s.shift === 'Yes' ? '#d97706' : '#64748b'}; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem;">${s.shift === 'Yes' ? 'Multi-Shift' : 'General Shift'}</span>` : ''}
                             </div>
                         </div>
                     </label>

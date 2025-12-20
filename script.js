@@ -18,8 +18,8 @@ const state = {
                 { name: 'David Chen', designation: 'CEO', phone: '+1-555-0110', email: 'david@techsolutions.com' }
             ],
             sites: [
-                { name: 'Head Office', address: '123 Tech Park', city: 'Silicon Valley', country: 'USA', geotag: '37.3382, -121.8863' },
-                { name: 'R&D Center', address: '456 Innovation Blvd', city: 'San Francisco', country: 'USA', geotag: '37.7749, -122.4194' }
+                { name: 'Head Office', address: '123 Tech Park', city: 'Silicon Valley', country: 'USA', geotag: '37.3382, -121.8863', employees: 100, shift: 'No' },
+                { name: 'R&D Center', address: '456 Innovation Blvd', city: 'San Francisco', country: 'USA', geotag: '37.7749, -122.4194', employees: 50, shift: 'No' }
             ],
             employees: 150,
             shifts: 'No',
@@ -36,7 +36,8 @@ const state = {
                 { name: 'Bob Builder', designation: 'Plant Manager', phone: '+1-555-0102', email: 'bob@globalmfg.com' }
             ],
             sites: [
-                { name: 'Main Plant', address: '456 Industrial Way', city: 'Detroit', country: 'USA', geotag: '42.3314, -83.0458' }
+                { name: 'Main Plant', address: '456 Industrial Way', city: 'Detroit', country: 'USA', geotag: '42.3314, -83.0458', employees: 350, shift: 'Yes' },
+                { name: 'Warehouse', address: '789 Storage Blvd', city: 'Detroit', country: 'USA', geotag: '42.3500, -83.0600', employees: 150, shift: 'Yes' }
             ],
             employees: 500,
             shifts: 'Yes',
@@ -54,8 +55,8 @@ const state = {
                 { name: 'Sarah Admin', designation: 'IT Manager', phone: '+1-555-0104', email: 'sadmin@securedata.com' }
             ],
             sites: [
-                { name: 'HQ', address: '789 Cyber Lane', city: 'Austin', country: 'USA', geotag: '30.2672, -97.7431' },
-                { name: 'Data Center', address: '101 Server Road', city: 'Dallas', country: 'USA', geotag: '32.7767, -96.7970' }
+                { name: 'HQ', address: '789 Cyber Lane', city: 'Austin', country: 'USA', geotag: '30.2672, -97.7431', employees: 30, shift: 'No' },
+                { name: 'Data Center', address: '101 Server Road', city: 'Dallas', country: 'USA', geotag: '32.7767, -96.7970', employees: 20, shift: 'Yes' }
             ],
             employees: 50,
             shifts: 'No',

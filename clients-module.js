@@ -248,6 +248,8 @@ function renderClientTab(client, tabName) {
                                         <th>Site Name</th>
                                         <th>Address</th>
                                         <th>City</th>
+                                        <th>Employees</th>
+                                        <th>Shift</th>
                                         <th>Geotag</th>
                                     </tr>
                                 </thead>
@@ -257,6 +259,12 @@ function renderClientTab(client, tabName) {
                                             <td style="font-weight: 500;">${s.name}</td>
                                             <td>${s.address || '-'}</td>
                                             <td>${s.city || '-'}, ${s.country || ''}</td>
+                                            <td>
+                                                ${s.employees ? `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-users" style="margin-right: 4px;"></i>${s.employees}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
+                                            </td>
+                                            <td>
+                                                ${s.shift ? `<span style="background: ${s.shift === 'Yes' ? '#fef3c7' : '#f1f5f9'}; color: ${s.shift === 'Yes' ? '#d97706' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${s.shift === 'Yes' ? 'Multi-Shift' : 'General'}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
+                                            </td>
                                             <td>
                                                 ${s.geotag ? `<a href="https://maps.google.com/?q=${s.geotag}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${s.geotag}</a>` : '-'}
                                             </td>
@@ -753,14 +761,35 @@ function addSite(clientId) {
                 <label>Address</label>
                 <input type="text" class="form-control" id="site-address" placeholder="Street Address">
             </div>
-            <div class="form-group">
-                <label>City</label>
-                <input type="text" class="form-control" id="site-city" placeholder="City">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" class="form-control" id="site-city" placeholder="City">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" class="form-control" id="site-country" placeholder="Country">
+                </div>
             </div>
-            <div class="form-group">
-                <label>Country</label>
-                <input type="text" class="form-control" id="site-country" placeholder="Country">
+            
+            <div style="border-top: 1px solid var(--border-color); margin: 1rem 0; padding-top: 1rem;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>Optional: Site-specific details for man-day calculation</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Employees at this Site <span style="font-weight: normal; color: var(--text-secondary);">(optional)</span></label>
+                        <input type="number" class="form-control" id="site-employees" min="0" placeholder="e.g. 50">
+                    </div>
+                    <div class="form-group">
+                        <label>Shift Work? <span style="font-weight: normal; color: var(--text-secondary);">(optional)</span></label>
+                        <select class="form-control" id="site-shift">
+                            <option value="">-- Not specified --</option>
+                            <option value="No">No (General Shift Only)</option>
+                            <option value="Yes">Yes (Multiple Shifts)</option>
+                        </select>
+                    </div>
+                </div>
             </div>
+
             <div class="form-group">
                 <label>Geotag (Lat, Long)</label>
                 <div style="display: flex; gap: 0.5rem;">
@@ -781,10 +810,12 @@ function addSite(clientId) {
         const city = document.getElementById('site-city').value;
         const country = document.getElementById('site-country').value;
         const geotag = document.getElementById('site-geotag').value;
+        const employees = parseInt(document.getElementById('site-employees').value) || null;
+        const shift = document.getElementById('site-shift').value || null;
 
         if (name) {
             if (!client.sites) client.sites = [];
-            client.sites.push({ name, address, city, country, geotag });
+            client.sites.push({ name, address, city, country, geotag, employees, shift });
             window.saveData();
             window.closeModal();
             renderClientDetail(clientId);
