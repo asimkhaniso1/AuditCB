@@ -11,10 +11,21 @@ function renderReportSummaryTab(report, tabContent) {
     const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
 
     let actionButtons = '';
+
+    // Workflow: Draft -> Review -> Approved -> Finalized
     if (report.status === window.CONSTANTS.STATUS.IN_REVIEW) {
         actionButtons = `
-            <button class="btn btn-danger" onclick="revertToDraft(${report.id})">
-                <i class="fa-solid fa-undo" style="margin-right: 0.5rem;"></i> Revert
+            <button class="btn btn-warning" onclick="window.revertToDraft(${report.id})">
+                <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Revert to Draft
+            </button>
+            <button class="btn btn-primary" style="flex: 1; background-color: #8b5cf6; border-color: #7c3aed;" onclick="window.approveReport(${report.id})">
+                <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Approve (Cert Manager)
+            </button>
+        `;
+    } else if (report.status === window.CONSTANTS.STATUS.APPROVED) {
+        actionButtons = `
+             <button class="btn btn-warning" onclick="window.revertToReview(${report.id})">
+                 <i class="fa-solid fa-pen-to-square" style="margin-right: 0.5rem;"></i> Re-open Review
             </button>
             <button class="btn btn-success" style="flex: 1;" onclick="publishReport(${report.id})">
                 <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem;"></i> Publish Final Report
@@ -179,6 +190,46 @@ function submitForReview(reportId) {
     window.saveData();
     window.renderExecutionDetail(reportId);
     window.showNotification('Report submitted for QA review');
+}
+
+// Approve Report (Certification Manager Step)
+window.approveReport = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    // VALIDATION: Classification Check
+    const hasPending = (report.ncrs || []).some(n => n.type === window.CONSTANTS.NCR_TYPES.PENDING) ||
+        (report.checklistProgress || []).some(n => n.status === 'nc' && n.ncrType === window.CONSTANTS.NCR_TYPES.PENDING);
+
+    if (hasPending) {
+        window.showNotification('Cannot Approve: Findings are Flagged/Pending. Please classify all findings first.', 'error');
+        return;
+    }
+
+    report.status = window.CONSTANTS.STATUS.APPROVED;
+    window.saveData();
+    window.renderExecutionDetail(reportId);
+    window.showNotification('Report Approved by Certification Manager. Ready to Publish.', 'success');
+};
+
+window.revertToDraft = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (report) {
+        report.status = window.CONSTANTS.STATUS.DRAFT;
+        window.saveData();
+        window.renderExecutionDetail(reportId);
+        window.showNotification('Report reverted to Draft for editing.');
+    }
+}
+
+window.revertToReview = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (report) {
+        report.status = window.CONSTANTS.STATUS.IN_REVIEW;
+        window.saveData();
+        window.renderExecutionDetail(reportId);
+        window.showNotification('Report re-opened for Review.');
+    }
 }
 
 // Publish the final report

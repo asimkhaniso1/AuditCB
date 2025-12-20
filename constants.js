@@ -3,6 +3,7 @@ window.CONSTANTS = {
         DRAFT: 'Draft',
         IN_PROGRESS: 'In Progress',
         IN_REVIEW: 'In Review',
+        APPROVED: 'Approved',
         PUBLISHED: 'Published',
         FINALIZED: 'Finalized',
         OPEN: 'Open',
