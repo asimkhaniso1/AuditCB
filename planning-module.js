@@ -45,9 +45,67 @@ function renderAuditPlanningEnhanced() {
 
     const html = `
         <div class="fade-in">
+        <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2 style="margin: 0;">Audit Planning <span style="font-size: 0.8rem; color: var(--text-secondary);">(v5.1)</span></h2>
+                <h2 style="margin: 0;">Audit Planning <span style="font-size: 0.8rem; color: var(--text-secondary);">(v5.2)</span></h2>
+                 <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanningAnalytics()" style="white-space: nowrap;">
+                        <i class="fa-solid ${state.showPlanningAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showPlanningAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
+                    </button>
+                    <button id="btn-create-plan" class="btn btn-primary">
+                        <i class="fa-solid fa-plus"></i> Create Audit Plan
+                    </button>
+                </div>
             </div>
+
+            ${state.showPlanningAnalytics !== false ? `
+             <div class="fade-in" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Total Plans -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Plans</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.length}</div>
+                    </div>
+                </div>
+
+                <!-- Drafts -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fefce8; color: #ca8a04; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-pencil"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Drafts</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.filter(p => p.status === 'Draft').length}</div>
+                    </div>
+                </div>
+
+                 <!-- Confirmed/Scheduled -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                         <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Scheduled</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.filter(p => p.status === 'Confirmed').length}</div>
+                    </div>
+                </div>
+
+                 <!-- Completed -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f1f5f9; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                         <i class="fa-solid fa-check-double"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Completed</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.filter(p => p.status === 'Completed').length}</div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
                 <div style="display: flex; gap: 1rem; flex: 1;">
                     <input type="text" id="plan-search" placeholder="Search audit plans..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
@@ -58,9 +116,6 @@ function renderAuditPlanningEnhanced() {
                         <option value="completed">Completed</option>
                     </select>
                 </div>
-                <button id="btn-create-plan" class="btn btn-primary">
-                    <i class="fa-solid fa-plus"></i> Create Audit Plan
-                </button>
             </div>
 
             <div class="table-container">

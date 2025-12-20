@@ -25,11 +25,69 @@ function renderAuditExecutionEnhanced() {
 
     const html = `
         <div class="fade-in">
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Execution & Reports</h2>
+                 <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleExecutionAnalytics()" style="white-space: nowrap;">
+                        <i class="fa-solid ${state.showExecutionAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showExecutionAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
+                    </button>
+                    <button class="btn btn-primary" onclick="window.openCreateReportModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Report</button>
+                </div>
+            </div>
+
+            ${state.showExecutionAnalytics !== false ? `
+             <div class="fade-in" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Total Reports -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-file-contract"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Reports</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditReports.length}</div>
+                    </div>
+                </div>
+
+                <!-- Pending Closure -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">In Progress</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditReports.filter(r => r.status !== 'Finalized').length}</div>
+                    </div>
+                </div>
+
+                 <!-- Total Findings -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Findings</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditReports.reduce((acc, r) => acc + (r.findings || 0), 0)}</div>
+                    </div>
+                </div>
+                
+                 <!-- Avg Findings -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fefce8; color: #ca8a04; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Avg per Audit</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${(state.auditReports.reduce((acc, r) => acc + (r.findings || 0), 0) / (state.auditReports.length || 1)).toFixed(1)}</div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
                 <div style="display: flex; gap: 1rem; flex: 1;">
                     <input type="text" id="execution-search" placeholder="Search by client..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
                 </div>
-                <button class="btn btn-primary" onclick="window.openCreateReportModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Report</button>
             </div>
             <div class="table-container">
                 <table>
@@ -74,6 +132,14 @@ function renderAuditExecutionEnhanced() {
             openEditReportModal(reportId);
         });
     });
+});
+
+// Helper for toggle
+window.toggleExecutionAnalytics = function () {
+    if (state.showExecutionAnalytics === undefined) state.showExecutionAnalytics = true;
+    state.showExecutionAnalytics = !state.showExecutionAnalytics;
+    renderAuditExecutionEnhanced();
+};
 }
 
 function openCreateReportModal() {

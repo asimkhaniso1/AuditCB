@@ -50,6 +50,56 @@ function renderAuditProgramsEnhanced() {
 
     const html = `
         <div class="fade-in">
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Audit Programs</h2>
+                 <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleProgramAnalytics()" style="white-space: nowrap;">
+                        <i class="fa-solid ${state.showProgramAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showProgramAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
+                    </button>
+                    <button id="btn-new-program" class="btn btn-primary" style="white-space: nowrap;">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Program
+                    </button>
+                </div>
+            </div>
+
+            ${state.showProgramAnalytics !== false ? `
+             <div class="fade-in" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Total Programs -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Programs</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPrograms.length}</div>
+                    </div>
+                </div>
+
+                <!-- Active Cycles -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-rotate"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Active Cycles</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPrograms.filter(p => p.status === 'Active').length}</div>
+                    </div>
+                </div>
+
+                 <!-- Completed/Inactive -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f8fafc; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                         <i class="fa-solid fa-flag-checkered"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Completed</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPrograms.filter(p => p.status === 'Completed').length}</div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
                 <div style="display: flex; gap: 1rem; flex: 1;">
                     <input type="text" id="program-search" placeholder="Search programs..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
@@ -59,9 +109,6 @@ function renderAuditProgramsEnhanced() {
                         <option value="completed">Completed</option>
                     </select>
                 </div>
-                <button id="btn-new-program" class="btn btn-primary">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Program
-                </button>
             </div>
 
             <div class="card" style="margin-bottom: 2rem; padding: 0; overflow: hidden;">
@@ -126,6 +173,14 @@ function renderAuditProgramsEnhanced() {
             openEditProgramModal(programId);
         });
     });
+});
+
+// Helper for toggle
+window.toggleProgramAnalytics = function () {
+    if (state.showProgramAnalytics === undefined) state.showProgramAnalytics = true;
+    state.showProgramAnalytics = !state.showProgramAnalytics;
+    renderAuditProgramsEnhanced();
+};
 }
 
 function renderTimelineVisualization(programs) {

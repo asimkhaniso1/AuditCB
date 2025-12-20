@@ -43,9 +43,13 @@ function renderCertificationModule() {
 
     contentArea.innerHTML = `
         <div class="fade-in">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
-                    <h2 style="margin-bottom: 0.5rem;">Certification Management</h2>
+                    <h2 style="margin-bottom: 0.5rem;" onclick="toggleCertAnalytics()" style="cursor: pointer;">
+                        Certification Management
+                         <i class="fa-solid ${window.state.showCertAnalytics !== false ? 'fa-angle-down' : 'fa-angle-right'}" style="font-size: 0.8em; color: var(--text-secondary); margin-left: 0.5rem;"></i>
+                    </h2>
                     <p style="color: var(--text-secondary);">Manage issuance, surveillance, and renewal of ISO certificates.</p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
@@ -53,6 +57,43 @@ function renderCertificationModule() {
                     <button class="btn btn-primary" onclick="openIssueCertificateModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Manual Issue</button>
                 </div>
             </div>
+
+            ${window.state.showCertAnalytics !== false ? `
+            <div class="fade-in" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Active Certificates -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-certificate"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Active Certificates</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${certs.filter(c => c.status === 'Valid').length}</div>
+                    </div>
+                </div>
+
+                <!-- Pending Decisions -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Pending Decisions</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${pendingDecisions.length}</div>
+                    </div>
+                </div>
+
+                 <!-- Suspended/Withdrawn -->
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                         <i class="fa-solid fa-ban"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Suspended/Withdrawn</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${certs.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
 
             <!-- Tabs -->
             <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
