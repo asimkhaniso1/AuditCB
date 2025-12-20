@@ -1070,7 +1070,7 @@ window.renderExecutionDetail = renderExecutionDetail;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
 window.createCAPA = createCAPA;
-// Generate Printable Report
+// Generate Printable Report - Enhanced Version
 window.generateAuditReport = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) {
@@ -1080,9 +1080,19 @@ window.generateAuditReport = function (reportId) {
 
     try {
         const plan = state.auditPlans.find(p => p.client === report.client) || {};
+        const client = state.clients.find(c => c.name === report.client) || {};
         const ncrCount = (report.ncrs || []).length;
         const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
         const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
+        const capaCount = (report.capas || []).length;
+
+        // Calculate checklist progress
+        const totalProgress = report.checklistProgress || [];
+        const conformCount = totalProgress.filter(p => p.status === 'conform').length;
+        const ncCount = totalProgress.filter(p => p.status === 'nc').length;
+        const naCount = totalProgress.filter(p => p.status === 'na').length;
+        const totalItems = totalProgress.length;
+        const progressPercent = totalItems > 0 ? Math.round((conformCount / totalItems) * 100) : 0;
 
         // QR Code URL
         const qrData = `REP-${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}%`;
@@ -1093,6 +1103,10 @@ window.generateAuditReport = function (reportId) {
         const conformHeight = complianceScore;
         const majorHeight = Math.min(100, majorCount * 15 + 10);
         const minorHeight = Math.min(100, minorCount * 10 + 10);
+
+        // Get audit team
+        const leadAuditor = state.auditors.find(a => plan.auditors?.includes(a.id));
+        const auditTeam = (plan.auditors || []).map(id => state.auditors.find(a => a.id === id)).filter(a => a);
 
         const printWindow = window.open('', '_blank');
 
@@ -1112,38 +1126,49 @@ window.generateAuditReport = function (reportId) {
                 .logo { font-size: 3rem; font-weight: bold; color: #2c3e50; margin-bottom: 2rem; }
                 .report-title { font-size: 2.5rem; margin-bottom: 1rem; color: #2c3e50; }
                 
-                h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 40px; page-break-after: avoid; }
+                h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; margin-top: 40px; page-break-after: avoid; }
+                h2 { color: #34495e; margin-top: 30px; font-size: 1.3rem; }
                 p { line-height: 1.6; text-align: justify; margin-bottom: 1rem; }
                 
-                /* Chart */
+                /* Enhanced Chart */
                 .chart-section { margin: 40px 0; page-break-inside: avoid; }
-                .chart-container { display: flex; justify-content: space-around; align-items: flex-end; height: 200px; margin: 20px auto; width: 70%; background: #f8f9fa; padding: 20px 20px 0 20px; border-bottom: 2px solid #cbd5e1; }
-                .bar-group { display: flex; flex-direction: column; align-items: center; width: 60px; }
-                .bar { width: 100%; position: relative; border-top-left-radius: 4px; border-top-right-radius: 4px; }
-                .bar-val { font-weight: bold; margin-bottom: 5px; color: #333; }
-                .bar-label { margin-top: 10px; font-size: 0.9rem; font-weight: 500; color: #64748b; }
+                .chart-container { display: flex; justify-content: space-around; align-items: flex-end; height: 220px; margin: 20px auto; width: 75%; background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%); padding: 25px 20px 0 20px; border-bottom: 3px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+                .bar-group { display: flex; flex-direction: column; align-items: center; width: 70px; }
+                .bar { width: 100%; position: relative; border-top-left-radius: 6px; border-top-right-radius: 6px; box-shadow: 0 -2px 4px rgba(0,0,0,0.1); }
+                .bar-val { font-weight: bold; margin-bottom: 8px; color: #1e293b; font-size: 1.1rem; }
+                .bar-label { margin-top: 12px; font-size: 0.9rem; font-weight: 600; color: #475569; }
 
-                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                .meta-table td { padding: 12px; border: 1px solid #ddd; }
-                .meta-table td:first-child { background: #f8f9fa; font-weight: bold; width: 220px; }
+                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+                .meta-table td { padding: 14px; border: 1px solid #e2e8f0; }
+                .meta-table td:first-child { background: #f1f5f9; font-weight: 600; width: 220px; color: #334155; }
                 
                 .finding-box { border: 1px solid #ddd; padding: 20px; margin-bottom: 15px; border-radius: 8px; page-break-inside: avoid; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
                 .finding-major { border-left: 5px solid #ef4444; background-color: #fef2f2; }
                 .finding-minor { border-left: 5px solid #f59e0b; background-color: #fffbeb; }
                 
-                .badge { padding: 4px 10px; border-radius: 12px; color: white; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+                .capa-box { border: 1px solid #cbd5e1; padding: 18px; margin-bottom: 12px; border-radius: 8px; page-break-inside: avoid; background: #f8fafc; border-left: 4px solid #3b82f6; }
+                
+                .badge { padding: 5px 12px; border-radius: 12px; color: white; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
                 .bg-red { background: #ef4444; }
                 .bg-yellow { background: #f59e0b; color: #fff; }
+                .bg-blue { background: #3b82f6; }
+                .bg-green { background: #10b981; }
                 
                 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+                .progress-bar { width: 100%; height: 24px; background: #e2e8f0; border-radius: 12px; overflow: hidden; margin: 10px 0; }
+                .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #059669); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; }
 
                 .qr-header { position: absolute; top: 40px; right: 40px; text-align: center; }
-                .qr-header img { width: 100px; height: 100px; }
+                .qr-header img { width: 100px; height: 100px; border: 2px solid #e2e8f0; border-radius: 8px; }
                 .qr-label { font-size: 10px; color: #666; margin-top: 5px; }
+                
+                .signature-section { margin-top: 60px; page-break-inside: avoid; }
+                .signature-box { border: 2px solid #cbd5e1; padding: 20px; border-radius: 8px; background: #f8fafc; }
+                .signature-line { border-top: 2px solid #334155; margin-top: 50px; padding-top: 8px; }
 
                 @media print {
                     @page { margin: 2cm; }
-                    body { -webkit-print-color-adjust: exact; }
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     .no-print { display: none; }
                 }
             </style>
@@ -1163,13 +1188,14 @@ window.generateAuditReport = function (reportId) {
                     <div class="logo"><i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> AuditCB360</div>
                     <div class="report-title">Audit Certification Report</div>
                     <div class="report-meta">
-                        <p style="text-align: center; font-weight: 500;">${report.client}</p>
-                        <p style="text-align: center;">${plan.standard || 'ISO Standard Audit'}</p>
-                        <p style="text-align: center;">Date: ${report.date}</p>
+                        <p style="text-align: center; font-weight: 500; font-size: 1.3rem;">${report.client}</p>
+                        <p style="text-align: center; font-size: 1.1rem;">${plan.standard || 'ISO Standard Audit'}</p>
+                        <p style="text-align: center;">Audit Date: ${report.date}</p>
+                        <p style="text-align: center; color: #64748b;">Report Generated: ${new Date().toLocaleDateString()}</p>
                     </div>
                     
                     <div style="margin-top: 2rem;">
-                        <div style="font-size: 4rem; font-weight: 800; color: ${complianceScore > 80 ? '#10b981' : '#f59e0b'}; line-height: 1;">
+                        <div style="font-size: 4.5rem; font-weight: 800; color: ${complianceScore > 80 ? '#10b981' : complianceScore > 60 ? '#f59e0b' : '#ef4444'}; line-height: 1;">
                             ${complianceScore}%
                         </div>
                         <div style="font-size: 1.2rem; color: #64748b; margin-top: 0.5rem;">Audit Compliance Score</div>
@@ -1180,16 +1206,50 @@ window.generateAuditReport = function (reportId) {
                 <table class="meta-table">
                     <tr><td>Client Name</td><td>${report.client}</td></tr>
                     <tr><td>Audit Standard</td><td>${plan.standard || 'N/A'}</td></tr>
+                    <tr><td>Audit Type</td><td>${plan.objectives || 'Certification Audit'}</td></tr>
+                    <tr><td>Audit Scope</td><td>${plan.scope || 'Full organization'}</td></tr>
                     <tr><td>Audit Date</td><td>${report.date}</td></tr>
                     <tr><td>Report ID</td><td>REP-${report.id}</td></tr>
-                    <tr><td>Lead Auditor</td><td>${state.auditors.find(a => plan.auditors?.includes(a.id))?.name || 'Unknown'}</td></tr>
+                    <tr><td>Lead Auditor</td><td>${leadAuditor?.name || 'Unknown'}</td></tr>
+                    <tr><td>Audit Team</td><td>${auditTeam.map(a => a.name).join(', ') || 'N/A'}</td></tr>
+                    <tr><td>Man-Days</td><td>${plan.manDays || 'N/A'}</td></tr>
                     <tr><td>Total Findings</td><td>${ncrCount} (Major: ${majorCount}, Minor: ${minorCount})</td></tr>
+                    <tr><td>Report Status</td><td><strong>${report.status}</strong></td></tr>
                 </table>
 
                 <h1>2. Executive Summary</h1>
                 <p><strong>Overview:</strong></p>
-                <div style="margin-bottom: 2rem;">
+                <div style="margin-bottom: 2rem; background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6;">
                     ${(report.execSummary || 'Executive summary pending...').replace(/\n/g, '<br>')}
+                </div>
+                
+                <h2>Checklist Completion Progress</h2>
+                <div style="background: #ffffff; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 30px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="font-weight: 600;">Overall Progress</span>
+                        <span style="font-weight: 700; color: #3b82f6;">${progressPercent}% Complete</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progressPercent}%;">${totalItems > 0 ? `${conformCount}/${totalItems}` : '0/0'}</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px;">
+                        <div style="text-align: center; padding: 12px; background: #f0f9ff; border-radius: 6px;">
+                            <div style="font-size: 1.8rem; font-weight: 700; color: #0284c7;">${totalItems}</div>
+                            <div style="font-size: 0.85rem; color: #64748b;">Total Items</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: #ecfdf5; border-radius: 6px;">
+                            <div style="font-size: 1.8rem; font-weight: 700; color: #10b981;">${conformCount}</div>
+                            <div style="font-size: 0.85rem; color: #64748b;">Conformities</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: #fef2f2; border-radius: 6px;">
+                            <div style="font-size: 1.8rem; font-weight: 700; color: #ef4444;">${ncCount}</div>
+                            <div style="font-size: 0.85rem; color: #64748b;">Non-Conformities</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: #f1f5f9; border-radius: 6px;">
+                            <div style="font-size: 1.8rem; font-weight: 700; color: #64748b;">${naCount}</div>
+                            <div style="font-size: 0.85rem; color: #64748b;">Not Applicable</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <h2>Audit Performance Analysis</h2>
@@ -1198,18 +1258,23 @@ window.generateAuditReport = function (reportId) {
                      <div class="chart-container">
                         <div class="bar-group">
                             <span class="bar-val">${complianceScore}%</span>
-                            <div class="bar" style="height: ${conformHeight}%; background: #10b981;"></div>
-                            <span class="bar-label">Score</span>
+                            <div class="bar" style="height: ${conformHeight}%; background: linear-gradient(to top, #059669, #10b981);"></div>
+                            <span class="bar-label">Compliance</span>
                         </div>
                         <div class="bar-group">
                             <span class="bar-val">${majorCount}</span>
-                            <div class="bar" style="height: ${majorHeight}px; background: #ef4444;"></div>
-                            <span class="bar-label">Major</span>
+                            <div class="bar" style="height: ${majorHeight}px; background: linear-gradient(to top, #dc2626, #ef4444);"></div>
+                            <span class="bar-label">Major NCs</span>
                         </div>
                         <div class="bar-group">
                             <span class="bar-val">${minorCount}</span>
-                            <div class="bar" style="height: ${minorHeight}px; background: #f59e0b;"></div>
-                            <span class="bar-label">Minor</span>
+                            <div class="bar" style="height: ${minorHeight}px; background: linear-gradient(to top, #d97706, #f59e0b);"></div>
+                            <span class="bar-label">Minor NCs</span>
+                        </div>
+                        <div class="bar-group">
+                            <span class="bar-val">${capaCount}</span>
+                            <div class="bar" style="height: ${Math.min(100, capaCount * 20 + 10)}px; background: linear-gradient(to top, #2563eb, #3b82f6);"></div>
+                            <span class="bar-label">CAPAs</span>
                         </div>
                     </div>
                 </div>
@@ -1219,73 +1284,148 @@ window.generateAuditReport = function (reportId) {
                     <div>
                         <h3><i class="fa-solid fa-thumbs-up" style="color: #10b981; margin-right: 8px;"></i> Key Strengths</h3>
                          <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; border: 1px solid #a7f3d0;">
-                            ${(report.strengths || 'None recorded').replace(/\n/g, '<br>')}
+                            ${(report.strengths || report.positiveObservations || 'None recorded').replace(/\n/g, '<br>')}
                          </div>
                     </div>
                     <div>
                         <h3><i class="fa-solid fa-lightbulb" style="color: #f59e0b; margin-right: 8px;"></i> Areas for Improvement</h3>
                          <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border: 1px solid #fde68a;">
-                            ${(report.improvements || 'None recorded').replace(/\n/g, '<br>')}
+                            ${(report.improvements || report.ofi || 'None recorded').replace(/\n/g, '<br>')}
                          </div>
                     </div>
                 </div>
 
                 <h1>4. Detailed Findings and Evidence</h1>
-                ${ncrCount === 0 ? '<p>No non-conformities were raised during this audit. The system was found to be in full compliance.</p>' : ''}
+                ${ncrCount === 0 ? '<p style="background: #ecfdf5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;"><i class="fa-solid fa-circle-check" style="color: #10b981; margin-right: 8px;"></i><strong>No non-conformities were raised during this audit.</strong> The management system was found to be in full compliance with the standard requirements.</p>' : ''}
                 ${(report.ncrs || []).map((ncr, i) => `
                     <div class="finding-box ${ncr.type === 'major' ? 'finding-major' : 'finding-minor'}">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.05);">
-                            <div style="font-weight: 700; font-size: 1.1rem;">Finding #${String(i + 1).padStart(3, '0')}</div>
-                            <span class="badge ${ncr.type === 'major' ? 'bg-red' : 'bg-yellow'}">${ncr.type}</span>
+                            <div style="font-weight: 700; font-size: 1.1rem;"><i class="fa-solid fa-exclamation-triangle" style="margin-right: 8px;"></i>Finding #${String(i + 1).padStart(3, '0')}</div>
+                            <span class="badge ${ncr.type === 'major' ? 'bg-red' : 'bg-yellow'}">${ncr.type.toUpperCase()}</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 8px;">
-                            <div style="font-weight: 600; color: #555;">Clause:</div>
-                            <div>${ncr.clause}</div>
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; margin-bottom: 8px;">
+                            <div style="font-weight: 600; color: #555;">Clause Reference:</div>
+                            <div><strong>${ncr.clause}</strong></div>
                             
                             <div style="font-weight: 600; color: #555;">Description:</div>
                             <div>${ncr.description}</div>
                             
-                            <div style="font-weight: 600; color: #555;">Evidence:</div>
-                            <div style="font-style: italic; color: #4b5563;">${ncr.evidence || 'Evidence reviewed on-site.'}</div>
+                            <div style="font-weight: 600; color: #555;">Objective Evidence:</div>
+                            <div style="font-style: italic; color: #4b5563;">${ncr.evidence || 'Evidence reviewed on-site during audit.'}</div>
 
                              ${ncr.transcript ? `
-                                <div style="font-weight: 600; color: #555;">Audio Note:</div>
-                                <div style="background: #f1f5f9; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 0.9rem;">
-                                    <i class="fa-solid fa-microphone-lines" style="color: #64748b; margin-right: 5px;"></i> ${ncr.transcript}
+                                <div style="font-weight: 600; color: #555;">Audio Transcript:</div>
+                                <div style="background: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.9rem; border-left: 3px solid #64748b;">
+                                    <i class="fa-solid fa-microphone-lines" style="color: #64748b; margin-right: 5px;"></i> "${ncr.transcript}"
                                 </div>
                             ` : ''}
 
                             ${ncr.evidenceImage ? `
                                 <div style="font-weight: 600; color: #555;">Visual Evidence:</div>
                                 <div>
-                                    <img src="${ncr.evidenceImage}" alt="Captured Evidence" style="max-width: 100%; max-height: 300px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px;">
+                                    <img src="${ncr.evidenceImage}" alt="Captured Evidence" style="max-width: 100%; max-height: 300px; border: 2px solid #cbd5e1; border-radius: 6px; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                                 </div>
                             ` : ''}
                             
-                            <div style="font-weight: 600; color: #555;">Status:</div>
-                            <div>${ncr.status}</div>
+                            <div style="font-weight: 600; color: #555;">Current Status:</div>
+                            <div><span class="badge ${ncr.status === 'Closed' ? 'bg-green' : 'bg-yellow'}" style="font-size: 0.75rem;">${ncr.status}</span></div>
                         </div>
                     </div>
                 `).join('')}
 
-                <h1>5. Conclusion and Recommendation</h1>
+                ${capaCount > 0 ? `
+                <h1>5. Corrective & Preventive Actions (CAPA)</h1>
+                <p>The following corrective and preventive actions have been identified to address the non-conformities raised during the audit:</p>
+                ${(report.capas || []).map((capa, i) => `
+                    <div class="capa-box">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #cbd5e1;">
+                            <div style="font-weight: 700; font-size: 1rem;"><i class="fa-solid fa-clipboard-check" style="color: #3b82f6; margin-right: 8px;"></i>CAPA #${String(i + 1).padStart(3, '0')}</div>
+                            <span class="badge ${capa.status === 'Completed' ? 'bg-green' : 'bg-blue'}">${capa.status || 'In Progress'}</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 10px;">
+                            ${capa.linkedNCR ? `
+                                <div style="font-weight: 600; color: #555;">Linked to:</div>
+                                <div><strong>${capa.linkedNCR}</strong></div>
+                            ` : ''}
+                            
+                            <div style="font-weight: 600; color: #555;">Root Cause:</div>
+                            <div>${capa.rootCause || 'Not specified'}</div>
+                            
+                            <div style="font-weight: 600; color: #555;">Action Plan:</div>
+                            <div>${capa.actionPlan || 'Not specified'}</div>
+                            
+                            ${capa.dueDate ? `
+                                <div style="font-weight: 600; color: #555;">Due Date:</div>
+                                <div>${capa.dueDate}</div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+                ` : ''}
+
+                <h1>${capaCount > 0 ? '6' : '5'}. Observations</h1>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                    <h3 style="color: #10b981; margin-top: 0;"><i class="fa-solid fa-star" style="margin-right: 8px;"></i>Positive Observations</h3>
+                    <div style="background: white; padding: 15px; border-radius: 6px;">
+                        ${(report.positiveObservations || 'No specific positive observations recorded.').replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+                <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border: 1px solid #fde68a;">
+                    <h3 style="color: #f59e0b; margin-top: 0;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>Opportunities for Improvement (OFI)</h3>
+                    <div style="background: white; padding: 15px; border-radius: 6px;">
+                        ${(report.ofi || 'No opportunities for improvement identified.').replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+
+                <h1>${capaCount > 0 ? '7' : '6'}. Conclusion and Recommendation</h1>
                 <p><strong>Auditor Conclusion:</strong></p>
-                <div style="margin-bottom: 30px; background: #fff; border-left: 4px solid #3b82f6; padding: 15px;">
-                    ${(report.conclusion || '').replace(/\n/g, '<br>')}
+                <div style="margin-bottom: 30px; background: #f8fafc; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 4px;">
+                    ${(report.conclusion || 'Conclusion pending finalization.').replace(/\n/g, '<br>')}
                 </div>
                 
-                <div style="margin-top: 30px; padding: 20px; border: 2px dashed ${report.recommendation === 'Recommend Certification' ? '#10b981' : '#f59e0b'}; background: ${report.recommendation === 'Recommend Certification' ? '#ecfdf5' : '#fffbeb'}; text-align: center; border-radius: 8px;">
-                    ${report.recommendation || 'Recommendation Pending'}
+                <div style="margin-top: 30px; padding: 25px; border: 3px solid ${report.recommendation === 'Recommend Certification' ? '#10b981' : report.recommendation === 'Do Not Recommend' ? '#ef4444' : '#f59e0b'}; background: ${report.recommendation === 'Recommend Certification' ? '#ecfdf5' : report.recommendation === 'Do Not Recommend' ? '#fef2f2' : '#fffbeb'}; text-align: center; border-radius: 8px;">
+                    <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">CERTIFICATION RECOMMENDATION</div>
+                    <div style="font-size: 1.3rem; font-weight: 800; color: ${report.recommendation === 'Recommend Certification' ? '#10b981' : report.recommendation === 'Do Not Recommend' ? '#ef4444' : '#f59e0b'};">
+                        ${report.recommendation || 'Recommendation Pending'}
+                    </div>
+                </div>
+
+                <div class="signature-section">
+                    <div class="signature-box">
+                        <h2 style="margin-top: 0; color: #334155;"><i class="fa-solid fa-pen-fancy" style="margin-right: 8px;"></i>Audit Team Signatures</h2>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px;">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 5px;">Lead Auditor</div>
+                                <div style="font-size: 1.1rem; color: #3b82f6; margin-bottom: 5px;">${leadAuditor?.name || 'Unknown'}</div>
+                                <div class="signature-line">Signature & Date</div>
+                            </div>
+                            ${auditTeam.length > 1 ? `
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 5px;">Team Member</div>
+                                <div style="font-size: 1.1rem; color: #3b82f6; margin-bottom: 5px;">${auditTeam[1]?.name || 'N/A'}</div>
+                                <div class="signature-line">Signature & Date</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #cbd5e1;">
+                            <div style="font-weight: 600; margin-bottom: 5px;">Client Representative</div>
+                            <div style="font-size: 1.1rem; color: #3b82f6; margin-bottom: 5px;">${client.contacts?.[0]?.name || 'To be signed'}</div>
+                            <div class="signature-line">Signature & Date</div>
+                        </div>
+                    </div>
                 </div>
                 
-                <div style="margin-top: 80px; text-align: center; color: #94a3b8; font-size: 0.8rem; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                    <p>Report generated by AuditCB360 Platform on ${new Date().toLocaleDateString()}</p>
+                <div style="margin-top: 80px; text-align: center; color: #94a3b8; font-size: 0.8rem; border-top: 2px solid #e2e8f0; padding-top: 20px;">
+                    <p><strong>AuditCB360 Certification Platform</strong></p>
+                    <p>Report ID: REP-${report.id} | Generated: ${new Date().toLocaleString()} | Version: ${report.finalizedAt ? '1.0 (Final)' : '0.1 (Draft)'}</p>
+                    <p style="font-style: italic;">This is a computer-generated report. Signatures are required for official certification purposes.</p>
                 </div>
             </div>
         </body>
         </html>
     `);
         printWindow.document.close();
+        window.showNotification('Enhanced audit report generated successfully!', 'success');
     } catch (error) {
         console.error('Error generating audit report:', error);
         window.showNotification('Failed to generate report: ' + error.message, 'error');
