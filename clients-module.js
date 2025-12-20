@@ -1612,32 +1612,41 @@ function generateCompanyProfile(clientId) {
     // Simulated AI generation (in production, this would call an API)
     setTimeout(() => {
         // Generate a professional company profile based on available data
-        const profile = `${client.name} - Company Overview
+        const parts = [];
 
-Industry: ${client.industry || 'Not specified'}
-Website: ${client.website}
+        parts.push(`${client.name} - Company Overview`);
+        parts.push(`\nIndustry: ${client.industry || 'Not specified'}`);
+        parts.push(`Website: ${client.website}`);
+        parts.push(`\nAbout the Organization:`);
+        parts.push(`${client.name} is a ${client.industry || 'professional'} organization ${client.employees ? `with approximately ${client.employees} employees` : ''} ${client.sites && client.sites.length > 1 ? `operating across ${client.sites.length} locations` : 'operating from a single location'}.`);
 
-About the Organization:
-${client.name} is a ${client.industry || 'professional'} organization ${client.employees ? `with approximately ${client.employees} employees` : ''} ${client.sites && client.sites.length > 1 ? `operating across ${client.sites.length} locations` : 'operating from a single location'}.
+        if (client.standard) {
+            parts.push(`\nThe organization maintains certification to ${client.standard} standards, demonstrating its commitment to quality management and continuous improvement.`);
+        }
 
-${client.standard ? `The organization maintains certification to ${client.standard} standards, demonstrating its commitment to quality management and continuous improvement.` : ''}
+        if (client.sites && client.sites.length > 0) {
+            parts.push(`\nOperational Locations:`);
+            client.sites.forEach(s => {
+                parts.push(`• ${s.name}${s.city ? ` - ${s.city}` : ''}${s.employees ? ` (${s.employees} employees)` : ''}`);
+            });
+        }
 
-${client.sites && client.sites.length > 0 ? `
-Operational Locations:
-${client.sites.map(s => `• ${s.name}${s.city ? ` - ${s.city}` : ''}${s.employees ? ` (${s.employees} employees)` : ''}`).join('\n')}
-` : ''}
+        if (client.departments && client.departments.length > 0) {
+            parts.push(`\nKey Departments:`);
+            client.departments.forEach(d => {
+                parts.push(`• ${d.name}${d.head ? ` - Led by ${d.head}` : ''}${d.employeeCount ? ` (${d.employeeCount} staff)` : ''}`);
+            });
+        }
 
-${client.departments && client.departments.length > 0 ? `
-Key Departments:
-${client.departments.map(d => `• ${d.name}${d.head ? ` - Led by ${d.head}` : ''}${d.employeeCount ? ` (${d.employeeCount} staff)` : ''}`).join('\n')}
-` : ''}
+        if (client.shifts === 'Yes') {
+            parts.push(`\nThe organization operates multiple shifts to ensure continuous operations and meet customer demands.`);
+        }
 
-${client.shifts === 'Yes' ? 'The organization operates multiple shifts to ensure continuous operations and meet customer demands.' : ''}
+        parts.push(`\nThis profile provides context for audit activities and helps auditors understand the organizational structure and scope of operations.`);
+        parts.push(`\n---`);
+        parts.push(`Note: This profile was AI-generated from available client data. Please review and edit as needed to ensure accuracy.`);
 
-This profile provides context for audit activities and helps auditors understand the organizational structure and scope of operations.
-
----
-Note: This profile was AI-generated from available client data. Please review and edit as needed to ensure accuracy.`;
+        const profile = parts.join('\n');
 
         // Save the generated profile
         client.profile = profile;
@@ -1696,6 +1705,12 @@ function editCompanyProfile(clientId) {
         }
     );
 }
+
+// Export department functions
+window.addDepartment = addDepartment;
+window.editDepartment = editDepartment;
+window.deleteDepartment = deleteDepartment;
+window.bulkUploadDepartments = bulkUploadDepartments;
 
 // Export profile functions
 window.generateCompanyProfile = generateCompanyProfile;
