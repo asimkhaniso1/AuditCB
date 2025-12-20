@@ -595,7 +595,11 @@ async function renderModule(moduleName) {
                 }
                 break;
             case 'certification':
-                renderCertification();
+                if (typeof renderCertificationModule === 'function') {
+                    renderCertificationModule();
+                } else {
+                    contentArea.innerHTML = '<div class="alert alert-info">Certification module under construction</div>';
+                }
                 break;
             case 'manday-calculator':
                 if (typeof renderManDayCalculator === 'function') {
