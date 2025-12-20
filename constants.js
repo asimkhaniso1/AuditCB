@@ -22,7 +22,8 @@ window.CONSTANTS = {
     NCR_TYPES: {
         MAJOR: 'major',
         MINOR: 'minor',
-        OBSERVATION: 'observation'
+        OBSERVATION: 'observation',
+        PENDING: 'pending_classification'
     },
     // ISO 17021-1:2015 Classification Matrix
     NCR_CRITERIA: {

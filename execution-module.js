@@ -433,6 +433,7 @@ function renderExecutionTab(report, tabName) {
                                      <label style="font-size: 0.8rem;">Severity</label>
                                      <div style="display: flex; gap: 5px;">
                                          <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
+                                             <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${!saved.ncrType || saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>Flagged (Pending Classification)</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation</option>
@@ -839,6 +840,7 @@ function createNCR(reportId) {
             <div class="form-group">
                 <label>Type <span style="color: var(--danger-color);">*</span></label>
                 <select class="form-control" id="ncr-type" required>
+                    <option value="${window.CONSTANTS.NCR_TYPES.PENDING}">Flagged (Pending Classification)</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.MINOR}">Minor NC</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}">Major NC</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}">Observation</option>
