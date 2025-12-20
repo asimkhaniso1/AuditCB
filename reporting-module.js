@@ -812,8 +812,8 @@ function renderReportingModule() {
                     <div style="font-size: 0.85rem;">Lead Auditor performs <strong>manual classification</strong> of findings and validates technical content.</div>
                 </div>
                 <div style="background: #f5f3ff; padding: 1rem; border-radius: 8px; border: 1px solid #ddd6fe;">
-                    <div style="font-weight: 600; color: #7c3aed; margin-bottom: 0.5rem;"><i class="fa-solid fa-robot"></i> Approved (AI)</div>
-                    <div style="font-size: 0.85rem;">Cert Manager performs <strong>AI context analysis</strong> against history before final approval.</div>
+                    <div style="font-weight: 600; color: #7c3aed; margin-bottom: 0.5rem;"><i class="fa-solid fa-check-double"></i> Approved</div>
+                    <div style="font-size: 0.85rem;">Cert Manager validates report against historical context and approves for final issuance.</div>
                 </div>
                  <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0;">
                     <div style="font-weight: 600; color: #15803d; margin-bottom: 0.5rem;"><i class="fa-solid fa-file-contract"></i> Finalized</div>
