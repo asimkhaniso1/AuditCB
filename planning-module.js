@@ -1721,4 +1721,9 @@ window.goToStep1 = goToStep1;
 
 window.togglePlanningAnalytics = togglePlanningAnalytics;
 window.openCreatePlanModal = openCreatePlanModal;
+window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
+window.editAuditPlan = editAuditPlan;
+window.viewAuditPlan = viewAuditPlan;
+window.updateClientDetails = updateClientDetails;
+window.autoCalculateDays = autoCalculateDays;
 
