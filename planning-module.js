@@ -203,6 +203,15 @@ function openCreatePlanModal() {
                     <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple standards</small>
                 </div>
 
+                <!-- Auditee (Contact Person) -->
+                <div class="form-group">
+                    <label><i class="fa-solid fa-user" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Auditee (Contact Person)</label>
+                    <select class="form-control" id="plan-auditee">
+                        <option value="">-- Select Contact Person --</option>
+                    </select>
+                    <small style="color: var(--text-secondary);">Primary contact person for this audit</small>
+                </div>
+
                 <!-- Client Info Panel -->
                 <div id="client-info-panel" style="grid-column: 1 / -1; display: none; background: #f0f9ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bae6fd; margin-bottom: 0.5rem;">
                     <p style="color: var(--text-secondary); text-align: center; margin: 0;">Select a client to view details</p>
@@ -500,13 +509,21 @@ function updateClientDetails(clientName) {
             clientInfoPanel.style.display = 'block';
         }
 
-        // Enable calculate button if sites are selected
-        const selectedSites = document.querySelectorAll('.site-checkbox:checked').length;
-        const calcBtn = document.getElementById('btn-calculate-mandays');
-        const hint = document.getElementById('manday-hint');
-        if (calcBtn && selectedSites > 0) {
-            calcBtn.disabled = false;
-            if (hint) hint.style.display = 'none';
+        // Populate auditee dropdown with client contacts
+        const auditeeSelect = document.getElementById('plan-auditee');
+        if (auditeeSelect && client.contacts && client.contacts.length > 0) {
+            auditeeSelect.innerHTML = `
+                <option value="">-- Select Contact Person --</option>
+                ${client.contacts.map(contact => `
+                    <option value="${contact.name}">${contact.name}${contact.designation ? ` - ${contact.designation}` : ''}</option>
+                `).join('')}
+            `;
+            // Auto-select first contact if available
+            if (client.contacts.length > 0) {
+                auditeeSelect.value = client.contacts[0].name;
+            }
+        } else if (auditeeSelect) {
+            auditeeSelect.innerHTML = '<option value="">-- No contacts available --</option>';
         }
     } else {
         if (siteGroup) siteGroup.style.display = 'none';
