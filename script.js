@@ -537,7 +537,8 @@ async function renderModule(moduleName) {
         'audit-planning': 'Audit Planning',
         'checklists': 'Checklist Library',
         'manday-calculator': 'Man-Day Calculator',
-        'audit-execution': 'Execution & Reports',
+        'audit-execution': 'Audit Execution',
+        'audit-reporting': 'Audit Reporting Dashboard',
         'certification': 'Certification Decisions',
         'documents': 'Document Management',
         'settings': 'Settings'
@@ -592,6 +593,13 @@ async function renderModule(moduleName) {
                     renderAuditExecutionEnhanced();
                 } else {
                     renderAuditExecution();
+                }
+                break;
+            case 'audit-reporting':
+                if (typeof renderReportingModule === 'function') {
+                    renderReportingModule();
+                } else {
+                    renderPlaceholder(moduleName);
                 }
                 break;
             case 'certification':

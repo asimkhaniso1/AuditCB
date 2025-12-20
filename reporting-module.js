@@ -629,3 +629,112 @@ window.renderReportSummaryTab = renderReportSummaryTab;
 window.submitForReview = submitForReview;
 window.publishReport = publishReport;
 window.revertToDraft = revertToDraft;
+
+// ============================================
+// NEW: Reporting Dashboard (Top-Level View)
+// ============================================
+
+function renderReportingModule() {
+    const h = window.UTILS.escapeHtml; // Sanitization alias
+    const reports = window.state.auditReports || [];
+
+    // Helper for status color
+    const getStatusColor = (status) => {
+        const S = window.CONSTANTS.STATUS;
+        if (status === S.FINALIZED || status === S.PUBLISHED) return 'var(--success-color)'; // Green
+        if (status === S.IN_REVIEW) return 'var(--warning-color)'; // Orange
+        if (status === S.DRAFT) return 'var(--info-color)'; // Blue
+        if (status === S.IN_PROGRESS) return '#64748b'; // Grey
+        return '#94a3b8';
+    };
+
+    const html = `
+        <div class="fade-in">
+             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div>
+                    <h2 style="margin: 0;">Audit Reporting Dashboard</h2>
+                    <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">Manage, review, and publish audit reports.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Audit Date</th>
+                                <th>Report Status</th>
+                                <th>Findings (Total)</th>
+                                <th>Last Action</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reports.length > 0 ? reports.map(r => `
+                                <tr>
+                                    <td><strong>${h(r.client)}</strong></td>
+                                    <td>${h(r.date)}</td>
+                                    <td><span class="badge" style="background: ${getStatusColor(r.status)}">${h(r.status)}</span></td>
+                                    <td>
+                                        <span style="font-weight: 600;">${(r.ncrs || []).length}</span> 
+                                        <span style="font-size: 0.8rem; color: #64748b;">(${(r.ncrs || []).filter(n => n.type === 'major').length} Major)</span>
+                                    </td>
+                                    <td style="font-size: 0.85rem; color: #64748b;">${r.finalizedAt ? 'Finalized on ' + new Date(r.finalizedAt).toLocaleDateString() : 'Drafting'}</td>
+                                    <td style="text-align: right;">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${r.id})">
+                                            <i class="fa-solid fa-file-pen" style="margin-right: 0.5rem;"></i> Manage Report
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('') : '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">No audit reports found. Start an audit in "Audit Execution" first.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Quick Help -->
+            <div style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <div style="font-weight: 600; color: #1d4ed8; margin-bottom: 0.5rem;"><i class="fa-solid fa-pen-ruler"></i> Draft</div>
+                    <div style="font-size: 0.85rem;">Auditors verify findings and draft the report content. Summary, Strengths, and Improvements are added here.</div>
+                </div>
+                 <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px solid #fed7aa;">
+                    <div style="font-weight: 600; color: #c2410c; margin-bottom: 0.5rem;"><i class="fa-solid fa-glasses"></i> Review</div>
+                    <div style="font-size: 0.85rem;">Lead Auditor reviews the content, validates findings, and ensures quality before publication.</div>
+                </div>
+                 <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0;">
+                    <div style="font-weight: 600; color: #15803d; margin-bottom: 0.5rem;"><i class="fa-solid fa-check-double"></i> Finalized</div>
+                    <div style="font-size: 0.85rem;">Report is locked and ready for Certification Decision. PDF can be generated and sent to client.</div>
+                </div>
+            </div>
+        </div>
+    `;
+    window.contentArea.innerHTML = html;
+}
+
+// Wrapper to open detail view from the list
+window.openReportingDetail = function (reportId) {
+    const report = window.state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    // Structure for Detail View
+    const html = `
+        <div class="fade-in">
+            <div style="margin-bottom: 1.5rem;">
+                <button class="btn btn-secondary" onclick="window.renderReportingModule()">
+                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reporting Dashboard
+                </button>
+            </div>
+            <div id="reporting-detail-container"></div>
+        </div>
+    `;
+    window.contentArea.innerHTML = html;
+
+    // Render the existing summary tab into the container
+    const container = document.getElementById('reporting-detail-container');
+    window.renderReportSummaryTab(report, container);
+};
+
+// Export
+window.renderReportingModule = renderReportingModule;
