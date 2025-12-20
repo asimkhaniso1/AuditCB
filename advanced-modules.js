@@ -100,7 +100,7 @@ function renderAuditorsEnhanced() {
                         <option value="Auditor" ${filterRole === 'Auditor' ? 'selected' : ''}>Auditor</option>
                         <option value="Technical Expert" ${filterRole === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
                     </select>
-                    <button class="btn btn-secondary" onclick="renderCompetenceMatrix()">
+                    <button class="btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none;" onclick="renderCompetenceMatrix()">
                         <i class="fa-solid fa-table" style="margin-right: 0.5rem;"></i> Competence Matrix
                     </button>
                 </div>
