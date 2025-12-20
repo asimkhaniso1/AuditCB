@@ -284,9 +284,14 @@ function openCreatePlanModal() {
         <div id="step-2-content" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0; font-size: 1.1rem;">Audit Agenda / Itinerary</h3>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
-                    <i class="fa-solid fa-plus"></i> Add Row
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateAIAgenda()" id="btn-ai-generate">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate with AI
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
+                        <i class="fa-solid fa-plus"></i> Add Row
+                    </button>
+                </div>
             </div>
             
             <div class="table-container" style="max-height: 400px; overflow-y: auto;">
@@ -1713,7 +1718,66 @@ function saveAuditPlan() {
     window.editingPlanId = null;
 }
 
+async function generateAIAgenda() {
+    if (!window.AI_SERVICE || !window.AI_SERVICE.isConfigured()) {
+        window.showNotification('Please configure Gemini API Key in Settings first', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-generate');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+    btn.disabled = true;
+
+    try {
+        // Collect Context
+        const clientName = document.getElementById('plan-client').value;
+        const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
+        const type = document.getElementById('plan-type').value;
+        const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
+        const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
+
+        const selectedSites = [];
+        document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
+            selectedSites.push({ name: cb.dataset.name });
+        });
+
+        const leadAuditor = document.getElementById('plan-lead-auditor').value;
+        const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
+        const fullTeam = [leadAuditor, ...team].filter(Boolean);
+
+        const context = {
+            client: clientName,
+            standard: standard,
+            type: type,
+            manDays: manDays,
+            onsiteDays: onsiteDays,
+            sites: selectedSites,
+            team: fullTeam
+        };
+
+        const agenda = await window.AI_SERVICE.generateAuditAgenda(context);
+
+        // Clear existing rows
+        const tbody = document.getElementById('agenda-tbody');
+        tbody.innerHTML = '';
+
+        agenda.forEach(item => {
+            addAgendaRow(item);
+        });
+
+        window.showNotification('Agenda generated successfully!', 'success');
+
+    } catch (error) {
+        window.showNotification(error.message, 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
 // Exports
+window.generateAIAgenda = generateAIAgenda;
 window.addAgendaRow = addAgendaRow;
 window.saveAuditPlan = saveAuditPlan;
 window.goToStep2 = goToStep2;
