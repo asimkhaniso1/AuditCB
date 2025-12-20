@@ -904,6 +904,7 @@ function renderRoleSwitcher() {
     switcher.style.zIndex = '10000';
     switcher.innerHTML = `
         <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.8rem; background: #fff;">
+            <option value="Auditor" ${state.currentUser.role === 'Auditor' ? 'selected' : ''}>Role: Auditor</option>
             <option value="Lead Auditor" ${state.currentUser.role === 'Lead Auditor' ? 'selected' : ''}>Role: Lead Auditor</option>
             <option value="Certification Manager" ${state.currentUser.role === 'Certification Manager' ? 'selected' : ''}>Role: Cert Manager</option>
         </select>
