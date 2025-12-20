@@ -1374,4 +1374,5 @@ function togglePlanningAnalytics() {
 }
 
 window.togglePlanningAnalytics = togglePlanningAnalytics;
+window.openCreatePlanModal = openCreatePlanModal;
 
