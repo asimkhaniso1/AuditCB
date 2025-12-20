@@ -435,9 +435,22 @@ function saveAuditPlan() {
 }
 
 function viewAuditPlan(id) {
+    if (!window.state) {
+        alert('ERROR: window.state is undefined');
+        return;
+    }
     const state = window.state;
+
+    if (!state.auditPlans) {
+        alert('ERROR: state.auditPlans is undefined. State keys: ' + Object.keys(state).join(', '));
+        return;
+    }
+
     const plan = state.auditPlans.find(p => p.id == id);
-    if (!plan) return;
+    if (!plan) {
+        alert('Plan not found with ID: ' + id);
+        return;
+    }
 
     const client = state.clients.find(c => c.name === plan.client);
     const checklists = state.checklists || [];
