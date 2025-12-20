@@ -149,17 +149,61 @@ function openCreateReportModal() {
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
     // Filter out plans that already have a report OR are marked Completed
-    const availablePlans = state.auditPlans.filter(p => !p.reportId && p.status !== 'Completed'); // Removed date restriction
+    const allOpenPlans = state.auditPlans.filter(p => !p.reportId && p.status !== 'Completed');
+    allOpenPlans.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
 
-    // UI: List of Plans + Selected Confirmation
-    const renderTable = () => {
-        if (availablePlans.length === 0) return '<div class="alert alert-warning">No open audit plans available. (Completed plans hidden)</div>';
+    // Helpers exposed for HTML interaction
+    window.selectAuditPlan = (id, date, client) => {
+        document.getElementById('report-plan').value = id;
+        document.getElementById('report-date').value = date;
+        document.getElementById('plan-display').textContent = `PLN-${id}: ${client}`;
+        document.querySelectorAll('.select-plan-btn').forEach(b => {
+            b.className = 'btn btn-sm btn-outline-primary select-plan-btn';
+            b.textContent = 'Select';
+        });
+        const btn = event.target; // Captured from onclick
+        if (btn) {
+            btn.className = 'btn btn-sm btn-success select-plan-btn';
+            btn.textContent = 'Selected';
+        }
+        document.getElementById('confirm-section').style.display = 'block';
+    };
 
-        return `
+    window.filterAuditPlansStart = (clientName) => {
+        const filtered = clientName ? allOpenPlans.filter(p => p.client === clientName) : allOpenPlans;
+        document.getElementById('plan-list-tbody').innerHTML = renderTableLines(filtered);
+    };
+
+    const renderTableLines = (plans) => {
+        if (plans.length === 0) return '<tr><td colspan="5" style="padding:1rem; text-align:center; color:#999;">No open plans found for selected criteria.</td></tr>';
+        return plans.map(p => `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 8px; font-weight: 600;">PLN-${p.id}</td>
+                <td style="padding: 8px;">${p.client}</td>
+                <td style="padding: 8px;">${p.standard}</td>
+                <td style="padding: 8px;">${p.date}</td>
+                <td style="padding: 8px; text-align: center;">
+                    <button class="btn btn-sm btn-outline-primary select-plan-btn" 
+                        onclick="window.selectAuditPlan('${p.id}', '${p.date}', '${p.client.replace(/'/g, "\\'")}')">
+                        Select
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    };
+
+    const uniqueClients = [...new Set(allOpenPlans.map(p => p.client))].sort();
+
+    modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
-            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Select an audit plan reference to proceed:</p>
+            <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filter by Company:</label>
+            <select class="form-control" onchange="window.filterAuditPlansStart(this.value)" style="margin-bottom: 1rem; border-color: var(--primary-color);">
+                <option value="">-- All Companies with Open Plans --</option>
+                ${uniqueClients.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+
             <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
                     <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 1;">
@@ -171,26 +215,8 @@ function openCreateReportModal() {
                             <th style="padding: 8px;">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${availablePlans.map(p => `
-                            <tr style="border-bottom: 1px solid #e2e8f0;">
-                                <td style="padding: 8px; font-weight: 600;">PLN-${p.id}</td>
-                                <td style="padding: 8px;">${p.client}</td>
-                                <td style="padding: 8px;">${p.standard}</td>
-                                <td style="padding: 8px;">${p.date}</td>
-                                <td style="padding: 8px; text-align: center;">
-                                    <button class="btn btn-sm btn-outline-primary select-plan-btn" 
-                                        onclick="document.getElementById('report-plan').value='${p.id}'; 
-                                                 document.getElementById('report-date').value='${p.date}';
-                                                 document.getElementById('plan-display').textContent='PLN-${p.id}: ${p.client}';
-                                                 document.querySelectorAll('.select-plan-btn').forEach(b => {b.className='btn btn-sm btn-outline-primary'; b.textContent='Select'});
-                                                 this.className='btn btn-sm btn-success'; this.textContent='Selected';
-                                                 document.getElementById('confirm-section').style.display='block';">
-                                        Select
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('')}
+                    <tbody id="plan-list-tbody">
+                        ${renderTableLines(allOpenPlans)}
                     </tbody>
                 </table>
             </div>
@@ -216,10 +242,7 @@ function openCreateReportModal() {
                 </select>
             </div>
         </div>
-        `;
-    };
-
-    modalBody.innerHTML = renderTable();
+    `;
     window.openModal();
 
     // Update button text to 'Start Audit'
