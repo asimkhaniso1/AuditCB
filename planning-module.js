@@ -1719,8 +1719,8 @@ function saveAuditPlan() {
 }
 
 async function generateAIAgenda() {
-    if (!window.AI_SERVICE || !window.AI_SERVICE.isConfigured()) {
-        window.showNotification('Please configure Gemini API Key in Settings first', 'error');
+    if (!window.AI_SERVICE) {
+        window.showNotification('AI Service not loaded', 'error');
         return;
     }
 

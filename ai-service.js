@@ -4,25 +4,36 @@
 
 const AI_SERVICE = {
 
-    // Check if API key is configured
+    // Check if LOCAL API key is configured
     isConfigured: () => {
         return window.state && window.state.settings && window.state.settings.geminiApiKey;
     },
 
     // Main function to generate agenda
     generateAuditAgenda: async (planContext) => {
-        if (!AI_SERVICE.isConfigured()) {
-            throw new Error("Gemini API Key is not configured. Please go to Settings > API Configuration.");
-        }
-
-        const apiKey = window.state.settings.geminiApiKey;
         const prompt = AI_SERVICE.buildPrompt(planContext);
 
         try {
-            const result = await AI_SERVICE.callGeminiAPI(apiKey, prompt);
-            return AI_SERVICE.parseAgendaResponse(result);
+            let apiResponseText;
+
+            if (AI_SERVICE.isConfigured()) {
+                // Option A: Use Local Key from Settings
+                const apiKey = window.state.settings.geminiApiKey;
+                apiResponseText = await AI_SERVICE.callDirectAPI(apiKey, prompt);
+            } else {
+                // Option B: Try Vercel Serverless Proxy (Env Var)
+                console.log("No local API key found. Attempting to use server proxy...");
+                apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
+            }
+
+            return AI_SERVICE.parseAgendaResponse(apiResponseText);
+
         } catch (error) {
             console.error("AI Generation Error:", error);
+            // Enhance error message for user
+            if (error.message.includes('GEMINI_API_KEY')) {
+                throw new Error("API Key missing. Please configure it in Settings OR add GEMINI_API_KEY to Vercel Environment Variables.");
+            }
             throw error;
         }
     },
@@ -62,8 +73,8 @@ Example:
 `;
     },
 
-    // Call the Gemini API via fetch
-    callGeminiAPI: async (apiKey, prompt) => {
+    // Option A: Call Gemini API directly (Client-side)
+    callDirectAPI: async (apiKey, prompt) => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
         const payload = {
@@ -74,9 +85,7 @@ Example:
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
@@ -86,12 +95,32 @@ Example:
         }
 
         const data = await response.json();
+        return AI_SERVICE.extractTextFromResponse(data);
+    },
 
-        // Extract text from response
+    // Option B: Call Vercel Serverless Function
+    callProxyAPI: async (prompt) => {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Server Proxy failed');
+        }
+
+        return AI_SERVICE.extractTextFromResponse(data);
+    },
+
+    // Helper: Extract text from Gemini JSON response
+    extractTextFromResponse: (data) => {
         if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
             return data.candidates[0].content.parts[0].text;
         } else {
-            throw new Error('No content returned from Gemini API');
+            throw new Error('No content returned from AI');
         }
     },
 
