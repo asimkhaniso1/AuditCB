@@ -153,6 +153,7 @@ function renderAuditorDetail(auditorId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Information</button>
+                <button class="tab-btn" data-tab="upcoming">Upcoming Audits</button>
                 <button class="tab-btn" data-tab="competence">Competence</button>
                 <button class="tab-btn" data-tab="training">Training</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
@@ -246,7 +247,114 @@ function renderAuditorTab(auditor, tabName) {
                         </div>
                     </div>
                 </div>
+                
+                <!-- Academic Qualifications -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-graduation-cap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Academic Qualifications</h3>
+                    ${auditor.education && (auditor.education.degree || auditor.education.fieldOfStudy) ? `
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                            <div>
+                                <label style="color: var(--text-secondary); font-size: 0.875rem;">Highest Degree</label>
+                                <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.education.degree || '-'}</p>
+                            </div>
+                            <div>
+                                <label style="color: var(--text-secondary); font-size: 0.875rem;">Field of Study</label>
+                                <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.education.fieldOfStudy || '-'}</p>
+                            </div>
+                            ${auditor.education.specialization ? `
+                            <div style="grid-column: 1 / -1;">
+                                <label style="color: var(--text-secondary); font-size: 0.875rem;">Specialization / Additional Qualifications</label>
+                                <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.education.specialization}</p>
+                            </div>
+                            ` : ''}
+                        </div>
+                    ` : '<p style="color: var(--text-secondary);">No academic qualifications recorded.</p>'}
+                </div>
             `;
+            break;
+        case 'upcoming':
+            // Get upcoming audits for this auditor
+            const today = new Date().toISOString().split('T')[0];
+            const upcomingPlans = state.auditPlans.filter(p => {
+                // Check if this auditor is assigned (lead or team member)
+                const isLead = p.lead === auditor.name || p.auditors?.includes(auditor.id);
+                const isTeamMember = (p.teamMembers || []).some(tm => tm === auditor.name || tm === auditor.id);
+                const isFuture = p.date >= today;
+                return (isLead || isTeamMember) && isFuture;
+            }).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            tabContent.innerHTML = `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-calendar-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Upcoming Audits</h3>
+                        <span style="background: var(--primary-color); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem;">${upcomingPlans.length} planned</span>
+                    </div>
+                    
+                    <!-- Filters -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-sm);">
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary);">Filter by Date</label>
+                            <input type="month" id="upcoming-date-filter" class="form-control form-control-sm" style="margin-top: 0.25rem;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary);">Filter by Location</label>
+                            <input type="text" id="upcoming-location-filter" class="form-control form-control-sm" placeholder="City or country..." style="margin-top: 0.25rem;">
+                        </div>
+                        <div style="display: flex; align-items: flex-end;">
+                            <button class="btn btn-sm btn-secondary" onclick="window.clearAuditorUpcomingFilters(${auditor.id})">Clear</button>
+                        </div>
+                    </div>
+                    
+                    ${upcomingPlans.length > 0 ? `
+                        <div id="upcoming-audits-list">
+                            ${upcomingPlans.map(plan => {
+                const client = state.clients.find(c => c.name === plan.client);
+                const location = client?.sites?.[0]?.city || client?.city || 'TBD';
+                return `
+                                    <div class="upcoming-audit-item" data-date="${plan.date}" data-location="${location.toLowerCase()}" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-left: 4px solid var(--primary-color);">
+                                        <div>
+                                            <div style="font-weight: 500; margin-bottom: 0.25rem;">${plan.client}</div>
+                                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                                <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>${plan.standard || 'ISO Standard'}
+                                                <span style="margin: 0 0.5rem;">•</span>
+                                                <i class="fa-solid fa-location-dot" style="margin-right: 0.25rem;"></i>${location}
+                                            </div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${new Date(plan.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                                            <div style="font-size: 0.8rem; color: var(--text-secondary);">${plan.type || 'Audit'} • ${plan.manDays || 0} days</div>
+                                        </div>
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                    ` : '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No upcoming audits scheduled for this auditor.</p>'}
+                </div>
+            `;
+
+            // Add filter event listeners
+            setTimeout(() => {
+                const dateFilter = document.getElementById('upcoming-date-filter');
+                const locationFilter = document.getElementById('upcoming-location-filter');
+
+                const applyFilters = () => {
+                    const dateVal = dateFilter?.value || '';
+                    const locVal = locationFilter?.value?.toLowerCase() || '';
+
+                    document.querySelectorAll('.upcoming-audit-item').forEach(item => {
+                        const itemDate = item.dataset.date || '';
+                        const itemLoc = item.dataset.location || '';
+
+                        const matchDate = !dateVal || itemDate.startsWith(dateVal);
+                        const matchLoc = !locVal || itemLoc.includes(locVal);
+
+                        item.style.display = (matchDate && matchLoc) ? 'flex' : 'none';
+                    });
+                };
+
+                dateFilter?.addEventListener('change', applyFilters);
+                locationFilter?.addEventListener('input', applyFilters);
+            }, 100);
             break;
         case 'competence':
             tabContent.innerHTML = `
@@ -1500,3 +1608,14 @@ window.openAddAuditorModal = openAddAuditorModal;
 window.openEditAuditorModal = openEditAuditorModal;
 window.openAddTrainingModal = openAddTrainingModal;
 window.openUploadDocumentModal = openUploadDocumentModal;
+
+// Clear upcoming audit filters and show all items
+window.clearAuditorUpcomingFilters = function (auditorId) {
+    const dateFilter = document.getElementById('upcoming-date-filter');
+    const locationFilter = document.getElementById('upcoming-location-filter');
+    if (dateFilter) dateFilter.value = '';
+    if (locationFilter) locationFilter.value = '';
+    document.querySelectorAll('.upcoming-audit-item').forEach(item => {
+        item.style.display = 'flex';
+    });
+};
