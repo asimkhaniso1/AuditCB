@@ -36,8 +36,8 @@ function renderCertificationModule() {
     // Find audit reports that are finalized but don't have a certificate yet (Pending Decision)
     // Simplified logic: Check if report is finalized & recommendation is 'Recommend Certification'
     const pendingDecisions = window.state.auditReports.filter(r =>
-        r.status === 'Finalized' &&
-        r.recommendation === 'Recommend Certification' &&
+        r.status === window.CONSTANTS.STATUS.FINALIZED &&
+        r.recommendation === window.CONSTANTS.RECOMMENDATIONS.RECOMMEND &&
         !certs.find(c => c.client === r.client && c.issueDate === r.date) // Simple dedupe check
     );
 
@@ -67,7 +67,7 @@ function renderCertificationModule() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Active Certificates</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${certs.filter(c => c.status === 'Valid').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).length}</div>
                     </div>
                 </div>
 
@@ -89,7 +89,7 @@ function renderCertificationModule() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Suspended/Withdrawn</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${certs.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${certs.filter(c => [window.CONSTANTS.CERT_STATUS.SUSPENDED, window.CONSTANTS.CERT_STATUS.WITHDRAWN].includes(c.status)).length}</div>
                     </div>
                 </div>
             </div>
@@ -97,7 +97,7 @@ function renderCertificationModule() {
 
             <!-- Tabs -->
             <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                <button class="tab-btn active" onclick="switchCertTab(this, 'active-certs')">Active Certificates (${certs.filter(c => c.status === 'Valid').length})</button>
+                <button class="tab-btn active" onclick="switchCertTab(this, 'active-certs')">Active Certificates (${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).length})</button>
                 <button class="tab-btn" onclick="switchCertTab(this, 'pending-certs')">Pending Decisions (${pendingDecisions.length})</button>
                 <button class="tab-btn" onclick="switchCertTab(this, 'suspended-certs')">Suspended/Withdrawn</button>
             </div>
@@ -119,14 +119,14 @@ function renderCertificationModule() {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${certs.filter(c => c.status === 'Valid').map(cert => `
+                                ${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).map(cert => `
                                     <tr>
                                         <td><strong>${cert.id}</strong></td>
                                         <td>${cert.client}</td>
                                         <td><span class="badge bg-blue">${cert.standard}</span></td>
                                         <td>${cert.issueDate}</td>
                                         <td>${cert.expiryDate}</td>
-                                        <td><span class="badge bg-green">Valid</span></td>
+                                        <td><span class="badge bg-green">${cert.status}</span></td>
                                         <td  style="text-align: right;">
                                             <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View/Print"><i class="fa-solid fa-eye"></i></button>
                                             <button class="btn btn-sm btn-icon" onclick="openCertActionModal('${cert.id}')" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
@@ -190,16 +190,16 @@ function renderCertificationModule() {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${certs.filter(c => c.status !== 'Valid').map(cert => `
+                                ${certs.filter(c => c.status !== window.CONSTANTS.CERT_STATUS.VALID).map(cert => `
                                     <tr>
                                         <td><strong>${cert.id}</strong></td>
                                         <td>${cert.client}</td>
                                         <td><span class="badge bg-blue">${cert.standard}</span></td>
-                                        <td><span class="badge" style="background: ${cert.status === 'Suspended' ? 'orange' : 'red'}; color: white;">${cert.status}</span></td>
+                                        <td><span class="badge" style="background: ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? 'orange' : 'red'}; color: white;">${cert.status}</span></td>
                                         <td>${cert.statusReason || 'N/A'}</td>
                                         <td style="text-align: right;">
                                             <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View History"><i class="fa-solid fa-history"></i></button>
-                                            ${cert.status === 'Suspended' ? `<button class="btn btn-sm btn-success" onclick="restoreCertificate('${cert.id}')" title="Restore"><i class="fa-solid fa-undo"></i> Restore</button>` : ''}
+                                            ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? `<button class="btn btn-sm btn-success" onclick="restoreCertificate('${cert.id}')" title="Restore"><i class="fa-solid fa-undo"></i> Restore</button>` : ''}
                                         </td>
                                     </tr>
                                 `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">No suspended or withdrawn certificates.</td></tr>'}
@@ -296,7 +296,7 @@ window.openIssueCertificateModal = function (prefillClient = '', auditDate = '')
             standard: standard,
             issueDate: issueDate,
             expiryDate: expiryDate,
-            status: 'Valid',
+            status: window.CONSTANTS.CERT_STATUS.VALID,
             scope: scope,
             history: [{ date: new Date().toISOString().split('T')[0], action: 'Initial Certification', user: 'Admin' }]
         };
@@ -401,9 +401,9 @@ window.openCertActionModal = function (certId) {
     if (!reason) return;
 
     if (action.toLowerCase() === 'suspend') {
-        cert.status = 'Suspended';
+        cert.status = window.CONSTANTS.CERT_STATUS.SUSPENDED;
     } else if (action.toLowerCase() === 'withdraw') {
-        cert.status = 'Withdrawn';
+        cert.status = window.CONSTANTS.CERT_STATUS.WITHDRAWN;
     } else {
         return; // invalid
     }
@@ -417,7 +417,7 @@ window.openCertActionModal = function (certId) {
 window.restoreCertificate = function (certId) {
     const cert = state.certifications.find(c => c.id === certId);
     if (confirm('Are you sure you want to restore this certificate to Valid status?')) {
-        cert.status = 'Valid';
+        cert.status = window.CONSTANTS.CERT_STATUS.VALID;
         cert.history.push({ date: new Date().toISOString().split('T')[0], action: 'Restored', user: 'Admin' });
         window.saveData();
         renderCertificationModule();
