@@ -4,6 +4,11 @@
 
 // Application State
 const state = {
+    // Current User Context (For Demo Roles)
+    currentUser: {
+        name: 'Demo Manager',
+        role: 'Certification Manager'
+    },
     currentModule: 'dashboard',
     clients: [
         {
@@ -890,4 +895,29 @@ async function lazyLoadModal(modulePath, functionName) {
 }
 
 // Initial Render
+// Role Switcher for Demo
+function renderRoleSwitcher() {
+    const switcher = document.createElement('div');
+    switcher.style.position = 'fixed';
+    switcher.style.top = '10px';
+    switcher.style.right = '200px'; // Left of Profile
+    switcher.style.zIndex = '10000';
+    switcher.innerHTML = `
+        <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.8rem; background: #fff;">
+            <option value="Lead Auditor" ${state.currentUser.role === 'Lead Auditor' ? 'selected' : ''}>Role: Lead Auditor</option>
+            <option value="Certification Manager" ${state.currentUser.role === 'Certification Manager' ? 'selected' : ''}>Role: Cert Manager</option>
+        </select>
+    `;
+    document.body.appendChild(switcher);
+}
+
+window.switchUserRole = function (role) {
+    state.currentUser.role = role;
+    window.showNotification(`Switched role to: ${role}`, 'info');
+    // Re-render current module to reflect permissions
+    window.renderModule(state.currentModule);
+};
+
+// Initialize
+renderRoleSwitcher();
 renderModule('dashboard');

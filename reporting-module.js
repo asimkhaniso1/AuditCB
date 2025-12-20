@@ -14,13 +14,21 @@ function renderReportSummaryTab(report, tabContent) {
 
     // Workflow: Draft -> Review -> Approved -> Finalized
     if (report.status === window.CONSTANTS.STATUS.IN_REVIEW) {
+        const isCertManager = window.state.currentUser?.role === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER;
+
         actionButtons = `
             <button class="btn btn-warning" onclick="window.revertToDraft(${report.id})">
                 <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Revert to Draft
             </button>
+            ${isCertManager ? `
             <button class="btn btn-primary" style="flex: 1; background-color: #8b5cf6; border-color: #7c3aed;" onclick="window.approveReport(${report.id})">
                 <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Approve (Cert Manager)
             </button>
+            ` : `
+            <button class="btn btn-secondary" style="flex: 1; opacity: 0.7; cursor: not-allowed;" disabled>
+                <i class="fa-solid fa-hourglass-half" style="margin-right: 0.5rem;"></i> Pending Approval
+            </button>
+            `}
         `;
     } else if (report.status === window.CONSTANTS.STATUS.APPROVED) {
         actionButtons = `

@@ -49,7 +49,8 @@ window.CONSTANTS = {
     ROLES: {
         LEAD_AUDITOR: 'Lead Auditor',
         AUDITOR: 'Auditor',
-        TECHNICAL_EXPERT: 'Technical Expert'
+        TECHNICAL_EXPERT: 'Technical Expert',
+        CERTIFICATION_MANAGER: 'Certification Manager'
     },
     RECOMMENDATIONS: {
         RECOMMEND: 'Recommend Certification',
