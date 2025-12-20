@@ -83,7 +83,7 @@ function renderAuditPlanningEnhanced() {
         </div >
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('btn-create-plan')?.addEventListener('click', openCreatePlanModal);

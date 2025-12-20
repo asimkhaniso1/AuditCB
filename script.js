@@ -425,6 +425,7 @@ const navItems = document.querySelectorAll('.main-nav li');
 
 // Export important items to window for modules to access
 window.state = state;
+window.contentArea = contentArea;
 window.saveData = saveState;
 window.showNotification = showNotification;
 window.openModal = openModal;
