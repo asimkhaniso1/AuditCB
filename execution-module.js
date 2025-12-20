@@ -50,7 +50,7 @@ function renderAuditExecutionEnhanced() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('execution-search')?.addEventListener('input', (e) => {
@@ -247,7 +247,7 @@ function renderExecutionDetail(reportId) {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {

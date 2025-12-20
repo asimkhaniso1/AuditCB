@@ -99,7 +99,7 @@ function renderAuditProgramsEnhanced() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('btn-new-program')?.addEventListener('click', openAddProgramModal);
@@ -257,7 +257,7 @@ function renderProgramDetail(programId) {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 }
 
 function openAddProgramModal() {

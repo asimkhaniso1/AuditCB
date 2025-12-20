@@ -99,7 +99,7 @@ function renderDocuments() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('doc-search')?.addEventListener('input', (e) => {

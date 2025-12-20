@@ -288,7 +288,7 @@ function renderDashboardEnhanced() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Initialize Enhanced Charts
     initEnhancedCharts(auditReports, industryStats);

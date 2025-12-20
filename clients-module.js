@@ -65,7 +65,7 @@ function renderClientsEnhanced() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('btn-new-client')?.addEventListener('click', openAddClientModal);
@@ -161,7 +161,7 @@ function renderClientDetail(clientId) {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {

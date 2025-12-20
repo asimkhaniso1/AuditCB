@@ -62,7 +62,7 @@ function renderAuditorsEnhanced() {
             </div>
         </div>
     `;
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('btn-add-auditor')?.addEventListener('click', openAddAuditorModal);
@@ -163,7 +163,7 @@ function renderAuditorDetail(auditorId) {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -399,7 +399,7 @@ function renderCompetenceMatrix() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Tab switching
     document.querySelectorAll('[data-matrix-tab]').forEach(btn => {
@@ -866,7 +866,7 @@ function renderManDayCalculator() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Form submission handler
     document.getElementById('manday-form').addEventListener('submit', (e) => {

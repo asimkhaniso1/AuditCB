@@ -83,7 +83,7 @@ function renderAuditPlanningEnhanced() {
         </div >
     `;
 
-    window.contentArea.innerHTML = html;
+    window.window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('btn-create-plan')?.addEventListener('click', openCreatePlanModal);
@@ -629,7 +629,7 @@ function viewAuditPlan(id) {
             </div>
         </div >
     `;
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 }
 
 window.printAuditPlan = function (planId) {

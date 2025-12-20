@@ -187,7 +187,7 @@ function renderChecklistLibrary() {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event Listeners
     document.getElementById('btn-new-checklist')?.addEventListener('click', openAddChecklistModal);
@@ -638,7 +638,7 @@ function viewChecklistDetail(id) {
         </div>
     `;
 
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 }
 
 function deleteChecklist(id) {

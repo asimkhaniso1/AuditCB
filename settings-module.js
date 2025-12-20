@@ -19,7 +19,7 @@ function renderSettings() {
             </div>
         </div>
     `;
-    contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 }
 
 function switchSettingsTab(tabName, btnElement) {
