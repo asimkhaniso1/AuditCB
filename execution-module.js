@@ -597,6 +597,33 @@ function renderExecutionTab(report, tabName) {
             const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
             const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
 
+            let actionButtons = '';
+            if (report.status === 'In Review') {
+                actionButtons = `
+                    <button class="btn btn-danger" onclick="revertToDraft(${report.id})">
+                        <i class="fa-solid fa-undo" style="margin-right: 0.5rem;"></i> Revert
+                    </button>
+                    <button class="btn btn-success" style="flex: 1;" onclick="publishReport(${report.id})">
+                        <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem;"></i> Publish Final Report
+                    </button>
+                `;
+            } else if (report.status === 'Published' || report.status === 'Finalized') {
+                actionButtons = `
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="window.generateAuditReport(${report.id})">
+                        <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i> Download Report
+                    </button>
+                `;
+            } else {
+                actionButtons = `
+                    <button class="btn btn-secondary" onclick="window.saveReportDraft(${report.id})">
+                        <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Draft
+                    </button>
+                    <button class="btn btn-primary" style="flex: 1;" onclick="submitForReview(${report.id})">
+                        <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit for Review
+                    </button>
+                `;
+            }
+
             const ncrReviewHTML = (report.ncrs || []).map((n, i) => `
                 <div style="background: #f8fafc; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; border-left: 3px solid ${n.type === 'major' ? 'var(--danger-color)' : 'var(--warning-color)'};">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -680,12 +707,7 @@ function renderExecutionTab(report, tabName) {
                             </div>
 
                             <div style="display: flex; gap: 1rem;">
-                                <button class="btn btn-secondary" onclick="window.saveReportDraft(${report.id})">
-                                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Draft
-                                </button>
-                                <button class="btn btn-primary" style="flex: 1;" onclick="finalizeReport(${report.id})">
-                                    <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Finalize & Generate Report
-                                </button>
+                                ${actionButtons}
                             </div>
                         </div>
                     </div>
@@ -1067,27 +1089,41 @@ function saveObservations(reportId) {
     window.showNotification('Observations saved successfully');
 }
 
-function finalizeReport(reportId) {
+function submitForReview(reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
     report.conclusion = document.getElementById('conclusion')?.value || '';
     report.recommendation = document.getElementById('recommendation')?.value || '';
-
-    // Also save other fields if present in the new editor
     if (document.getElementById('exec-summary')) report.execSummary = document.getElementById('exec-summary').value;
     if (document.getElementById('strengths')) report.strengths = document.getElementById('strengths').value;
     if (document.getElementById('improvements')) report.improvements = document.getElementById('improvements').value;
 
-    report.status = 'Finalized';
-    report.finalizedAt = new Date().toISOString();
-
+    report.status = 'In Review';
     window.saveData();
     renderExecutionDetail(reportId);
-    window.showNotification('Report finalized successfully');
+    window.showNotification('Report submitted for review');
+}
 
-    // Optionally auto-open the report
+function publishReport(reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    report.status = 'Published';
+    report.finalizedAt = new Date().toISOString();
+    window.saveData();
+    renderExecutionDetail(reportId);
+    window.showNotification('Report Published Successfully!', 'success');
     setTimeout(() => window.generateAuditReport(reportId), 500);
+}
+
+function revertToDraft(reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+    report.status = 'Draft';
+    window.saveData();
+    renderExecutionDetail(reportId);
+    window.showNotification('Report reverted to Draft');
 }
 
 window.saveReportDraft = function (reportId) {
@@ -1162,6 +1198,9 @@ window.renderExecutionDetail = renderExecutionDetail;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
 window.createCAPA = createCAPA;
+window.submitForReview = submitForReview;
+window.publishReport = publishReport;
+window.revertToDraft = revertToDraft;
 
 // ============================================
 // EVIDENCE IMAGE HANDLING (Compression & Upload)
