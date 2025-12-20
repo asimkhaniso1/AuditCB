@@ -274,15 +274,16 @@ function editAuditPlan(id) {
         // If we saved calculation data, we would restore it here.
         updateClientDetails(plan.client); // Auto-fill from client data again to ensure calc inputs are ready
 
-        // Handle Lead Auditor
-        const lead = plan.team[0];
+        // Handle Lead Auditor and Team Members
+        const teamMembers = (plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown');
+        const lead = teamMembers[0] || '';
         document.getElementById('plan-lead-auditor').value = lead;
 
         // Handle Team Members
         const teamSelect = document.getElementById('plan-team');
-        const teamMembers = plan.team.slice(1);
+        const otherMembers = teamMembers.slice(1);
         Array.from(teamSelect.options).forEach(option => {
-            option.selected = teamMembers.includes(option.value);
+            option.selected = otherMembers.includes(option.value);
         });
 
         // Update save handler to update instead of create
