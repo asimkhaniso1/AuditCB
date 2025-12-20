@@ -312,6 +312,7 @@ function renderClientTab(client, tabName) {
                         </button>
                     </div>
                     ${(client.sites && client.sites.length > 0) ? `
+
                         <div class="table-container">
                             <table>
                                 <thead>
@@ -322,10 +323,11 @@ function renderClientTab(client, tabName) {
                                         <th>Employees</th>
                                         <th>Shift</th>
                                         <th>Geotag</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${client.sites.map(s => `
+                                    ${client.sites.map((s, index) => `
                                         <tr>
                                             <td style="font-weight: 500;">${s.name}</td>
                                             <td>${s.address || '-'}</td>
@@ -338,6 +340,14 @@ function renderClientTab(client, tabName) {
                                             </td>
                                             <td>
                                                 ${s.geotag ? `<a href="https://maps.google.com/?q=${s.geotag}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${s.geotag}</a>` : '-'}
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite(${client.id}, ${index})">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
                                             </td>
                                         </tr>
                                     `).join('')}
@@ -358,6 +368,7 @@ function renderClientTab(client, tabName) {
                         </button>
                     </div>
                     ${(client.contacts && client.contacts.length > 0) ? `
+
                         <div class="table-container">
                             <table>
                                 <thead>
@@ -366,15 +377,24 @@ function renderClientTab(client, tabName) {
                                         <th>Designation</th>
                                         <th>Phone</th>
                                         <th>Email</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${client.contacts.map(c => `
+                                    ${client.contacts.map((c, index) => `
                                         <tr>
                                             <td style="font-weight: 500;">${c.name}</td>
                                             <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.designation || '-'}</span></td>
                                             <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${c.phone || '-'}</td>
                                             <td><a href="mailto:${c.email}" style="color: var(--primary-color); text-decoration: none;">${c.email || '-'}</a></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact(${client.id}, ${index})">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -1059,3 +1079,167 @@ window.openAddClientModal = openAddClientModal;
 window.openEditClientModal = openEditClientModal;
 window.addContactPerson = addContactPerson;
 window.addSite = addSite;
+
+// Edit Site Modal
+window.editSite = function (clientId, siteIndex) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.sites || !client.sites[siteIndex]) return;
+
+    const site = client.sites[siteIndex];
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Edit Site Location';
+    modalBody.innerHTML = `
+        <form id="site-form">
+            <div class="form-group">
+                <label>Site Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="site-name" value="${site.name}" required>
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <input type="text" class="form-control" id="site-address" value="${site.address || ''}">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" class="form-control" id="site-city" value="${site.city || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" class="form-control" id="site-country" value="${site.country || ''}">
+                </div>
+            </div>
+            
+            <div style="border-top: 1px solid var(--border-color); margin: 1rem 0; padding-top: 1rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Employees</label>
+                        <input type="number" class="form-control" id="site-employees" min="0" value="${site.employees || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Shift Work?</label>
+                        <select class="form-control" id="site-shift">
+                            <option value="" ${!site.shift ? 'selected' : ''}>-- Not specified --</option>
+                            <option value="No" ${site.shift === 'No' ? 'selected' : ''}>No</option>
+                            <option value="Yes" ${site.shift === 'Yes' ? 'selected' : ''}>Yes</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Geotag</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" class="form-control" id="site-geotag" value="${site.geotag || ''}">
+                    <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('site-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('site-name').value;
+        const address = document.getElementById('site-address').value;
+        const city = document.getElementById('site-city').value;
+        const country = document.getElementById('site-country').value;
+        const geotag = document.getElementById('site-geotag').value;
+        const employees = parseInt(document.getElementById('site-employees').value) || null;
+        const shift = document.getElementById('site-shift').value || null;
+
+        if (name) {
+            client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift };
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            window.showNotification('Site updated successfully');
+        } else {
+            window.showNotification('Site name is required', 'error');
+        }
+    };
+};
+
+// Delete Site
+window.deleteSite = function (clientId, siteIndex) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.sites) return;
+
+    if (confirm('Are you sure you want to delete this site?')) {
+        client.sites.splice(siteIndex, 1);
+        window.saveData();
+        renderClientDetail(clientId);
+        window.showNotification('Site deleted');
+    }
+};
+
+// Edit Contact Modal
+window.editContact = function (clientId, contactIndex) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.contacts || !client.contacts[contactIndex]) return;
+
+    const contact = client.contacts[contactIndex];
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Edit Contact Person';
+    modalBody.innerHTML = `
+        <form id="contact-form">
+            <div class="form-group">
+                <label>Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="contact-name" value="${contact.name}" required>
+            </div>
+            <div class="form-group">
+                <label>Designation</label>
+                <input type="text" class="form-control" id="contact-designation" value="${contact.designation || ''}">
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" class="form-control" id="contact-phone" value="${contact.phone || ''}">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="form-control" id="contact-email" value="${contact.email || ''}">
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const name = document.getElementById('contact-name').value;
+        const designation = document.getElementById('contact-designation').value;
+        const phone = document.getElementById('contact-phone').value;
+        const email = document.getElementById('contact-email').value;
+
+        if (name) {
+            client.contacts[contactIndex] = { ...contact, name, designation, phone, email };
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            window.showNotification('Contact updated successfully');
+        } else {
+            window.showNotification('Name is required', 'error');
+        }
+    };
+};
+
+// Delete Contact
+window.deleteContact = function (clientId, contactIndex) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.contacts) return;
+
+    if (confirm('Are you sure you want to delete this contact?')) {
+        client.contacts.splice(contactIndex, 1);
+        window.saveData();
+        renderClientDetail(clientId);
+        window.showNotification('Contact deleted');
+    }
+};
