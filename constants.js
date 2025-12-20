@@ -24,6 +24,26 @@ window.CONSTANTS = {
         MINOR: 'minor',
         OBSERVATION: 'observation'
     },
+    // ISO 17021-1:2015 Classification Matrix
+    NCR_CRITERIA: {
+        MAJOR: {
+            description: "Non-conformity that affects the capability of the management system to achieve the intended results.",
+            triggers: [
+                "Total breakdown of a system or process",
+                "Absence of a required procedure/process",
+                "Failure to address a statutory/regulatory requirement",
+                "Significant number of minor NCs in one area (Systemic failure)"
+            ]
+        },
+        MINOR: {
+            description: "Non-conformity that does not affect the capability of the management system to achieve the intended results.",
+            triggers: [
+                "Single/isolated lapse in following a procedure",
+                "Documentation error not affecting outcome",
+                "Process is generally effective but had a specific deviation"
+            ]
+        }
+    },
     ROLES: {
         LEAD_AUDITOR: 'Lead Auditor',
         AUDITOR: 'Auditor',

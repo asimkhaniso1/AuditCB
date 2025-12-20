@@ -255,72 +255,7 @@ function openCreateReportModal() {
         }
     };
 }
-const modalTitle = document.getElementById('modal-title');
-const modalBody = document.getElementById('modal-body');
-const modalSave = document.getElementById('modal-save');
 
-modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
-modalBody.innerHTML = `
-        <form id="report-form">
-            <div class="form-group">
-                <label style="font-weight: 600;">Select Approved Audit Plan</label>
-                <select class="form-control" id="report-plan" required onchange="
-                    const p = state.auditPlans.find(x => x.id == this.value);
-                    if(p) document.getElementById('report-date').value = p.date;
-                ">
-                    <option value="">-- Select Audit Plan to Execute --</option>
-                    ${state.auditPlans.filter(p => !p.reportId).map(p => `<option value="${p.id}">${p.client} - ${p.standard} (${p.date})</option>`).join('')}
-                </select>
-                ${state.auditPlans.length === 0 ? '<small style="color: var(--danger-color);">No audit plans available. Please create a plan first.</small>' : ''}
-            </div>
-            <div class="form-group">
-                <label>Audit Date</label>
-                <input type="date" class="form-control" id="report-date" required>
-            </div>
-            <div class="form-group">
-                <label>Initial Status</label>
-                <select class="form-control" id="report-status">
-                    <option>${window.CONSTANTS.STATUS.IN_PROGRESS}</option>
-                    <option>${window.CONSTANTS.STATUS.DRAFT}</option>
-                </select>
-            </div>
-        </form>
-    `;
-
-window.openModal();
-document.getElementById('modal-save').textContent = 'Start Audit';
-
-modalSave.onclick = () => {
-    const planId = document.getElementById('report-plan').value;
-    const date = document.getElementById('report-date').value;
-    const status = document.getElementById('report-status').value;
-
-    if (planId && date) {
-        const plan = state.auditPlans.find(p => p.id == planId);
-        const newReport = {
-            id: Date.now(),
-            planId: plan.id, // Link to plan
-            client: plan.client,
-            date: date,
-            findings: 0,
-            status: status
-        };
-
-        if (!state.auditReports) state.auditReports = [];
-        state.auditReports.push(newReport);
-
-        // Mark plan as executed (optional, but good for filtering)
-        plan.reportId = newReport.id;
-
-        window.saveData();
-        window.closeModal();
-        renderAuditExecutionEnhanced();
-        window.showNotification('Audit Initiated! Checklist loaded from Plan.', 'success');
-    } else {
-        window.showNotification('Please select an Audit Plan', 'error');
-    }
-};
-}
 
 function openEditReportModal(reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
@@ -496,11 +431,26 @@ function renderExecutionTab(report, tabName) {
                              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
                                  <div>
                                      <label style="font-size: 0.8rem;">Severity</label>
-                                     <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
-                                         <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor</option>
-                                        <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major</option>
-                                        <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation</option>
-                                     </select>
+                                     <div style="display: flex; gap: 5px;">
+                                         <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
+                                             <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation</option>
+                                         </select>
+                                         <button type="button" class="btn btn-sm btn-info" onclick="const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'" title="View Classification Matrix (ISO 17021-1)">
+                                            <i class="fa-solid fa-scale-balanced"></i>
+                                         </button>
+                                     </div>
+                                     <div id="criteria-${uniqueId}" style="display: none; position: absolute; background: white; border: 1px solid #ccc; padding: 10px; z-index: 100; width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 4px; font-size: 0.8rem; margin-top: 5px;">
+                                        <strong>ISO 17021-1 Criteria</strong>
+                                        <div style="margin-top:5px; border-left: 3px solid var(--danger-color); padding-left: 5px; background: #fff5f5;">
+                                            <strong>Major:</strong> ${window.CONSTANTS.NCR_CRITERIA.MAJOR.description}
+                                        </div>
+                                        <div style="margin-top:5px; border-left: 3px solid var(--warning-color); padding-left: 5px; background: #fffaf0;">
+                                            <strong>Minor:</strong> ${window.CONSTANTS.NCR_CRITERIA.MINOR.description}
+                                        </div>
+                                        <div style="text-align: right; margin-top: 5px;"><small style="color: blue; cursor: pointer;" onclick="this.parentElement.parentElement.style.display='none'">Close</small></div>
+                                     </div>
                                  </div>
                                  <div style="display: flex; flex-direction: column;">
                                      <label style="font-size: 0.8rem;">Evidence Image <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
