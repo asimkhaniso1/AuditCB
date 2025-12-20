@@ -24,7 +24,7 @@ function renderAuditPlanningEnhanced() {
             <td>${plan.date}</td>
             <td>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    ${(plan.team || (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(auditor => `
+                    ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(auditor => `
                         <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
                             <i class="fa-solid fa-user" style="font-size: 0.7rem; color: var(--text-secondary); margin-right: 4px;"></i>${auditor}
                         </span>
