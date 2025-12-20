@@ -298,11 +298,11 @@ function openCreatePlanModal() {
                 <table style="width: 100%;">
                     <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                         <tr>
-                            <th style="width: 15%;">Day</th>
+                            <th style="width: 10%;">Day</th>
                             <th style="width: 15%;">Time</th>
-                            <th style="width: 25%;">Activity / Clause</th>
-                            <th style="width: 20%;">Department/Auditee</th>
-                            <th style="width: 20%;">Auditor(s)</th>
+                            <th style="width: 45%;">Activity / Clause</th>
+                            <th style="width: 15%;">Department/Auditee</th>
+                            <th style="width: 15%;">Auditor(s)</th>
                             <th style="width: 5%;"></th>
                         </tr>
                     </thead>
@@ -1500,11 +1500,11 @@ window.printAuditPlanDetails = function (planId) {
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 15%">Day</th>
+                        <th style="width: 10%">Day</th>
                         <th style="width: 15%">Time</th>
-                        <th style="width: 25%">Activity / Clause</th>
-                        <th style="width: 20%">Dept/Auditee</th>
-                        <th style="width: 20%">Auditor</th>
+                        <th style="width: 45%">Activity / Clause</th>
+                        <th style="width: 15%">Dept/Auditee</th>
+                        <th style="width: 15%">Auditor</th>
                     </tr>
                 </thead>
                 <tbody>
