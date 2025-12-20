@@ -790,18 +790,22 @@ function renderReportingModule() {
             </div>
             
             <!-- Quick Help -->
-            <div style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+            <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
                 <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe;">
                     <div style="font-weight: 600; color: #1d4ed8; margin-bottom: 0.5rem;"><i class="fa-solid fa-pen-ruler"></i> Draft</div>
                     <div style="font-size: 0.85rem;">Auditors verify findings and draft the report content. Summary, Strengths, and Improvements are added here.</div>
                 </div>
                  <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px solid #fed7aa;">
                     <div style="font-weight: 600; color: #c2410c; margin-bottom: 0.5rem;"><i class="fa-solid fa-glasses"></i> Review</div>
-                    <div style="font-size: 0.85rem;">Lead Auditor reviews the content, validates findings, and ensures quality before publication.</div>
+                    <div style="font-size: 0.85rem;">Lead Auditor reviews content, validates findings, and submits for final approval.</div>
+                </div>
+                <div style="background: #f5f3ff; padding: 1rem; border-radius: 8px; border: 1px solid #ddd6fe;">
+                    <div style="font-weight: 600; color: #7c3aed; margin-bottom: 0.5rem;"><i class="fa-solid fa-check-circle"></i> Approved</div>
+                    <div style="font-size: 0.85rem;">Certification Manager approves the report integrity. Final gate before official issuance.</div>
                 </div>
                  <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0;">
-                    <div style="font-weight: 600; color: #15803d; margin-bottom: 0.5rem;"><i class="fa-solid fa-check-double"></i> Finalized</div>
-                    <div style="font-size: 0.85rem;">Report is locked and ready for Certification Decision. PDF can be generated and sent to client.</div>
+                    <div style="font-weight: 600; color: #15803d; margin-bottom: 0.5rem;"><i class="fa-solid fa-file-contract"></i> Finalized</div>
+                    <div style="font-size: 0.85rem;">Report is locked and ready for Certification Decision. PDF can be generated and sent.</div>
                 </div>
             </div>
         </div>
