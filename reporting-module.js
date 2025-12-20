@@ -37,15 +37,51 @@ function renderReportSummaryTab(report, tabContent) {
         `;
     }
 
-    const ncrReviewHTML = (report.ncrs || []).map((n, i) => `
-        <div style="background: #f8fafc; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; border-left: 3px solid ${n.type === 'major' ? 'var(--danger-color)' : 'var(--warning-color)'};">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                 <strong style="font-size: 0.9rem;">${n.type.toUpperCase()} - ${h(n.clause)}</strong>
-                 <span style="font-size: 0.8rem; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${h(n.status || 'Open')}</span>
+    // Combine findings for Review
+    const allFindings = [];
+    (report.checklistProgress || []).forEach((item, idx) => {
+        if (item.status === window.CONSTANTS.STATUS.NC) {
+            allFindings.push({ ...item, source: 'checklist', idxInArr: idx, type: item.ncrType || 'minor', description: item.ncrDescription || item.comment || 'Checklist Finding', clause: 'Checklist' });
+        }
+    });
+    (report.ncrs || []).forEach((item, idx) => {
+        allFindings.push({ ...item, source: 'manual', idxInArr: idx, type: item.type || 'minor', description: item.description, clause: item.clause });
+    });
+
+    const pendingCount = allFindings.filter(f => f.type === window.CONSTANTS.NCR_TYPES.PENDING).length;
+
+    const ncrReviewHTML = allFindings.map(n => {
+        const isPending = n.type === window.CONSTANTS.NCR_TYPES.PENDING;
+        const color = isPending ? '#8b5cf6' : (n.type === 'major' ? 'var(--danger-color)' : 'var(--warning-color)');
+
+        return `
+        <div style="background: #f8fafc; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; border-left: 4px solid ${color}; ${isPending ? 'border: 2px solid #8b5cf6; background: #f5f3ff;' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                 <div style="flex: 1;">
+                    <strong style="font-size: 0.8rem; color: ${color}; text-transform: uppercase;">${isPending ? '<i class="fa-solid fa-flag"></i> Flagged (Pending Review)' : n.type}</strong>
+                    <div style="font-weight: 600; margin-bottom: 2px;">${h(n.clause || '-')}</div>
+                    <div style="font-size: 0.9rem;">${h(n.description)}</div>
+                 </div>
+                 
+                 ${isPending ? `
+                    <div style="display: flex; gap: 5px; flex-direction: column; align-items: flex-end;">
+                        <button id="ai-btn-${n.source}-${n.idxInArr}" class="btn btn-sm btn-outline-primary" style="font-size: 0.75rem; padding: 2px 8px;" onclick="window.autoClassifyFinding(${report.id}, '${n.source}', ${n.idxInArr}, '${h(n.description).replace(/'/g, "\\'")}')" title="Ask AI">
+                             <i class="fa-solid fa-wand-magic-sparkles"></i> AI Classify
+                        </button>
+                        <div style="display: flex; gap: 2px;">
+                            <button class="btn btn-sm btn-warning" style="font-size: 0.7rem; padding: 2px 5px;" onclick="window.classifyFinding(${report.id}, '${n.source}', ${n.idxInArr}, '${window.CONSTANTS.NCR_TYPES.MINOR}')">Minor</button>
+                            <button class="btn btn-sm btn-danger" style="font-size: 0.7rem; padding: 2px 5px;" onclick="window.classifyFinding(${report.id}, '${n.source}', ${n.idxInArr}, '${window.CONSTANTS.NCR_TYPES.MAJOR}')">Major</button>
+                        </div>
+                    </div>
+                 ` : `<span class="badge" style="background: #e2e8f0; color: #64748b; font-size: 0.7rem;">${n.source}</span>`}
             </div>
-            <p style="margin: 0.25rem 0; font-size: 0.9rem; color: var(--text-color);">${h(n.description)}</p>
         </div>
-    `).join('') || '<div style="padding: 1rem; text-align: center; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">No findings to review. Seamless audit!</div>';
+        `;
+    }).join('') || '<div style="padding: 1rem; text-align: center; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">No findings to review. Seamless audit!</div>';
+
+    if (pendingCount > 0) {
+        window.showNotification(`${pendingCount} findings are pending classification.`, 'warning');
+    }
 
     tabContent.innerHTML = `
         <div class="card">
@@ -149,6 +185,15 @@ function submitForReview(reportId) {
 function publishReport(reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
+
+    // VALIDATION: Check for Pending Findings
+    const hasPending = (report.ncrs || []).some(n => n.type === window.CONSTANTS.NCR_TYPES.PENDING) ||
+        (report.checklistProgress || []).some(n => n.status === 'nc' && n.ncrType === window.CONSTANTS.NCR_TYPES.PENDING);
+
+    if (hasPending) {
+        window.showNotification('Cannot Publish: You have Flagged items pending classification. Please classify them as Major or Minor first.', 'error');
+        return;
+    }
 
     report.status = window.CONSTANTS.STATUS.FINALIZED;
     report.finalizedAt = new Date().toISOString();
@@ -738,3 +783,66 @@ window.openReportingDetail = function (reportId) {
 
 // Export
 window.renderReportingModule = renderReportingModule;
+
+// ============================================
+// AI & Classification Helpers
+// ============================================
+
+window.classifyFinding = function (reportId, source, index, newType) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    if (source === 'manual') {
+        if (report.ncrs && report.ncrs[index]) {
+            report.ncrs[index].type = newType;
+        }
+    } else if (source === 'checklist') {
+        if (report.checklistProgress && report.checklistProgress[index]) {
+            report.checklistProgress[index].ncrType = newType;
+        }
+    }
+
+    window.saveData();
+    // Re-render the summary tab. Since renderReportSummaryTab is called by execution-module's renderExecutionTab('summary'),
+    // we ideally call renderExecutionDetail(reportId) and switch to summary tab, or just re-render content if we can.
+    // Easiest is to reload the view.
+    window.renderExecutionDetail(reportId);
+    // Since renderExecutionDetail defaults to 'checklist', we might need to select 'summary'.
+    // A quick hack: Trigger click on summary tab after render.
+    setTimeout(() => {
+        const btn = document.querySelector('button[data-tab="summary"]');
+        if (btn) btn.click();
+    }, 100);
+
+    window.showNotification(`Finding classified as ${newType.toUpperCase()}`);
+};
+
+window.autoClassifyFinding = function (reportId, source, index, description) {
+    const btnId = `ai-btn-${source}-${index}`;
+    const btn = document.getElementById(btnId);
+    if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI Analyzing...';
+        btn.disabled = true;
+    }
+
+    // Mock AI Analysis based on ISO 17021-1 triggers
+    setTimeout(() => {
+        const desc = description.toLowerCase();
+        let suggestedType = window.CONSTANTS.NCR_TYPES.MINOR;
+        let reasoning = "Single occurrence";
+
+        if (desc.includes('critical') || desc.includes('breakdown') || desc.includes('systemic') || desc.includes('regulatory') || desc.includes('absence')) {
+            suggestedType = window.CONSTANTS.NCR_TYPES.MAJOR;
+            reasoning = "Potential systemic failure or regulatory issue";
+        }
+
+        if (confirm(`AI Analysis Result:\nSuggested: ${suggestedType.toUpperCase()}\nReason: ${reasoning}\n\nApply this classification?`)) {
+            window.classifyFinding(reportId, source, index, suggestedType);
+        } else {
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> AI Classify';
+                btn.disabled = false;
+            }
+        }
+    }, 1200);
+};
