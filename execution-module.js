@@ -1301,3 +1301,4 @@ window.captureScreenEvidence = async function (uniqueId) {
         }
     }
 };
+window.renderExecutionDetail = renderExecutionDetail;
