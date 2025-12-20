@@ -148,13 +148,14 @@ function openCreateReportModal() {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
-    const availablePlans = state.auditPlans.filter(p => !p.reportId);
+    const today = new Date().toISOString().split('T')[0];
+    const availablePlans = state.auditPlans.filter(p => !p.reportId && p.date >= today);
 
     modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
 
     // UI: List of Plans + Selected Confirmation
     const renderTable = () => {
-        if (availablePlans.length === 0) return '<div class="alert alert-warning">No approved audit plans available to execute.</div>';
+        if (availablePlans.length === 0) return '<div class="alert alert-warning">No upcoming audit plans available. (Reference limited to Today or Future)</div>';
 
         return `
         <div style="margin-bottom: 1rem;">
@@ -204,7 +205,7 @@ function openCreateReportModal() {
             
             <div class="form-group">
                 <label>Confirm Execution Date</label>
-                <input type="date" class="form-control" id="report-date" required>
+                <input type="date" class="form-control" id="report-date" min="${today}" required>
             </div>
             
             <div class="form-group">
