@@ -627,12 +627,13 @@ function viewAuditPlan(id) {
                      <div class="card">
                         <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-users-gear" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Team</h3>
                          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            ${plan.team.map((m, i) => `
+                            ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map((m, i) => `
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <div style="width: 30px; height: 30px; background: ${i === 0 ? 'var(--primary-color)' : '#e2e8f0'}; color: ${i === 0 ? 'white' : 'var(--text-secondary)'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
                                         <i class="fa-solid fa-user"></i>
                                     </div>
                                     <span style="font-size: 0.9rem;">${m}</span>
+                                    ${i === 0 ? '<span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: auto;">Lead Auditor</span>' : ''}
                                 </div>
                             `).join('')}
                          </div>
