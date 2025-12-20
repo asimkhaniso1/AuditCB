@@ -226,6 +226,7 @@ function renderClientDetail(clientId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Information</button>
+                <button class="tab-btn" data-tab="profile">Company Profile</button>
                 <button class="tab-btn" data-tab="contacts">Contacts</button>
                 <button class="tab-btn" data-tab="departments">Departments</button>
                 <button class="tab-btn" data-tab="audits">Audits</button>
@@ -405,6 +406,65 @@ function renderClientTab(client, tabName) {
                             <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
                         </p>
                     `}
+                </div>
+            `;
+            break;
+        case 'profile':
+            const profile = client.profile || '';
+            const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
+
+            tabContent.innerHTML = `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div>
+                            <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Profile</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">
+                                <i class="fa-solid fa-clock"></i> Last updated: ${lastUpdated}
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            ${client.website ? `
+                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
+                                    <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate from Website
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">
+                                <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i> Edit Manually
+                            </button>
+                        </div>
+                    </div>
+                    
+                    ${profile ? `
+                        <div style="background: #f8fafc; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); line-height: 1.8;">
+                            <div style="white-space: pre-wrap; color: var(--text-primary);">${profile}</div>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
+                            <i class="fa-solid fa-file-lines" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No company profile generated yet.</p>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                                ${client.website ?
+                    'Click "AI Generate from Website" to automatically create a company profile summary.' :
+                    'Add a website URL in the client information to enable AI generation, or edit manually.'}
+                            </p>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                ${client.website ? `
+                                    <button class="btn btn-primary btn-sm" onclick="window.generateCompanyProfile(${client.id})">
+                                        <i class="fa-solid fa-sparkles"></i> AI Generate
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-outline-secondary btn-sm" onclick="window.editCompanyProfile(${client.id})">
+                                    <i class="fa-solid fa-pen"></i> Write Manually
+                                </button>
+                            </div>
+                        </div>
+                    `}
+                    
+                    <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid #bae6fd;">
+                        <p style="font-size: 0.85rem; color: #0369a1; margin: 0;">
+                            <i class="fa-solid fa-info-circle"></i> <strong>Usage:</strong> This profile summary will be included in the "Organization Overview" section of audit reports.
+                        </p>
+                    </div>
                 </div>
             `;
             break;
@@ -1537,4 +1597,107 @@ window.addDepartment = addDepartment;
 window.editDepartment = editDepartment;
 window.deleteDepartment = deleteDepartment;
 window.bulkUploadDepartments = bulkUploadDepartments;
+
+// Company Profile Functions
+function generateCompanyProfile(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.website) {
+        window.showNotification('Website URL is required for AI generation', 'error');
+        return;
+    }
+
+    // Show loading notification
+    window.showNotification('Generating company profile from website...', 'info');
+
+    // Simulated AI generation (in production, this would call an API)
+    setTimeout(() => {
+        // Generate a professional company profile based on available data
+        const profile = `${client.name} - Company Overview
+
+Industry: ${client.industry || 'Not specified'}
+Website: ${client.website}
+
+About the Organization:
+${client.name} is a ${client.industry || 'professional'} organization ${client.employees ? `with approximately ${client.employees} employees` : ''} ${client.sites && client.sites.length > 1 ? `operating across ${client.sites.length} locations` : 'operating from a single location'}.
+
+${client.standard ? `The organization maintains certification to ${client.standard} standards, demonstrating its commitment to quality management and continuous improvement.` : ''}
+
+${client.sites && client.sites.length > 0 ? `
+Operational Locations:
+${client.sites.map(s => `• ${s.name}${s.city ? ` - ${s.city}` : ''}${s.employees ? ` (${s.employees} employees)` : ''}`).join('\n')}
+` : ''}
+
+${client.departments && client.departments.length > 0 ? `
+Key Departments:
+${client.departments.map(d => `• ${d.name}${d.head ? ` - Led by ${d.head}` : ''}${d.employeeCount ? ` (${d.employeeCount} staff)` : ''}`).join('\n')}
+` : ''}
+
+${client.shifts === 'Yes' ? 'The organization operates multiple shifts to ensure continuous operations and meet customer demands.' : ''}
+
+This profile provides context for audit activities and helps auditors understand the organizational structure and scope of operations.
+
+---
+Note: This profile was AI-generated from available client data. Please review and edit as needed to ensure accuracy.`;
+
+        // Save the generated profile
+        client.profile = profile;
+        client.profileUpdated = new Date().toISOString();
+
+        window.saveData();
+        renderClientDetail(clientId);
+        renderClientTab(client, 'profile');
+        window.showNotification('Company profile generated successfully!');
+    }, 1500); // Simulate API delay
+}
+
+function editCompanyProfile(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const currentProfile = client.profile || '';
+
+    window.openModal(
+        'Edit Company Profile',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                <i class="fa-solid fa-info-circle"></i> Write a comprehensive overview of the organization. This will be included in audit reports.
+            </p>
+        </div>
+        <form id="profile-form">
+            <div class="form-group">
+                <label>Company Profile / Organization Overview</label>
+                <textarea id="profile-text" rows="15" placeholder="Enter company profile, including:
+- Company background and history
+- Industry and market position
+- Products/services offered
+- Organizational structure
+- Key operational locations
+- Management system certifications
+- Quality objectives and commitments">${currentProfile}</textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+                <div><i class="fa-solid fa-lightbulb"></i> Be concise but comprehensive</div>
+                <div><i class="fa-solid fa-check"></i> Focus on audit-relevant information</div>
+            </div>
+        </form>
+        `,
+        () => {
+            const profileText = document.getElementById('profile-text').value.trim();
+
+            client.profile = profileText;
+            client.profileUpdated = new Date().toISOString();
+
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            renderClientTab(client, 'profile');
+            window.showNotification('Company profile updated successfully');
+        }
+    );
+}
+
+// Export profile functions
+window.generateCompanyProfile = generateCompanyProfile;
+window.editCompanyProfile = editCompanyProfile;
 
