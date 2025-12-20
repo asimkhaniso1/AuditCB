@@ -375,7 +375,7 @@ function updateClientDetails(clientName) {
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
                 <div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-weight: normal;">
-                        <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" checked style="margin-top: 3px;">
+                        <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="margin-top: 3px;">
                         <div style="flex: 1;">
                             <div style="font-weight: 500;">${s.name}</div>
                             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;">
@@ -444,37 +444,79 @@ function updateClientDetails(clientName) {
 }
 
 function autoCalculateDays() {
-    const employees = parseInt(document.getElementById('plan-employees').value) || 0;
-    const risk = document.getElementById('plan-risk').value || 'Medium';
+    // Step 1: Get currently selected sites and sum up employees
+    const selectedCheckboxes = document.querySelectorAll('.site-checkbox:checked');
+    const siteCount = selectedCheckboxes.length;
 
-    // Ensure the helper function exists (it's in advanced-modules.js, make sure it's loaded)
-    if (typeof calculateManDays !== 'function') {
-        // Simple fallback if advanced-module isn't loaded/exposed
-        console.warn('Advanced Man-Day Calculator not found, using simple fallback');
-        const simpleDays = employees < 50 ? 2 : employees < 500 ? 5 : 10;
-        document.getElementById('plan-mandays').value = simpleDays;
-        document.getElementById('plan-onsite-days').value = simpleDays * 0.8;
+    if (siteCount === 0) {
+        window.showNotification('Please select at least one site', 'warning');
         return;
     }
 
-    if (employees > 0) {
-        // Signature: calculateManDays(employees, reductionFactor, sites, shiftWork, riskLevel)
-        // Assume default reduction (1) and shiftWork (false) for now unless added to UI
-        const results = calculateManDays(employees, 1, 1, false, risk);
+    // Sum employees from selected sites (from data-employees attribute)
+    let totalEmployees = 0;
+    let hasShiftWork = false;
+
+    selectedCheckboxes.forEach(checkbox => {
+        const empCount = parseInt(checkbox.dataset.employees) || 0;
+        totalEmployees += empCount;
+        // Check for shift work - if any site has shift, consider it
+        const shift = checkbox.dataset.shift;
+        if (shift === 'Yes') hasShiftWork = true;
+    });
+
+    // If no employees found in selected sites, try to get from client info
+    if (totalEmployees === 0) {
+        const clientSelect = document.getElementById('plan-client');
+        const selectedClient = state.clients.find(c => c.name === clientSelect?.value);
+        if (selectedClient && selectedClient.employees) {
+            totalEmployees = selectedClient.employees;
+        }
+    }
+
+    // Update the display fields
+    document.getElementById('plan-employees').value = totalEmployees;
+    document.getElementById('plan-sites').value = siteCount;
+
+    const risk = document.getElementById('plan-risk').value || 'Medium';
+
+    // Ensure the helper function exists (it's in advanced-modules.js)
+    if (typeof calculateManDays !== 'function') {
+        // Simple fallback if advanced-module isn't loaded
+        console.warn('Advanced Man-Day Calculator not found, using simple fallback');
+        let simpleDays;
+        if (totalEmployees <= 10) simpleDays = 2;
+        else if (totalEmployees <= 50) simpleDays = 3;
+        else if (totalEmployees <= 100) simpleDays = 5;
+        else if (totalEmployees <= 500) simpleDays = 8;
+        else simpleDays = 12;
+
+        // Adjust for multiple sites
+        simpleDays += (siteCount - 1) * 0.5;
+
+        document.getElementById('plan-mandays').value = simpleDays.toFixed(1);
+        document.getElementById('plan-onsite-days').value = (simpleDays * 0.8).toFixed(1);
+        window.showNotification(`Calculated ${simpleDays.toFixed(1)} days for ${totalEmployees} employees at ${siteCount} site(s)`, 'success');
+        return;
+    }
+
+    if (totalEmployees > 0) {
+        // Signature: calculateManDays(employees, sites, effectiveness, shiftWork, riskLevel)
+        const results = calculateManDays(totalEmployees, siteCount, 2, hasShiftWork, risk);
 
         const type = document.getElementById('plan-type').value;
         let days = 0;
 
         if (type === 'Stage 1') days = results.stage1;
         else if (type === 'Stage 2') days = results.stage2;
-        else days = results.surveillance; // Default
+        else days = results.surveillance;
 
-        document.getElementById('plan-mandays').value = days.toFixed(2);
-        document.getElementById('plan-onsite-days').value = (days * 0.8).toFixed(2);
+        document.getElementById('plan-mandays').value = days.toFixed(1);
+        document.getElementById('plan-onsite-days').value = (days * 0.8).toFixed(1);
 
-        window.showNotification(`Calculated ${days.toFixed(2)} days based on ${employees} employees.`, 'success');
+        window.showNotification(`Calculated ${days.toFixed(1)} man-days for ${totalEmployees} employees at ${siteCount} site(s)${hasShiftWork ? ' (with shift work)' : ''}`, 'success');
     } else {
-        window.showNotification('Please enter number of employees', 'warning');
+        window.showNotification('No employee data available for selected sites. Please verify client/site information.', 'warning');
     }
 }
 
