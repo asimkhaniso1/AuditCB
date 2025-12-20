@@ -314,13 +314,28 @@ function renderExecutionTab(report, tabName) {
                                         <option value="observation" ${saved.ncrType === 'observation' ? 'selected' : ''}>Observation</option>
                                      </select>
                                  </div>
-                                 <div style="display: flex; align-items: flex-end;">
-                                     <button class="btn btn-sm btn-outline-secondary" style="width: 100%; border-style: dashed;" onclick="document.getElementById('img-${uniqueId}').click()">
-                                         <i class="fa-solid fa-camera"></i> Capture Evidence
+                                 <div style="display: flex; flex-direction: column;">
+                                     <label style="font-size: 0.8rem;">Evidence Image <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
+                                     <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
+                                         <i class="fa-solid fa-camera"></i> ${saved.evidenceImage ? 'Change Image' : 'Attach Photo'}
                                      </button>
-                                     <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="if(this.files.length) alert('Image selected (mock)')">
+                                     <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
                                  </div>
                              </div>
+                             
+                             <!-- Evidence Image Preview -->
+                             <div id="evidence-preview-${uniqueId}" style="display: ${saved.evidenceImage ? 'block' : 'none'}; margin-bottom: 0.5rem;">
+                                 <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
+                                     <img id="evidence-img-${uniqueId}" src="${saved.evidenceImage || ''}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
+                                     <div style="flex: 1;">
+                                         <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;"><i class="fa-solid fa-check-circle"></i> Image attached</p>
+                                         <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">${saved.evidenceSize || ''}</p>
+                                     </div>
+                                     <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                                 </div>
+                             </div>
+                             <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">
+                             
                              <div style="position: relative;">
                                 <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Dictate/Type short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
                                 <button type="button" class="btn btn-sm btn-light" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 5px; top: 5px; color: var(--primary-color); border: 1px solid #ddd;" title="Dictate (10s limit)">
@@ -673,8 +688,14 @@ window.saveChecklist = function (reportId) {
         const ncrDesc = document.getElementById('ncr-desc-' + uniqueId)?.value || '';
         const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
 
+        // Get evidence image data
+        const evidenceImg = document.getElementById('evidence-img-' + uniqueId);
+        const evidenceData = document.getElementById('evidence-data-' + uniqueId)?.value || '';
+        const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
+        const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
+
         // Only save if interacted with
-        if (status || comment || ncrDesc) {
+        if (status || comment || ncrDesc || evidenceImage) {
             checklistData.push({
                 checklistId: input.dataset.checklist,
                 itemIdx: input.dataset.item,
@@ -682,7 +703,9 @@ window.saveChecklist = function (reportId) {
                 status: status,
                 comment: comment,
                 ncrDescription: ncrDesc,
-                ncrType: ncrType
+                ncrType: ncrType,
+                evidenceImage: evidenceImage,
+                evidenceSize: evidenceSize
             });
         }
     });
@@ -1070,6 +1093,144 @@ window.renderExecutionDetail = renderExecutionDetail;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
 window.createCAPA = createCAPA;
+
+// ============================================
+// EVIDENCE IMAGE HANDLING (Compression & Upload)
+// ============================================
+
+// Handle evidence image upload with compression and 5MB limit
+window.handleEvidenceUpload = function (uniqueId, input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        window.showNotification('Please select an image file', 'error');
+        input.value = '';
+        return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+        window.showNotification('Image exceeds 5MB limit. Please select a smaller image.', 'error');
+        input.value = '';
+        return;
+    }
+
+    // Show loading indicator
+    const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+    if (previewDiv) {
+        previewDiv.style.display = 'block';
+        previewDiv.innerHTML = `
+            <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); text-align: center;">
+                <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color);"></i>
+                <span style="margin-left: 0.5rem; font-size: 0.85rem;">Compressing image...</span>
+            </div>
+        `;
+    }
+
+    // Read and compress the image
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+            // Compress the image
+            const compressedDataUrl = compressImage(img, file.type);
+            const compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024); // Approximate KB
+
+            // Update preview
+            if (previewDiv) {
+                previewDiv.style.display = 'block';
+                previewDiv.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
+                        <img id="evidence-img-${uniqueId}" src="${compressedDataUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
+                        <div style="flex: 1;">
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;"><i class="fa-solid fa-check-circle"></i> Image attached</p>
+                            <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">Compressed: ${compressedSize} KB (original: ${Math.round(file.size / 1024)} KB)</p>
+                        </div>
+                        <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            }
+
+            // Mark as attached
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+            if (evidenceData) evidenceData.value = 'attached';
+
+            window.showNotification('Image attached and compressed successfully', 'success');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+// Compress image to reduce storage size
+function compressImage(img, fileType) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Calculate new dimensions (max 800px on longest side)
+    const maxDimension = 800;
+    let width = img.width;
+    let height = img.height;
+
+    if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+        } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+        }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+
+    // Draw and compress
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // Convert to JPEG with 0.7 quality for compression
+    return canvas.toDataURL('image/jpeg', 0.7);
+}
+
+// View evidence image in full size (modal/popup)
+window.viewEvidenceImage = function (uniqueId) {
+    const imgEl = document.getElementById('evidence-img-' + uniqueId);
+    if (!imgEl || !imgEl.src) return;
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'evidence-modal-overlay';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer;';
+    overlay.onclick = function () { overlay.remove(); };
+
+    // Create image container
+    overlay.innerHTML = `
+        <div style="position: relative; max-width: 90%; max-height: 90%;">
+            <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+            <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem;">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+};
+
+// Remove evidence image
+window.removeEvidence = function (uniqueId) {
+    const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+    const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+    const fileInput = document.getElementById('img-' + uniqueId);
+
+    if (previewDiv) previewDiv.style.display = 'none';
+    if (evidenceData) evidenceData.value = '';
+    if (fileInput) fileInput.value = '';
+
+    window.showNotification('Evidence image removed', 'info');
+};
 // Generate Printable Report - Enhanced Version
 window.generateAuditReport = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
