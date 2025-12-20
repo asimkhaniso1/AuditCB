@@ -338,7 +338,7 @@ function updateClientDetails(clientName) {
         const siteSelect = document.getElementById('plan-site-select');
         if (siteSelect && client.sites && client.sites.length > 0) {
             siteSelect.innerHTML = client.sites.map((s, i) =>
-                `< option value = "${i}" > ${s.name} - ${s.city || 'N/A'}</option > `
+                `<option value="${i}">${s.name} - ${s.city || 'N/A'}</option>`
             ).join('');
             siteSelect.style.display = 'block';
         }
@@ -348,14 +348,14 @@ function updateClientDetails(clientName) {
         if (clientInfoPanel) {
             const primaryContact = (client.contacts && client.contacts[0]) || {};
             clientInfoPanel.innerHTML = `
-    < div style = "display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;" >
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
                     <div><strong>Industry:</strong> ${client.industry || '-'}</div>
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
                     <div><strong>Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
                     <div><strong>Contact:</strong> ${primaryContact.name || '-'} (${primaryContact.designation || ''})</div>
                     <div><strong>Website:</strong> ${client.website ? `<a href="${client.website}" target="_blank">${client.website}</a>` : '-'}</div>
-                </div >
+                </div>
     `;
             clientInfoPanel.style.display = 'block';
         }
