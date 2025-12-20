@@ -227,6 +227,7 @@ function renderClientDetail(clientId) {
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Information</button>
                 <button class="tab-btn" data-tab="contacts">Contacts</button>
+                <button class="tab-btn" data-tab="departments">Departments</button>
                 <button class="tab-btn" data-tab="audits">Audits</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
             </div>
@@ -450,6 +451,64 @@ function renderClientTab(client, tabName) {
                         </div>
                     ` : `
                         <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No contact persons added yet.</p>
+                    `}
+                </div>
+            `;
+            break;
+        case 'departments':
+            const departments = client.departments || [];
+            tabContent.innerHTML = `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">
+                                <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="window.addDepartment(${client.id})">
+                                <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Department
+                            </button>
+                        </div>
+                    </div>
+                    ${departments.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Department Name</th>
+                                        <th>Head of Department</th>
+                                        <th>Employee Count</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${departments.map((dept, index) => `
+                                        <tr>
+                                            <td style="font-weight: 500;">${dept.name}</td>
+                                            <td>${dept.head || '-'}</td>
+                                            <td><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i>${dept.employeeCount || 0}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment(${client.id}, ${index})">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
+                            <i class="fa-solid fa-sitemap" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment(${client.id})">Add Manually</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
+                            </div>
+                        </div>
                     `}
                 </div>
             `;
@@ -1281,4 +1340,201 @@ window.initiateAuditPlanFromClient = function (clientName) {
         }
     }, 200);
 };
+
+// Department Management Functions
+function addDepartment(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Add Department',
+        `
+        <form id="dept-form">
+            <div class="form-group">
+                <label>Department Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" id="dept-name" placeholder="e.g., Quality Assurance" required>
+            </div>
+            <div class="form-group">
+                <label>Head of Department</label>
+                <input type="text" id="dept-head" placeholder="e.g., John Doe">
+            </div>
+            <div class="form-group">
+                <label>Employee Count</label>
+                <input type="number" id="dept-employees" placeholder="0" min="0">
+            </div>
+        </form>
+        `,
+        () => {
+            const name = document.getElementById('dept-name').value.trim();
+            if (!name) {
+                window.showNotification('Department name is required', 'error');
+                return;
+            }
+
+            const department = {
+                name,
+                head: document.getElementById('dept-head').value.trim(),
+                employeeCount: parseInt(document.getElementById('dept-employees').value) || 0
+            };
+
+            if (!client.departments) client.departments = [];
+            client.departments.push(department);
+
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            renderClientTab(client, 'departments');
+            window.showNotification('Department added successfully');
+        }
+    );
+}
+
+function editDepartment(clientId, deptIndex) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.departments || !client.departments[deptIndex]) return;
+
+    const dept = client.departments[deptIndex];
+
+    window.openModal(
+        'Edit Department',
+        `
+        <form id="dept-form">
+            <div class="form-group">
+                <label>Department Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" id="dept-name" value="${dept.name}" required>
+            </div>
+            <div class="form-group">
+                <label>Head of Department</label>
+                <input type="text" id="dept-head" value="${dept.head || ''}">
+            </div>
+            <div class="form-group">
+                <label>Employee Count</label>
+                <input type="number" id="dept-employees" value="${dept.employeeCount || 0}" min="0">
+            </div>
+        </form>
+        `,
+        () => {
+            const name = document.getElementById('dept-name').value.trim();
+            if (!name) {
+                window.showNotification('Department name is required', 'error');
+                return;
+            }
+
+            client.departments[deptIndex] = {
+                name,
+                head: document.getElementById('dept-head').value.trim(),
+                employeeCount: parseInt(document.getElementById('dept-employees').value) || 0
+            };
+
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            renderClientTab(client, 'departments');
+            window.showNotification('Department updated successfully');
+        }
+    );
+}
+
+function deleteDepartment(clientId, deptIndex) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client || !client.departments || !client.departments[deptIndex]) return;
+
+    const dept = client.departments[deptIndex];
+
+    if (confirm(`Are you sure you want to delete the department "${dept.name}"?`)) {
+        client.departments.splice(deptIndex, 1);
+        window.saveData();
+        renderClientDetail(clientId);
+        renderClientTab(client, 'departments');
+        window.showNotification('Department deleted successfully');
+    }
+}
+
+function bulkUploadDepartments(clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Upload Departments',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-info-circle"></i> Paste department list in CSV format (one per line):
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
+                Department Name, Head of Department, Employee Count<br>
+                Quality Assurance, John Doe, 15<br>
+                Production, Jane Smith, 50<br>
+                Human Resources, Bob Johnson, 8
+            </p>
+        </div>
+        <form id="bulk-dept-form">
+            <div class="form-group">
+                <label>Department List (CSV Format)</label>
+                <textarea id="dept-bulk-data" rows="10" placeholder="Quality Assurance, John Doe, 15
+Production, Jane Smith, 50
+Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+                    <input type="checkbox" id="dept-replace" style="width: auto;">
+                    Replace existing departments (otherwise, append to existing list)
+                </label>
+            </div>
+        </form>
+        `,
+        () => {
+            const bulkData = document.getElementById('dept-bulk-data').value.trim();
+            const replace = document.getElementById('dept-replace').checked;
+
+            if (!bulkData) {
+                window.showNotification('Please enter department data', 'error');
+                return;
+            }
+
+            const lines = bulkData.split('\n').filter(line => line.trim());
+            const newDepartments = [];
+            let errors = 0;
+
+            lines.forEach((line, index) => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 1 && parts[0]) {
+                    newDepartments.push({
+                        name: parts[0],
+                        head: parts[1] || '',
+                        employeeCount: parseInt(parts[2]) || 0
+                    });
+                } else {
+                    errors++;
+                }
+            });
+
+            if (newDepartments.length === 0) {
+                window.showNotification('No valid departments found in the data', 'error');
+                return;
+            }
+
+            if (replace) {
+                client.departments = newDepartments;
+            } else {
+                if (!client.departments) client.departments = [];
+                client.departments.push(...newDepartments);
+            }
+
+            window.saveData();
+            window.closeModal();
+            renderClientDetail(clientId);
+            renderClientTab(client, 'departments');
+
+            const message = `${newDepartments.length} department(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+            window.showNotification(message);
+        }
+    );
+}
+
+// Export department functions
+window.addDepartment = addDepartment;
+window.editDepartment = editDepartment;
+window.deleteDepartment = deleteDepartment;
+window.bulkUploadDepartments = bulkUploadDepartments;
 
