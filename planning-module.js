@@ -636,182 +636,174 @@ function viewAuditPlan(id) {
     `;
     }).join('') : '<p style="color: var(--text-secondary); font-style: italic;">No checklists assigned.</p>';
 
+    // --- UI REDESIGN ---
+    // Stepper Calculation
+    const phases = ['Draft', 'Confirmed', 'In Progress', 'Reporting', 'Completed']; // Mapping logic might need adjustment based on statuses
+
+    // Determine active step (0-indexed)
+    let activeStep = 0;
+    if (plan.status === 'Draft') activeStep = 0;
+    else if (plan.status === 'Confirmed') {
+        activeStep = 1;
+        if (totalItems > 0) activeStep = 1; // Checklists assigned
+    }
+    else if (plan.status === 'In Progress' || progress > 0) activeStep = 2;
+    // For Reporting/Closing, we might need to check report status
+    if (report) activeStep = 3;
+    if (plan.status === 'Completed') activeStep = 4;
+
+    const stepperHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative;">
+            <div style="position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: #e2e8f0; z-index: 0;"></div>
+            ${['Plan Created', 'Checklists Ready', 'Execution', 'Reporting', 'Audit Closed'].map((step, index) => {
+        const isActive = index <= activeStep;
+        const isCurrent = index === activeStep;
+        const color = isActive ? 'var(--primary-color)' : '#94a3b8';
+        const bgColor = isActive ? 'var(--primary-color)' : '#e2e8f0';
+
+        return `
+                <div style="position: relative; z-index: 1; text-align: center; flex: 1;">
+                    <div style="width: 30px; height: 30px; border-radius: 50%; background: ${bgColor}; color: ${isActive ? 'white' : '#64748b'}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-weight: bold; font-size: 0.9rem; border: 4px solid white;">
+                        ${isActive ? '<i class="fa-solid fa-check"></i>' : index + 1}
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.85rem; font-weight: ${isCurrent ? 'bold' : 'normal'}; color: ${isCurrent ? 'var(--primary-color)' : '#64748b'};">${step}</div>
+                </div>
+                `;
+    }).join('')}
+        </div>
+    `;
+
     const html = `
     <div class="fade-in">
-            <!--Header -->
+            <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
-                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back
-                </button>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.5rem;">${plan.client}</h2>
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Audit Plan Details • ${plan.standard}</span>
+                    </div>
+                </div>
                 <div style="display: flex; gap: 1rem;">
-                     ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan(${plan.id})"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Checklist</button>` : ''}
+                     ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan(${plan.id})"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
                      <button class="btn btn-secondary" onclick="printAuditPlanDetails(${plan.id})"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
-                     <button class="btn btn-primary" onclick="editAuditPlan(${plan.id})"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Plan</button>
+                     <button class="btn btn-primary" onclick="editAuditPlan(${plan.id})"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
                 </div>
             </div>
 
-            <!--Title & Status-- >
-            <div style="margin-bottom: 2rem;">
-                 <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">${plan.client} <span style="font-weight: 300; color: var(--text-secondary);">Audit Plan</span></h2>
-                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <span class="status-badge status-${plan.status.toLowerCase()}">${plan.status}</span>
-                    <span style="color: var(--text-secondary);"><i class="fa-solid fa-calendar" style="margin-right: 0.25rem;"></i> ${plan.date}</span>
-                    <span style="color: var(--text-secondary);"><i class="fa-solid fa-book" style="margin-right: 0.25rem;"></i> ${plan.standard}</span>
-                 </div>
-            </div>
-
-            <!--Progress Bar-- >
-            <div class="card" style="margin-bottom: 2rem;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <strong>Audit Progress</strong>
-                    <strong>${progress}%</strong>
-                </div>
-                <div style="height: 1.5rem; background: #e2e8f0; border-radius: 1rem; overflow: hidden;">
-                    <div style="width: ${progress}%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); height: 100%; transition: width 0.5s ease; text-align: center; color: white; font-size: 0.8rem; line-height: 1.5rem;">${progress > 5 ? progress + '%' : ''}</div>
-                </div>
-                <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
-                    <i class="fa-solid fa-check-circle" style="margin-right: 0.25rem;"></i> ${completedItems} / ${totalItems} checklist items verified
-                </p>
-            </div>
+            <!-- Stepper -->
+            ${stepperHTML}
             
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+            <!-- Details Grid (Row 1) -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
                 
-                <!-- Left Column Main Content -->
-                <div style="display: flex; flex-direction: column; gap: 2rem;">
-                    
-                    <!-- Configuration Checklist Block -->
-                    <div class="card">
-                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h3 style="margin: 0;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Configuration Checklists</h3>
-                            <div>
-                                <button class="btn btn-sm btn-outline-primary" style="margin-right: 0.5rem;" onclick="window.printAuditPlan('${plan.id}')">
-                                    <i class="fa-solid fa-print"></i> Print
-                                </button>
-                                <button class="btn btn-sm btn-secondary" onclick="openChecklistSelectionModal(${plan.id})">
-                                    <i class="fa-solid fa-cog" style="margin-right: 0.25rem;"></i> Configure
-                                </button>
-                            </div>
-                        </div>
-                        ${checklistListHTML}
-                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
-                            <strong>${totalItems}</strong> total items assigned
-                        </div>
-                    </div>
-
-                    <!-- Execution Block -->
-                    <div class="card" style="border-left: 5px solid var(--success-color);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                             <h3 style="margin: 0;"><i class="fa-solid fa-play" style="margin-right: 0.5rem; color: var(--success-color);"></i> Audit Execution</h3>
-                        </div>
-                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Manage the execution phase, verify checklists, raise NCRs, and collect evidence.</p>
-                        <button class="btn btn-primary" style="width: 100%;" onclick="window.renderModule('audit-execution')">
-                            Go to Execution Panel <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- Reporting Block -->
-                    <div class="card">
-                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-file-lines" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Reporting</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                            <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md);">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: var(--danger-color);">${report?.ncrs?.length || 0}</div>
-                                <div style="font-size: 0.85rem; color: var(--text-secondary);">NCRs Raised</div>
-                            </div>
-                             <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md);">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: var(--warning-color);">${report?.capas?.length || 0}</div>
-                                <div style="font-size: 0.85rem; color: var(--text-secondary);">CAPAs Required</div>
-                            </div>
-                        </div>
-                         <div style="padding: 1rem; background: #f1f5f9; border-radius: var(--radius-md);">
-                            <strong>Final Conclusion:</strong>
-                            <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-style: italic;">
-                                ${report?.conclusion || 'No conclusion finalized yet.'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Closing Block -->
-                    <div class="card">
-                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-check-double" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Closing</h3>
-                         ${plan.status === 'Completed' ? `
-                            <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); text-align: center;">
-                                <i class="fa-solid fa-certificate" style="font-size: 2rem; color: var(--success-color); margin-bottom: 0.5rem;"></i>
-                                <h4 style="margin: 0; color: var(--success-color);">Audit Closed Successfully</h4>
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">Certificate Issued on ${plan.date}</p>
-                                <button class="btn btn-sm btn-outline-primary" onclick="window.showNotification('Certificate generated (mock)')">
-                                    <i class="fa-solid fa-file-pdf"></i> View Certificate
-                                </button>
-                            </div>
-                        ` : `
-                            <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); text-align: center;">
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
-                                    ${report?.status === 'Finalized'
-            ? 'Audit report is finalized. Ready to close audit.'
-            : 'Waiting for report finalization.'}
-                                </p>
-                                <button class="btn btn-success" ${report?.status !== 'Finalized' ? 'disabled' : ''} onclick="closeAuditPlan(${plan.id})">
-                                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> Close Audit Loop
-                                </button>
-                            </div>
-                        `}
+                <!-- Client Info -->
+                <div class="card" style="margin: 0;">
+                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Client Information</h4>
+                    <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">${client?.name}</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                        <div><i class="fa-solid fa-industry" style="width: 20px;"></i> ${client?.industry || 'N/A'}</div>
+                        <div style="margin-top: 0.25rem;"><i class="fa-solid fa-users" style="width: 20px;"></i> ${client?.employees || 0} employees</div>
                     </div>
                 </div>
 
-                <!-- Right Column Side Info -->
-                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                     <!-- Client Info -->
-                     <div class="card">
-                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Client</h3>
-                        <p style="margin-bottom: 0.5rem;"><strong>${client?.name}</strong></p>
-                        <div style="font-size: 0.9rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.5rem;">
-                            <div><i class="fa-solid fa-industry" style="width: 20px;"></i> ${client?.industry || '-'}</div>
-                            <div><i class="fa-solid fa-users" style="width: 20px;"></i> ${client?.employees || 0} employees</div>
-                            <div><i class="fa-solid fa-map-marker-alt" style="width: 20px;"></i> ${client?.sites?.length || 1} sites total</div>
+                <!-- Scope/Sites -->
+                <div class="card" style="margin: 0;">
+                   <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Audit Scope</h4>
+                   <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">${plan.selectedSites?.length || 1} Site(s)</div>
+                   <div style="font-size: 0.9rem; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
+                        ${(plan.selectedSites || []).map(s => `<div>• ${s.name}</div>`).join('') || 'All Sites'}
+                   </div>
+                </div>
+
+                <!-- Team -->
+                <div class="card" style="margin: 0;">
+                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Audit Team</h4>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(m => `
+                             <span style="background: #f1f5f9; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem;">${m}</span>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Stages Grid (Row 2) -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
+                
+                <!-- 1. Configuration -->
+                <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                    <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Checklist Config</h3>
+                    <div style="flex: 1; margin-bottom: 1rem;">
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Assign and customize checklists for this audit.</p>
+                        <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditPlan('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
+                        <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="openChecklistSelectionModal(${plan.id})">Configure</button>
+                    </div>
+                </div>
+
+                <!-- 2. Execution -->
+                <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid var(--success-color);">
+                     <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-play" style="margin-right: 0.5rem; color: var(--success-color);"></i> Execution</h3>
+                     <div style="flex: 1; margin-bottom: 1rem;">
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Verify items, raise NCRs.</p>
+                        <!-- Mini Progress -->
+                        <div style="margin-top: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
+                                <span>Progress</span>
+                                <span>${progress}%</span>
+                            </div>
+                            <div style="height: 6px; background: #e2e8f0; border-radius: 3px;">
+                                <div style="width: ${progress}%; background: var(--success-color); height: 100%; border-radius: 3px;"></div>
+                            </div>
                         </div>
                      </div>
+                     <button class="btn btn-primary" style="width: 100%;" onclick="window.renderModule('audit-execution')">Execute</button>
+                </div>
 
-                     <!-- Audit Sites (Scope) -->
-                     <div class="card">
-                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Sites <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">(in scope)</span></h3>
-                        ${(plan.selectedSites && plan.selectedSites.length > 0) ? `
-                            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                ${plan.selectedSites.map(site => `
-                                    <div style="padding: 0.5rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
-                                        <div style="font-weight: 500; font-size: 0.9rem;">${site.name}</div>
-                                        ${site.geotag ? `<div style="font-size: 0.75rem; color: #0369a1;"><i class="fa-solid fa-map-pin"></i> GPS: ${site.geotag}</div>` : ''}
-                                    </div>
-                                `).join('')}
+                <!-- 3. Reporting -->
+                <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                    <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-edit" style="margin-right: 0.5rem; color: orange;"></i> Reporting</h3>
+                    <div style="flex: 1; margin-bottom: 1rem;">
+                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: center;">
+                            <div style="background: #fef2f2; padding: 0.5rem; border-radius: 4px;">
+                                <div style="font-weight: bold; color: var(--danger-color);">${report?.ncrs?.length || 0}</div>
+                                <div style="font-size: 0.75rem;">NCRs</div>
                             </div>
-                            <div style="margin-top: 0.75rem; padding: 0.5rem; background: #e0f2fe; border-radius: var(--radius-sm); text-align: center; font-size: 0.85rem;">
-                                <strong>${plan.selectedSites.length}</strong> site(s) in audit scope
+                            <div style="background: #fffbeb; padding: 0.5rem; border-radius: 4px;">
+                                <div style="font-weight: bold; color: var(--warning-color);">${report?.capas?.length || 0}</div>
+                                <div style="font-size: 0.75rem;">CAPAs</div>
                             </div>
-                        ` : `
-                            <p style="color: var(--text-secondary); font-style: italic; margin: 0;">All sites (legacy plan)</p>
-                        `}
-                     </div>
-
-                     <!-- Audit Team -->
-                     <div class="card">
-                        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-users-gear" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Team</h3>
-                         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map((m, i) => `
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <div style="width: 30px; height: 30px; background: ${i === 0 ? 'var(--primary-color)' : '#e2e8f0'}; color: ${i === 0 ? 'white' : 'var(--text-secondary)'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
-                                        <i class="fa-solid fa-user"></i>
-                                    </div>
-                                    <span style="font-size: 0.9rem;">${m}</span>
-                                    ${i === 0 ? '<span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: auto;">Lead Auditor</span>' : ''}
-                                </div>
-                            `).join('')}
                          </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; font-style: italic;">
+                         ${report?.status === 'Finalized' ? 'Report Finalized' : 'Draft Report'}
+                    </div>
+                </div>
+
+                <!-- 4. Closing -->
+                <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                     <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-flag-checkered" style="margin-right: 0.5rem; color: #64748b;"></i> Closing</h3>
+                     <div style="flex: 1; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
+                        ${plan.status === 'Completed' ?
+            '<div style="text-align: center; color: var(--success-color);"><i class="fa-solid fa-certificate" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Certified</div></div>' :
+            '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>'
+        }
                      </div>
+                     <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} onclick="closeAuditPlan(${plan.id})" style="width: 100%;">
+                        ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
+                     </button>
                 </div>
 
             </div>
-        </div >
+    </div>
     `;
     window.contentArea.innerHTML = html;
 }
+
 
 window.printAuditPlanDetails = function (planId) {
     const plan = state.auditPlans.find(p => p.id == planId);
