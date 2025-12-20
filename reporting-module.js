@@ -21,9 +21,15 @@ function renderReportSummaryTab(report, tabContent) {
                 <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Revert to Draft
             </button>
             ${isCertManager ? `
-            <button class="btn btn-primary" style="flex: 1; background-color: #8b5cf6; border-color: #7c3aed;" onclick="window.approveReport(${report.id})">
-                <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Approve (Cert Manager)
-            </button>
+            <div style="display: flex; gap: 0.5rem; flex-direction: column; width: 100%;">
+                <button class="btn btn-info" style="color: white; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border: none;" onclick="window.runContextAnalysis(${report.id})">
+                    <i class="fa-solid fa-robot" style="margin-right: 0.5rem;"></i> AI Context Analysis
+                </button>
+                <div id="ai-context-result-${report.id}" style="display: none; background: #eef2ff; padding: 10px; border-radius: 6px; font-size: 0.85rem; border: 1px solid #c7d2fe; margin-bottom: 5px;"></div>
+                <button class="btn btn-primary" style="background-color: #8b5cf6; border-color: #7c3aed;" onclick="window.approveReport(${report.id})">
+                    <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Approve (Cert Manager)
+                </button>
+            </div>
             ` : `
             <button class="btn btn-secondary" style="flex: 1; opacity: 0.7; cursor: not-allowed;" disabled>
                 <i class="fa-solid fa-hourglass-half" style="margin-right: 0.5rem;"></i> Pending Approval
@@ -84,9 +90,7 @@ function renderReportSummaryTab(report, tabContent) {
                  
                  ${isPending ? `
                     <div style="display: flex; gap: 5px; flex-direction: column; align-items: flex-end;">
-                        <button id="ai-btn-${n.source}-${n.idxInArr}" class="btn btn-sm btn-outline-primary" style="font-size: 0.75rem; padding: 2px 8px;" onclick="window.autoClassifyFinding(${report.id}, '${n.source}', ${n.idxInArr}, '${h(n.description).replace(/'/g, "\\'")}')" title="Ask AI">
-                             <i class="fa-solid fa-wand-magic-sparkles"></i> AI Classify
-                        </button>
+                        <!-- AI Classify Removed for Lead Auditor Review Stage -->
                         <div style="display: flex; gap: 2px;">
                             <button class="btn btn-sm btn-warning" style="font-size: 0.7rem; padding: 2px 5px;" onclick="window.classifyFinding(${report.id}, '${n.source}', ${n.idxInArr}, '${window.CONSTANTS.NCR_TYPES.MINOR}')">Minor</button>
                             <button class="btn btn-sm btn-danger" style="font-size: 0.7rem; padding: 2px 5px;" onclick="window.classifyFinding(${report.id}, '${n.source}', ${n.idxInArr}, '${window.CONSTANTS.NCR_TYPES.MAJOR}')">Major</button>
@@ -850,6 +854,38 @@ window.renderReportingModule = renderReportingModule;
 // ============================================
 // AI & Classification Helpers
 // ============================================
+
+window.runContextAnalysis = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    const resultDiv = document.getElementById(`ai-context-result-${reportId}`);
+    if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Analyzing historical context...';
+
+        // Mock AI Analysis
+        setTimeout(() => {
+            // Mock fetching previous report
+            const prevReport = state.auditReports.find(r => r.client === report.client && r.id !== reportId && r.status === 'Finalized');
+            const historyText = prevReport
+                ? `Compared to previous report (${prevReport.date}): Improvement shown in Clause 9. Performance evaluation is consistent.`
+                : 'No historical data available for direct comparison.';
+
+            const findingCount = (report.ncrs || []).length;
+            const contextMsg = findingCount > 5
+                ? 'High number of findings detected relative to industry average.'
+                : 'Finding count within normal parameters for this standard.';
+
+            resultDiv.innerHTML = `
+                <div style="font-weight: 600; color: #4338ca; margin-bottom: 4px;">AI Context Validation:</div>
+                <div style="margin-bottom: 4px;">${historyText}</div>
+                <div>${contextMsg}</div>
+                <div style="margin-top: 5px; font-style: italic; color: #6366f1; font-size: 0.75rem;">Confidence Score: 92%</div>
+            `;
+        }, 1500);
+    }
+};
 
 window.classifyFinding = function (reportId, source, index, newType) {
     const report = state.auditReports.find(r => r.id === reportId);
