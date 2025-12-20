@@ -106,7 +106,10 @@
         </div>
     </div>
 
-    <!-- Core Modules -->
+    <!-- Load core script FIRST to initialize window.state -->
+    <script src="script.js?v=7"></script>
+
+    <!-- Core Modules (loaded after state is initialized) -->
     <script src="advanced-modules.js"></script>
     <script src="planning-module.js"></script>
     <script src="execution-module.js"></script>
@@ -119,7 +122,6 @@
     <script src="settings-module.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="script.js?v=6"></script>
 </body>
 
 </html>
