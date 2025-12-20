@@ -40,11 +40,11 @@ function renderAuditPlanningEnhanced() {
                     <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                 </button>
             </td>
-        </tr >
+        </tr>
     `).join('');
 
     const html = `
-    < div class="fade-in" >
+        <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Planning <span style="font-size: 0.8rem; color: var(--text-secondary);">(v5.1)</span></h2>
             </div>
@@ -53,13 +53,13 @@ function renderAuditPlanningEnhanced() {
                     <input type="text" id="plan-search" placeholder="Search audit plans..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
                     <select id="plan-filter" style="max-width: 150px; margin-bottom: 0;">
                         <option value="all">All Status</option>
-                        <option value="Draft">Draft</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Completed">Completed</option>
+                        <option value="draft">Draft</option>
+                        <option value="approved">Approved</option>
+                        <option value="completed">Completed</option>
                     </select>
                 </div>
                 <button id="btn-create-plan" class="btn btn-primary">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Audit Plan
+                    <i class="fa-solid fa-plus"></i> Create Audit Plan
                 </button>
             </div>
 
@@ -80,10 +80,10 @@ function renderAuditPlanningEnhanced() {
                     </tbody>
                 </table>
             </div>
-        </div >
+        </div>
     `;
 
-    window.window.contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
     // Event listeners
     document.getElementById('btn-create-plan')?.addEventListener('click', openCreatePlanModal);
