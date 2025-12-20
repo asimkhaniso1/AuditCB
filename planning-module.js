@@ -821,11 +821,13 @@ function viewAuditPlan(id) {
                             </div>
                         </div>
                      </div>
-                     <button class="btn btn-primary" style="width: 100%;" onclick="window.renderModule('audit-execution')">Execute</button>
+                     <button class="btn btn-primary" style="width: 100%;" onclick="window.navigateToAuditExecution(${plan.id})">
+                        ${report ? 'Continue Audit' : 'Start Audit'}
+                     </button>
                 </div>
 
                 <!-- 3. Reporting -->
-                <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid orange;">
                     <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-edit" style="margin-right: 0.5rem; color: orange;"></i> Reporting</h3>
                     <div style="flex: 1; margin-bottom: 1rem;">
                          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: center;">
@@ -839,9 +841,11 @@ function viewAuditPlan(id) {
                             </div>
                          </div>
                     </div>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; font-style: italic;">
-                         ${report?.status === 'Finalized' ? 'Report Finalized' : 'Draft Report'}
-                    </div>
+                    ${report ? `
+                    <button class="btn btn-secondary" style="width: 100%;" onclick="window.navigateToReporting(${plan.id})">
+                        ${report.status === 'Finalized' ? 'View Final Report' : 'Draft Report'}
+                    </button>
+                    ` : '<div style="text-align:center; font-size:0.8rem; color:#aaa;">Pending Execution</div>'}
                 </div>
 
                 <!-- 4. Closing -->
@@ -1788,6 +1792,41 @@ window.openCreatePlanModal = openCreatePlanModal;
 window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
 window.editAuditPlan = editAuditPlan;
 window.viewAuditPlan = viewAuditPlan;
+
+// Navigation Helpers (Integrated Lifecycle)
+window.navigateToAuditExecution = function (planId) {
+    const report = window.state.auditReports.find(r => r.planId === planId);
+
+    // Switch to execution tab
+    const tab = document.querySelector('[data-module="audit-execution"]');
+    if (tab) tab.click();
+
+    setTimeout(() => {
+        if (report) {
+            // Open specific audit
+            if (window.renderExecutionDetail) window.renderExecutionDetail(report.id);
+        } else {
+            // Suggest creating one
+            window.showNotification('Plan selected. Click "Start Audit" to begin checklisting.', 'info');
+        }
+    }, 200);
+};
+
+window.navigateToReporting = function (planId) {
+    const report = window.state.auditReports.find(r => r.planId === planId);
+    if (!report) {
+        window.showNotification('No report data found. Please complete execution first.', 'warning');
+        return;
+    }
+
+    // Switch to reporting tab
+    const tab = document.querySelector('[data-module="audit-reporting"]');
+    if (tab) tab.click();
+
+    setTimeout(() => {
+        if (window.openReportingDetail) window.openReportingDetail(report.id);
+    }, 200);
+};
 window.updateClientDetails = updateClientDetails;
 window.autoCalculateDays = autoCalculateDays;
 
