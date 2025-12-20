@@ -137,15 +137,15 @@ function openCreatePlanModal() {
                     </select>
                 </div>
 
-                <!-- Standard -->
+                <!-- Standard (Multi-select) -->
                 <div class="form-group">
-                    <label>Audit Standard</label>
-                    <select class="form-control" id="plan-standard">
-                        <option value="ISO 9001:2015">ISO 9001:2015</option>
-                        <option value="ISO 14001:2015">ISO 14001:2015</option>
-                        <option value="ISO 45001:2018">ISO 45001:2018</option>
-                        <option value="ISO 27001:2022">ISO 27001:2022</option>
+                    <label>Audit Standard(s)</label>
+                    <select class="form-control" id="plan-standard" multiple style="height: 120px;">
+                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+        `<option value="${std}">${std}</option>`
+    ).join('')}
                     </select>
+                    <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple standards</small>
                 </div>
 
                 <!-- Client Info Panel -->
@@ -269,7 +269,14 @@ function editAuditPlan(id) {
     setTimeout(() => {
         document.getElementById('modal-title').textContent = 'Edit Audit Plan';
         document.getElementById('plan-client').value = plan.client;
-        document.getElementById('plan-standard').value = plan.standard || '';
+        document.getElementById('plan-client').value = plan.client;
+
+        // Handle Multi-Standards selection
+        const currentStandards = (plan.standard || '').split(', ');
+        Array.from(document.getElementById('plan-standard').options).forEach(opt => {
+            opt.selected = currentStandards.includes(opt.value);
+        });
+
         document.getElementById('plan-type').value = plan.type || 'Surveillance';
         document.getElementById('plan-date').value = plan.date;
 
@@ -310,7 +317,7 @@ function editAuditPlan(id) {
             const updatedDate = document.getElementById('plan-date').value;
             const updatedLead = document.getElementById('plan-lead-auditor').value;
             const updatedType = document.getElementById('plan-type').value;
-            const updatedStandard = document.getElementById('plan-standard').value;
+            const updatedStandard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
             const updatedManDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
             const updatedOnsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 
@@ -355,7 +362,13 @@ function updateClientDetails(clientName) {
         // Auto-select standard
         if (client.standard) {
             const stdSelect = document.getElementById('plan-standard');
-            if (stdSelect) stdSelect.value = client.standard;
+            if (stdSelect) {
+                // Determine if client standard is single or comma-separated
+                const clientStds = (client.standard || '').split(', ');
+                Array.from(stdSelect.options).forEach(opt => {
+                    opt.selected = clientStds.includes(opt.value);
+                });
+            }
         }
 
         // Auto-fill calculation params
@@ -525,7 +538,7 @@ function saveAuditPlan() {
     const date = document.getElementById('plan-date').value;
     const lead = document.getElementById('plan-lead-auditor').value;
     const type = document.getElementById('plan-type').value;
-    const standard = document.getElementById('plan-standard').value;
+    const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
     const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
     const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 

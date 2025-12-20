@@ -1245,9 +1245,37 @@ window.generateAuditReport = function (reportId) {
     try {
         const plan = state.auditPlans.find(p => p.client === report.client) || {};
         const client = state.clients.find(c => c.name === report.client) || {};
-        const ncrCount = (report.ncrs || []).length;
-        const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
-        const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
+        // Combine Manual NCRs and Checklist Progress NCs
+        const manualNCRs = report.ncrs || [];
+        const checklistNCRs = (report.checklistProgress || [])
+            .filter(item => item.status === 'nc')
+            .map(item => {
+                let clause = 'Checklist Item';
+                if (item.checklistId) {
+                    const cl = state.checklists.find(c => c.id == item.checklistId);
+                    const clItem = cl?.items?.[item.itemIdx];
+                    if (clItem) clause = clItem.clause;
+                } else if (item.isCustom) {
+                    const customItem = (report.customItems || [])[item.itemIdx];
+                    if (customItem) clause = customItem.clause;
+                }
+
+                return {
+                    type: item.ncrType || 'minor',
+                    clause: clause,
+                    description: item.ncrDescription || item.comment || 'Non-conformity identified in checklist.',
+                    evidence: 'Checklist Finding',
+                    transcript: item.transcript,
+                    evidenceImage: item.evidenceImage,
+                    status: 'Open'
+                };
+            });
+
+        const combinedNCRs = [...manualNCRs, ...checklistNCRs];
+
+        const ncrCount = combinedNCRs.length;
+        const majorCount = combinedNCRs.filter(n => n.type === 'major').length;
+        const minorCount = combinedNCRs.filter(n => n.type === 'minor').length;
         const capaCount = (report.capas || []).length;
 
         // Calculate checklist progress
@@ -1461,7 +1489,8 @@ window.generateAuditReport = function (reportId) {
 
                 <h1>4. Detailed Findings and Evidence</h1>
                 ${ncrCount === 0 ? '<p style="background: #ecfdf5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;"><i class="fa-solid fa-circle-check" style="color: #10b981; margin-right: 8px;"></i><strong>No non-conformities were raised during this audit.</strong> The management system was found to be in full compliance with the standard requirements.</p>' : ''}
-                ${(report.ncrs || []).map((ncr, i) => `
+
+                ${combinedNCRs.map((ncr, i) => `
                     <div class="finding-box ${ncr.type === 'major' ? 'finding-major' : 'finding-minor'}">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.05);">
                             <div style="font-weight: 700; font-size: 1.1rem;"><i class="fa-solid fa-exclamation-triangle" style="margin-right: 8px;"></i>Finding #${String(i + 1).padStart(3, '0')}</div>
