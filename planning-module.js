@@ -186,22 +186,19 @@ function openCreatePlanModal() {
             <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h4 style="margin: 0; font-size: 0.95rem; color: var(--primary-color);">
-                        <i class="fa-solid fa-calculator" style="margin-right: 0.5rem;"></i> Audit Duration
+                        <i class="fa-solid fa-calculator" style="margin-right: 0.5rem;"></i> Audit Duration (ISO 17021-1)
                     </h4>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="autoCalculateDays()">
-                        Auto-Calculate
-                    </button>
                 </div>
                 
-                <!-- Calculation Parameters (Hidden or Visible) -->
+                <!-- Calculation Parameters -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label style="font-size: 0.8rem;">Employees</label>
-                        <input type="number" class="form-control" id="plan-employees" placeholder="Count">
+                        <input type="number" class="form-control" id="plan-employees" placeholder="Count" readonly style="background: #f1f5f9;">
                     </div>
                      <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.8rem;">Sites</label>
-                        <input type="number" class="form-control" id="plan-sites" value="1">
+                        <label style="font-size: 0.8rem;">Sites (selected)</label>
+                        <input type="number" class="form-control" id="plan-sites" value="0" readonly style="background: #f1f5f9;">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label style="font-size: 0.8rem;">Risk/Complexity</label>
@@ -213,14 +210,20 @@ function openCreatePlanModal() {
                     </div>
                 </div>
 
+                <!-- Calculate Button -->
+                <button type="button" id="btn-calculate-mandays" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" onclick="autoCalculateDays()" disabled>
+                    <i class="fa-solid fa-calculator" style="margin-right: 0.5rem;"></i> Calculate Man-Days
+                </button>
+                <p id="manday-hint" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; margin-bottom: 1rem;"><i class="fa-solid fa-info-circle"></i> Select site(s) above to enable calculation</p>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label style="font-size: 0.85rem;">Total Man-Days</label>
-                        <input type="number" class="form-control" id="plan-mandays" step="0.5" placeholder="0.0">
+                        <input type="number" class="form-control" id="plan-mandays" step="0.5" placeholder="--">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label style="font-size: 0.85rem;">On-Site Days</label>
-                        <input type="number" class="form-control" id="plan-onsite-days" step="0.5" placeholder="0.0">
+                        <input type="number" class="form-control" id="plan-onsite-days" step="0.5" placeholder="--">
                     </div>
                 </div>
             </div>
@@ -395,9 +398,14 @@ function updateClientDetails(clientName) {
                     if (document.getElementById('plan-sites')) {
                         document.getElementById('plan-sites').value = count;
                     }
-                    // Optionally auto-recalculate
-                    if (typeof autoCalculateDays === 'function') {
-                        autoCalculateDays();
+                    // Enable/disable calculate button based on site selection
+                    const calcBtn = document.getElementById('btn-calculate-mandays');
+                    const hint = document.getElementById('manday-hint');
+                    if (calcBtn) {
+                        calcBtn.disabled = count === 0;
+                        if (hint) {
+                            hint.style.display = count > 0 ? 'none' : 'block';
+                        }
                     }
                 });
             });
@@ -422,9 +430,13 @@ function updateClientDetails(clientName) {
             clientInfoPanel.style.display = 'block';
         }
 
-        // Trigger calculation automatically if we have data
-        if (client.employees && window.calculateManDays) {
-            autoCalculateDays();
+        // Enable calculate button if sites are selected
+        const selectedSites = document.querySelectorAll('.site-checkbox:checked').length;
+        const calcBtn = document.getElementById('btn-calculate-mandays');
+        const hint = document.getElementById('manday-hint');
+        if (calcBtn && selectedSites > 0) {
+            calcBtn.disabled = false;
+            if (hint) hint.style.display = 'none';
         }
     } else {
         if (siteGroup) siteGroup.style.display = 'none';
