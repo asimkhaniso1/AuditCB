@@ -37,8 +37,8 @@ function renderCertificationModule() {
     // Simplified logic: Check if report is finalized & recommendation is 'Recommend Certification'
     const pendingDecisions = window.state.auditReports.filter(r =>
         r.status === window.CONSTANTS.STATUS.FINALIZED &&
-        r.recommendation === window.CONSTANTS.RECOMMENDATIONS.RECOMMEND &&
-        !certs.find(c => c.client === r.client && c.issueDate === r.date) // Simple dedupe check
+        [window.CONSTANTS.RECOMMENDATIONS.RECOMMEND, window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL].includes(r.recommendation) &&
+        !certs.find(c => c.client === r.client && c.issueDate === r.date)
     );
 
     contentArea.innerHTML = `
