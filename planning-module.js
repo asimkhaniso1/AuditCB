@@ -478,7 +478,7 @@ function viewAuditPlan(id) {
         const cl = checklists.find(c => c.id === clId);
         if (!cl) return '';
         return `
-    < div style = "display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;" >
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
                 <div>
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
@@ -486,13 +486,13 @@ function viewAuditPlan(id) {
                 <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
                     <i class="fa-solid fa-eye"></i>
                 </button>
-            </div >
+            </div>
     `;
     }).join('') : '<p style="color: var(--text-secondary); font-style: italic;">No checklists assigned.</p>';
 
     const html = `
-    < div class="fade-in" >
-            < !--Header -->
+    <div class="fade-in">
+            <!--Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back
