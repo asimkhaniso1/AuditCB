@@ -240,7 +240,7 @@ function openCreatePlanModal() {
 
                     <div class="form-group">
                         <label>Planned Date</label>
-                        <input type="date" class="form-control" id="plan-date" min="${new Date().toISOString().split('T')[0]}" required>
+                        <input type="date" class="form-control" id="plan-date" required>
                     </div>
                 </div>
 
