@@ -382,3 +382,58 @@ window.restoreCertificate = function (certId) {
         renderCertificationModule();
     }
 };
+
+window.printCertificateRegister = function () {
+    const certs = window.state.certifications;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Certificate Register</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; }
+                h1 { text-align: center; color: #2c3e50; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                th { background-color: #f8f9fa; font-weight: 600; color: #2c3e50; }
+                tr:nth-child(even) { background-color: #f9f9f9; }
+                .status-valid { color: green; font-weight: bold; }
+                .status-suspended { color: orange; font-weight: bold; }
+                .status-withdrawn { color: red; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <h1>Certificate Register</h1>
+            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Certificate ID</th>
+                        <th>Client Organization</th>
+                        <th>Standard</th>
+                        <th>Status</th>
+                        <th>Issue Date</th>
+                        <th>Expiry Date</th>
+                        <th>Scope</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${certs.map(c => `
+                        <tr>
+                            <td>${c.id}</td>
+                            <td>${c.client}</td>
+                            <td>${c.standard}</td>
+                            <td class="status-${c.status.toLowerCase()}">${c.status}</td>
+                            <td>${c.issueDate}</td>
+                            <td>${c.expiryDate}</td>
+                            <td>${c.scope}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <script>setTimeout(() => window.print(), 500);</script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
