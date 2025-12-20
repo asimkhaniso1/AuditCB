@@ -805,19 +805,19 @@ function renderReportingModule() {
             <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
                 <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe;">
                     <div style="font-weight: 600; color: #1d4ed8; margin-bottom: 0.5rem;"><i class="fa-solid fa-pen-ruler"></i> Draft</div>
-                    <div style="font-size: 0.85rem;">Auditors verify findings and draft the report content. Summary, Strengths, and Improvements are added here.</div>
+                    <div style="font-size: 0.85rem;">Auditors consolidate findings and draft the initial report content.</div>
                 </div>
                  <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px solid #fed7aa;">
-                    <div style="font-weight: 600; color: #c2410c; margin-bottom: 0.5rem;"><i class="fa-solid fa-glasses"></i> Review</div>
-                    <div style="font-size: 0.85rem;">Lead Auditor reviews content, validates findings, and submits for final approval.</div>
+                    <div style="font-weight: 600; color: #c2410c; margin-bottom: 0.5rem;"><i class="fa-solid fa-glasses"></i> Review (Manual)</div>
+                    <div style="font-size: 0.85rem;">Lead Auditor performs <strong>manual classification</strong> of findings and validates technical content.</div>
                 </div>
                 <div style="background: #f5f3ff; padding: 1rem; border-radius: 8px; border: 1px solid #ddd6fe;">
-                    <div style="font-weight: 600; color: #7c3aed; margin-bottom: 0.5rem;"><i class="fa-solid fa-check-circle"></i> Approved</div>
-                    <div style="font-size: 0.85rem;">Certification Manager approves the report integrity. Final gate before official issuance.</div>
+                    <div style="font-weight: 600; color: #7c3aed; margin-bottom: 0.5rem;"><i class="fa-solid fa-robot"></i> Approved (AI)</div>
+                    <div style="font-size: 0.85rem;">Cert Manager performs <strong>AI context analysis</strong> against history before final approval.</div>
                 </div>
                  <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0;">
                     <div style="font-weight: 600; color: #15803d; margin-bottom: 0.5rem;"><i class="fa-solid fa-file-contract"></i> Finalized</div>
-                    <div style="font-size: 0.85rem;">Report is locked and ready for Certification Decision. PDF can be generated and sent.</div>
+                    <div style="font-size: 0.85rem;">Report is published, locked, and ready for the formal Certification Decision.</div>
                 </div>
             </div>
         </div>
