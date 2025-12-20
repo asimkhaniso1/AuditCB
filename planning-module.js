@@ -842,8 +842,10 @@ function viewAuditPlan(id) {
                          </div>
                     </div>
                     ${report ? `
-                    <button class="btn btn-secondary" style="width: 100%;" onclick="window.navigateToReporting(${plan.id})">
-                        ${report.status === 'Finalized' ? 'View Final Report' : 'Draft Report'}
+                    <button class="${report.status === 'Finalized' ? 'btn btn-secondary' : 'btn btn-primary'}" style="width: 100%;" onclick="window.navigateToReporting(${plan.id})">
+                        ${report.status === 'Finalized' ? 'View Final Report' :
+                report.status === 'Approved' ? 'Publish Report' :
+                    report.status === 'In Review' ? 'Review / Approve' : 'Draft Report'}
                     </button>
                     ` : '<div style="text-align:center; font-size:0.8rem; color:#aaa;">Pending Execution</div>'}
                 </div>
