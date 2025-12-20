@@ -455,9 +455,14 @@ function renderExecutionTab(report, tabName) {
                                  </div>
                                  <div style="display: flex; flex-direction: column;">
                                      <label style="font-size: 0.8rem;">Evidence Image <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
-                                     <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
-                                         <i class="fa-solid fa-camera"></i> ${saved.evidenceImage ? 'Change Image' : 'Attach Photo'}
-                                     </button>
+                                     <div style="display: flex; gap: 5px;">
+                                         <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
+                                             <i class="fa-solid fa-file-image"></i> Upload
+                                         </button>
+                                         <button type="button" class="btn btn-sm btn-outline-primary" style="flex: 1;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Capture from Zoom/Teams Screen Share">
+                                             <i class="fa-solid fa-desktop"></i> Screen
+                                         </button>
+                                     </div>
                                      <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
                                  </div>
                              </div>
@@ -1196,3 +1201,56 @@ window.removeEvidence = function (uniqueId) {
 
 window.openCreateReportModal = openCreateReportModal;
 window.openEditReportModal = openEditReportModal;
+
+window.captureScreenEvidence = async function (uniqueId) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        window.showNotification('Screen capture is not supported in this environment (needs HTTPS or modern browser).', 'error');
+        return;
+    }
+
+    try {
+        window.showNotification('Please select the window (e.g. Zoom/Teams) to capture.', 'info');
+
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { cursor: "always" },
+            audio: false
+        });
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.muted = true;
+        video.play();
+
+        // Wait for stream to be active
+        await new Promise(r => setTimeout(r, 500));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+        const tracks = stream.getTracks();
+        tracks.forEach(t => t.stop());
+
+        // Update UI
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        const imgElem = document.getElementById('evidence-img-' + uniqueId);
+        const dataInput = document.getElementById('evidence-data-' + uniqueId);
+        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+
+        if (imgElem) imgElem.src = dataUrl;
+        if (previewDiv) previewDiv.style.display = 'block';
+        if (dataInput) dataInput.value = 'attached';
+        if (sizeElem) sizeElem.textContent = 'Screen Capture';
+
+        window.showNotification('Evidence captured from screen!', 'success');
+
+    } catch (err) {
+        if (err.name !== 'NotAllowedError') {
+            console.error(err);
+            window.showNotification('Capture failed: ' + err.message, 'error');
+        }
+    }
+};
