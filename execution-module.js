@@ -1202,27 +1202,43 @@ window.removeEvidence = function (uniqueId) {
 window.openCreateReportModal = openCreateReportModal;
 window.openEditReportModal = openEditReportModal;
 
+// Persistent stream for remote audits
+window.activeAuditScreenStream = null;
+
 window.captureScreenEvidence = async function (uniqueId) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        window.showNotification('Screen capture is not supported in this environment (needs HTTPS or modern browser).', 'error');
+        window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
         return;
     }
 
     try {
-        window.showNotification('Please select the window (e.g. Zoom/Teams) to capture.', 'info');
+        let stream = window.activeAuditScreenStream;
+        let isNew = false;
 
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: { cursor: "always" },
-            audio: false
-        });
+        // Check active stream
+        if (!stream || !stream.active) {
+            window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" },
+                audio: false
+            });
+            window.activeAuditScreenStream = stream;
+            isNew = true;
+
+            // Handle stop sharing
+            stream.getVideoTracks()[0].onended = () => {
+                window.activeAuditScreenStream = null;
+                window.showNotification('Screen sharing session ended.', 'info');
+            };
+        }
 
         const video = document.createElement('video');
         video.srcObject = stream;
         video.muted = true;
         video.play();
 
-        // Wait for stream to be active
-        await new Promise(r => setTimeout(r, 500));
+        // Wait for buffer
+        await new Promise(r => setTimeout(r, isNew ? 500 : 200));
 
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -1231,8 +1247,7 @@ window.captureScreenEvidence = async function (uniqueId) {
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
-        const tracks = stream.getTracks();
-        tracks.forEach(t => t.stop());
+        // DO NOT stop tracks here. We reuse them.
 
         // Update UI
         const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
@@ -1245,7 +1260,12 @@ window.captureScreenEvidence = async function (uniqueId) {
         if (dataInput) dataInput.value = 'attached';
         if (sizeElem) sizeElem.textContent = 'Screen Capture';
 
-        window.showNotification('Evidence captured from screen!', 'success');
+        window.showNotification('Captured!', 'success');
+
+        // Cleanup element
+        video.pause();
+        video.srcObject = null;
+        video.remove();
 
     } catch (err) {
         if (err.name !== 'NotAllowedError') {
