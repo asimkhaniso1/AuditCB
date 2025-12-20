@@ -107,70 +107,7 @@ function renderDashboardEnhanced() {
             </div>
 
             <!-- Enhanced KPI Cards -->
-            <div class="dashboard-grid" style="margin-bottom: 2rem;">
-                <div class="card stat-card" style="border-left: 4px solid #667eea;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total Clients</h3>
-                            <p class="stat-value" style="font-size: 2.5rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${totalClients}</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fa-solid fa-building" style="color: #667eea; font-size: 1.5rem;"></i>
-                        </div>
-                    </div>
-                    <div style="margin-top: 1rem; display: flex; gap: 1rem; font-size: 0.85rem;">
-                        <span style="color: var(--success-color);"><i class="fa-solid fa-check-circle"></i> ${activeClients} Active</span>
-                        <span style="color: var(--text-secondary);"><i class="fa-solid fa-pause-circle"></i> ${inactiveClients} Inactive</span>
-                    </div>
-                </div>
-
-                <div class="card stat-card" style="border-left: 4px solid #11998e;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Compliance Score</h3>
-                            <p class="stat-value" style="font-size: 2.5rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${avgComplianceScore}%</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #11998e20 0%, #38ef7d20 100%); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fa-solid fa-chart-line" style="color: #11998e; font-size: 1.5rem;"></i>
-                        </div>
-                    </div>
-                    <div style="margin-top: 1rem; font-size: 0.85rem; color: ${avgComplianceScore >= 85 ? 'var(--success-color)' : 'var(--warning-color)'};">
-                        <i class="fa-solid fa-${avgComplianceScore >= 85 ? 'arrow-up' : 'arrow-down'}"></i> ${avgComplianceScore >= 85 ? 'Excellent Performance' : 'Needs Improvement'}
-                    </div>
-                </div>
-
-                <div class="card stat-card" style="border-left: 4px solid #f093fb;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Audit Plans</h3>
-                            <p class="stat-value" style="font-size: 2.5rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${auditPlans.length}</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #f093fb20 0%, #f5576c20 100%); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fa-solid fa-calendar-check" style="color: #f093fb; font-size: 1.5rem;"></i>
-                        </div>
-                    </div>
-                    <div style="margin-top: 1rem; display: flex; gap: 1rem; font-size: 0.85rem;">
-                        <span style="color: var(--warning-color);"><i class="fa-solid fa-clock"></i> ${upcomingAudits} Upcoming</span>
-                        <span style="color: var(--success-color);"><i class="fa-solid fa-check"></i> ${completedAudits} Done</span>
-                    </div>
-                </div>
-
-                <div class="card stat-card" style="border-left: 4px solid #fa709a;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total NCRs</h3>
-                            <p class="stat-value" style="font-size: 2.5rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${totalNCRs}</p>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #fa709a20 0%, #fee14020 100%); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fa-solid fa-exclamation-triangle" style="color: #fa709a; font-size: 1.5rem;"></i>
-                        </div>
-                    </div>
-                    <div style="margin-top: 1rem; display: flex; gap: 1rem; font-size: 0.85rem;">
-                        <span style="color: var(--danger-color);"><i class="fa-solid fa-circle"></i> ${openNCRs} Open</span>
-                        <span style="color: var(--success-color);"><i class="fa-solid fa-check-circle"></i> ${closedNCRs} Closed</span>
-                    </div>
-                </div>
-            </div>
+            <!-- Analytics Removed as per request (Only Charts) -->
 
             <!-- Charts Row -->
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
