@@ -226,6 +226,7 @@ function renderClientDetail(clientId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Information</button>
+                <button class="tab-btn" data-tab="contacts">Contacts</button>
                 <button class="tab-btn" data-tab="audits">Audits</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
             </div>
@@ -371,8 +372,44 @@ function renderClientTab(client, tabName) {
                     `}
                 </div>
 
-                <!-- Contact Persons -->
+                <!-- Matching Auditors -->
                 <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;">
+                        <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
+                        Auditors with ${client.industry || 'Matching'} Industry Experience
+                    </h3>
+                    ${matchingAuditors.length > 0 ? `
+                        <div style="display: grid; gap: 0.75rem;">
+                            ${matchingAuditors.map(a => `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                    <div style="display: flex; align-items: center; gap: 1rem;">
+                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                                            ${a.name.split(' ').map(n => n[0]).join('')}
+                                        </div>
+                                        <div>
+                                            <p style="font-weight: 500; margin: 0;">${a.name}</p>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${a.role} • ${a.experience || 0} years exp</p>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+                            <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                            No auditors found with ${client.industry || 'this'} industry experience. 
+                            <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
+                        </p>
+                    `}
+                </div>
+            `;
+            break;
+        case 'contacts':
+            tabContent.innerHTML = `
+                <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
                         <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
@@ -380,7 +417,6 @@ function renderClientTab(client, tabName) {
                         </button>
                     </div>
                     ${(client.contacts && client.contacts.length > 0) ? `
-
                         <div class="table-container">
                             <table>
                                 <thead>
@@ -414,40 +450,6 @@ function renderClientTab(client, tabName) {
                         </div>
                     ` : `
                         <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No contact persons added yet.</p>
-                    `}
-                </div>
-
-                <!-- Matching Auditors -->
-                <div class="card" style="margin-top: 1.5rem;">
-                    <h3 style="margin-bottom: 1rem;">
-                        <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
-                        Auditors with ${client.industry || 'Matching'} Industry Experience
-                    </h3>
-                    ${matchingAuditors.length > 0 ? `
-                        <div style="display: grid; gap: 0.75rem;">
-                            ${matchingAuditors.map(a => `
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                                    <div style="display: flex; align-items: center; gap: 1rem;">
-                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600;">
-                                            ${a.name.split(' ').map(n => n[0]).join('')}
-                                        </div>
-                                        <div>
-                                            <p style="font-weight: 500; margin: 0;">${a.name}</p>
-                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${a.role} • ${a.experience || 0} years exp</p>
-                                        </div>
-                                    </div>
-                                    <div style="display: flex; gap: 0.5rem;">
-                                        ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('')}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : `
-                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
-                            <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                            No auditors found with ${client.industry || 'this'} industry experience. 
-                            <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
-                        </p>
                     `}
                 </div>
             `;
