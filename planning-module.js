@@ -45,7 +45,6 @@ function renderAuditPlanningEnhanced() {
 
     const html = `
         <div class="fade-in">
-        <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Planning <span style="font-size: 0.8rem; color: var(--text-secondary);">(v5.2)</span></h2>
                  <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1622,38 +1621,6 @@ function goToStep1() {
     currentPlanStep = 1;
 }
 
-function addAgendaRow(data = {}) {
-    const tbody = document.getElementById('agenda-tbody');
-    const row = document.createElement('tr');
-
-    // Get Auditors for dropdown
-    const leadVal = document.getElementById('plan-lead-auditor').value;
-    const teamSelect = document.getElementById('plan-team');
-    const teamVals = Array.from(teamSelect.selectedOptions).map(o => o.value);
-    const allAuditors = [leadVal, ...teamVals].filter(Boolean);
-    const uniqueAuditors = [...new Set(allAuditors)];
-
-    const auditorOptions = uniqueAuditors.map(a => `<option value="${a}" ${data.auditor === a ? 'selected' : ''}>${a}</option>`).join('');
-
-    row.innerHTML = `
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.day || 'Day 1'}" placeholder="Day"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.time || ''}" placeholder="Time"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.item || ''}" placeholder="Activity/Clause"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.dept || ''}" placeholder="Dept"></td>
-        <td>
-            <select class="form-control" style="padding: 4px;">
-                <option value="All" ${data.auditor === 'All' ? 'selected' : ''}>All Team</option>
-                ${auditorOptions}
-                <option value="Other" ${!uniqueAuditors.includes(data.auditor) && data.auditor !== 'All' ? 'selected' : ''}>Other</option>
-            </select>
-        </td>
-        <td style="text-align: center;">
-            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button>
-        </td>
-    `;
-
-    tbody.appendChild(row);
-}
 
 function saveAuditPlan() {
     const clientName = document.getElementById('plan-client').value;

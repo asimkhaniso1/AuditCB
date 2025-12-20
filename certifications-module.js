@@ -43,7 +43,6 @@ function renderCertificationModule() {
 
     contentArea.innerHTML = `
         <div class="fade-in">
-        <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
                     <h2 style="margin-bottom: 0.5rem;" onclick="toggleCertAnalytics()" style="cursor: pointer;">
