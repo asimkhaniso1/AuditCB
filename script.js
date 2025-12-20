@@ -142,33 +142,47 @@ const state = {
     auditPrograms: [
         {
             id: 1,
-            name: 'ISO 9001 Quality Management Program',
+            client: 'Tech Solutions Ltd',
             standard: 'ISO 9001:2015',
             type: 'Certification',
-            clientId: 1,
+            cycleStart: '2023-03-15',
+            cycleEnd: '2026-03-14',
             status: 'Active',
-            createdDate: '2024-01-15',
-            description: 'Comprehensive QMS audit program covering all core processes and quality management principles.'
+            description: 'Comprehensive QMS audit program covering all core processes and quality management principles.',
+            audits: [
+                { type: 'Stage 1', date: '2023-03-20', status: 'Completed' },
+                { type: 'Stage 2', date: '2023-04-15', status: 'Completed' },
+                { type: 'Surveillance 1', date: '2024-04-15', status: 'Completed' },
+                { type: 'Surveillance 2', date: '2025-04-15', status: 'Planned' }
+            ]
         },
         {
             id: 2,
-            name: 'ISO 14001 Environmental Program',
+            client: 'Global Manufacturing',
             standard: 'ISO 14001:2015',
             type: 'Certification',
-            clientId: 2,
+            cycleStart: '2024-02-20',
+            cycleEnd: '2027-02-19',
             status: 'Active',
-            createdDate: '2024-02-20',
-            description: 'Environmental management system audit program for manufacturing operations.'
+            description: 'Environmental management system audit program for manufacturing operations.',
+            audits: [
+                { type: 'Stage 1', date: '2024-02-20', status: 'Completed' },
+                { type: 'Stage 2', date: '2024-03-15', status: 'Completed' },
+                { type: 'Surveillance 1', date: '2025-03-15', status: 'Planned' }
+            ]
         },
         {
             id: 3,
-            name: 'ISO 27001 ISMS Surveillance',
+            client: 'SecureData Corp',
             standard: 'ISO 27001:2022',
             type: 'Surveillance',
-            clientId: 3,
+            cycleStart: '2024-05-10',
+            cycleEnd: '2027-05-09',
             status: 'Pending',
-            createdDate: '2024-03-10',
-            description: 'Information security management surveillance audit program.'
+            description: 'Information security management surveillance audit program.',
+            audits: [
+                { type: 'Stage 1', date: '2024-05-10', status: 'Planned' }
+            ]
         }
     ],
     auditPlans: [
