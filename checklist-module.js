@@ -927,15 +927,36 @@ function viewChecklistDetail(id) {
 
 function deleteChecklist(id) {
     const checklist = state.checklists?.find(c => c.id === id);
-    if (!checklist) return;
+    if (!checklist) {
+        console.error('Checklist not found:', id);
+        return;
+    }
 
     const userRole = state.currentUser?.role;
     const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
     const canEditGlobal = isCertManager || isAdmin;
 
+    // Log attempt for debugging
+    console.log('Delete attempt:', {
+        checklistName: checklist.name,
+        checklistType: checklist.type,
+        userRole: userRole,
+        isAdmin: isAdmin,
+        isCertManager: isCertManager,
+        canEditGlobal: canEditGlobal
+    });
+
+    // CRITICAL: Block deletion of global checklists by unauthorized users
     if (checklist.type === 'global' && !canEditGlobal) {
+        console.error('Unauthorized delete attempt blocked');
         window.showNotification('Only Certification Managers or Admins can delete global checklists', 'error');
+        return;
+    }
+
+    // Additional safety check - prevent deletion if no user is logged in
+    if (!state.currentUser) {
+        window.showNotification('You must be logged in to delete checklists', 'error');
         return;
     }
 

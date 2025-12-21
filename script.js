@@ -699,6 +699,16 @@ function migrateChecklistsToHierarchy() {
         return checklist;
     });
 
+    // IMPORTANT: Restore any missing default checklists
+    defaultHierarchicalChecklists.forEach(defaultChecklist => {
+        const exists = state.checklists.find(c => c.id === defaultChecklist.id);
+        if (!exists) {
+            console.log('Restoring missing default checklist:', defaultChecklist.name);
+            state.checklists.push(defaultChecklist);
+            needsUpdate = true;
+        }
+    });
+
     if (needsUpdate) {
         saveState();
         console.log('Checklists migrated to hierarchical format');
