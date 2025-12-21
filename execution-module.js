@@ -339,6 +339,11 @@ function renderExecutionDetail(reportId) {
     // Calculate Progress
     // Fetch Data & Calculate Progress
     const plan = report.planId ? state.auditPlans.find(p => p.id == report.planId) : state.auditPlans.find(p => p.client === report.client);
+
+    // Fetch Client Departments/Sites
+    const clientData = state.clients.find(c => c.name === report.client);
+    const departments = clientData && clientData.sites ? clientData.sites.map(s => s.name) : ['Management', 'Production', 'Quality', 'Store', 'Maintenance', 'HR', 'Sales'];
+
     const planChecklists = plan?.selectedChecklists || [];
     const checklists = state.checklists || [];
     const assignedChecklists = planChecklists.map(clId => checklists.find(c => c.id === clId)).filter(c => c);
@@ -469,11 +474,11 @@ function renderExecutionDetail(reportId) {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems });
+            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments });
         });
     });
 
-    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems });
+    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments });
 }
 
 function renderExecutionTab(report, tabName, contextData = {}) {
@@ -481,7 +486,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     switch (tabName) {
         case 'checklist':
-            const { assignedChecklists = [], progressMap = {}, customItems = [] } = contextData;
+            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [] } = contextData;
 
 
             // Helper to render row
@@ -567,7 +572,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                  </div>
                                  <div>
                                      <label style="font-size: 0.8rem;">Department</label>
-                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" placeholder="e.g., Production" value="${saved.department || ''}">
+                                     <select id="ncr-department-${uniqueId}" class="form-control form-control-sm">
+                                        <option value="">-- Select --</option>
+                                        ${departments.map(d => `<option value="${d}" ${saved.department === d ? 'selected' : ''}>${d}</option>`).join('')}
+                                        ${saved.department && !departments.includes(saved.department) ? `<option value="${saved.department}" selected>${saved.department}</option>` : ''}
+                                     </select>
                                  </div>
                              </div>
                              
