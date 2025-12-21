@@ -1087,16 +1087,42 @@ window.addCustomQuestion = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
-    const clause = prompt("Enter Clause Number (e.g. 'New 1.1'):");
-    if (!clause) return;
-    const req = prompt("Enter Requirement Question:");
-    if (!req) return;
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
 
-    if (!report.customItems) report.customItems = [];
-    report.customItems.push({ clause, requirement: req });
+    modalTitle.textContent = 'Add Custom Question';
+    modalBody.innerHTML = `
+        <form id="custom-question-form">
+            <div class="form-group">
+                <label>Clause Number/Title <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="custom-clause" placeholder="e.g. New 1.1 or Additional" required>
+            </div>
+            <div class="form-group">
+                <label>Requirement / Question <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="custom-req" rows="3" placeholder="Enter the audit question or requirement..." required></textarea>
+            </div>
+        </form>
+    `;
 
-    window.saveData();
-    window.renderExecutionDetail(reportId);
+    window.openModal();
+
+    modalSave.onclick = () => {
+        const clause = document.getElementById('custom-clause').value;
+        const req = document.getElementById('custom-req').value;
+
+        if (clause && req) {
+            if (!report.customItems) report.customItems = [];
+            report.customItems.push({ clause, requirement: req });
+
+            window.saveData();
+            window.closeModal();
+            window.renderExecutionDetail(reportId);
+            window.showNotification('Custom question added successfully');
+        } else {
+            window.showNotification('Please fill in both fields', 'error');
+        }
+    };
 };
 
 window.saveChecklist = function (reportId) {
