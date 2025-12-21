@@ -1011,6 +1011,17 @@ window.printAuditChecklist = function (planId) {
             return;
         }
 
+        // Calculate Auditor Names safely
+        let auditorNames = 'Unassigned';
+        if (plan.team && Array.isArray(plan.team)) {
+            auditorNames = plan.team.join(', ');
+        } else if (plan.auditors && Array.isArray(plan.auditors)) {
+            auditorNames = plan.auditors.map(id => {
+                const auditor = (state.auditors || []).find(a => a.id == id);
+                return auditor ? auditor.name : 'Unknown';
+            }).join(', ');
+        }
+
         // Map progress correctly
         const progressMap = {};
         if (report && report.checklistProgress) {
@@ -1048,7 +1059,7 @@ window.printAuditChecklist = function (planId) {
                     </div>
                     <h1>Audit Checklist Execution Report</h1>
                     <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${plan.date}</p>
-                    <p><strong>Auditor(s):</strong> ${plan.team.join(', ')} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
+                    <p><strong>Auditor(s):</strong> ${auditorNames} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
                 </div>
         `;
 
