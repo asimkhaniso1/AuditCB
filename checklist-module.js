@@ -454,7 +454,7 @@ function openAddChecklistModal() {
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th style="width: 100px;">Clause #</th>
+                                <th style="width: 120px;">Clause #</th>
                                 <th>Requirement</th>
                                 <th style="width: 50px;"></th>
                             </tr>
@@ -681,7 +681,7 @@ function openEditChecklistModal(id) {
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th style="width: 100px;">Clause #</th>
+                                <th style="width: 120px;">Clause #</th>
                                 <th>Requirement</th>
                                 <th style="width: 50px;"></th>
                             </tr>
@@ -704,7 +704,7 @@ function openEditChecklistModal(id) {
 
             return flatItems.map(item => `
                                     <tr class="checklist-item-row">
-                                        <td><input type="text" class="form-control item-clause" value="${item.clause || ''}" style="margin: 0;"></td>
+                                        <td><input type="text" class="form-control item-clause" value="${item.clause || ''}" style="margin: 0; width: 100%; min-width: 80px;"></td>
                                         <td><input type="text" class="form-control item-requirement" value="${item.requirement || ''}" style="margin: 0;"></td>
                                         <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
