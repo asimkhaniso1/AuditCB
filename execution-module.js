@@ -337,19 +337,56 @@ function renderExecutionDetail(reportId) {
 
     // Calculate Progress
     // Calculate Progress
+    // Fetch Data & Calculate Progress
     const plan = report.planId ? state.auditPlans.find(p => p.id == report.planId) : state.auditPlans.find(p => p.client === report.client);
-    let totalItems = 0;
-    if (plan && plan.selectedChecklists) {
-        plan.selectedChecklists.forEach(id => {
-            const cl = state.checklists.find(c => c.id === id);
-            if (cl && cl.items) totalItems += cl.items.length;
-        });
-    }
-    // Add custom items
-    totalItems += (report.customItems || []).length;
+    const planChecklists = plan?.selectedChecklists || [];
+    const checklists = state.checklists || [];
+    const assignedChecklists = planChecklists.map(clId => checklists.find(c => c.id === clId)).filter(c => c);
+    const customItems = report.customItems || [];
 
-    const completedItems = (report.checklistProgress || []).filter(p => p.status && p.status !== '').length;
-    const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    // Create lookup
+    const progressMap = {};
+    (report.checklistProgress || []).forEach(p => {
+        const key = p.isCustom ? `custom-${p.itemIdx}` : `${p.checklistId}-${p.itemIdx}`;
+        progressMap[key] = p;
+    });
+
+    // Calculate stats
+    const allItems = [];
+    assignedChecklists.forEach(cl => {
+        if (cl.clauses) {
+            cl.clauses.forEach(clause => {
+                clause.subClauses.forEach((item, subIdx) => {
+                    allItems.push({ checklistId: cl.id, itemIdx: `${clause.mainClause}-${subIdx}` });
+                });
+            });
+        } else {
+            (cl.items || []).forEach((item, idx) => {
+                allItems.push({ checklistId: cl.id, itemIdx: idx });
+            });
+        }
+    });
+    customItems.forEach((item, idx) => {
+        allItems.push({ checklistId: 'custom', itemIdx: idx, isCustom: true });
+    });
+
+    const totalItems = allItems.length;
+    const conformCount = allItems.filter(item => {
+        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+        return progressMap[key]?.status === 'conform';
+    }).length;
+    const ncCount = allItems.filter(item => {
+        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+        return progressMap[key]?.status === 'nc';
+    }).length;
+    const naCount = allItems.filter(item => {
+        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+        return progressMap[key]?.status === 'na';
+    }).length;
+    const answeredCount = conformCount + ncCount + naCount;
+    const pendingCount = totalItems - answeredCount;
+    const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
+
 
     const html = `
         <div class="fade-in">
@@ -369,6 +406,44 @@ function renderExecutionDetail(reportId) {
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report
                     </button>
                 </div>
+
+                    <!-- Progress Dashboard -->
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; margin-top: 1rem; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                        <div style="display: grid; grid-template-columns: 120px 1fr; gap: 2rem; align-items: center;">
+                            <!-- Progress Ring -->
+                            <div style="position: relative; width: 120px; height: 120px;">
+                                <svg class="progress-ring" width="120" height="120">
+                                    <circle class="progress-ring-circle" stroke="#ffffff33" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
+                                    <circle class="progress-ring-circle" stroke="#ffffff" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"
+                                        style="stroke-dasharray: ${2 * Math.PI * 52}; stroke-dashoffset: ${2 * Math.PI * 52 * (1 - progressPct / 100)}; stroke-linecap: round;"/>
+                                </svg>
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                                    <div style="font-size: 1.75rem; font-weight: bold;">${progressPct}%</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9;">Complete</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Stats Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                                <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${totalItems}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Total Items</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${conformCount}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Conformities</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${ncCount}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Non-Conform.</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${pendingCount}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 
 
             </div>
@@ -394,30 +469,20 @@ function renderExecutionDetail(reportId) {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            renderExecutionTab(report, e.target.getAttribute('data-tab'));
+            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems });
         });
     });
 
-    renderExecutionTab(report, 'checklist');
+    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems });
 }
 
-function renderExecutionTab(report, tabName) {
+function renderExecutionTab(report, tabName, contextData = {}) {
     const tabContent = document.getElementById('tab-content');
 
     switch (tabName) {
         case 'checklist':
-            const plan = report.planId ? state.auditPlans.find(p => p.id == report.planId) : state.auditPlans.find(p => p.client === report.client);
-            const planChecklists = plan?.selectedChecklists || [];
-            const checklists = state.checklists || [];
-            const assignedChecklists = planChecklists.map(clId => checklists.find(c => c.id === clId)).filter(c => c);
-            const customItems = report.customItems || [];
+            const { assignedChecklists = [], progressMap = {}, customItems = [] } = contextData;
 
-            // Create lookup for saved progress
-            const progressMap = {};
-            (report.checklistProgress || []).forEach(p => {
-                const key = p.isCustom ? `custom-${p.itemIdx}` : `${p.checklistId}-${p.itemIdx}`;
-                progressMap[key] = p;
-            });
 
             // Helper to render row
             const renderRow = (item, checklistId, idx, isCustom = false) => {
@@ -608,41 +673,7 @@ function renderExecutionTab(report, tabName) {
                 `;
             }
 
-            // Calculate overall progress stats
-            const allItems = [];
-            assignedChecklists.forEach(cl => {
-                if (cl.clauses) {
-                    cl.clauses.forEach(clause => {
-                        clause.subClauses.forEach((item, subIdx) => {
-                            allItems.push({ checklistId: cl.id, itemIdx: `${clause.mainClause}-${subIdx}` });
-                        });
-                    });
-                } else {
-                    (cl.items || []).forEach((item, idx) => {
-                        allItems.push({ checklistId: cl.id, itemIdx: idx });
-                    });
-                }
-            });
-            customItems.forEach((item, idx) => {
-                allItems.push({ checklistId: 'custom', itemIdx: idx, isCustom: true });
-            });
 
-            const totalItems = allItems.length;
-            const conformCount = allItems.filter(item => {
-                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-                return progressMap[key]?.status === 'conform';
-            }).length;
-            const ncCount = allItems.filter(item => {
-                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-                return progressMap[key]?.status === 'nc';
-            }).length;
-            const naCount = allItems.filter(item => {
-                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-                return progressMap[key]?.status === 'na';
-            }).length;
-            const answeredCount = conformCount + ncCount + naCount;
-            const pendingCount = totalItems - answeredCount;
-            const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
 
             tabContent.innerHTML = `
                 <style>
@@ -664,43 +695,7 @@ function renderExecutionTab(report, tabName) {
                     .keyboard-hint { position: fixed; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.75rem; z-index: 999; }
                 </style>
                 <div>
-                    <!-- Progress Dashboard -->
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                        <div style="display: grid; grid-template-columns: 120px 1fr; gap: 2rem; align-items: center;">
-                            <!-- Progress Ring -->
-                            <div style="position: relative; width: 120px; height: 120px;">
-                                <svg class="progress-ring" width="120" height="120">
-                                    <circle class="progress-ring-circle" stroke="#ffffff33" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
-                                    <circle class="progress-ring-circle" stroke="#ffffff" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"
-                                        style="stroke-dasharray: ${2 * Math.PI * 52}; stroke-dashoffset: ${2 * Math.PI * 52 * (1 - progressPct / 100)}; stroke-linecap: round;"/>
-                                </svg>
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                                    <div style="font-size: 1.75rem; font-weight: bold;">${progressPct}%</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9;">Complete</div>
-                                </div>
-                            </div>
-                            
-                            <!-- Stats Grid -->
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                                <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${totalItems}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Total Items</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${conformCount}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Conformities</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${ncCount}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Non-Conform.</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${pendingCount}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
 
                     <!-- Filters & Actions Bar -->
                     <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
