@@ -554,6 +554,53 @@ const state = {
             ]
         }
     ],
+    // ISO 17021-1 Compliance: Appeals & Complaints Register
+    appeals: [
+        {
+            id: 1,
+            clientId: 1,
+            clientName: 'Tech Solutions Ltd',
+            type: 'Certification Decision',
+            subject: 'Appeal against Minor NC classification',
+            description: 'Client appeals the classification of NC-001 as minor, requesting reclassification as observation.',
+            dateReceived: '2024-02-20',
+            dueDate: '2024-03-20',
+            status: 'Resolved',
+            assignedTo: 'Impartiality Committee',
+            resolution: 'Appeal upheld. NC reclassified as OFI.',
+            dateResolved: '2024-03-15',
+            history: [
+                { date: '2024-02-20', action: 'Received', user: 'Admin', notes: 'Appeal logged' },
+                { date: '2024-02-22', action: 'Under Review', user: 'John Smith', notes: 'Assigned to committee' },
+                { date: '2024-03-15', action: 'Resolved', user: 'Committee Chair', notes: 'Decision communicated to client' }
+            ]
+        }
+    ],
+    complaints: [
+        {
+            id: 1,
+            source: 'Client',
+            clientName: 'Global Manufacturing',
+            relatedAuditId: 2,
+            type: 'Auditor Conduct',
+            subject: 'Auditor scheduling concern',
+            description: 'Client raised concern about late arrival of auditor on Day 2 of the audit.',
+            dateReceived: '2024-03-25',
+            dueDate: '2024-04-10',
+            status: 'Closed',
+            investigator: 'Quality Manager',
+            findings: 'Auditor was delayed due to traffic. No systemic issue identified.',
+            correctiveAction: 'Reminder issued to all auditors about punctuality and communication.',
+            resolution: 'Apology letter sent to client. Internal process reminder issued.',
+            dateResolved: '2024-04-05',
+            history: [
+                { date: '2024-03-25', action: 'Received', user: 'Admin', notes: 'Complaint logged' },
+                { date: '2024-03-26', action: 'Acknowledged', user: 'Quality Manager', notes: 'Acknowledgment sent to client' },
+                { date: '2024-04-01', action: 'Investigation', user: 'Quality Manager', notes: 'Auditor interviewed' },
+                { date: '2024-04-05', action: 'Closed', user: 'Quality Manager', notes: 'Resolution communicated' }
+            ]
+        }
+    ],
     settings: {
         standards: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'],
         roles: ['Lead Auditor', 'Auditor', 'Technical Expert'],
@@ -1054,6 +1101,13 @@ async function renderModule(moduleName) {
                     renderCertificationModule();
                 } else {
                     contentArea.innerHTML = '<div class="alert alert-info">Certification module under construction</div>';
+                }
+                break;
+            case 'appeals-complaints':
+                if (typeof renderAppealsComplaintsModule === 'function') {
+                    renderAppealsComplaintsModule();
+                } else {
+                    renderPlaceholder(moduleName);
                 }
                 break;
             case 'manday-calculator':
