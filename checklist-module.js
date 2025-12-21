@@ -461,7 +461,7 @@ function openAddChecklistModal() {
                         </thead>
                         <tbody id="checklist-items-body">
                             <tr class="checklist-item-row">
-                                <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+                                <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0; width: 100%; min-width: 80px;"></td>
                                 <td><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
                                 <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
                             </tr>
@@ -488,7 +488,7 @@ function openAddChecklistModal() {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0; width: 100%; min-width: 80px;"></td>
             <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
@@ -725,7 +725,7 @@ function openEditChecklistModal(id) {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0; width: 100%; min-width: 80px;"></td>
             <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
