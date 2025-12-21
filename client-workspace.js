@@ -271,51 +271,191 @@ function renderClientOverview(client) {
     const clientReports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
     const openNCs = clientReports.reduce((count, r) => count + ((r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length), 0);
 
+    // Calculate additional metrics
+    const completedAudits = clientPlans.filter(p => p.status === 'Completed').length;
+    const upcomingAudits = clientPlans.filter(p => p.status === 'Planned' || p.status === 'Approved').length;
+    const validCerts = clientCerts.filter(c => c.status === 'Valid').length;
+    const totalSites = (client.sites || []).length;
+    const totalEmployees = client.employees || 0;
+
     return `
         <div class="fade-in">
-             <!-- Summary Cards -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
-                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.25rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${clientPlans.length}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Audit Plans</p>
+            <!-- Action Bar -->
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <button class="btn btn-outline-primary" onclick="window.openEditClientModal(${client.id})">
+                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem;"></i>Edit Client
+                </button>
+                <button class="btn btn-outline-primary" onclick="window.openCreatePlanModal('${client.name}')">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
+                </button>
+            </div>
+
+            <!-- Enhanced Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'plans', null)">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${completedAudits} completed • ${upcomingAudits} upcoming</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
-                    <i class="fa-solid fa-certificate" style="font-size: 1.25rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${clientCerts.length}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Certificates</p>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'certs', null)">
+                    <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientCerts.length}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Certificates</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${validCerts} valid</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'};">
-                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${openNCs}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'findings', null)">
+                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${openNCs === 0 ? 'No issues' : 'Requires attention'}</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
-                    <i class="fa-solid fa-shield-halved" style="font-size: 1.25rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${client.compliance?.contract?.signed ? '✓' : '!'}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Compliance</p>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'compliance', null)">
+                    <i class="fa-solid fa-shield-halved" style="font-size: 1.5rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${client.compliance?.contract?.signed ? '✓' : '!'}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Compliance</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${client.compliance?.contract?.signed ? 'Contract signed' : 'Pending'}</p>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <!-- Client Information Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Company Details -->
                 <div class="card">
-                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Details</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Details</h3>
+                        <button class="btn btn-sm btn-icon" onclick="window.openEditClientModal(${client.id})" title="Edit">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                    </div>
                     <div style="display: grid; gap: 0.75rem;">
-                        <div><strong>Industry:</strong> ${client.industry || '-'}</div>
-                        <div><strong>Location:</strong> ${client.city || '-'}</div>
-                        <div><strong>Employees:</strong> ${client.employees || '-'}</div>
-                        <div><strong>Scope:</strong> ${client.scope || '-'}</div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Standard:</strong> 
+                            <span>${client.standard || '-'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Industry:</strong> 
+                            <span>${client.industry || '-'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Status:</strong> 
+                            <span class="status-badge status-${(client.status || 'active').toLowerCase()}">${client.status || 'Active'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Employees:</strong> 
+                            <span>${totalEmployees.toLocaleString()}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Shifts:</strong> 
+                            <span>${client.shifts || 'No'}</span>
+                        </div>
+                        ${client.website ? `
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Website:</strong> 
+                            <a href="${client.website}" target="_blank" style="color: var(--primary-color);">
+                                <i class="fa-solid fa-external-link-alt" style="font-size: 0.8rem;"></i> Visit
+                            </a>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
+
+                <!-- Primary Contact -->
                 <div class="card">
                     <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-user" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Primary Contact</h3>
                     <div style="display: grid; gap: 0.75rem;">
-                        <div><strong>Name:</strong> ${client.contactName || client.contact || '-'}</div>
-                        <div><strong>Email:</strong> ${client.email || '-'}</div>
-                        <div><strong>Phone:</strong> ${client.phone || '-'}</div>
+                        ${(client.contacts && client.contacts.length > 0) ? `
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Name:</strong> 
+                                <span>${client.contacts[0].name}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Designation:</strong> 
+                                <span>${client.contacts[0].designation || '-'}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Email:</strong> 
+                                <a href="mailto:${client.contacts[0].email}" style="color: var(--primary-color);">${client.contacts[0].email}</a>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Phone:</strong> 
+                                <a href="tel:${client.contacts[0].phone}" style="color: var(--primary-color);">${client.contacts[0].phone}</a>
+                            </div>
+                        ` : `
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Name:</strong> 
+                                <span>${client.contactName || client.contact || '-'}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Email:</strong> 
+                                <span>${client.email || '-'}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>Phone:</strong> 
+                                <span>${client.phone || '-'}</span>
+                            </div>
+                        `}
+                        ${client.contacts && client.contacts.length > 1 ? `
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.renderClientModule(${client.id}, 'compliance', null)" style="width: 100%;">
+                                View All Contacts (${client.contacts.length})
+                            </button>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>
+
+            <!-- Sites Information -->
+            ${totalSites > 0 ? `
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">
+                        <i class="fa-solid fa-map-marker-alt" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                        Sites (${totalSites})
+                    </h3>
+                    <button class="btn btn-sm btn-primary" onclick="window.openEditClientModal(${client.id})">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Site
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Site Name</th>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>Employees</th>
+                                <th>Shift Work</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${client.sites.map(site => `
+                                <tr>
+                                    <td style="font-weight: 500;">${site.name}</td>
+                                    <td>${site.address || '-'}</td>
+                                    <td>${site.city || '-'}, ${site.country || '-'}</td>
+                                    <td>${site.employees || '-'}</td>
+                                    <td>
+                                        <span class="badge" style="background: ${site.shift === 'Yes' ? '#fef3c7' : '#e0f2fe'}; color: ${site.shift === 'Yes' ? '#d97706' : '#0284c7'};">
+                                            ${site.shift || 'No'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            ` : `
+            <div class="card" style="text-align: center; padding: 2rem;">
+                <i class="fa-solid fa-map-marker-alt" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">No sites added yet</p>
+                <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add First Site
+                </button>
+            </div>
+            `}
         </div>
     `;
 }
