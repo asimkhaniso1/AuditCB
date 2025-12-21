@@ -508,6 +508,17 @@ function openAddChecklistModal() {
             return;
         }
 
+        // CRITICAL: Prevent unauthorized users from creating global checklists
+        const userRole = state.currentUser?.role;
+        const isAdmin = state.settings?.isAdmin || false;
+        const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+        const canEditGlobal = isCertManager || isAdmin;
+
+        if (type === 'global' && !canEditGlobal) {
+            window.showNotification('Only Certification Managers or Admins can create global checklists', 'error');
+            return;
+        }
+
         // Collect items and auto-extract main clauses
         const rawRows = [];
 
@@ -745,6 +756,18 @@ function openEditChecklistModal(id) {
 
         if (!name) {
             window.showNotification('Please enter a checklist name', 'error');
+            return;
+        }
+
+        // CRITICAL: Prevent unauthorized users from changing checklist to global or editing global checklists
+        const userRole = state.currentUser?.role;
+        const isAdmin = state.settings?.isAdmin || false;
+        const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+        const canEditGlobal = isCertManager || isAdmin;
+
+        // Check if trying to change to global type or if checklist is already global
+        if ((type === 'global' || checklist.type === 'global') && !canEditGlobal) {
+            window.showNotification('Only Certification Managers or Admins can edit global checklists', 'error');
             return;
         }
 
