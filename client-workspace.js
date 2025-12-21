@@ -155,7 +155,7 @@ function renderClientWorkspace(clientId) {
                 <button class="tab-btn" data-workspace-tab="docs">Documents</button>
             </div>
             
-            <div id="workspace-content"></div>
+            <div id="tab-content"></div>
         </div>
     `;
 
@@ -177,7 +177,7 @@ function renderWorkspaceTab(clientId, tabName) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
-    const workspaceContent = document.getElementById('workspace-content');
+    const workspaceContent = document.getElementById('tab-content');
 
     switch (tabName) {
         case 'overview':
