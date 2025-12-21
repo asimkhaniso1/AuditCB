@@ -285,6 +285,40 @@ window.openIssueCertificateModal = function (reportId) {
                 <label>Certification Scope (Critical)</label>
                 <textarea class="form-control" id="cert-scope" rows="4" placeholder="Enter the precise scope of certification...">${prefillScope}</textarea>
             </div>
+            
+            <!-- ISO 17021-1 Decision Fields -->
+            <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe; margin-top: 1rem;">
+                <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #1d4ed8;">
+                    <i class="fa-solid fa-shield-halved"></i> ISO 17021-1 Certification Decision
+                </h4>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label>Decision Justification <span style="color: #dc2626;">*</span></label>
+                    <textarea class="form-control" id="cert-justification" rows="3" placeholder="Document the basis for the certification decision, including review of audit findings, NC closure evidence, and overall system effectiveness..." required></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label>Decision Maker (Competent Reviewer)</label>
+                        <input type="text" class="form-control" id="cert-reviewer" value="${state.currentUser?.name || 'Certification Manager'}" readonly>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label>Independent of Audit Team?</label>
+                        <select class="form-control" id="cert-independent">
+                            <option value="yes" selected>Yes - Not part of audit team</option>
+                            <option value="no">No - Was involved in audit</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="cert-nc-verified" required>
+                        <span>I confirm all non-conformities have been closed with objective evidence</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-top: 0.5rem;">
+                        <input type="checkbox" id="cert-scope-verified" required>
+                        <span>I confirm the scope accurately reflects the certified activities</span>
+                    </label>
+                </div>
+            </div>
         </form>
     `;
 
@@ -298,8 +332,25 @@ window.openIssueCertificateModal = function (reportId) {
         const expiryDate = document.getElementById('cert-expiry-date').value;
         const scope = document.getElementById('cert-scope').value;
 
+        // ISO 17021-1 Decision Fields
+        const justification = document.getElementById('cert-justification').value;
+        const reviewer = document.getElementById('cert-reviewer').value;
+        const independent = document.getElementById('cert-independent').value;
+        const ncVerified = document.getElementById('cert-nc-verified').checked;
+        const scopeVerified = document.getElementById('cert-scope-verified').checked;
+
         if (!scope) {
             alert('Scope is mandatory!');
+            return;
+        }
+
+        if (!justification) {
+            alert('Decision justification is mandatory per ISO 17021-1!');
+            return;
+        }
+
+        if (!ncVerified || !scopeVerified) {
+            alert('Please confirm NC closure and scope verification before issuing certificate!');
             return;
         }
 
@@ -311,7 +362,16 @@ window.openIssueCertificateModal = function (reportId) {
             expiryDate: expiryDate,
             status: window.CONSTANTS.CERT_STATUS.VALID,
             scope: scope,
-            history: [{ date: new Date().toISOString().split('T')[0], action: 'Initial Certification', user: 'Admin' }]
+            // ISO 17021-1 Decision Record
+            decisionRecord: {
+                justification: justification,
+                decisionMaker: reviewer,
+                independentOfAudit: independent === 'yes',
+                ncClosureVerified: ncVerified,
+                scopeVerified: scopeVerified,
+                decisionDate: new Date().toISOString().split('T')[0]
+            },
+            history: [{ date: new Date().toISOString().split('T')[0], action: 'Initial Certification', user: reviewer }]
         };
 
         state.certifications.push(newCert);
