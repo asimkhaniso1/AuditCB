@@ -616,34 +616,152 @@ function renderExecutionTab(report, tabName) {
                 `;
             }
 
+            // Calculate overall progress stats
+            const allItems = [];
+            assignedChecklists.forEach(cl => {
+                if (cl.clauses) {
+                    cl.clauses.forEach(clause => {
+                        clause.subClauses.forEach((item, subIdx) => {
+                            allItems.push({ checklistId: cl.id, itemIdx: `${clause.mainClause}-${subIdx}` });
+                        });
+                    });
+                } else {
+                    (cl.items || []).forEach((item, idx) => {
+                        allItems.push({ checklistId: cl.id, itemIdx: idx });
+                    });
+                }
+            });
+            customItems.forEach((item, idx) => {
+                allItems.push({ checklistId: 'custom', itemIdx: idx, isCustom: true });
+            });
+
+            const totalItems = allItems.length;
+            const conformCount = allItems.filter(item => {
+                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+                return progressMap[key]?.status === 'conform';
+            }).length;
+            const ncCount = allItems.filter(item => {
+                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+                return progressMap[key]?.status === 'nc';
+            }).length;
+            const naCount = allItems.filter(item => {
+                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+                return progressMap[key]?.status === 'na';
+            }).length;
+            const answeredCount = conformCount + ncCount + naCount;
+            const pendingCount = totalItems - answeredCount;
+            const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
+
             tabContent.innerHTML = `
                 <style>
-                    .btn-icon { border: 1px solid #d1d5db; background: white; width: 32px; height: 32px; border-radius: 4px; color: #6b7280; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; transition: all 0.2s; }
+                    .btn-icon { border: 1px solid #d1d5db; background: white; width: 32px; height: 32px; border-radius: 4px; color: #6b7280; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; transition: all 0.2s; cursor: pointer; }
                     .btn-icon:hover { background: #f3f4f6; }
                     .btn-icon.active { transform: scale(1.1); font-weight: bold; border-color: transparent; }
                     .btn-icon.btn-ok.active { background: var(--success-color); color: white; }
                     .btn-icon.btn-nc.active { background: var(--danger-color); color: white; }
                     .btn-icon.btn-na.active { background: #9ca3af; color: white; }
                     .checklist-item:focus-within { border-color: var(--primary-color) !important; background: #f0f9ff !important; }
+                    .checklist-item.filtered-out { display: none !important; }
+                    .progress-ring { transform: rotate(-90deg); }
+                    .progress-ring-circle { transition: stroke-dashoffset 0.5s; }
+                    .filter-btn { padding: 0.5rem 1rem; border: 1px solid #e2e8f0; background: white; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 0.85rem; }
+                    .filter-btn:hover { background: #f8fafc; }
+                    .filter-btn.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+                    .save-indicator { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 1000; animation: slideIn 0.3s; }
+                    @keyframes slideIn { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+                    .keyboard-hint { position: fixed; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.75rem; z-index: 999; }
                 </style>
                 <div>
-                   
-                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem; position: sticky; top: 0; background: rgba(255,255,255,0.9); padding: 10px; z-index: 100; backdrop-filter: blur(5px); border-bottom: 1px solid #eee;">
-                         <button class="btn btn-secondary" onclick="window.addCustomQuestion(${report.id})">
-                            <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Custom Question
-                        </button>
-                        <button class="btn btn-primary" onclick="window.saveChecklist(${report.id})">
-                            <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
-                        </button>
+                    <!-- Progress Dashboard -->
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                        <div style="display: grid; grid-template-columns: 120px 1fr; gap: 2rem; align-items: center;">
+                            <!-- Progress Ring -->
+                            <div style="position: relative; width: 120px; height: 120px;">
+                                <svg class="progress-ring" width="120" height="120">
+                                    <circle class="progress-ring-circle" stroke="#ffffff33" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
+                                    <circle class="progress-ring-circle" stroke="#ffffff" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"
+                                        style="stroke-dasharray: ${2 * Math.PI * 52}; stroke-dashoffset: ${2 * Math.PI * 52 * (1 - progressPct / 100)}; stroke-linecap: round;"/>
+                                </svg>
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                                    <div style="font-size: 1.75rem; font-weight: bold;">${progressPct}%</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9;">Complete</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Stats Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                                <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${totalItems}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Total Items</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${conformCount}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Conformities</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${ncCount}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Non-Conform.</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${pendingCount}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filters & Actions Bar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary); margin-right: 0.5rem;">Filter:</span>
+                            <button class="filter-btn active" onclick="window.filterChecklistItems('all')" data-filter="all">
+                                <i class="fa-solid fa-list"></i> All (${totalItems})
+                            </button>
+                            <button class="filter-btn" onclick="window.filterChecklistItems('pending')" data-filter="pending">
+                                <i class="fa-solid fa-clock"></i> Pending (${pendingCount})
+                            </button>
+                            <button class="filter-btn" onclick="window.filterChecklistItems('conform')" data-filter="conform">
+                                <i class="fa-solid fa-check"></i> Conform (${conformCount})
+                            </button>
+                            <button class="filter-btn" onclick="window.filterChecklistItems('nc')" data-filter="nc">
+                                <i class="fa-solid fa-times"></i> NC (${ncCount})
+                            </button>
+                            <button class="filter-btn" onclick="window.filterChecklistItems('na')" data-filter="na">
+                                <i class="fa-solid fa-ban"></i> N/A (${naCount})
+                            </button>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="window.addCustomQuestion(${report.id})">
+                                <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
+                            </button>
+                            <button class="btn btn-primary" onclick="window.saveChecklist(${report.id})" id="save-progress-btn">
+                                <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
+                            </button>
+                        </div>
                     </div>
 
                     ${checklistHTML}
                     
                     <div style="text-align: center; margin-top: 2rem; padding: 2rem; background: #f8fafc; border-radius: 8px;">
-                        <button class="btn btn-primary btn-lg" onclick="window.saveChecklist(${report.id})">Save All Progress</button>
+                        <button class="btn btn-primary btn-lg" onclick="window.saveChecklist(${report.id})">
+                            <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Save All Progress
+                        </button>
                     </div>
                 </div>
+
+                <!-- Save Indicator -->
+                <div class="save-indicator" id="save-indicator">
+                    <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Progress Saved
+                </div>
+
+                <!-- Keyboard Hints -->
+                <div class="keyboard-hint">
+                    <strong>Shortcuts:</strong> C = Conform | N = Non-Conform | A = N/A | S = Save
+                </div>
             `;
+
+            // Initialize keyboard shortcuts
+            window.initChecklistKeyboardShortcuts(report.id);
             break;
 
         case 'ncr':
@@ -995,7 +1113,113 @@ window.saveChecklist = function (reportId) {
 
     report.checklistProgress = checklistData;
     window.saveData();
+
+    // Show save indicator
+    const indicator = document.getElementById('save-indicator');
+    if (indicator) {
+        indicator.style.display = 'block';
+        setTimeout(() => {
+            indicator.style.display = 'none';
+        }, 2000);
+    }
+
     window.showNotification('Checklist progress saved successfully');
+};
+
+// Filter checklist items by status
+window.filterChecklistItems = function (filterType) {
+    // Update filter button states
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.filter === filterType) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Filter items
+    document.querySelectorAll('.checklist-item').forEach(item => {
+        const uniqueId = item.id.replace('row-', '');
+        const statusInput = document.getElementById('status-' + uniqueId);
+        const status = statusInput?.value || '';
+
+        let shouldShow = false;
+
+        if (filterType === 'all') {
+            shouldShow = true;
+        } else if (filterType === 'pending') {
+            shouldShow = !status || status === '';
+        } else {
+            shouldShow = status === filterType;
+        }
+
+        if (shouldShow) {
+            item.classList.remove('filtered-out');
+        } else {
+            item.classList.add('filtered-out');
+        }
+    });
+};
+
+// Initialize keyboard shortcuts for checklist execution
+window.initChecklistKeyboardShortcuts = function (reportId) {
+    // Remove any existing listener
+    if (window.checklistKeyHandler) {
+        document.removeEventListener('keydown', window.checklistKeyHandler);
+    }
+
+    window.checklistKeyHandler = function (e) {
+        // Only activate if not typing in an input/textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+
+        // Find focused checklist item or the first visible one
+        let targetItem = document.querySelector('.checklist-item:focus-within');
+        if (!targetItem) {
+            targetItem = document.querySelector('.checklist-item:not(.filtered-out)');
+        }
+
+        if (!targetItem) return;
+
+        const uniqueId = targetItem.id.replace('row-', '');
+
+        switch (e.key.toLowerCase()) {
+            case 'c':
+                e.preventDefault();
+                window.setChecklistStatus(uniqueId, window.CONSTANTS.STATUS.CONFORM);
+                // Move to next item
+                const nextConform = targetItem.nextElementSibling;
+                if (nextConform && nextConform.classList.contains('checklist-item')) {
+                    nextConform.querySelector('input, textarea')?.focus();
+                }
+                break;
+            case 'n':
+                e.preventDefault();
+                window.setChecklistStatus(uniqueId, window.CONSTANTS.STATUS.NC);
+                // Focus on NCR description
+                setTimeout(() => {
+                    document.getElementById('ncr-desc-' + uniqueId)?.focus();
+                }, 100);
+                break;
+            case 'a':
+                e.preventDefault();
+                window.setChecklistStatus(uniqueId, window.CONSTANTS.STATUS.NA);
+                // Move to next item
+                const nextNA = targetItem.nextElementSibling;
+                if (nextNA && nextNA.classList.contains('checklist-item')) {
+                    nextNA.querySelector('input, textarea')?.focus();
+                }
+                break;
+            case 's':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    window.saveChecklist(reportId);
+                }
+                break;
+        }
+    };
+
+    document.addEventListener('keydown', window.checklistKeyHandler);
 };
 
 // Submit findings to Lead Auditor for review
