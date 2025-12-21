@@ -699,6 +699,12 @@ label {
     border-width: 0;
 }
 
+/* Hidden utility class */
+.hidden {
+    display: none !important;
+}
+
+
 /* Improved button accessibility */
 button:disabled {
     opacity: 0.5;
