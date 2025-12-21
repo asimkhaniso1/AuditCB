@@ -1328,6 +1328,14 @@ textarea:focus:invalid {
     display: flex;
     flex-direction: column;
     z-index: 50;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.client-sidebar.hidden {
+    transform: translateX(100%);
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .client-sidebar-header {

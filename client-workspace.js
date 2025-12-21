@@ -101,7 +101,7 @@ function renderClientSidebarMenu(clientId) {
     const navList = document.querySelector('.main-nav ul');
     if (!navList) return;
 
-    // Force sidebar to be visible (in case it was hidden)
+    // Force left sidebar to be visible
     const sidebar = document.getElementById('sidebar');
     if (sidebar) {
         sidebar.classList.remove('hidden');
@@ -110,6 +110,12 @@ function renderClientSidebarMenu(clientId) {
         sidebar.style.width = 'var(--sidebar-width)';
         sidebar.style.opacity = '1';
         sidebar.style.pointerEvents = 'auto';
+    }
+
+    // Hide right client sidebar when in client workspace
+    const clientSidebar = document.querySelector('.client-sidebar');
+    if (clientSidebar) {
+        clientSidebar.classList.add('hidden');
     }
 
     // Client Menu Items
@@ -157,6 +163,12 @@ window.backToDashboard = function () {
         sidebar.style.width = 'var(--sidebar-width)';
         sidebar.style.opacity = '1';
         sidebar.style.pointerEvents = 'auto';
+    }
+
+    // Show right client sidebar again
+    const clientSidebar = document.querySelector('.client-sidebar');
+    if (clientSidebar) {
+        clientSidebar.classList.remove('hidden');
     }
 
     // RESTORE GLOBAL SIDEBAR MENU
