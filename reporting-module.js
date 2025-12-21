@@ -6,6 +6,24 @@
 // Render the Summary/Report Drafting Tab
 function renderReportSummaryTab(report, tabContent) {
     const h = window.UTILS.escapeHtml; // Alias for sanitization
+
+    // Role-based access: Only Lead Auditor and Cert Manager can access drafting
+    const userRole = window.state.currentUser?.role;
+    const canAccessDrafting = userRole === window.CONSTANTS.ROLES.LEAD_AUDITOR ||
+        userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER;
+
+    if (!canAccessDrafting) {
+        tabContent.innerHTML = `
+            <div class="card" style="text-align: center; padding: 3rem;">
+                <i class="fa-solid fa-lock" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                <h3 style="margin-bottom: 0.5rem; color: var(--text-secondary);">Access Restricted</h3>
+                <p style="color: #94a3b8; margin-bottom: 1rem;">Audit Report Drafting is available to Lead Auditors and Certification Managers only.</p>
+                <p style="font-size: 0.85rem; color: #64748b;">Current Role: <strong>${userRole || 'Unknown'}</strong></p>
+            </div>
+        `;
+        return;
+    }
+
     const ncrCount = (report.ncrs || []).length;
     const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
     const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
