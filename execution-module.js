@@ -536,14 +536,70 @@ function renderExecutionTab(report, tabName) {
             let checklistHTML = '';
 
             if (assignedChecklists.length > 0) {
-                checklistHTML = assignedChecklists.map(checklist => `
-                    <div style="margin-bottom: 2rem;">
-                        <h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--primary-color);">
-                            ${checklist.name}
-                        </h4>
-                        ${(checklist.items || []).map((item, idx) => renderRow(item, checklist.id, idx, false)).join('')}
-                    </div>
-                 `).join('');
+                checklistHTML = assignedChecklists.map(checklist => {
+                    // Support both old (items) and new (clauses) format
+                    const useClauses = checklist.clauses && checklist.clauses.length > 0;
+
+                    if (useClauses) {
+                        // New hierarchical format with accordion
+                        let itemIdx = 0;
+                        return `
+                            <div style="margin-bottom: 2rem;">
+                                <h4 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                                    <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color); -webkit-text-fill-color: #667eea;"></i> ${checklist.name}
+                                </h4>
+                                ${checklist.clauses.map((clause, clauseIdx) => {
+                            const sectionId = `clause-${checklist.id}-${clause.mainClause}`;
+                            const clauseItems = clause.subClauses.map((item, subIdx) => {
+                                const globalIdx = itemIdx++;
+                                return renderRow(item, checklist.id, `${clause.mainClause}-${subIdx}`, false);
+                            }).join('');
+
+                            // Calculate progress for this section
+                            const sectionProgress = clause.subClauses.map((_, subIdx) => {
+                                const key = `${checklist.id}-${clause.mainClause}-${subIdx}`;
+                                return progressMap[key]?.status || '';
+                            });
+                            const completed = sectionProgress.filter(s => s === 'conform' || s === 'nc' || s === 'na').length;
+                            const total = clause.subClauses.length;
+                            const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+                            return `
+                                        <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                                            <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); cursor: pointer; user-select: none;" onclick="window.toggleAccordion('${sectionId}')">
+                                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${clause.mainClause}</span>
+                                                    <span style="font-weight: 600; color: #1e293b;">${clause.title}</span>
+                                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">(${clause.subClauses.length} items)</span>
+                                                </div>
+                                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                                    <div style="width: 100px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                                                        <div style="width: ${progressPct}%; height: 100%; background: ${progressPct === 100 ? '#10b981' : '#3b82f6'}; transition: width 0.3s;"></div>
+                                                    </div>
+                                                    <span style="font-size: 0.8rem; color: var(--text-secondary);">${completed}/${total}</span>
+                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s;"></i>
+                                                </div>
+                                            </div>
+                                            <div class="accordion-content" id="${sectionId}" style="display: ${clauseIdx === 0 ? 'block' : 'none'}; padding: 1rem; background: white;">
+                                                ${clauseItems}
+                                            </div>
+                                        </div>
+                                    `;
+                        }).join('')}
+                            </div>
+                        `;
+                    } else {
+                        // Fallback for old flat format
+                        return `
+                            <div style="margin-bottom: 2rem;">
+                                <h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--primary-color);">
+                                    ${checklist.name}
+                                </h4>
+                                ${(checklist.items || []).map((item, idx) => renderRow(item, checklist.id, idx, false)).join('')}
+                            </div>
+                        `;
+                    }
+                }).join('');
             } else {
                 checklistHTML = `<div class="alert alert-warning">No configured checklists found.</div>`;
             }
@@ -836,7 +892,19 @@ function renderExecutionTab(report, tabName) {
 }
 
 // Helper functions for execution module
-// Helper functions for execution module
+
+// Accordion toggle for clause sections
+window.toggleAccordion = function (sectionId) {
+    const content = document.getElementById(sectionId);
+    const icon = document.getElementById('icon-' + sectionId);
+    if (content) {
+        const isVisible = content.style.display === 'block';
+        content.style.display = isVisible ? 'none' : 'block';
+        if (icon) {
+            icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+    }
+};
 
 window.setChecklistStatus = function (uniqueId, status) {
     const row = document.getElementById('row-' + uniqueId);

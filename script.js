@@ -284,60 +284,144 @@ const state = {
             createdBy: 'System Admin',
             createdAt: '2024-01-01',
             updatedAt: '2025-01-01',
-            items: [
-                { clause: '4.1', requirement: 'Has the organization determined external and internal issues relevant to its purpose?' },
-                { clause: '4.2', requirement: 'Have the needs and expectations of interested parties been determined?' },
-                { clause: '4.3', requirement: 'Is the scope of the quality management system determined and documented?' },
-                { clause: '4.4', requirement: 'Are QMS processes and their interactions determined and maintained?' },
-                { clause: '5.1', requirement: 'Does top management demonstrate leadership and commitment to the QMS?' },
-                { clause: '5.2', requirement: 'Is the quality policy established, communicated, and understood?' },
-                { clause: '5.3', requirement: 'Are roles, responsibilities, and authorities assigned and communicated?' },
-                { clause: '6.1', requirement: 'Have risks and opportunities been addressed to assure results?' },
-                { clause: '6.2', requirement: 'Are quality objectives established at relevant functions and levels?' },
-                { clause: '6.3', requirement: 'Are changes to the QMS planned and carried out systematically?' },
-                { clause: '7.1.3', requirement: 'Is the infrastructure necessary for processes provided and maintained?' },
-                { clause: '7.1.5', requirement: 'Are resources for monitoring and measurement fit for purpose?' },
-                { clause: '7.2', requirement: 'Are persons competent based on education, training, or experience?' },
-                { clause: '7.5', requirement: 'Is documented information created, updated, and controlled?' },
-                { clause: '8.1', requirement: 'Are processes for products and services planned and controlled?' },
-                { clause: '8.2.3', requirement: 'Are requirements for products and services reviewed before commitment?' },
-                { clause: '8.4', requirement: 'Are external providers (suppliers) evaluated and monitored?' },
-                { clause: '8.5.1', requirement: 'Is production and service provision implemented under controlled conditions?' },
-                { clause: '8.7', requirement: 'Are nonconforming outputs identified and controlled?' },
-                { clause: '9.2', requirement: 'Are internal audits conducted at planned intervals?' },
-                { clause: '9.3', requirement: 'Does top management review the QMS at planned intervals?' },
-                { clause: '10.2', requirement: 'Are nonconformities and corrective actions managed effectively?' }
+            clauses: [
+                {
+                    mainClause: '4',
+                    title: 'Context of the Organization',
+                    subClauses: [
+                        { clause: '4.1', requirement: 'Has the organization determined external and internal issues relevant to its purpose?' },
+                        { clause: '4.2', requirement: 'Have the needs and expectations of interested parties been determined?' },
+                        { clause: '4.3', requirement: 'Is the scope of the quality management system determined and documented?' },
+                        { clause: '4.4', requirement: 'Are QMS processes and their interactions determined and maintained?' }
+                    ]
+                },
+                {
+                    mainClause: '5',
+                    title: 'Leadership',
+                    subClauses: [
+                        { clause: '5.1', requirement: 'Does top management demonstrate leadership and commitment to the QMS?' },
+                        { clause: '5.2', requirement: 'Is the quality policy established, communicated, and understood?' },
+                        { clause: '5.3', requirement: 'Are roles, responsibilities, and authorities assigned and communicated?' }
+                    ]
+                },
+                {
+                    mainClause: '6',
+                    title: 'Planning',
+                    subClauses: [
+                        { clause: '6.1', requirement: 'Have risks and opportunities been addressed to assure results?' },
+                        { clause: '6.2', requirement: 'Are quality objectives established at relevant functions and levels?' },
+                        { clause: '6.3', requirement: 'Are changes to the QMS planned and carried out systematically?' }
+                    ]
+                },
+                {
+                    mainClause: '7',
+                    title: 'Support',
+                    subClauses: [
+                        { clause: '7.1.3', requirement: 'Is the infrastructure necessary for processes provided and maintained?' },
+                        { clause: '7.1.5', requirement: 'Are resources for monitoring and measurement fit for purpose?' },
+                        { clause: '7.2', requirement: 'Are persons competent based on education, training, or experience?' },
+                        { clause: '7.5', requirement: 'Is documented information created, updated, and controlled?' }
+                    ]
+                },
+                {
+                    mainClause: '8',
+                    title: 'Operation',
+                    subClauses: [
+                        { clause: '8.1', requirement: 'Are processes for products and services planned and controlled?' },
+                        { clause: '8.2.3', requirement: 'Are requirements for products and services reviewed before commitment?' },
+                        { clause: '8.4', requirement: 'Are external providers (suppliers) evaluated and monitored?' },
+                        { clause: '8.5.1', requirement: 'Is production and service provision implemented under controlled conditions?' },
+                        { clause: '8.7', requirement: 'Are nonconforming outputs identified and controlled?' }
+                    ]
+                },
+                {
+                    mainClause: '9',
+                    title: 'Performance Evaluation',
+                    subClauses: [
+                        { clause: '9.2', requirement: 'Are internal audits conducted at planned intervals?' },
+                        { clause: '9.3', requirement: 'Does top management review the QMS at planned intervals?' }
+                    ]
+                },
+                {
+                    mainClause: '10',
+                    title: 'Improvement',
+                    subClauses: [
+                        { clause: '10.2', requirement: 'Are nonconformities and corrective actions managed effectively?' }
+                    ]
+                }
             ]
         },
         {
             id: 2,
-            name: 'ISO 14001:2015 Environmenal Audit Checklist',
+            name: 'ISO 14001:2015 Environmental Audit Checklist',
             standard: 'ISO 14001:2015',
             type: 'global',
             createdBy: 'System Admin',
             createdAt: '2024-01-01',
             updatedAt: '2025-01-01',
-            items: [
-                { clause: '4.1', requirement: 'Have internal/external issues affecting the EMS been determined?' },
-                { clause: '4.2', requirement: 'Are needs/expectations of interested parties (stakeholders) identified?' },
-                { clause: '4.3', requirement: 'Is the scope of the EMS defined and available as documented info?' },
-                { clause: '5.2', requirement: 'Is the environmental policy established and compatible with context?' },
-                { clause: '6.1.2', requirement: 'Have environmental aspects and significant impacts been identified?' },
-                { clause: '6.1.3', requirement: 'Does the organization have access to compliance obligations/laws?' },
-                { clause: '6.1.4', requirement: 'Are actions planned to address significant aspects and obligations?' },
-                { clause: '6.2', requirement: 'Are environmental objectives established and measurable where feasible?' },
-                { clause: '7.2', requirement: 'Are persons doing work affecting environmental performance competent?' },
-                { clause: '7.3', requirement: 'Are persons aware of the policy and their contribution to the EMS?' },
-                { clause: '7.4', requirement: 'Are internal and external communications processes established?' },
-                { clause: '7.5', requirement: 'Is documented information required by ISO 14001 controlled?' },
-                { clause: '8.1', requirement: 'Are operational controls established for significant aspects?' },
-                { clause: '8.2', requirement: 'Are emergency preparedness and response procedures in place?' },
-                { clause: '9.1.1', requirement: 'Is environmental performance monitored, measured, and analyzed?' },
-                { clause: '9.1.2', requirement: 'Is compliance with legal requirements evaluated periodically?' },
-                { clause: '9.2', requirement: 'Are internal audits conducted to determine if EMS conforms and is effective?' },
-                { clause: '9.3', requirement: 'Is management review conducted to ensure continuing suitability?' },
-                { clause: '10.2', requirement: 'Are nonconformities reacted to and root causes eliminated?' },
-                { clause: '10.3', requirement: 'Is the EMS continually improved to enhance performance?' }
+            clauses: [
+                {
+                    mainClause: '4',
+                    title: 'Context of the Organization',
+                    subClauses: [
+                        { clause: '4.1', requirement: 'Have internal/external issues affecting the EMS been determined?' },
+                        { clause: '4.2', requirement: 'Are needs/expectations of interested parties (stakeholders) identified?' },
+                        { clause: '4.3', requirement: 'Is the scope of the EMS defined and available as documented info?' }
+                    ]
+                },
+                {
+                    mainClause: '5',
+                    title: 'Leadership',
+                    subClauses: [
+                        { clause: '5.2', requirement: 'Is the environmental policy established and compatible with context?' }
+                    ]
+                },
+                {
+                    mainClause: '6',
+                    title: 'Planning',
+                    subClauses: [
+                        { clause: '6.1.2', requirement: 'Have environmental aspects and significant impacts been identified?' },
+                        { clause: '6.1.3', requirement: 'Does the organization have access to compliance obligations/laws?' },
+                        { clause: '6.1.4', requirement: 'Are actions planned to address significant aspects and obligations?' },
+                        { clause: '6.2', requirement: 'Are environmental objectives established and measurable where feasible?' }
+                    ]
+                },
+                {
+                    mainClause: '7',
+                    title: 'Support',
+                    subClauses: [
+                        { clause: '7.2', requirement: 'Are persons doing work affecting environmental performance competent?' },
+                        { clause: '7.3', requirement: 'Are persons aware of the policy and their contribution to the EMS?' },
+                        { clause: '7.4', requirement: 'Are internal and external communications processes established?' },
+                        { clause: '7.5', requirement: 'Is documented information required by ISO 14001 controlled?' }
+                    ]
+                },
+                {
+                    mainClause: '8',
+                    title: 'Operation',
+                    subClauses: [
+                        { clause: '8.1', requirement: 'Are operational controls established for significant aspects?' },
+                        { clause: '8.2', requirement: 'Are emergency preparedness and response procedures in place?' }
+                    ]
+                },
+                {
+                    mainClause: '9',
+                    title: 'Performance Evaluation',
+                    subClauses: [
+                        { clause: '9.1.1', requirement: 'Is environmental performance monitored, measured, and analyzed?' },
+                        { clause: '9.1.2', requirement: 'Is compliance with legal requirements evaluated periodically?' },
+                        { clause: '9.2', requirement: 'Are internal audits conducted to determine if EMS conforms and is effective?' },
+                        { clause: '9.3', requirement: 'Is management review conducted to ensure continuing suitability?' }
+                    ]
+                },
+                {
+                    mainClause: '10',
+                    title: 'Improvement',
+                    subClauses: [
+                        { clause: '10.2', requirement: 'Are nonconformities reacted to and root causes eliminated?' },
+                        { clause: '10.3', requirement: 'Is the EMS continually improved to enhance performance?' }
+                    ]
+                }
             ]
         },
         {
@@ -348,29 +432,71 @@ const state = {
             createdBy: 'System Admin',
             createdAt: '2024-01-01',
             updatedAt: '2025-01-01',
-            items: [
-                { clause: '4.1', requirement: 'Has the organization determined context relevant to OHS purpose?' },
-                { clause: '4.2', requirement: 'Are needs and expectations of workers and interested parties determined?' },
-                { clause: '4.3', requirement: 'Is the scope of the OH&S management system documented?' },
-                { clause: '5.1', requirement: 'Does management take overall responsibility and accountability for OHS?' },
-                { clause: '5.2', requirement: 'Is there an OHS Policy that includes commitment to safe working conditions?' },
-                { clause: '5.4', requirement: 'Are processes for consultation and participation of workers established?' },
-                { clause: '6.1.2.1', requirement: 'Is there an ongoing process for hazard identification?' },
-                { clause: '6.1.2.2', requirement: 'Are assessment of OHS risks and other risks to the OHS system conducted?' },
-                { clause: '6.1.3', requirement: 'Are legal and other requirements determined and up to date?' },
-                { clause: '6.2', requirement: 'Are OHS objectives established to maintain and improve the OHS system?' },
-                { clause: '7.2', requirement: 'Are workers competent on the basis of education, training or experience?' },
-                { clause: '7.3', requirement: 'Are workers aware of incident implications and their right to remove themselves?' },
-                { clause: '7.4', requirement: 'Are internal and external communications relevant to the OHS system done?' },
-                { clause: '8.1.2', requirement: 'Is the hierarchy of controls used to eliminate hazards and reduce risks?' },
-                { clause: '8.1.3', requirement: 'Is there a process for the implementation and control of planned changes?' },
-                { clause: '8.1.4', requirement: 'Are procurement processes and contractors controlled regarding OHS?' },
-                { clause: '8.2', requirement: 'Are potential emergency situations prepared for and responded to?' },
-                { clause: '9.1.1', requirement: 'Is OHS performance and effectiveness monitored and evaluated?' },
-                { clause: '9.1.2', requirement: 'Is evaluation of compliance with legal requirements carried out?' },
-                { clause: '9.2', requirement: 'Are internal audits conducted effectively?' },
-                { clause: '9.3', requirement: 'Is management review conducted?' },
-                { clause: '10.2', requirement: 'Are incidents and nonconformities investigated and acted upon?' }
+            clauses: [
+                {
+                    mainClause: '4',
+                    title: 'Context of the Organization',
+                    subClauses: [
+                        { clause: '4.1', requirement: 'Has the organization determined context relevant to OHS purpose?' },
+                        { clause: '4.2', requirement: 'Are needs and expectations of workers and interested parties determined?' },
+                        { clause: '4.3', requirement: 'Is the scope of the OH&S management system documented?' }
+                    ]
+                },
+                {
+                    mainClause: '5',
+                    title: 'Leadership',
+                    subClauses: [
+                        { clause: '5.1', requirement: 'Does management take overall responsibility and accountability for OHS?' },
+                        { clause: '5.2', requirement: 'Is there an OHS Policy that includes commitment to safe working conditions?' },
+                        { clause: '5.4', requirement: 'Are processes for consultation and participation of workers established?' }
+                    ]
+                },
+                {
+                    mainClause: '6',
+                    title: 'Planning',
+                    subClauses: [
+                        { clause: '6.1.2.1', requirement: 'Is there an ongoing process for hazard identification?' },
+                        { clause: '6.1.2.2', requirement: 'Are assessment of OHS risks and other risks to the OHS system conducted?' },
+                        { clause: '6.1.3', requirement: 'Are legal and other requirements determined and up to date?' },
+                        { clause: '6.2', requirement: 'Are OHS objectives established to maintain and improve the OHS system?' }
+                    ]
+                },
+                {
+                    mainClause: '7',
+                    title: 'Support',
+                    subClauses: [
+                        { clause: '7.2', requirement: 'Are workers competent on the basis of education, training or experience?' },
+                        { clause: '7.3', requirement: 'Are workers aware of incident implications and their right to remove themselves?' },
+                        { clause: '7.4', requirement: 'Are internal and external communications relevant to the OHS system done?' }
+                    ]
+                },
+                {
+                    mainClause: '8',
+                    title: 'Operation',
+                    subClauses: [
+                        { clause: '8.1.2', requirement: 'Is the hierarchy of controls used to eliminate hazards and reduce risks?' },
+                        { clause: '8.1.3', requirement: 'Is there a process for the implementation and control of planned changes?' },
+                        { clause: '8.1.4', requirement: 'Are procurement processes and contractors controlled regarding OHS?' },
+                        { clause: '8.2', requirement: 'Are potential emergency situations prepared for and responded to?' }
+                    ]
+                },
+                {
+                    mainClause: '9',
+                    title: 'Performance Evaluation',
+                    subClauses: [
+                        { clause: '9.1.1', requirement: 'Is OHS performance and effectiveness monitored and evaluated?' },
+                        { clause: '9.1.2', requirement: 'Is evaluation of compliance with legal requirements carried out?' },
+                        { clause: '9.2', requirement: 'Are internal audits conducted effectively?' },
+                        { clause: '9.3', requirement: 'Is management review conducted?' }
+                    ]
+                },
+                {
+                    mainClause: '10',
+                    title: 'Improvement',
+                    subClauses: [
+                        { clause: '10.2', requirement: 'Are incidents and nonconformities investigated and acted upon?' }
+                    ]
+                }
             ]
         },
         {
@@ -381,18 +507,42 @@ const state = {
             createdBy: 'System Admin',
             createdAt: '2024-01-01',
             updatedAt: '2024-01-20',
-            items: [
-                { clause: '4.1', requirement: 'Understanding the organization and its context' },
-                { clause: '4.2', requirement: 'Understanding the needs and expectations of interested parties' },
-                { clause: '5.1', requirement: 'Leadership and commitment' },
-                { clause: '5.2', requirement: 'Information Security Policy' },
-                { clause: '6.1.2', requirement: 'Information security risk assessment' },
-                { clause: '6.1.3', requirement: 'Information security risk treatment' },
-                { clause: '6.2', requirement: 'Information security objectives' },
-                { clause: 'A.5', requirement: 'Organizational controls' },
-                { clause: 'A.6', requirement: 'People controls' },
-                { clause: 'A.7', requirement: 'Physical controls' },
-                { clause: 'A.8', requirement: 'Technological controls' }
+            clauses: [
+                {
+                    mainClause: '4',
+                    title: 'Context of the Organization',
+                    subClauses: [
+                        { clause: '4.1', requirement: 'Understanding the organization and its context' },
+                        { clause: '4.2', requirement: 'Understanding the needs and expectations of interested parties' }
+                    ]
+                },
+                {
+                    mainClause: '5',
+                    title: 'Leadership',
+                    subClauses: [
+                        { clause: '5.1', requirement: 'Leadership and commitment' },
+                        { clause: '5.2', requirement: 'Information Security Policy' }
+                    ]
+                },
+                {
+                    mainClause: '6',
+                    title: 'Planning',
+                    subClauses: [
+                        { clause: '6.1.2', requirement: 'Information security risk assessment' },
+                        { clause: '6.1.3', requirement: 'Information security risk treatment' },
+                        { clause: '6.2', requirement: 'Information security objectives' }
+                    ]
+                },
+                {
+                    mainClause: 'A',
+                    title: 'Annex A Controls',
+                    subClauses: [
+                        { clause: 'A.5', requirement: 'Organizational controls' },
+                        { clause: 'A.6', requirement: 'People controls' },
+                        { clause: 'A.7', requirement: 'Physical controls' },
+                        { clause: 'A.8', requirement: 'Technological controls' }
+                    ]
+                }
             ]
         }
     ],
