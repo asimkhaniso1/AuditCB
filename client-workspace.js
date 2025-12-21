@@ -132,6 +132,9 @@ function renderClientSidebarMenu(clientId) {
         <li onclick="window.renderClientModule(${clientId}, 'plans', this)">
             <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
+        <li onclick="window.renderClientModule(${clientId}, 'execution', this)">
+            <i class="fa-solid fa-tasks"></i> Execution
+        </li>
         <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
             <i class="fa-solid fa-triangle-exclamation"></i> Findings
         </li>
@@ -221,6 +224,9 @@ window.renderClientModule = function (clientId, moduleName, clickedElement) {
             break;
         case 'plans':
             contentArea.innerHTML = renderClientPlans(client);
+            break;
+        case 'execution':
+            contentArea.innerHTML = renderClientExecution(client);
             break;
         case 'findings':
             contentArea.innerHTML = renderClientFindings(client);
@@ -565,6 +571,73 @@ function renderClientPlans(client) {
                                 </td>
                             </tr>
                         `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+// Client execution/audit reports
+function renderClientExecution(client) {
+    const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
+
+    if (reports.length === 0) {
+        return `
+            <div class="card" style="text-align: center; padding: 3rem;">
+                <i class="fa-solid fa-tasks" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                <p style="color: var(--text-secondary);">No audit execution records for this client yet.</p>
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openCreatePlanModal('${client.name}')">
+                    Start First Audit
+                </button>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Audit Execution & Reports</h3>
+                <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Audit
+                </button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Findings</th>
+                            <th>Recommendation</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
+        const findingsCount = (r.ncrs || r.findings || []).length;
+        const openNCs = (r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
+
+        return `
+                            <tr>
+                                <td>${r.date || '-'}</td>
+                                <td>${r.type || 'Audit'}</td>
+                                <td><span class="status-badge status-${(r.status || 'draft').toLowerCase().replace(' ', '-')}">${r.status || 'Draft'}</span></td>
+                                <td>
+                                    <span class="badge" style="background: ${findingsCount > 0 ? '#fef3c7' : '#e0f2fe'}; color: ${findingsCount > 0 ? '#d97706' : '#0284c7'};">
+                                        ${findingsCount} total
+                                    </span>
+                                    ${openNCs > 0 ? `<span class="badge" style="background: #fee2e2; color: #dc2626; margin-left: 0.25rem;">${openNCs} open</span>` : ''}
+                                </td>
+                                <td>${r.recommendation || '-'}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditReport && window.viewAuditReport(${r.id})" title="View Report">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `}).join('')}
                     </tbody>
                 </table>
             </div>
