@@ -1063,3 +1063,205 @@ window.autoClassifyFinding = function (reportId, source, index, description) {
         }
     }, 1200);
 };
+
+// ============================================
+// MAIN REPORTING DASHBOARD
+// ============================================
+
+function renderReportingModule() {
+    // 1. Calculate Metrics
+    const reports = window.state.auditReports || [];
+    const totalReports = reports.length;
+    const pendingReview = reports.filter(r => r.status === window.CONSTANTS.STATUS.IN_REVIEW).length;
+    const approved = reports.filter(r => r.status === window.CONSTANTS.STATUS.APPROVED).length;
+    const published = reports.filter(r => r.status === window.CONSTANTS.STATUS.PUBLISHED || r.status === window.CONSTANTS.STATUS.FINALIZED).length;
+    const drafting = reports.filter(r => r.status === window.CONSTANTS.STATUS.DRAFT).length;
+
+    // 2. Render Dashboard HTML
+    const contentArea = document.getElementById('content-area');
+    contentArea.innerHTML = `
+        <div class="fade-in">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h2 style="margin: 0;">Audit Reporting Dashboard</h2>
+                    <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">Manage audit reports, QA reviews, and certification decisions.</p>
+                </div>
+                <button class="btn btn-primary" onclick="window.renderModule('audit-execution')">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create New Report
+                </button>
+            </div>
+
+            <!-- Reporting Process Flow Block -->
+            <div class="card" style="margin-bottom: 2rem; background: linear-gradient(to right, #f8fafc, #fff);">
+                <h3 style="margin: 0 0 1.5rem 0; font-size: 1.1rem; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">Reporting Process Flow</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; text-align: center; overflow-x: auto; padding-bottom: 0.5rem;">
+                    <div style="flex: 1; min-width: 100px; position: relative;">
+                        <div style="width: 48px; height: 48px; background: #e0f2fe; color: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">1</div>
+                        <div style="font-weight: 600; color: #334155;">Drafting</div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Auditor compiles findings</div>
+                    </div>
+                    <div style="flex: 0 0 40px; color: #cbd5e1;"><i class="fa-solid fa-chevron-right"></i></div>
+                    
+                    <div style="flex: 1; min-width: 100px; position: relative;">
+                        <div style="width: 48px; height: 48px; background: #ffedd5; color: #ea580c; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">2</div>
+                        <div style="font-weight: 600; color: #334155;">QA Review</div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Compliance check</div>
+                    </div>
+                    <div style="flex: 0 0 40px; color: #cbd5e1;"><i class="fa-solid fa-chevron-right"></i></div>
+
+                    <div style="flex: 1; min-width: 100px; position: relative;">
+                        <div style="width: 48px; height: 48px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">3</div>
+                        <div style="font-weight: 600; color: #334155;">Approval</div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Cert. Manager Decision</div>
+                    </div>
+                    <div style="flex: 0 0 40px; color: #cbd5e1;"><i class="fa-solid fa-chevron-right"></i></div>
+
+                    <div style="flex: 1; min-width: 100px; position: relative;">
+                        <div style="width: 48px; height: 48px; background: #f3e8ff; color: #9333ea; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">4</div>
+                        <div style="font-weight: 600; color: #334155;">Publish</div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Final report issued</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="dashboard-grid" style="margin-bottom: 2rem;">
+                <div class="card stat-card" style="border-left: 4px solid var(--primary-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Total Reports</p>
+                            <h3 style="margin: 0.5rem 0 0 0; font-size: 2rem;">${totalReports}</h3>
+                        </div>
+                        <div style="background: #eff6ff; padding: 0.75rem; border-radius: 8px; color: var(--primary-color);">
+                            <i class="fa-solid fa-file-contract" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        <span style="color: var(--primary-color); font-weight: 500;">${drafting}</span> currently drafting
+                    </div>
+                </div>
+
+                <div class="card stat-card" style="border-left: 4px solid var(--warning-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Pending Review</p>
+                            <h3 style="margin: 0.5rem 0 0 0; font-size: 2rem;">${pendingReview}</h3>
+                        </div>
+                        <div style="background: #fff7ed; padding: 0.75rem; border-radius: 8px; color: var(--warning-color);">
+                            <i class="fa-solid fa-hourglass-half" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        Requires QA / Cert Manager attention
+                    </div>
+                </div>
+
+                <div class="card stat-card" style="border-left: 4px solid #16a34a;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Approved</p>
+                            <h3 style="margin: 0.5rem 0 0 0; font-size: 2rem;">${approved}</h3>
+                        </div>
+                        <div style="background: #f0fdf4; padding: 0.75rem; border-radius: 8px; color: #16a34a;">
+                            <i class="fa-solid fa-check-circle" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        Ready for publishing
+                    </div>
+                </div>
+
+                <div class="card stat-card" style="border-left: 4px solid #d946ef;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Published</p>
+                            <h3 style="margin: 0.5rem 0 0 0; font-size: 2rem;">${published}</h3>
+                        </div>
+                        <div style="background: #fdf4ff; padding: 0.75rem; border-radius: 8px; color: #d946ef;">
+                            <i class="fa-solid fa-file-signature" style="font-size: 1.25rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        Finalized reports
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Table -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3>All Reports</h3>
+                    <div class="search-box" style="width: 300px;">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" placeholder="Search reports..." onkeyup="window.filterReports(this.value)">
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Report ID</th>
+                                <th>Client</th>
+                                <th>Standard</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Lead Auditor</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table-body">
+                            ${renderReportsTableRows(reports)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderReportsTableRows(reports) {
+    if (reports.length === 0) {
+        return `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No reports found.</td></tr>`;
+    }
+
+    return reports.map(r => {
+        const statusClass = r.status.toLowerCase().replace(' ', '-');
+
+        // Custom status badge style
+        let badgeStyle = 'background: #f1f5f9; color: #64748b;';
+        if (r.status === window.CONSTANTS.STATUS.IN_REVIEW) badgeStyle = 'background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5;';
+        if (r.status === window.CONSTANTS.STATUS.APPROVED) badgeStyle = 'background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;';
+        if (r.status === window.CONSTANTS.STATUS.PUBLISHED) badgeStyle = 'background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;';
+        if (r.status === window.CONSTANTS.STATUS.DRAFT) badgeStyle = 'background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;';
+
+        return `
+        <tr>
+            <td style="font-family: monospace; font-weight: 600;">#${r.id}</td>
+            <td style="font-weight: 500;">${r.clientName || 'Unknown Client'}</td>
+            <td>${r.standard || '-'}</td>
+            <td>${r.type || '-'}</td>
+            <td><span class="badge" style="${badgeStyle}">${r.status}</span></td>
+            <td><div style="display: flex; align-items: center; gap: 0.5rem;"><div style="width: 24px; height: 24px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #64748b;"><i class="fa-solid fa-user"></i></div> ${r.leadAuditor || 'System'}</div></td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="window.renderExecutionDetail(${r.id})">
+                    <i class="fa-solid fa-eye"></i> View
+                </button>
+            </td>
+        </tr>
+        `;
+    }).join('');
+}
+
+window.filterReports = function (query) {
+    const term = query.toLowerCase();
+    const rows = document.querySelectorAll('#reports-table-body tr');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(term) ? '' : 'none';
+    });
+};
+
+// Export
+window.renderReportingModule = renderReportingModule;
