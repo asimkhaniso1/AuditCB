@@ -875,7 +875,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             `;
             break;
 
-        case 'review':
+        case 'review': {
             // Auditor's Findings Review Screen
             const allFindings = [];
 
@@ -1021,6 +1021,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     `}
                 </div>
             `;
+        }
             break;
 
         case 'summary':
