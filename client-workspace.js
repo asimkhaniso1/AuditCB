@@ -3,13 +3,21 @@
 // Client-centric navigation and workspace rendering
 // ============================================
 
+let globalSidebarContent = '';
+
 // Initialize client sidebar on page load
 document.addEventListener('DOMContentLoaded', function () {
+    // Capture global sidebar content before any changes
+    const navList = document.querySelector('.main-nav ul');
+    if (navList) {
+        globalSidebarContent = navList.innerHTML;
+    }
+
     setTimeout(() => {
         console.log('Initializing client sidebar...', window.state?.clients);
         populateClientSidebar();
         setupClientSearch();
-    }, 1000); // Increased timeout to ensure state is loaded
+    }, 1000);
 });
 
 // Populate the right sidebar with client list
@@ -64,125 +72,223 @@ function setupClientSearch() {
     });
 }
 
-// Select a client and render their workspace
+// ============================================
+// NAVIGATION & SIDEBAR SWITCHING
+// ============================================
+
+// Select a client and switch to their workspace
 window.selectClient = function (clientId) {
-    console.log('selectClient called with ID:', clientId, 'Type:', typeof clientId);
     const client = window.state.clients.find(c => c.id === clientId);
-    console.log('Found client:', client);
-    if (!client) {
-        console.error('Client not found for ID:', clientId);
-        return;
-    }
+    if (!client) return;
 
     // Update active state
     window.state.activeClientId = clientId;
 
-    // Update sidebar active states
+    // Update right sidebar visual state
     document.querySelectorAll('.client-list-item').forEach(item => {
         item.classList.toggle('active', parseInt(item.dataset.clientId) === clientId);
     });
 
-    // Clear left sidebar active state
-    document.querySelectorAll('.main-nav li').forEach(li => li.classList.remove('active'));
+    // SWITCH LEFT SIDEBAR TO CLIENT MENU
+    renderClientSidebarMenu(clientId);
 
-    // Hide left sidebar when in client workspace
-    // Hide left sidebar when in client workspace
-    const leftSidebar = document.getElementById('sidebar');
-    if (leftSidebar) {
-        leftSidebar.classList.add('hidden');
-        leftSidebar.style.display = ''; // Clear inline style if present
-    }
-
-    // Render client workspace
-    renderClientWorkspace(clientId);
+    // Initial Render: Overview
+    renderClientModule(clientId, 'overview');
 };
 
-// Render the client workspace in main content area
-function renderClientWorkspace(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+// Render Client-Specific Layout in Left Sidebar
+function renderClientSidebarMenu(clientId) {
+    const navList = document.querySelector('.main-nav ul');
+    if (!navList) return;
 
-    // Update page title
-    document.getElementById('page-title').textContent = client.name;
-
-    // Delegate to the comprehensive client detail view from clients-module.js
-    if (typeof window.renderClientDetail === 'function') {
-        window.renderClientDetail(clientId);
-
-        // Re-apply sidebar hiding since renderClientDetail might reset layout
-        const leftSidebar = document.getElementById('sidebar');
-        if (leftSidebar) {
-            leftSidebar.classList.add('hidden');
-            leftSidebar.style.display = '';
-        }
-    } else {
-        console.error('renderClientDetail function not found');
-        // Fallback to basic view if module missing
-        const contentArea = document.getElementById('content-area');
-        contentArea.innerHTML = `<div class="card"><p>Error: Client Detail module not loaded.</p></div>`;
+    // Force sidebar to be visible (in case it was hidden)
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.remove('hidden');
+        sidebar.style.display = 'flex';
+        sidebar.style.transform = 'translateX(0)';
+        sidebar.style.width = 'var(--sidebar-width)';
+        sidebar.style.opacity = '1';
+        sidebar.style.pointerEvents = 'auto';
     }
+
+    // Client Menu Items
+    navList.innerHTML = `
+        <li style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;" onclick="window.backToDashboard()">
+            <i class="fa-solid fa-arrow-left"></i> Back to Global
+        </li>
+        <li class="active" onclick="window.renderClientModule(${clientId}, 'overview', this)">
+            <i class="fa-solid fa-house"></i> Overview
+        </li>
+        <li onclick="window.renderClientModule(${clientId}, 'cycle', this)">
+            <i class="fa-solid fa-timeline"></i> Audit Cycle
+        </li>
+        <li onclick="window.renderClientModule(${clientId}, 'plans', this)">
+            <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
+        </li>
+        <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
+            <i class="fa-solid fa-triangle-exclamation"></i> Findings
+        </li>
+        <li onclick="window.renderClientModule(${clientId}, 'certs', this)">
+            <i class="fa-solid fa-certificate"></i> Certificates
+        </li>
+        <li onclick="window.renderClientModule(${clientId}, 'compliance', this)">
+            <i class="fa-solid fa-shield-halved"></i> Compliance
+        </li>
+        <li onclick="window.renderClientModule(${clientId}, 'docs', this)">
+            <i class="fa-solid fa-folder-open"></i> Documents
+        </li>
+    `;
 }
 
-// Render individual workspace tab content
-function renderWorkspaceTab(clientId, tabName) {
+// Back to Global Dashboard
+window.backToDashboard = function () {
+    window.state.activeClientId = null;
+
+    // Clear right sidebar selection
+    document.querySelectorAll('.client-list-item').forEach(item => item.classList.remove('active'));
+
+    // Force sidebar to be visible
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.remove('hidden');
+        sidebar.style.display = 'flex';
+        sidebar.style.transform = 'translateX(0)';
+        sidebar.style.width = 'var(--sidebar-width)';
+        sidebar.style.opacity = '1';
+        sidebar.style.pointerEvents = 'auto';
+    }
+
+    // RESTORE GLOBAL SIDEBAR MENU
+    const navList = document.querySelector('.main-nav ul');
+    if (navList && globalSidebarContent) {
+        navList.innerHTML = globalSidebarContent;
+
+        // Re-attach global event listeners?
+        // The original listeners in script.js used event delegation or direct onclicks.
+        // Assuming original HTML had onclick="renderModule(...)" or script.js attaches them.
+        // If script.js attached them via addEventListener to specific elements, we might lose them.
+        // BUT, looking at index.html (implied), menu items usually have onclick or are handled by delegation.
+        // Let's assume standard behavior. If listeners are lost, we might need a refresh logic.
+        // Ideally, check if original items had onclick attributes.
+    }
+
+    // Default to Dashboard
+    window.renderModule('dashboard');
+
+    // Highlight Dashboard link
+    document.querySelector('.main-nav li[data-module="dashboard"]')?.classList.add('active');
+};
+
+// ============================================
+// CONTENT RENDERING
+// ============================================
+
+// Main function to render client modules
+window.renderClientModule = function (clientId, moduleName, clickedElement) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
-    const workspaceContent = document.getElementById('tab-content');
+    // Update Sidebar Active Class
+    if (clickedElement) {
+        document.querySelectorAll('.main-nav li').forEach(li => li.classList.remove('active'));
+        clickedElement.classList.add('active');
+    }
 
-    switch (tabName) {
+    // Update Page Title
+    document.getElementById('page-title').textContent = `${client.name} - ${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}`;
+
+    const contentArea = document.getElementById('content-area');
+
+    switch (moduleName) {
         case 'overview':
-            workspaceContent.innerHTML = renderClientOverview(client);
+            contentArea.innerHTML = renderClientOverview(client);
             break;
         case 'cycle':
-            workspaceContent.innerHTML = renderAuditCycleTimeline(client);
+            contentArea.innerHTML = renderAuditCycleTimeline(client);
             break;
         case 'plans':
-            workspaceContent.innerHTML = renderClientPlans(client);
+            contentArea.innerHTML = renderClientPlans(client);
             break;
         case 'findings':
-            workspaceContent.innerHTML = renderClientFindings(client);
+            contentArea.innerHTML = renderClientFindings(client);
             break;
         case 'certs':
-            workspaceContent.innerHTML = renderClientCertificates(client);
+            contentArea.innerHTML = renderClientCertificates(client);
             break;
         case 'compliance':
-            // Reuse existing compliance tab rendering from clients-module
+            // Reuse existing compliance rendering
             if (typeof renderClientTab === 'function') {
+                // We need a container for renderClientTab to write to
+                contentArea.innerHTML = '<div id="tab-content"></div>';
                 renderClientTab(client, 'compliance');
-                return; // renderClientTab handles it
+            } else {
+                contentArea.innerHTML = 'Module not loaded';
             }
-            workspaceContent.innerHTML = '<p>Compliance tab loading...</p>';
             break;
         case 'docs':
             if (typeof renderClientTab === 'function') {
+                contentArea.innerHTML = '<div id="tab-content"></div>';
                 renderClientTab(client, 'documents');
-                return;
+            } else {
+                contentArea.innerHTML = 'Module not loaded';
             }
-            workspaceContent.innerHTML = '<p>Documents tab loading...</p>';
             break;
     }
-}
+};
+
+// ... HELPER RENDER FUNCTIONS (Same as before) ...
 
 // Overview tab content
 function renderClientOverview(client) {
+    const clientPlans = (window.state.auditPlans || []).filter(p => p.client === client.name || p.clientId === client.id);
+    const clientCerts = (window.state.certifications || []).filter(c => c.client === client.name || c.clientId === client.id);
+    const clientReports = (window.state.auditReports || []).filter(r => r.client === client.name || r.clientId === client.id);
+    const openNCs = clientReports.reduce((count, r) => count + ((r.findings || []).filter(f => f.status !== 'Closed').length), 0);
+
     return `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            <div class="card">
-                <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Details</h3>
-                <div style="display: grid; gap: 0.75rem;">
-                    <div><strong>Industry:</strong> ${client.industry || '-'}</div>
-                    <div><strong>Location:</strong> ${client.city || '-'}</div>
-                    <div><strong>Employees:</strong> ${client.employees || '-'}</div>
-                    <div><strong>Scope:</strong> ${client.scope || '-'}</div>
+        <div class="fade-in">
+             <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.25rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${clientPlans.length}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Audit Plans</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                    <i class="fa-solid fa-certificate" style="font-size: 1.25rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${clientCerts.length}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Certificates</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'};">
+                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${openNCs}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
+                    <i class="fa-solid fa-shield-halved" style="font-size: 1.25rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${client.compliance?.contract?.signed ? '✓' : '!'}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Compliance</p>
                 </div>
             </div>
-            <div class="card">
-                <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-user" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Primary Contact</h3>
-                <div style="display: grid; gap: 0.75rem;">
-                    <div><strong>Name:</strong> ${client.contactName || client.contact || '-'}</div>
-                    <div><strong>Email:</strong> ${client.email || '-'}</div>
-                    <div><strong>Phone:</strong> ${client.phone || '-'}</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div class="card">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Details</h3>
+                    <div style="display: grid; gap: 0.75rem;">
+                        <div><strong>Industry:</strong> ${client.industry || '-'}</div>
+                        <div><strong>Location:</strong> ${client.city || '-'}</div>
+                        <div><strong>Employees:</strong> ${client.employees || '-'}</div>
+                        <div><strong>Scope:</strong> ${client.scope || '-'}</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-user" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Primary Contact</h3>
+                    <div style="display: grid; gap: 0.75rem;">
+                        <div><strong>Name:</strong> ${client.contactName || client.contact || '-'}</div>
+                        <div><strong>Email:</strong> ${client.email || '-'}</div>
+                        <div><strong>Phone:</strong> ${client.phone || '-'}</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -390,26 +496,9 @@ function renderClientCertificates(client) {
     `;
 }
 
-// Back to dashboard
-window.backToDashboard = function () {
-    window.state.activeClientId = null;
-    document.querySelectorAll('.client-list-item').forEach(item => item.classList.remove('active'));
-    document.querySelector('.main-nav li[data-module="dashboard"]')?.classList.add('active');
-
-    // Show left sidebar again
-    // Show left sidebar again
-    const leftSidebar = document.getElementById('sidebar');
-    if (leftSidebar) {
-        leftSidebar.classList.remove('hidden');
-        leftSidebar.style.display = '';
-    }
-
-    window.renderModule('dashboard');
-};
-
 // Re-populate sidebar when state changes
 window.refreshClientSidebar = populateClientSidebar;
 
 // Export
 window.populateClientSidebar = populateClientSidebar;
-window.renderClientWorkspace = renderClientWorkspace;
+// window.renderClientWorkspace export is not needed as selectClient handles it directly via renderClientSidebarMenu loops
