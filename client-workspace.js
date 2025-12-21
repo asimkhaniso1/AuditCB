@@ -85,6 +85,12 @@ window.selectClient = function (clientId) {
     // Clear left sidebar active state
     document.querySelectorAll('.main-nav li').forEach(li => li.classList.remove('active'));
 
+    // Hide left sidebar when in client workspace
+    const leftSidebar = document.getElementById('sidebar');
+    if (leftSidebar) {
+        leftSidebar.style.display = 'none';
+    }
+
     // Render client workspace
     renderClientWorkspace(clientId);
 };
@@ -450,6 +456,13 @@ window.backToDashboard = function () {
     window.state.activeClientId = null;
     document.querySelectorAll('.client-list-item').forEach(item => item.classList.remove('active'));
     document.querySelector('.main-nav li[data-module="dashboard"]')?.classList.add('active');
+
+    // Show left sidebar again
+    const leftSidebar = document.getElementById('sidebar');
+    if (leftSidebar) {
+        leftSidebar.style.display = 'flex';
+    }
+
     window.renderModule('dashboard');
 };
 
