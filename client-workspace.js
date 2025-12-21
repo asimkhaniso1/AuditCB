@@ -13,11 +13,12 @@ document.addEventListener('DOMContentLoaded', function () {
         globalSidebarContent = navList.innerHTML;
     }
 
+    // Reduced timeout for faster loading
     setTimeout(() => {
         console.log('Initializing client sidebar...', window.state?.clients);
         populateClientSidebar();
         setupClientSearch();
-    }, 1000);
+    }, 100); // Reduced from 1000ms to 100ms for faster page load
 });
 
 // Populate the right sidebar with client list
@@ -135,6 +136,9 @@ function renderClientSidebarMenu(clientId) {
         <li onclick="window.renderClientModule(${clientId}, 'execution', this)">
             <i class="fa-solid fa-tasks"></i> Execution
         </li>
+        <li onclick="window.renderClientModule(${clientId}, 'reporting', this)">
+            <i class="fa-solid fa-file-alt"></i> Reporting
+        </li>
         <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
             <i class="fa-solid fa-triangle-exclamation"></i> Findings
         </li>
@@ -227,6 +231,9 @@ window.renderClientModule = function (clientId, moduleName, clickedElement) {
             break;
         case 'execution':
             contentArea.innerHTML = renderClientExecution(client);
+            break;
+        case 'reporting':
+            contentArea.innerHTML = renderClientReporting(client);
             break;
         case 'findings':
             contentArea.innerHTML = renderClientFindings(client);
@@ -634,6 +641,77 @@ function renderClientExecution(client) {
                                 <td>
                                     <button class="btn btn-sm btn-icon" onclick="window.viewAuditReport && window.viewAuditReport(${r.id})" title="View Report">
                                         <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `}).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+// Client reporting - finalized reports
+function renderClientReporting(client) {
+    const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client) && r.status === 'Finalized');
+
+    if (reports.length === 0) {
+        return `
+            <div class="card" style="text-align: center; padding: 3rem;">
+                <i class="fa-solid fa-file-alt" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                <p style="color: var(--text-secondary);">No finalized reports for this client yet.</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">Reports will appear here once audits are completed and finalized.</p>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Finalized Audit Reports</h3>
+                <span class="badge" style="background: #d1fae5; color: #065f46;">${reports.length} Reports</span>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Auditor</th>
+                            <th>Findings</th>
+                            <th>Recommendation</th>
+                            <th>Finalized</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
+        const findingsCount = (r.ncrs || r.findings || []).length;
+        const finalizedDate = r.finalizedAt ? new Date(r.finalizedAt).toLocaleDateString() : '-';
+
+        return `
+                            <tr>
+                                <td>${r.date || '-'}</td>
+                                <td>${r.type || 'Audit'}</td>
+                                <td>${r.auditor || r.lead || '-'}</td>
+                                <td>
+                                    <span class="badge" style="background: ${findingsCount > 0 ? '#fef3c7' : '#d1fae5'}; color: ${findingsCount > 0 ? '#d97706' : '#065f46'};">
+                                        ${findingsCount} ${findingsCount === 1 ? 'finding' : 'findings'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge" style="background: ${r.recommendation?.includes('Recommend') ? '#d1fae5' : '#fee2e2'}; color: ${r.recommendation?.includes('Recommend') ? '#065f46' : '#dc2626'};">
+                                        ${r.recommendation || '-'}
+                                    </span>
+                                </td>
+                                <td>${finalizedDate}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditReport && window.viewAuditReport(${r.id})" title="View Report">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="window.downloadReport && window.downloadReport(${r.id})" title="Download PDF">
+                                        <i class="fa-solid fa-download"></i>
                                     </button>
                                 </td>
                             </tr>
