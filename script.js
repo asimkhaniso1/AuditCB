@@ -1131,6 +1131,13 @@ async function renderModule(moduleName) {
                     renderPlaceholder(moduleName);
                 }
                 break;
+            case 'record-retention':
+                if (typeof renderRecordRetentionModule === 'function') {
+                    renderRecordRetentionModule();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
             case 'settings':
                 if (typeof renderSettingsEnhanced === 'function') {
                     renderSettingsEnhanced();
