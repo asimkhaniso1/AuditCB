@@ -86,9 +86,11 @@ window.selectClient = function (clientId) {
     document.querySelectorAll('.main-nav li').forEach(li => li.classList.remove('active'));
 
     // Hide left sidebar when in client workspace
+    // Hide left sidebar when in client workspace
     const leftSidebar = document.getElementById('sidebar');
     if (leftSidebar) {
-        leftSidebar.style.display = 'none';
+        leftSidebar.classList.add('hidden');
+        leftSidebar.style.display = ''; // Clear inline style if present
     }
 
     // Render client workspace
@@ -458,9 +460,11 @@ window.backToDashboard = function () {
     document.querySelector('.main-nav li[data-module="dashboard"]')?.classList.add('active');
 
     // Show left sidebar again
+    // Show left sidebar again
     const leftSidebar = document.getElementById('sidebar');
     if (leftSidebar) {
-        leftSidebar.style.display = 'flex';
+        leftSidebar.classList.remove('hidden');
+        leftSidebar.style.display = '';
     }
 
     window.renderModule('dashboard');
