@@ -133,7 +133,7 @@ function renderClientSidebarMenu(clientId) {
         </li>
 
         <!-- Audit Operations -->
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 1rem; font-weight: 600;">Audit Operations</div>
+        <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Audit Operations</li>
         <li onclick="window.renderClientModule(${clientId}, 'plans', this)">
             <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
@@ -145,7 +145,7 @@ function renderClientSidebarMenu(clientId) {
         </li>
 
         <!-- Outcomes -->
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 1rem; font-weight: 600;">Outcomes</div>
+        <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Outcomes</li>
         <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
             <i class="fa-solid fa-triangle-exclamation"></i> Findings
         </li>
@@ -154,7 +154,7 @@ function renderClientSidebarMenu(clientId) {
         </li>
 
         <!-- Records & Compliance -->
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 1rem; font-weight: 600;">Governance</div>
+        <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Governance</li>
         <li onclick="window.renderClientModule(${clientId}, 'compliance', this)">
             <i class="fa-solid fa-shield-halved"></i> Compliance
         </li>
@@ -232,6 +232,9 @@ window.renderClientModule = function (clientId, moduleName, clickedElement) {
     switch (moduleName) {
         case 'overview':
             contentArea.innerHTML = renderClientOverview(client);
+            setTimeout(() => {
+                if (window.initClientDashboardCharts) window.initClientDashboardCharts(client.id);
+            }, 50);
             break;
         case 'cycle':
             contentArea.innerHTML = renderAuditCycleTimeline(client);
@@ -425,6 +428,28 @@ function renderClientOverview(client) {
                             </button>
                         </div>
                         ` : ''}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Charts -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="card" style="min-height: 300px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-chart-bar" style="margin-right: 0.5rem; color: var(--primary-color);"></i>NCR Analysis</h3>
+                        <select id="ncrChartFilter" style="font-size: 0.8rem; padding: 2px 5px;">
+                            <option>Last 12 Months</option>
+                            <option>All Time</option>
+                        </select>
+                    </div>
+                    <div style="position: relative; height: 220px; width: 100%;">
+                        <canvas id="ncrTrendChart"></canvas>
+                    </div>
+                </div>
+                <div class="card" style="min-height: 300px;">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Performance</h3>
+                    <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center;">
+                        <canvas id="auditPerformanceChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -1023,5 +1048,184 @@ window.downloadReport = function (reportId) {
     setTimeout(() => {
         window.showNotification('Report downloaded successfully (Simulated)', 'success');
     }, 1500);
+};
+
+// ============================================
+// DASHBOARD CHARTS
+// ============================================
+
+// Store chart instances to destroy them before re-rendering
+const clientDashboardCharts = {
+    ncr: null,
+    performance: null
+};
+
+window.initClientDashboardCharts = function (clientId) {
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        // console.warn('Chart.js is not loaded. Skipping chart initialization.');
+        return;
+    }
+
+    // Client Data
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const reports = window.state.auditReports.filter(r => matchesClient(r, client));
+
+    // ----------------------------
+    // 1. NCR Analysis Chart
+    // ----------------------------
+    const ctxNCR = document.getElementById('ncrTrendChart');
+    if (ctxNCR) {
+        if (clientDashboardCharts.ncr) {
+            clientDashboardCharts.ncr.destroy();
+        }
+
+        // Aggregate findings (Mocking a timeline for now, or just aggregating by status)
+        const findings = reports.flatMap(r => r.ncrs || []);
+        const major = findings.filter(f => f.type === 'major').length;
+        const minor = findings.filter(f => f.type === 'minor').length;
+        const closed = findings.filter(f => f.status === 'Closed').length;
+        const open = findings.length - closed;
+
+        clientDashboardCharts.ncr = new Chart(ctxNCR, {
+            type: 'bar',
+            data: {
+                labels: ['Major', 'Minor', 'Open', 'Closed'],
+                datasets: [{
+                    label: 'Findings Count',
+                    data: [major, minor, open, closed],
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.8)',  // Red for Major
+                        'rgba(245, 158, 11, 0.8)', // Orange for Minor
+                        'rgba(59, 130, 246, 0.8)', // Blue for Open
+                        'rgba(16, 185, 129, 0.8)'  // Green for Closed
+                    ],
+                    borderColor: [
+                        'rgb(239, 68, 68)',
+                        'rgb(245, 158, 11)',
+                        'rgb(59, 130, 246)',
+                        'rgb(16, 185, 129)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.raw + ' Findings';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            borderDash: [2, 4],
+                            color: '#f1f5f9'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ----------------------------
+    // 2. Audit Performance Chart (Process Conformity)
+    // ----------------------------
+    const ctxPerf = document.getElementById('auditPerformanceChart');
+    if (ctxPerf) {
+        if (clientDashboardCharts.performance) {
+            clientDashboardCharts.performance.destroy();
+        }
+
+        // Mock Calculation: (Total Checkpoints - NCs) / Total Checkpoints * 100
+        // Since we don't have total checkpoints easily, we'll mock a "Conformity Score" based on trends
+        const totalFindings = reports.reduce((acc, r) => acc + (r.ncrs ? r.ncrs.length : 0), 0);
+        // Scores starts at 100, deduct 5 for major, 1 for minor
+        let deduction = 0;
+        reports.forEach(r => {
+            (r.ncrs || []).forEach(n => {
+                deduction += (n.type === 'major' ? 5 : 1);
+            });
+        });
+
+        let score = Math.max(0, 100 - (deduction / (reports.length || 1))); // Average deduction per audit
+        score = Math.round(score);
+
+        clientDashboardCharts.performance = new Chart(ctxPerf, {
+            type: 'doughnut',
+            data: {
+                labels: ['Conformity', 'Non-Conformity Gap'],
+                datasets: [{
+                    data: [score, 100 - score],
+                    backgroundColor: [
+                        '#10b981', // Green
+                        '#f1f5f9'  // Light Grey
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '75%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    }
+                }
+            },
+            plugins: [{
+                id: 'textCenter',
+                beforeDraw: function (chart) {
+                    var width = chart.width,
+                        height = chart.height,
+                        ctx = chart.ctx;
+
+                    ctx.restore();
+                    var fontSize = (height / 114).toFixed(2);
+                    ctx.font = "bold " + fontSize + "em sans-serif";
+                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = "#1e293b";
+
+                    var text = score + "%",
+                        textX = Math.round((width - ctx.measureText(text).width) / 2),
+                        textY = height / 2; // Center
+
+                    ctx.fillText(text, textX, textY);
+
+                    ctx.font = "normal " + (fontSize * 0.3).toFixed(2) + "em sans-serif";
+                    ctx.fillStyle = "#64748b";
+                    var text2 = "Conformity",
+                        text2X = Math.round((width - ctx.measureText(text2).width) / 2),
+                        text2Y = height / 2 + 20;
+
+                    ctx.fillText(text2, text2X, text2Y);
+                    ctx.save();
+                }
+            }]
+        });
+    }
 };
 // window.renderClientWorkspace export is not needed as selectClient handles it directly via renderClientSidebarMenu loops
