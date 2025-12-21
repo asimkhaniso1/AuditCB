@@ -477,7 +477,7 @@ function renderExecutionTab(report, tabName) {
                                          <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
                                              <i class="fa-solid fa-file-image"></i> Upload
                                          </button>
-                                         <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" onclick="document.getElementById('cam-${uniqueId}').click()" title="Capture photo from mobile camera">
+                                         <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" onclick="window.handleCameraButton('${uniqueId}')" title="Capture photo from mobile camera or webcam">
                                              <i class="fa-solid fa-camera"></i> Camera
                                          </button>
                                          <button type="button" class="btn btn-sm btn-outline-primary" style="flex: 1;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Capture from Zoom/Teams Screen Share">
@@ -1795,4 +1795,120 @@ window.toggleSectionSelection = function (sectionId) {
             item.style.borderLeft = '';
         }
     });
+};
+
+// ============================================
+// Webcam Handling for Desktop 'Camera' Button
+// ============================================
+window.activeWebcamStream = null;
+
+window.handleCameraButton = function (uniqueId) {
+    // Check if mobile device (simple check)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile) {
+        // Use the native input for mobile (file picker / camera app)
+        const inp = document.getElementById('cam-' + uniqueId);
+        if (inp) inp.click();
+    } else {
+        // Use Webcam Modal for desktop
+        window.openWebcamModal(uniqueId);
+    }
+};
+
+window.openWebcamModal = async function (uniqueId) {
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    // Cleanup any existing stream first
+    if (window.activeWebcamStream) {
+        window.activeWebcamStream.getTracks().forEach(track => track.stop());
+        window.activeWebcamStream = null;
+    }
+
+    modalTitle.textContent = 'Capture from Webcam';
+
+    modalBody.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+            <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
+            </div>
+            <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
+        </div>
+    `;
+
+    // Configure "Capture" button
+    modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+    modalSave.onclick = () => window.captureWebcam(uniqueId);
+
+    // Show modal BEFORE requesting media
+    if (window.openModal) window.openModal();
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        window.activeWebcamStream = stream;
+
+        const video = document.getElementById('webcam-video');
+        const loading = document.getElementById('webcam-loading');
+
+        if (video) {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                if (loading) loading.style.display = 'none';
+            };
+        }
+    } catch (err) {
+        const errDiv = document.getElementById('webcam-error');
+        const loading = document.getElementById('webcam-loading');
+        if (loading) loading.style.display = 'none';
+
+        if (errDiv) {
+            errDiv.style.display = 'block';
+            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+        }
+        console.error("Webcam error:", err);
+    }
+};
+
+window.captureWebcam = function (uniqueId) {
+    const video = document.getElementById('webcam-video');
+    if (!video || !window.activeWebcamStream) return;
+
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        // Mirror the capture if the video was mirrored
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+        // Stop stream
+        window.activeWebcamStream.getTracks().forEach(track => track.stop());
+        window.activeWebcamStream = null;
+
+        // Update UI
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        const imgElem = document.getElementById('evidence-img-' + uniqueId);
+        const dataInput = document.getElementById('evidence-data-' + uniqueId);
+        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+
+        if (imgElem) imgElem.src = dataUrl;
+        if (previewDiv) previewDiv.style.display = 'block';
+        if (dataInput) dataInput.value = 'attached';
+        if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+
+        // Close modal
+        if (window.closeModal) window.closeModal();
+    } catch (e) {
+        console.error("Capture failed:", e);
+        window.showNotification("Failed to capture image", "error");
+    }
 };
