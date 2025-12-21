@@ -586,9 +586,238 @@ function loadState() {
             const data = JSON.parse(saved);
             Object.assign(state, data);
         }
+
+        // Migrate checklists to hierarchical format if needed
+        migrateChecklistsToHierarchy();
     } catch (e) {
         console.warn('LocalStorage not available:', e);
     }
+}
+
+// Migrate old flat checklists to hierarchical format
+function migrateChecklistsToHierarchy() {
+    const defaultHierarchicalChecklists = getDefaultHierarchicalChecklists();
+
+    if (!state.checklists || state.checklists.length === 0) {
+        state.checklists = defaultHierarchicalChecklists;
+        saveState();
+        return;
+    }
+
+    // Check if any checklist needs migration (has items but no clauses)
+    let needsUpdate = false;
+
+    state.checklists = state.checklists.map(checklist => {
+        // If already hierarchical, keep it
+        if (checklist.clauses && checklist.clauses.length > 0) {
+            return checklist;
+        }
+
+        // Check if this is a default checklist that should use new hierarchical data
+        const defaultVersion = defaultHierarchicalChecklists.find(d => d.id === checklist.id);
+        if (defaultVersion && defaultVersion.clauses) {
+            needsUpdate = true;
+            return {
+                ...checklist,
+                clauses: defaultVersion.clauses,
+                auditType: checklist.auditType || defaultVersion.auditType,
+                auditScope: checklist.auditScope || defaultVersion.auditScope
+            };
+        }
+
+        // For custom checklists with flat items, convert to simple hierarchy
+        if (checklist.items && checklist.items.length > 0 && !checklist.clauses) {
+            needsUpdate = true;
+            const clauseGroups = {};
+
+            checklist.items.forEach(item => {
+                const mainNum = (item.clause || '').split('.')[0] || 'General';
+                if (!clauseGroups[mainNum]) {
+                    clauseGroups[mainNum] = {
+                        mainClause: mainNum,
+                        title: mainNum === 'General' ? 'General Requirements' : `Clause ${mainNum}`,
+                        subClauses: []
+                    };
+                }
+                clauseGroups[mainNum].subClauses.push({
+                    clause: item.clause || '',
+                    requirement: item.requirement || ''
+                });
+            });
+
+            return {
+                ...checklist,
+                clauses: Object.values(clauseGroups)
+            };
+        }
+
+        return checklist;
+    });
+
+    if (needsUpdate) {
+        saveState();
+        console.log('Checklists migrated to hierarchical format');
+    }
+}
+
+// Default hierarchical checklists (reference copy for migration)
+function getDefaultHierarchicalChecklists() {
+    return [
+        {
+            id: 1,
+            name: 'ISO 9001:2015 Comprehensive Audit Checklist',
+            standard: 'ISO 9001:2015',
+            type: 'global',
+            auditType: 'Stage 2 (Implementation Audit)',
+            auditScope: 'Full System',
+            clauses: [
+                {
+                    mainClause: '4', title: 'Context of the Organization', subClauses: [
+                        { clause: '4.1', requirement: 'Has the organization determined external and internal issues relevant to its purpose?' },
+                        { clause: '4.2', requirement: 'Have the needs and expectations of interested parties been determined?' },
+                        { clause: '4.3', requirement: 'Is the scope of the quality management system determined and documented?' },
+                        { clause: '4.4', requirement: 'Are QMS processes and their interactions determined and maintained?' }
+                    ]
+                },
+                {
+                    mainClause: '5', title: 'Leadership', subClauses: [
+                        { clause: '5.1', requirement: 'Does top management demonstrate leadership and commitment to the QMS?' },
+                        { clause: '5.2', requirement: 'Is the quality policy established, communicated, and understood?' },
+                        { clause: '5.3', requirement: 'Are roles, responsibilities, and authorities assigned and communicated?' }
+                    ]
+                },
+                {
+                    mainClause: '6', title: 'Planning', subClauses: [
+                        { clause: '6.1', requirement: 'Have risks and opportunities been addressed to assure results?' },
+                        { clause: '6.2', requirement: 'Are quality objectives established at relevant functions and levels?' },
+                        { clause: '6.3', requirement: 'Are changes to the QMS planned and carried out systematically?' }
+                    ]
+                },
+                {
+                    mainClause: '7', title: 'Support', subClauses: [
+                        { clause: '7.1.3', requirement: 'Is the infrastructure necessary for processes provided and maintained?' },
+                        { clause: '7.1.5', requirement: 'Are resources for monitoring and measurement fit for purpose?' },
+                        { clause: '7.2', requirement: 'Are persons competent based on education, training, or experience?' },
+                        { clause: '7.5', requirement: 'Is documented information created, updated, and controlled?' }
+                    ]
+                },
+                {
+                    mainClause: '8', title: 'Operation', subClauses: [
+                        { clause: '8.1', requirement: 'Are processes for products and services planned and controlled?' },
+                        { clause: '8.2.3', requirement: 'Are requirements for products and services reviewed before commitment?' },
+                        { clause: '8.4', requirement: 'Are external providers (suppliers) evaluated and monitored?' },
+                        { clause: '8.5.1', requirement: 'Is production and service provision implemented under controlled conditions?' },
+                        { clause: '8.7', requirement: 'Are nonconforming outputs identified and controlled?' }
+                    ]
+                },
+                {
+                    mainClause: '9', title: 'Performance Evaluation', subClauses: [
+                        { clause: '9.2', requirement: 'Are internal audits conducted at planned intervals?' },
+                        { clause: '9.3', requirement: 'Does top management review the QMS at planned intervals?' }
+                    ]
+                },
+                {
+                    mainClause: '10', title: 'Improvement', subClauses: [
+                        { clause: '10.2', requirement: 'Are nonconformities and corrective actions managed effectively?' }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 2,
+            name: 'ISO 14001:2015 Environmental Audit Checklist',
+            standard: 'ISO 14001:2015',
+            type: 'global',
+            auditType: 'Surveillance',
+            auditScope: 'Site-specific',
+            clauses: [
+                {
+                    mainClause: '4', title: 'Context of the Organization', subClauses: [
+                        { clause: '4.1', requirement: 'Have internal/external issues affecting the EMS been determined?' },
+                        { clause: '4.2', requirement: 'Are needs/expectations of interested parties identified?' },
+                        { clause: '4.3', requirement: 'Is the scope of the EMS defined and documented?' }
+                    ]
+                },
+                {
+                    mainClause: '6', title: 'Planning', subClauses: [
+                        { clause: '6.1.2', requirement: 'Have environmental aspects and impacts been identified?' },
+                        { clause: '6.1.3', requirement: 'Are compliance obligations determined?' },
+                        { clause: '6.2', requirement: 'Are environmental objectives established and measurable?' }
+                    ]
+                },
+                {
+                    mainClause: '8', title: 'Operation', subClauses: [
+                        { clause: '8.1', requirement: 'Are operational controls for significant aspects established?' },
+                        { clause: '8.2', requirement: 'Are emergency preparedness procedures in place?' }
+                    ]
+                },
+                {
+                    mainClause: '9', title: 'Performance Evaluation', subClauses: [
+                        { clause: '9.1.2', requirement: 'Is compliance with legal requirements evaluated?' },
+                        { clause: '9.2', requirement: 'Are internal audits conducted?' }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 3,
+            name: 'ISO 45001:2018 OHS Audit Checklist',
+            standard: 'ISO 45001:2018',
+            type: 'global',
+            auditType: 'Recertification',
+            auditScope: 'Full System',
+            clauses: [
+                {
+                    mainClause: '5', title: 'Leadership', subClauses: [
+                        { clause: '5.1', requirement: 'Does management take responsibility for OHS?' },
+                        { clause: '5.4', requirement: 'Are worker consultation processes established?' }
+                    ]
+                },
+                {
+                    mainClause: '6', title: 'Planning', subClauses: [
+                        { clause: '6.1.2.1', requirement: 'Is hazard identification ongoing?' },
+                        { clause: '6.1.3', requirement: 'Are legal requirements determined?' }
+                    ]
+                },
+                {
+                    mainClause: '8', title: 'Operation', subClauses: [
+                        { clause: '8.1.2', requirement: 'Is hierarchy of controls used?' },
+                        { clause: '8.2', requirement: 'Is emergency preparedness in place?' }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 4,
+            name: 'ISO 27001 Information Security Checklist',
+            standard: 'ISO 27001:2022',
+            type: 'global',
+            auditType: 'Stage 1 (Documentation Review)',
+            auditScope: 'Process-specific',
+            clauses: [
+                {
+                    mainClause: '5', title: 'Leadership', subClauses: [
+                        { clause: '5.1', requirement: 'Leadership and commitment' },
+                        { clause: '5.2', requirement: 'Information Security Policy' }
+                    ]
+                },
+                {
+                    mainClause: '6', title: 'Planning', subClauses: [
+                        { clause: '6.1.2', requirement: 'Information security risk assessment' },
+                        { clause: '6.1.3', requirement: 'Information security risk treatment' }
+                    ]
+                },
+                {
+                    mainClause: 'A', title: 'Annex A Controls', subClauses: [
+                        { clause: 'A.5', requirement: 'Organizational controls' },
+                        { clause: 'A.6', requirement: 'People controls' },
+                        { clause: 'A.7', requirement: 'Physical controls' },
+                        { clause: 'A.8', requirement: 'Technological controls' }
+                    ]
+                }
+            ]
+        }
+    ];
 }
 
 loadState();
