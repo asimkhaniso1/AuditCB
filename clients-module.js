@@ -230,6 +230,9 @@ function renderClientDetail(clientId) {
                 <button class="tab-btn" data-tab="departments">Departments</button>
                 <button class="tab-btn" data-tab="audits">Audits</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
+                <button class="tab-btn" data-tab="compliance" style="background: #eff6ff; color: #1d4ed8;">
+                    <i class="fa-solid fa-shield-halved" style="margin-right: 0.25rem;"></i>Compliance
+                </button>
             </div>
 
             <div id="tab-content"></div>
@@ -757,6 +760,146 @@ function renderClientTab(client, tabName) {
                             <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
                         </div>
                     `}
+                </div>
+            `;
+            break;
+
+        case 'compliance':
+            // ISO 17021-1 Client Compliance Tab
+            const compliance = client.compliance || {};
+            const appStatus = compliance.applicationStatus || 'Active';
+            const contract = compliance.contract || {};
+            const nda = compliance.nda || {};
+            const changesLog = compliance.changesLog || [];
+
+            const statusColors = {
+                'Inquiry': '#3b82f6',
+                'Application Received': '#8b5cf6',
+                'Under Review': '#f59e0b',
+                'Contract Sent': '#06b6d4',
+                'Contract Signed': '#10b981',
+                'Active': '#16a34a'
+            };
+
+            tabContent.innerHTML = `
+                <div class="card" style="margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};">
+                    <h3 style="margin: 0 0 1rem 0;">
+                        <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                        Application Status
+                    </h3>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                        ${['Inquiry', 'Application Received', 'Under Review', 'Contract Sent', 'Contract Signed', 'Active'].map(s => `
+                            <span style="padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; cursor: pointer; 
+                                background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
+                                color: ${appStatus === s ? 'white' : '#64748b'};"
+                                onclick="window.updateClientApplicationStatus(${client.id}, '${s}')">
+                                ${s}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <!-- Contract Card -->
+                    <div class="card" style="margin: 0; border-left: 4px solid ${contract.signed ? '#10b981' : '#f59e0b'};">
+                        <h4 style="margin: 0 0 1rem 0;">
+                            <i class="fa-solid fa-file-contract" style="margin-right: 0.5rem; color: ${contract.signed ? '#10b981' : '#f59e0b'};"></i>
+                            Certification Contract
+                        </h4>
+                        ${contract.signed ? `
+                            <div style="background: #f0fdf4; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                                <p style="margin: 0 0 0.5rem 0;"><strong>Contract #:</strong> ${contract.number || 'N/A'}</p>
+                                <p style="margin: 0 0 0.5rem 0;"><strong>Signed Date:</strong> ${contract.signedDate || 'N/A'}</p>
+                                <p style="margin: 0;"><strong>Valid Until:</strong> ${contract.validUntil || 'N/A'}</p>
+                            </div>
+                        ` : `
+                            <div style="background: #fef3c7; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                                <p style="margin: 0; color: #92400e;">
+                                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                                    No contract on file
+                                </p>
+                            </div>
+                        `}
+                        <button class="btn btn-sm btn-secondary" onclick="window.editClientContract(${client.id})">
+                            <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
+                        </button>
+                    </div>
+                    
+                    <!-- NDA Card -->
+                    <div class="card" style="margin: 0; border-left: 4px solid ${nda.signed ? '#10b981' : '#dc2626'};">
+                        <h4 style="margin: 0 0 1rem 0;">
+                            <i class="fa-solid fa-user-lock" style="margin-right: 0.5rem; color: ${nda.signed ? '#10b981' : '#dc2626'};"></i>
+                            Confidentiality Agreement (NDA)
+                        </h4>
+                        ${nda.signed ? `
+                            <div style="background: #f0fdf4; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                                <p style="margin: 0 0 0.5rem 0;"><strong>Signed Date:</strong> ${nda.signedDate || 'N/A'}</p>
+                                <p style="margin: 0;"><strong>Signed By:</strong> ${nda.signedBy || 'N/A'}</p>
+                            </div>
+                        ` : `
+                            <div style="background: #fee2e2; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                                <p style="margin: 0; color: #991b1b;">
+                                    <i class="fa-solid fa-exclamation-circle" style="margin-right: 0.5rem;"></i>
+                                    NDA not signed - Required per ISO 17021-1
+                                </p>
+                            </div>
+                        `}
+                        <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA(${client.id})">
+                            <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Client Changes Log -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="margin: 0;">
+                            <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                            Client Changes Log (ISO 9.6)
+                        </h4>
+                        <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog(${client.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
+                        </button>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
+                        Track significant changes to client's organization, processes, or scope (ISO 17021-1 Clause 9.6.2)
+                    </p>
+                    ${changesLog.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Change Type</th>
+                                        <th>Description</th>
+                                        <th>Reported By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${changesLog.map(log => `
+                                        <tr>
+                                            <td>${log.date}</td>
+                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${log.type}</span></td>
+                                            <td>${log.description}</td>
+                                            <td>${log.reportedBy}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px;">
+                            <i class="fa-solid fa-clipboard-check" style="font-size: 2rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                            <p style="color: #64748b; margin: 0;">No changes logged. Client stable.</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                        <strong>ISO 17021-1:</strong> Maintain records of contracts/agreements (Cl. 9.2), confidentiality arrangements (Cl. 5.6), and significant changes notified by clients (Cl. 9.6.2).
+                    </p>
                 </div>
             `;
             break;
@@ -1846,3 +1989,203 @@ window.bulkUploadDepartments = bulkUploadDepartments;
 window.generateCompanyProfile = generateCompanyProfile;
 window.editCompanyProfile = editCompanyProfile;
 
+// ============================================
+// ISO 17021-1 CLIENT COMPLIANCE FUNCTIONS
+// ============================================
+
+window.updateClientApplicationStatus = function (clientId, newStatus) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    if (!client.compliance) client.compliance = {};
+    client.compliance.applicationStatus = newStatus;
+
+    window.saveData();
+    window.showNotification(`Application status updated to: ${newStatus}`, 'success');
+    renderClientDetail(clientId);
+
+    // Switch to compliance tab
+    setTimeout(() => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('.tab-btn[data-tab="compliance"]')?.classList.add('active');
+        renderClientTab(client, 'compliance');
+    }, 100);
+};
+
+window.editClientContract = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const contract = client.compliance?.contract || {};
+
+    document.getElementById('modal-title').textContent = 'Certification Contract Details';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="contract-form">
+            <div class="form-group">
+                <label>Contract Number</label>
+                <input type="text" id="contract-number" class="form-control" value="${contract.number || ''}" placeholder="e.g., CB-2024-001">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Signed Date</label>
+                    <input type="date" id="contract-signed-date" class="form-control" value="${contract.signedDate || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Valid Until</label>
+                    <input type="date" id="contract-valid-until" class="form-control" value="${contract.validUntil || ''}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="contract-signed" ${contract.signed ? 'checked' : ''}>
+                    Contract has been signed by client
+                </label>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        if (!client.compliance) client.compliance = {};
+        client.compliance.contract = {
+            number: document.getElementById('contract-number').value,
+            signedDate: document.getElementById('contract-signed-date').value,
+            validUntil: document.getElementById('contract-valid-until').value,
+            signed: document.getElementById('contract-signed').checked
+        };
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Contract details updated', 'success');
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+window.editClientNDA = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const nda = client.compliance?.nda || {};
+
+    document.getElementById('modal-title').textContent = 'Confidentiality Agreement (NDA)';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="nda-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Signed Date</label>
+                    <input type="date" id="nda-signed-date" class="form-control" value="${nda.signedDate || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Signed By (Client Representative)</label>
+                    <input type="text" id="nda-signed-by" class="form-control" value="${nda.signedBy || ''}" placeholder="Name of signatory">
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="nda-signed" ${nda.signed ? 'checked' : ''}>
+                    NDA/Confidentiality agreement has been signed
+                </label>
+            </div>
+            <div style="padding: 1rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
+                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    ISO 17021-1 Clause 5.6 requires the CB to maintain confidentiality of client information.
+                </p>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        if (!client.compliance) client.compliance = {};
+        client.compliance.nda = {
+            signedDate: document.getElementById('nda-signed-date').value,
+            signedBy: document.getElementById('nda-signed-by').value,
+            signed: document.getElementById('nda-signed').checked
+        };
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('NDA details updated', 'success');
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+window.addClientChangeLog = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    document.getElementById('modal-title').textContent = 'Log Client Change';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="change-log-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Date of Change</label>
+                    <input type="date" id="change-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label>Change Type</label>
+                    <select id="change-type" class="form-control">
+                        <option value="Scope Change">Scope Change</option>
+                        <option value="Organization Change">Organization Change</option>
+                        <option value="Process Change">Process Change</option>
+                        <option value="Site/Location Change">Site/Location Change</option>
+                        <option value="Management Change">Management Change</option>
+                        <option value="Legal Entity Change">Legal Entity Change</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description of Change</label>
+                <textarea id="change-description" class="form-control" rows="3" placeholder="Describe the significant change..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Reported By</label>
+                <input type="text" id="change-reported-by" class="form-control" value="${window.state.currentUser?.name || ''}" placeholder="Who reported this change?">
+            </div>
+            <div style="padding: 1rem; background: #fef3c7; border-radius: 6px; margin-top: 1rem;">
+                <p style="margin: 0; font-size: 0.85rem; color: #92400e;">
+                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                    Significant changes may require assessment of impact on certification scope or trigger a special audit.
+                </p>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        const description = document.getElementById('change-description').value;
+        if (!description) {
+            window.showNotification('Please enter a description of the change', 'error');
+            return;
+        }
+
+        if (!client.compliance) client.compliance = {};
+        if (!client.compliance.changesLog) client.compliance.changesLog = [];
+
+        client.compliance.changesLog.unshift({
+            date: document.getElementById('change-date').value,
+            type: document.getElementById('change-type').value,
+            description: description,
+            reportedBy: document.getElementById('change-reported-by').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Client change logged', 'success');
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
