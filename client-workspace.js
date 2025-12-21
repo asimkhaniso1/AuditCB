@@ -656,6 +656,14 @@ function renderClientExecution(client) {
 function renderClientReporting(client) {
     const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client) && r.status === 'Finalized');
 
+    // Calculate metrics
+    const totalReports = reports.length;
+    const recommendedCount = reports.filter(r => r.recommendation?.includes('Recommend')).length;
+    const conditionalCount = reports.filter(r => r.recommendation?.includes('Conditional')).length;
+    const notRecommendedCount = reports.filter(r => r.recommendation?.includes('Not Recommend')).length;
+    const totalFindings = reports.reduce((sum, r) => sum + (r.ncrs || r.findings || []).length, 0);
+    const majorFindings = reports.reduce((sum, r) => sum + (r.ncrs || r.findings || []).filter(f => f.type === 'Major').length, 0);
+
     if (reports.length === 0) {
         return `
             <div class="card" style="text-align: center; padding: 3rem;">
@@ -667,6 +675,34 @@ function renderClientReporting(client) {
     }
 
     return `
+        <!-- Summary Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                <i class="fa-solid fa-file-alt" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalReports}</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Reports</p>
+            </div>
+            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${recommendedCount}</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Recommended</p>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${conditionalCount} conditional</p>
+            </div>
+            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${majorFindings > 0 ? '#f59e0b' : '#10b981'};">
+                <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: ${majorFindings > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
+                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalFindings}</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Findings</p>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${majorFindings} major</p>
+            </div>
+            ${notRecommendedCount > 0 ? `
+            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #dc2626;">
+                <i class="fa-solid fa-times-circle" style="font-size: 1.5rem; color: #dc2626; margin-bottom: 0.5rem;"></i>
+                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${notRecommendedCount}</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Not Recommended</p>
+            </div>
+            ` : ''}
+        </div>
+
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Finalized Audit Reports</h3>
