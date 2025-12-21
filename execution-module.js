@@ -496,7 +496,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <div style="font-weight: bold; color: var(--primary-color);">${item.clause || 'N/A'}</div>
                             <div>
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${item.requirement}</div>
-                                <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${saved.comment || ''}" style="margin-bottom: 0;">
+                                <div style="position: relative;">
+                                    <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${saved.comment || ''}" style="margin-bottom: 0; padding-right: 35px;">
+                                    <button type="button" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
+                                        <i class="fa-solid fa-microphone"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                                 <button type="button" class="btn-icon btn-na ${s === window.CONSTANTS.STATUS.NA ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', '${window.CONSTANTS.STATUS.NA}')" title="Not Applicable">N/A</button>
@@ -580,12 +585,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">
                              
 
-                             <div style="position: relative;">
-                                <textarea id="ncr-transcript-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Voice Transcript..." style="margin-top: 5px; background: #f8fafc; font-family: monospace; font-size: 0.85rem;">${saved.transcript || ''}</textarea>
-                                <button type="button" class="btn btn-sm btn-light" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 5px; bottom: 5px; color: var(--primary-color); border: 1px solid #ddd;" title="Dictate (10s limit)">
-                                    <i class="fa-solid fa-microphone"></i>
-                                </button>
-                             </div>
+
                          </div>
                     </div>
                 `;
@@ -885,11 +885,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     id: `checklist-${idx}`,
                     source: 'Checklist',
                     type: item.ncrType || 'observation',
-                    description: item.ncrDescription || item.comment || 'Non-conformity identified',
-                    remarks: item.remarks || '',
+                    description: item.ncrDescription || 'Non-conformity identified',
+                    remarks: item.comment || item.transcript || '',
                     designation: item.designation || '',
                     department: item.department || '',
-                    hasEvidence: !!item.evidenceImage
+                    hasEvidence: !!item.evidenceImage,
+                    evidenceImage: item.evidenceImage
                 });
             });
 
@@ -903,7 +904,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     remarks: ncr.remarks || '',
                     designation: ncr.designation || '',
                     department: ncr.department || '',
-                    hasEvidence: !!ncr.evidenceImage
+                    hasEvidence: !!ncr.evidenceImage,
+                    evidenceImage: ncr.evidenceImage
                 });
             });
 
@@ -953,9 +955,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'};">
                                     <div style="display: grid; grid-template-columns: 1fr 150px 150px; gap: 1rem; align-items: start;">
                                         <div>
-                                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
                                                 ${f.source} Finding #${idx + 1}
-                                                ${f.hasEvidence ? '<span style="margin-left: 0.5rem; color: #10b981;"><i class="fa-solid fa-image"></i> Evidence</span>' : ''}
+                                                ${f.hasEvidence ? `<img src="${f.evidenceImage}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; margin-left: 0.5rem; vertical-align: middle;" title="Evidence">` : ''}
                                             </div>
                                             <div style="font-weight: 500; margin-bottom: 0.5rem;">${f.description}</div>
                                             ${f.designation || f.department ? `
@@ -1268,7 +1269,7 @@ window.startDictation = function (uniqueId) {
     const recognition = new SpeechRecognition();
 
     const micBtn = document.getElementById('mic-btn-' + uniqueId);
-    const textarea = document.getElementById('ncr-transcript-' + uniqueId);
+    const textarea = document.getElementById('comment-' + uniqueId);
 
     recognition.lang = 'en-US';
     recognition.continuous = false;
