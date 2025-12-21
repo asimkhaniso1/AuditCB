@@ -225,6 +225,9 @@ function renderAuditorDetail(auditorId) {
                 <button class="tab-btn" data-tab="training">Training</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
                 <button class="tab-btn" data-tab="history">Audit History</button>
+                <button class="tab-btn" data-tab="evaluations" style="background: #eff6ff; color: #1d4ed8;">
+                    <i class="fa-solid fa-chart-line" style="margin-right: 0.25rem;"></i>Evaluations
+                </button>
             </div>
 
             <div id="tab-content"></div>
@@ -531,6 +534,147 @@ function renderAuditorTab(auditor, tabName) {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            `;
+            break;
+
+        case 'evaluations':
+            // ISO 17021-1 Clause 7.2 - Auditor Performance Monitoring
+            const evaluations = auditor.evaluations || { witnessAudits: [], performanceReviews: [] };
+            const nextWitness = evaluations.nextWitnessAuditDue || 'Not scheduled';
+            const witnessAudits = evaluations.witnessAudits || [];
+            const performanceReviews = evaluations.performanceReviews || [];
+
+            tabContent.innerHTML = `
+                <!-- Performance Summary -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                        <i class="fa-solid fa-eye" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${witnessAudits.length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Witness Audits</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                        <i class="fa-solid fa-chart-line" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${performanceReviews.length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Performance Reviews</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${auditor.customerRating && auditor.customerRating >= 4 ? '#10b981' : '#f59e0b'};">
+                        <i class="fa-solid fa-star" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${auditor.customerRating || '-'}/5</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Avg Rating</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'};">
+                        <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'}; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 0.9rem; font-weight: 600; margin: 0;">${nextWitness}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Next Witness Due</p>
+                    </div>
+                </div>
+                
+                <!-- Witness Audits -->
+                <div class="card" style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-eye" style="margin-right: 0.5rem; color: #3b82f6;"></i>
+                            Witness Audits
+                        </h3>
+                        <button class="btn btn-sm btn-primary" onclick="window.addWitnessAudit(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Record Witness Audit
+                        </button>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
+                        ISO 17021-1 Clause 7.2.12 requires periodic observation of auditors during audits.
+                    </p>
+                    ${witnessAudits.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Client</th>
+                                        <th>Standard</th>
+                                        <th>Witnessed By</th>
+                                        <th>Rating</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${witnessAudits.map(w => `
+                                        <tr>
+                                            <td>${w.date}</td>
+                                            <td>${w.client}</td>
+                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${w.standard}</span></td>
+                                            <td>${w.witnessedBy}</td>
+                                            <td>
+                                                <span style="color: #fbbf24;">${'★'.repeat(w.rating || 0)}${'☆'.repeat(5 - (w.rating || 0))}</span>
+                                            </td>
+                                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${w.notes || ''}">${w.notes || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #fef3c7; border-radius: 8px;">
+                            <i class="fa-solid fa-exclamation-triangle" style="font-size: 2rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                            <p style="color: #92400e; margin: 0;">No witness audits recorded. Schedule monitoring per ISO 17021-1.</p>
+                        </div>
+                    `}
+                </div>
+                
+                <!-- Performance Reviews -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
+                            Performance Reviews
+                        </h3>
+                        <button class="btn btn-sm btn-secondary" onclick="window.addPerformanceReview(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
+                        </button>
+                    </div>
+                    ${performanceReviews.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Review Type</th>
+                                        <th>Overall Rating</th>
+                                        <th>Reviewed By</th>
+                                        <th>Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${performanceReviews.map(r => `
+                                        <tr>
+                                            <td>${r.date}</td>
+                                            <td>${r.type}</td>
+                                            <td>
+                                                <span style="background: ${r.rating >= 4 ? '#d1fae5' : r.rating >= 3 ? '#fef3c7' : '#fee2e2'}; 
+                                                    color: ${r.rating >= 4 ? '#065f46' : r.rating >= 3 ? '#92400e' : '#991b1b'};
+                                                    padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
+                                                    ${r.rating}/5
+                                                </span>
+                                            </td>
+                                            <td>${r.reviewedBy}</td>
+                                            <td><span class="status-badge status-${r.outcome?.toLowerCase() || 'pending'}">${r.outcome || 'Pending'}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #f1f5f9; border-radius: 8px;">
+                            <p style="color: #64748b; margin: 0;">No performance reviews recorded yet.</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                        <strong>ISO 17021-1 Clause 7.2:</strong> The CB shall monitor auditor competence through office reviews, feedback analysis, and witness audits. New qualifications require witness observation.
+                    </p>
                 </div>
             `;
             break;
@@ -1795,3 +1939,173 @@ window.deleteAuditorDocument = function (auditorId, docId) {
         if (window.showNotification) window.showNotification('Document deleted');
     }
 }
+
+// ============================================
+// ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
+// ============================================
+
+// Add Witness Audit Record
+window.addWitnessAudit = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Record Witness Audit';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="witness-form">
+            <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
+                Record a witness assessment of this auditor during an actual audit.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Date of Witness Audit</label>
+                    <input type="date" id="witness-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="form-group">
+                    <label>Client/Organization</label>
+                    <input type="text" id="witness-client" class="form-control" placeholder="Client name" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Standard</label>
+                    <select id="witness-standard" class="form-control">
+                        <option value="ISO 9001:2015">ISO 9001:2015</option>
+                        <option value="ISO 14001:2015">ISO 14001:2015</option>
+                        <option value="ISO 45001:2018">ISO 45001:2018</option>
+                        <option value="ISO 27001:2022">ISO 27001:2022</option>
+                        <option value="ISO 22000:2018">ISO 22000:2018</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Witnessed By</label>
+                    <input type="text" id="witness-by" class="form-control" value="${window.state.currentUser?.name || ''}" placeholder="Observer name" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Overall Rating</label>
+                <select id="witness-rating" class="form-control">
+                    <option value="5">5 - Excellent</option>
+                    <option value="4" selected>4 - Good</option>
+                    <option value="3">3 - Satisfactory</option>
+                    <option value="2">2 - Needs Improvement</option>
+                    <option value="1">1 - Unsatisfactory</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Observations/Notes</label>
+                <textarea id="witness-notes" class="form-control" rows="3" placeholder="Key observations, strengths, areas for improvement..."></textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        const client = document.getElementById('witness-client').value;
+        if (!client) {
+            window.showNotification('Please enter the client name', 'error');
+            return;
+        }
+
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
+
+        auditor.evaluations.witnessAudits.unshift({
+            date: document.getElementById('witness-date').value,
+            client: client,
+            standard: document.getElementById('witness-standard').value,
+            witnessedBy: document.getElementById('witness-by').value,
+            rating: parseInt(document.getElementById('witness-rating').value),
+            notes: document.getElementById('witness-notes').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Witness audit recorded', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+// Add Performance Review
+window.addPerformanceReview = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Performance Review';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="review-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Review Date</label>
+                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="form-group">
+                    <label>Review Type</label>
+                    <select id="review-type" class="form-control">
+                        <option value="Annual Review">Annual Review</option>
+                        <option value="Qualification Review">Qualification Review</option>
+                        <option value="Client Feedback Review">Client Feedback Review</option>
+                        <option value="Report Quality Review">Report Quality Review</option>
+                        <option value="Extension of Scope">Extension of Scope</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Overall Rating</label>
+                    <select id="review-rating" class="form-control">
+                        <option value="5">5 - Excellent</option>
+                        <option value="4" selected>4 - Good</option>
+                        <option value="3">3 - Satisfactory</option>
+                        <option value="2">2 - Needs Improvement</option>
+                        <option value="1">1 - Unsatisfactory</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reviewed By</label>
+                    <input type="text" id="review-by" class="form-control" value="${window.state.currentUser?.name || 'Competence Manager'}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Outcome</label>
+                <select id="review-outcome" class="form-control">
+                    <option value="Approved">Approved - No action required</option>
+                    <option value="Approved with conditions">Approved with conditions</option>
+                    <option value="Training Required">Training Required</option>
+                    <option value="Suspended">Suspended - Pending remediation</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Comments</label>
+                <textarea id="review-comments" class="form-control" rows="3" placeholder="Review findings and recommendations..."></textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
+
+        auditor.evaluations.performanceReviews.unshift({
+            date: document.getElementById('review-date').value,
+            type: document.getElementById('review-type').value,
+            rating: parseInt(document.getElementById('review-rating').value),
+            reviewedBy: document.getElementById('review-by').value,
+            outcome: document.getElementById('review-outcome').value,
+            comments: document.getElementById('review-comments').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Performance review added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
