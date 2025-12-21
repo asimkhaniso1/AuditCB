@@ -42,6 +42,7 @@
     <div class="mobile-overlay" id="mobile-overlay"></div>
 
     <div class="app-container">
+        <!-- LEFT SIDEBAR: CB-Level Functions -->
         <aside class="sidebar" id="sidebar">
             <div class="logo-container">
                 <i class="fa-solid fa-certificate"></i>
@@ -51,44 +52,35 @@
                 <ul>
                     <li class="active" data-module="dashboard" role="button" tabindex="0" aria-label="Dashboard"><i
                             class="fa-solid fa-chart-line"></i> Dashboard</li>
-                    <li data-module="clients" role="button" tabindex="0" aria-label="Clients"><i
-                            class="fa-solid fa-building"></i> Clients</li>
                     <li data-module="auditors" role="button" tabindex="0" aria-label="Auditors"><i
                             class="fa-solid fa-user-tie"></i> Auditors</li>
                     <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
-                            class="fa-solid fa-list-check"></i> Checklist Library</li>
-                    <li data-module="audit-planning" role="button" tabindex="0" aria-label="Audit Planning"><i
-                            class="fa-solid fa-clipboard-list"></i> Audit Planning</li>
-                    <li data-module="audit-execution" role="button" tabindex="0" aria-label="Audit Execution"><i
-                            class="fa-solid fa-tasks"></i> Audit Execution</li>
-                    <li data-module="audit-reporting" role="button" tabindex="0" aria-label="Audit Reporting"><i
-                            class="fa-solid fa-file-contract"></i> Audit Reporting</li>
-                    <li data-module="certification" role="button" tabindex="0" aria-label="Certification"><i
-                            class="fa-solid fa-stamp"></i> Certification</li>
+                            class="fa-solid fa-list-check"></i> Checklists</li>
                     <li data-module="appeals-complaints" role="button" tabindex="0" aria-label="Appeals & Complaints"><i
-                            class="fa-solid fa-balance-scale"></i> Appeals & Complaints</li>
-                    <li data-module="documents" role="button" tabindex="0" aria-label="Documents"><i
-                            class="fa-solid fa-folder-open"></i> Documents</li>
+                            class="fa-solid fa-balance-scale"></i> Appeals</li>
                     <li data-module="record-retention" role="button" tabindex="0" aria-label="Record Retention"
                         style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"><i
-                            class="fa-solid fa-archive"></i> Record Retention</li>
+                            class="fa-solid fa-archive"></i> Retention</li>
                     <li data-module="settings" role="button" tabindex="0" aria-label="Settings"><i
                             class="fa-solid fa-cog"></i> Settings</li>
                 </ul>
             </nav>
         </aside>
 
+        <!-- MAIN CONTENT AREA -->
         <main class="main-content">
             <header class="top-bar">
                 <h2 id="page-title">Dashboard</h2>
-                <button class="btn btn-outline-primary"
-                    onclick="document.querySelectorAll('.main-nav li').forEach(el => el.classList.remove('active')); window.renderModule('manday-calculator')"
-                    style="margin-right: 1rem; border: none; background: transparent; color: var(--primary-color);">
-                    <i class="fa-solid fa-calculator"></i> <span style="font-weight: 500;">Man-Day Calculator</span>
-                </button>
-                <div class="user-profile">
-                    <span>Admin User</span>
-                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="btn btn-outline-primary"
+                        onclick="document.querySelectorAll('.main-nav li').forEach(el => el.classList.remove('active')); window.renderModule('manday-calculator')"
+                        style="border: none; background: transparent; color: var(--primary-color);">
+                        <i class="fa-solid fa-calculator"></i> <span style="font-weight: 500;">Man-Day Calc</span>
+                    </button>
+                    <div class="user-profile">
+                        <span>Admin User</span>
+                        <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                    </div>
                 </div>
             </header>
 
@@ -96,6 +88,24 @@
                 <!-- Dynamic Content Loaded Here -->
             </div>
         </main>
+
+        <!-- RIGHT SIDEBAR: Client List -->
+        <aside class="client-sidebar" id="client-sidebar">
+            <div class="client-sidebar-header">
+                <h3><i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>My Clients</h3>
+            </div>
+            <div class="client-search">
+                <input type="text" id="client-search-input" placeholder="Search clients..." />
+            </div>
+            <div class="client-list" id="client-list">
+                <!-- Populated by JS -->
+            </div>
+            <div class="client-sidebar-footer">
+                <button class="btn btn-sm btn-primary" onclick="window.openAddClientModal()" style="width: 100%;">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add Client
+                </button>
+            </div>
+        </aside>
     </div>
 
     <!-- Modal Overlay -->
@@ -129,6 +139,7 @@
     <script src="reporting-module.js?v=2"></script>
     <script src="dashboard-module.js"></script>
     <script src="clients-module.js"></script>
+    <script src="client-workspace.js"></script>
     <script src="checklist-module.js"></script>
     <script src="export-module.js"></script>
     <script src="documents-module.js"></script>
