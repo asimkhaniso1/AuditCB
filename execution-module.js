@@ -734,6 +734,33 @@ function renderExecutionTab(report, tabName) {
                             <button class="btn btn-secondary" onclick="window.addCustomQuestion(${report.id})">
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
+                            <div style="position: relative;">
+                                <button class="btn btn-outline-secondary" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                                    <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i> Bulk Actions
+                                </button>
+                                <div class="hidden" style="position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 220px; z-index: 1000;">
+                                    <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Filtered Items As:</div>
+                                    </div>
+                                    <button onclick="window.bulkUpdateStatus(${report.id}, 'conform'); this.parentElement.classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                        <i class="fa-solid fa-check" style="color: var(--success-color); width: 18px;"></i>
+                                        <span>Conform</span>
+                                    </button>
+                                    <button onclick="window.bulkUpdateStatus(${report.id}, 'nc'); this.parentElement.classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                        <i class="fa-solid fa-times" style="color: var(--danger-color); width: 18px;"></i>
+                                        <span>Non-Conform</span>
+                                    </button>
+                                    <button onclick="window.bulkUpdateStatus(${report.id}, 'na'); this.parentElement.classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                        <i class="fa-solid fa-ban" style="color: #9ca3af; width: 18px;"></i>
+                                        <span>Not Applicable</span>
+                                    </button>
+                                    <div style="border-top: 1px solid #e2e8f0; padding: 0.75rem 1rem;">
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">
+                                            <i class="fa-solid fa-info-circle"></i> Applies to visible items only
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <button class="btn btn-primary" onclick="window.saveChecklist(${report.id})" id="save-progress-btn">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                             </button>
@@ -1151,6 +1178,33 @@ window.filterChecklistItems = function (filterType) {
             item.classList.add('filtered-out');
         }
     });
+};
+
+// Bulk update status for all currently visible (filtered) items
+window.bulkUpdateStatus = function (reportId, status) {
+    const visibleItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
+
+    if (visibleItems.length === 0) {
+        window.showNotification('No items to update', 'warning');
+        return;
+    }
+
+    const confirmMsg = `Mark ${visibleItems.length} filtered item(s) as "${status.toUpperCase()}"?`;
+    if (!confirm(confirmMsg)) return;
+
+    let updatedCount = 0;
+    visibleItems.forEach(item => {
+        const uniqueId = item.id.replace('row-', '');
+        window.setChecklistStatus(uniqueId, status);
+        updatedCount++;
+    });
+
+    // Close dropdown
+    const menu = document.getElementById(`bulk-actions-menu-${reportId}`);
+    if (menu) menu.classList.add('hidden');
+
+    window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
+    window.saveChecklist(reportId);
 };
 
 
