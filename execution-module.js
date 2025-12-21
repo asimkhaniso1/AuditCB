@@ -754,14 +754,7 @@ function renderExecutionTab(report, tabName) {
                     <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Progress Saved
                 </div>
 
-                <!-- Keyboard Hints -->
-                <div class="keyboard-hint">
-                    <strong>Shortcuts:</strong> C = Conform | N = Non-Conform | A = N/A | S = Save
-                </div>
             `;
-
-            // Initialize keyboard shortcuts
-            window.initChecklistKeyboardShortcuts(report.id);
             break;
 
         case 'ncr':
@@ -1160,67 +1153,6 @@ window.filterChecklistItems = function (filterType) {
     });
 };
 
-// Initialize keyboard shortcuts for checklist execution
-window.initChecklistKeyboardShortcuts = function (reportId) {
-    // Remove any existing listener
-    if (window.checklistKeyHandler) {
-        document.removeEventListener('keydown', window.checklistKeyHandler);
-    }
-
-    window.checklistKeyHandler = function (e) {
-        // Only activate if not typing in an input/textarea
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
-            return;
-        }
-
-        // Find focused checklist item or the first visible one
-        let targetItem = document.querySelector('.checklist-item:focus-within');
-        if (!targetItem) {
-            targetItem = document.querySelector('.checklist-item:not(.filtered-out)');
-        }
-
-        if (!targetItem) return;
-
-        const uniqueId = targetItem.id.replace('row-', '');
-
-        switch (e.key.toLowerCase()) {
-            case 'c':
-                e.preventDefault();
-                window.setChecklistStatus(uniqueId, window.CONSTANTS.STATUS.CONFORM);
-                // Move to next item
-                const nextConform = targetItem.nextElementSibling;
-                if (nextConform && nextConform.classList.contains('checklist-item')) {
-                    nextConform.querySelector('input, textarea')?.focus();
-                }
-                break;
-            case 'n':
-                e.preventDefault();
-                window.setChecklistStatus(uniqueId, window.CONSTANTS.STATUS.NC);
-                // Focus on NCR description
-                setTimeout(() => {
-                    document.getElementById('ncr-desc-' + uniqueId)?.focus();
-                }, 100);
-                break;
-            case 'a':
-                e.preventDefault();
-                window.setChecklistStatus(uniqueId, window.CONSTANTS.STATUS.NA);
-                // Move to next item
-                const nextNA = targetItem.nextElementSibling;
-                if (nextNA && nextNA.classList.contains('checklist-item')) {
-                    nextNA.querySelector('input, textarea')?.focus();
-                }
-                break;
-            case 's':
-                if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    window.saveChecklist(reportId);
-                }
-                break;
-        }
-    };
-
-    document.addEventListener('keydown', window.checklistKeyHandler);
-};
 
 // Submit findings to Lead Auditor for review
 window.submitToLeadAuditor = function (reportId) {
