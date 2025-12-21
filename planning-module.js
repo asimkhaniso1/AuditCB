@@ -796,7 +796,7 @@ function viewAuditPlan(id) {
                         <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
                     </div>
                     <div>
-                        <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditPlan('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
+                        <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditChecklist('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
                         <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="openChecklistSelectionModal(${plan.id})">Configure</button>
                     </div>
                 </div>
@@ -992,79 +992,109 @@ window.printAuditPlanDetails = function (planId) {
     printWin.document.close();
 };
 
-window.printAuditPlan = function (planId) {
-    const plan = state.auditPlans.find(p => p.id == planId);
-    if (!plan) return;
-    const report = (state.auditReports || []).find(r => r.planId === planId);
-    const checklists = state.checklists || [];
-    const planChecklists = plan.selectedChecklists || [];
+window.printAuditChecklist = function (planId) {
+    try {
+        console.log('Printing Plan ID:', planId);
+        const plan = state.auditPlans.find(p => p.id == planId);
+        if (!plan) {
+            alert("Error: Audit Plan not found for ID: " + planId);
+            return;
+        }
 
-    // Map progress correctly
-    const progressMap = {};
-    if (report && report.checklistProgress) {
-        report.checklistProgress.forEach(p => {
-            // Normalized key: ID-Idx (String)
-            progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
-        });
-    }
+        // Use loose equality as planId might be string
+        const report = (state.auditReports || []).find(r => r.planId == planId);
+        const checklists = state.checklists || [];
+        const planChecklists = plan.selectedChecklists || [];
 
-    const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
-    const statusColor = { 'conform': 'green', 'minor': 'orange', 'major': 'red', 'na': 'gray', '': 'black' };
+        if (!planChecklists || planChecklists.length === 0) {
+            alert("No checklists are assigned to this audit plan.");
+            return;
+        }
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
+        // Map progress correctly
+        const progressMap = {};
+        if (report && report.checklistProgress) {
+            report.checklistProgress.forEach(p => {
+                // Normalized key: ID-Idx (String)
+                progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
+            });
+        }
 
-    let content = `
-        <html>
-        <head>
-            <title>Audit Checklist Report - ${plan.client}</title>
-            <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; padding: 20px; }
-                .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; position: relative; }
-                .section { margin-bottom: 2rem; page-break-inside: avoid; }
-                h2 { background: #f2f2f2; padding: 0.5rem; border-left: 5px solid #333; margin-top: 0; }
-                h3 { margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; font-size: 1rem; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f8f8f8; font-weight: bold; }
-                .main-clause { background-color: #eef2ff; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div style="position: absolute; top: 0; right: 0;">
-                    <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
+        const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
+        const statusColor = { 'conform': 'green', 'minor': 'orange', 'major': 'red', 'na': 'gray', '': 'black' };
+
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
+
+        let content = `
+            <html>
+            <head>
+                <title>Audit Checklist Report - ${plan.client}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; -webkit-print-color-adjust: exact; padding: 20px; }
+                    .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; position: relative; }
+                    .section { margin-bottom: 2rem; page-break-inside: avoid; }
+                    h2 { background: #f2f2f2; padding: 0.5rem; border-left: 5px solid #333; margin-top: 0; }
+                    h3 { margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; font-size: 1rem; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f8f8f8; font-weight: bold; }
+                    .main-clause { background-color: #eef2ff; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div style="position: absolute; top: 0; right: 0;">
+                        <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
+                    </div>
+                    <h1>Audit Checklist Execution Report</h1>
+                    <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${plan.date}</p>
+                    <p><strong>Auditor(s):</strong> ${plan.team.join(', ')} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
                 </div>
-                <h1>Audit Checklist Execution Report</h1>
-                <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${plan.date}</p>
-                <p><strong>Auditor(s):</strong> ${plan.team.join(', ')} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
-            </div>
-    `;
-
-    planChecklists.forEach(clId => {
-        const cl = checklists.find(c => c.id === clId);
-        if (!cl) return;
-
-        content += `
-            <div class="section">
-                <h2>${cl.name}</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th width="10%">Clause</th>
-                            <th width="40%">Requirement</th>
-                            <th width="15%">Status</th>
-                            <th width="35%">Auditor Comments / Evidence</th>
-                        </tr>
-                    </thead>
-                    <tbody>
         `;
 
-        if (cl.clauses) {
-            // Hierarchical
-            cl.clauses.forEach(clause => {
-                content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
-                clause.subClauses.forEach((item, subIdx) => {
-                    const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
+        planChecklists.forEach(clId => {
+            const cl = checklists.find(c => c.id == clId);
+            if (!cl) return; // Skip if checklist not found
+
+            content += `
+                <div class="section">
+                    <h2>${cl.name}</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="10%">Clause</th>
+                                <th width="40%">Requirement</th>
+                                <th width="15%">Status</th>
+                                <th width="35%">Auditor Comments / Evidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            if (cl.clauses) {
+                // Hierarchical
+                cl.clauses.forEach(clause => {
+                    content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
+                    clause.subClauses.forEach((item, subIdx) => {
+                        const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
+                        const prog = progressMap[key] || {};
+                        const s = prog.status || '';
+                        const c = prog.comment || '-';
+
+                        content += `
+                            <tr>
+                                <td>${item.clause || ''}</td>
+                                <td>${item.requirement || ''}</td>
+                                <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
+                                <td>${c}</td>
+                            </tr>
+                         `;
+                    });
+                });
+            } else if (cl.items) {
+                // Flat
+                cl.items.forEach((item, idx) => {
+                    const key = `${cl.id}-${idx}`;
                     const prog = progressMap[key] || {};
                     const s = prog.status || '';
                     const c = prog.comment || '-';
@@ -1076,53 +1106,42 @@ window.printAuditPlan = function (planId) {
                             <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
                             <td>${c}</td>
                         </tr>
-                     `;
+                    `;
                 });
-            });
-        } else if (cl.items) {
-            // Flat
-            cl.items.forEach((item, idx) => {
-                const key = `${cl.id}-${idx}`;
-                const prog = progressMap[key] || {};
-                const s = prog.status || '';
-                const c = prog.comment || '-';
+            }
 
-                content += `
-                    <tr>
-                        <td>${item.clause || ''}</td>
-                        <td>${item.requirement || ''}</td>
-                        <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                        <td>${c}</td>
-                    </tr>
-                `;
+            content += `</tbody></table></div>`;
+        });
+
+        if (report && report.ncrs && report.ncrs.length > 0) {
+            content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
+            report.ncrs.forEach(ncr => {
+                content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
             });
+            content += `</ul></div>`;
         }
 
-        content += `</tbody></table></div>`;
-    });
+        content += `
+            <div style="margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 1rem;">
+                Generated by AuditCB360 on ${new Date().toLocaleDateString()}
+            </div>
+            </body></html>
+        `;
 
-    if (report && report.ncrs && report.ncrs.length > 0) {
-        content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
-        report.ncrs.forEach(ncr => {
-            content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
-        });
-        content += `</ul></div>`;
-    }
-
-    content += `
-        <div style="margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 1rem;">
-            Generated by AuditCB360 on ${new Date().toLocaleDateString()}
-        </div>
-        </body></html>
-    `;
-
-    const win = window.open('', '_blank');
-    if (win) {
-        win.document.write(content);
-        win.document.close();
-        setTimeout(() => win.print(), 500);
-    } else {
-        alert("Pop-up blocker prevented printing. Please check your browser settings.");
+        // Use specific window name to avoid some blockers
+        const win = window.open('', 'PrintChecklist', 'width=1000,height=800');
+        if (win) {
+            win.document.open();
+            win.document.write(content);
+            win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 500);
+        } else {
+            alert("Pop-up blocker prevented printing. Please check your browser settings and try again.");
+        }
+    } catch (err) {
+        console.error("Print function error:", err);
+        alert("An error occurred while trying to print: " + err.message);
     }
 };
 
