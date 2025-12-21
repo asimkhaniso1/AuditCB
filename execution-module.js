@@ -473,15 +473,19 @@ function renderExecutionTab(report, tabName) {
                                  </div>
                                  <div style="display: flex; flex-direction: column;">
                                      <label style="font-size: 0.8rem;">Evidence Image <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
-                                     <div style="display: flex; gap: 5px;">
+                                    <div style="display: flex; gap: 5px;">
                                          <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
                                              <i class="fa-solid fa-file-image"></i> Upload
+                                         </button>
+                                         <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" onclick="document.getElementById('cam-${uniqueId}').click()" title="Capture photo from mobile camera">
+                                             <i class="fa-solid fa-camera"></i> Camera
                                          </button>
                                          <button type="button" class="btn btn-sm btn-outline-primary" style="flex: 1;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Capture from Zoom/Teams Screen Share">
                                              <i class="fa-solid fa-desktop"></i> Screen
                                          </button>
                                      </div>
                                      <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
+                                     <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
                                  </div>
                              </div>
                              
