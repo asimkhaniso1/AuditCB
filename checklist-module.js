@@ -521,6 +521,8 @@ function openEditChecklistModal(id) {
     const modalSave = document.getElementById('modal-save');
 
     const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
+    const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
     modalTitle.textContent = 'Edit Checklist';
     modalBody.innerHTML = `
@@ -543,11 +545,25 @@ function openEditChecklistModal(id) {
                         ${canEditGlobal ? `<option value="global" ${checklist.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Audit Type</label>
+                    <select class="form-control" id="checklist-audit-type">
+                        <option value="">-- Select --</option>
+                        ${auditTypes.map(t => `<option value="${t}" ${checklist.auditType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Audit Scope</label>
+                    <select class="form-control" id="checklist-audit-scope">
+                        <option value="">-- Select --</option>
+                        ${auditScopes.map(s => `<option value="${s}" ${checklist.auditScope === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>
+                </div>
             </div>
 
             <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items (${checklist.items?.length || 0})</h4>
+                    <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses?.length || 0), 0) : (checklist.items?.length || 0)})</h4>
                     <div style="display: flex; gap: 0.5rem;">
                         <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
                         <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
@@ -605,6 +621,8 @@ function openEditChecklistModal(id) {
         const name = document.getElementById('checklist-name').value.trim();
         const standard = document.getElementById('checklist-standard').value;
         const type = document.getElementById('checklist-type').value;
+        const auditType = document.getElementById('checklist-audit-type').value;
+        const auditScope = document.getElementById('checklist-audit-scope').value;
 
         if (!name) {
             window.showNotification('Please enter a checklist name', 'error');
@@ -623,6 +641,8 @@ function openEditChecklistModal(id) {
         checklist.name = name;
         checklist.standard = standard;
         checklist.type = type;
+        checklist.auditType = auditType;
+        checklist.auditScope = auditScope;
         checklist.items = items;
         checklist.updatedAt = new Date().toISOString().split('T')[0];
 
@@ -655,6 +675,16 @@ function viewChecklistDetail(id) {
                             <span style="background: ${checklist.type === 'global' ? '#fef3c7' : '#d1fae5'}; color: ${checklist.type === 'global' ? '#d97706' : '#059669'}; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
                                 <i class="fa-solid fa-${checklist.type === 'global' ? 'globe' : 'user'}" style="margin-right: 0.25rem;"></i>${checklist.type === 'global' ? 'Global' : 'Custom'}
                             </span>
+                            ${checklist.auditType ? `
+                                <span style="background: #f3e8ff; color: #7e22ce; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-clipboard-list" style="margin-right: 0.25rem;"></i>${checklist.auditType}
+                                </span>
+                            ` : ''}
+                            ${checklist.auditScope ? `
+                                <span style="background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-sitemap" style="margin-right: 0.25rem;"></i>${checklist.auditScope}
+                                </span>
+                            ` : ''}
                         </div>
                     </div>
                     <div style="text-align: right; font-size: 0.85rem; color: var(--text-secondary);">
@@ -667,7 +697,7 @@ function viewChecklistDetail(id) {
             <div class="card">
                 <h3 style="margin-bottom: 1rem;">
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                    Checklist Items (${checklist.items?.length || 0})
+                    Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses?.length || 0), 0) : (checklist.items?.length || 0)})
                 </h3>
                 <div class="table-container">
                     <table>
@@ -679,7 +709,20 @@ function viewChecklistDetail(id) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${(checklist.items || []).map((item, idx) => `
+                            ${checklist.clauses ? checklist.clauses.map(mainClause => `
+                                <tr style="background-color: #f8fafc;">
+                                    <td colspan="3" style="font-weight: 600; color: var(--primary-color);">
+                                        Clause ${mainClause.mainClause}: ${mainClause.title}
+                                    </td>
+                                </tr>
+                                ${mainClause.subClauses.map((sub, idx) => `
+                                    <tr>
+                                        <td style="font-weight: 500; color: var(--text-secondary); padding-left: 2rem;">${idx + 1}</td>
+                                        <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${sub.clause}</span></td>
+                                        <td>${sub.requirement}</td>
+                                    </tr>
+                                `).join('')}
+                            `).join('') : (checklist.items || []).map((item, idx) => `
                                 <tr>
                                     <td style="font-weight: 500; color: var(--text-secondary);">${idx + 1}</td>
                                     <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${item.clause || '-'}</span></td>
