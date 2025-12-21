@@ -161,7 +161,7 @@ function renderCertificationModule() {
                                         <td>${r.date}</td>
                                         <td><span style="color: var(--success-color); font-weight: 600;">${r.recommendation}</span></td>
                                         <td>
-                                            <button class="btn btn-primary btn-sm" onclick="openIssueCertificateModal('${r.client}', '${r.date}')">
+                                            <button class="btn btn-primary btn-sm" onclick="openIssueCertificateModal('${r.id}')">
                                                 <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Issue Certificate
                                             </button>
                                         </td>
@@ -219,20 +219,34 @@ window.switchCertTab = function (btn, tabId) {
     document.getElementById(tabId).style.display = 'block';
 };
 
-window.openIssueCertificateModal = function (prefillClient = '', auditDate = '') {
+window.openIssueCertificateModal = function (reportId) {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
 
-    // Find prefill data if available
+    let prefillClient = '';
     let prefillStandard = '';
     let prefillScope = '';
-    if (prefillClient) {
-        const client = state.clients.find(c => c.name === prefillClient);
-        if (client) prefillStandard = client.standard;
-        // Try to find scope from audit plans
-        const plan = state.auditPlans.find(p => p.client === prefillClient);
-        if (plan) prefillScope = plan.scope;
+    let auditDate = '';
+
+    // Find report data
+    if (reportId) {
+        const report = state.auditReports.find(r => r.id == reportId);
+        if (report) {
+            prefillClient = report.client;
+            auditDate = report.date;
+
+            // Try to find plan for accurate scope/standard
+            const plan = state.auditPlans.find(p => p.client === report.client);
+            if (plan) {
+                prefillScope = plan.scope;
+                prefillStandard = plan.standard;
+            } else {
+                // Fallback to client data
+                const client = state.clients.find(c => c.name === prefillClient);
+                if (client) prefillStandard = client.standard;
+            }
+        }
     }
 
     modalTitle.textContent = 'Issue ISO Certificate';
