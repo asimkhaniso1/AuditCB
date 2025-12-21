@@ -639,7 +639,7 @@ function renderClientExecution(client) {
                                 </td>
                                 <td>${r.recommendation || '-'}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditReport && window.viewAuditReport(${r.id})" title="View Report">
+                                    <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report">
                                         <i class="fa-solid fa-eye"></i>
                                     </button>
                                 </td>
@@ -707,7 +707,7 @@ function renderClientReporting(client) {
                                 </td>
                                 <td>${finalizedDate}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditReport && window.viewAuditReport(${r.id})" title="View Report">
+                                    <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report">
                                         <i class="fa-solid fa-eye"></i>
                                     </button>
                                     <button class="btn btn-sm btn-icon" onclick="window.downloadReport && window.downloadReport(${r.id})" title="Download PDF">
