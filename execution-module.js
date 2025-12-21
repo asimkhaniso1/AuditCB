@@ -879,8 +879,31 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Auditor's Findings Review Screen
             const allFindings = [];
 
+            // Destructure for lookup
+            const { assignedChecklists = [] } = contextData;
+
             // Collect checklist NCs
             (report.checklistProgress || []).filter(p => p.status === 'nc').forEach((item, idx) => {
+                // Lookup Requirement
+                let clauseText = '';
+                let reqText = '';
+                const cl = assignedChecklists.find(c => c.id == item.checklistId);
+                if (cl) {
+                    if (cl.clauses) {
+                        const parts = String(item.itemIdx).split('-');
+                        if (parts.length === 2) {
+                            const main = cl.clauses.find(c => c.mainClause == parts[0]);
+                            if (main && main.subClauses[parts[1]]) {
+                                clauseText = main.subClauses[parts[1]].clause;
+                                reqText = main.subClauses[parts[1]].requirement;
+                            }
+                        }
+                    } else if (cl.items && cl.items[item.itemIdx]) {
+                        clauseText = cl.items[item.itemIdx].clause;
+                        reqText = cl.items[item.itemIdx].requirement;
+                    }
+                }
+
                 allFindings.push({
                     id: `checklist-${idx}`,
                     source: 'Checklist',
@@ -890,7 +913,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     designation: item.designation || '',
                     department: item.department || '',
                     hasEvidence: !!item.evidenceImage,
-                    evidenceImage: item.evidenceImage
+                    evidenceImage: item.evidenceImage,
+                    clause: clauseText,
+                    requirement: reqText
                 });
             });
 
@@ -958,6 +983,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 ${f.source} Finding #${idx + 1}
                                                 ${f.hasEvidence ? `<img src="${f.evidenceImage}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; margin-left: 0.5rem; vertical-align: middle;" title="Evidence">` : ''}
                                             </div>
+                                            ${f.clause || f.requirement ? `
+                                                <div style="font-size: 0.8rem; color: var(--primary-color); margin-bottom: 0.25rem; font-weight: 600;">
+                                                    ${f.clause ? `${f.clause}: ` : ''}${f.requirement || ''}
+                                                </div>
+                                            ` : ''}
                                             <div style="font-weight: 500; margin-bottom: 0.5rem;">${f.description}</div>
                                             ${f.designation || f.department ? `
                                                 <div style="font-size: 0.85rem; color: #64748b;">
