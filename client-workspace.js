@@ -495,34 +495,65 @@ function renderAuditCycleTimeline(client) {
     const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
     const expiry = new Date(issueDate); expiry.setFullYear(expiry.getFullYear() + 3);
 
+    const today = new Date();
+    let currentStage = "Initial Certification";
+    let nextAudit = surv1;
+    if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
+    if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = expiry; }
+    if (today > expiry) { currentStage = "Expired"; nextAudit = null; }
+
+    const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
+
     return `
-        <div class="card">
-            <h3 style="margin: 0 0 1.5rem 0;"><i class="fa-solid fa-timeline" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Certification Cycle: ${latestCert.standard || 'ISO'}</h3>
-            <div style="display: flex; justify-content: space-between; position: relative; padding: 2rem 0;">
-                <div style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 33%, #3b82f6 33%, #3b82f6 66%, #f59e0b 66%); border-radius: 2px;"></div>
-                
-                <div style="text-align: center; z-index: 1;">
-                    <div style="width: 40px; height: 40px; background: #10b981; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-check"></i></div>
-                    <div style="font-weight: 500;">Certification</div>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${issueDate.toLocaleDateString()}</div>
+        <div class="fade-in">
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-sync" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${currentStage}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Current Cycle Stage</p>
                 </div>
-                
-                <div style="text-align: center; z-index: 1;">
-                    <div style="width: 40px; height: 40px; background: ${new Date() > surv1 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
-                    <div style="font-weight: 500;">Surveillance 1</div>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${surv1.toLocaleDateString()}</div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                    <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${nextAudit ? nextAudit.toLocaleDateString() : 'N/A'}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Next Scheduled Audit</p>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${daysToNext > 0 ? daysToNext + ' days remaining' : 'Due/Overdue'}</p>
                 </div>
-                
-                <div style="text-align: center; z-index: 1;">
-                    <div style="width: 40px; height: 40px; background: ${new Date() > surv2 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
-                    <div style="font-weight: 500;">Surveillance 2</div>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${surv2.toLocaleDateString()}</div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
+                    <i class="fa-solid fa-hourglass-half" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${expiry.toLocaleDateString()}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Cycle Expiry Date</p>
                 </div>
-                
-                <div style="text-align: center; z-index: 1;">
-                    <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
-                    <div style="font-weight: 500;">Recertification</div>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${expiry.toLocaleDateString()}</div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin: 0 0 1.5rem 0;"><i class="fa-solid fa-timeline" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Certification Cycle: ${latestCert.standard || 'ISO'}</h3>
+                <div style="display: flex; justify-content: space-between; position: relative; padding: 2rem 0;">
+                    <div style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 33%, #3b82f6 33%, #3b82f6 66%, #f59e0b 66%); border-radius: 2px;"></div>
+                    
+                    <div style="text-align: center; z-index: 1;">
+                        <div style="width: 40px; height: 40px; background: #10b981; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-check"></i></div>
+                        <div style="font-weight: 500;">Certification</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${issueDate.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div style="text-align: center; z-index: 1;">
+                        <div style="width: 40px; height: 40px; background: ${new Date() > surv1 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
+                        <div style="font-weight: 500;">Surveillance 1</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${surv1.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div style="text-align: center; z-index: 1;">
+                        <div style="width: 40px; height: 40px; background: ${new Date() > surv2 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
+                        <div style="font-weight: 500;">Surveillance 2</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${surv2.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div style="text-align: center; z-index: 1;">
+                        <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
+                        <div style="font-weight: 500;">Recertification</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${expiry.toLocaleDateString()}</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -532,6 +563,11 @@ function renderAuditCycleTimeline(client) {
 // Client plans list
 function renderClientPlans(client) {
     const plans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
+
+    const totalPlans = plans.length;
+    const completedPlans = plans.filter(p => p.status === 'Completed').length;
+    const inProgressPlans = plans.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
+    const upcomingPlans = plans.filter(p => p.status === 'Planned').length;
 
     if (plans.length === 0) {
         return `
@@ -546,40 +582,66 @@ function renderClientPlans(client) {
     }
 
     return `
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0;">Audit Plans</h3>
-                <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
-                </button>
+        <div class="fade-in">
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalPlans}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Plans</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                    <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${completedPlans}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Completed</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
+                    <i class="fa-solid fa-spinner" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${inProgressPlans}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">In Progress</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
+                    <i class="fa-solid fa-calendar-alt" style="font-size: 1.5rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${upcomingPlans}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Upcoming</p>
+                </div>
             </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Standard</th>
-                            <th>Status</th>
-                            <th>Lead Auditor</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${plans.sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => `
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Audit Plans</h3>
+                    <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
                             <tr>
-                                <td>${p.date || '-'}</td>
-                                <td>${p.type || 'Audit'}</td>
-                                <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${p.standard || 'ISO'}</span></td>
-                                <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
-                                <td>${p.lead || '-'}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan(${p.id})"><i class="fa-solid fa-eye"></i></button>
-                                </td>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Standard</th>
+                                <th>Status</th>
+                                <th>Lead Auditor</th>
+                                <th>Actions</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${plans.sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => `
+                                <tr>
+                                    <td>${p.date || '-'}</td>
+                                    <td>${p.type || 'Audit'}</td>
+                                    <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${p.standard || 'ISO'}</span></td>
+                                    <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
+                                    <td>${p.lead || '-'}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan(${p.id})"><i class="fa-solid fa-eye"></i></button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
@@ -588,6 +650,11 @@ function renderClientPlans(client) {
 // Client execution/audit reports
 function renderClientExecution(client) {
     const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
+
+    const totalReports = reports.length;
+    const finalizedReports = reports.filter(r => r.status === 'Finalized').length;
+    const inProgressReports = reports.filter(r => r.status !== 'Finalized').length;
+    const totalFindings = reports.reduce((sum, r) => sum + (r.ncrs || r.findings || []).length, 0);
 
     if (reports.length === 0) {
         return `
@@ -602,51 +669,77 @@ function renderClientExecution(client) {
     }
 
     return `
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0;">Audit Execution & Reports</h3>
-                <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Audit
-                </button>
+        <div class="fade-in">
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-tasks" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalReports}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                    <i class="fa-solid fa-file-invoice" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${finalizedReports}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Finalized</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
+                    <i class="fa-solid fa-spinner" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${inProgressReports}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">In Progress</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #ef4444;">
+                    <i class="fa-solid fa-search" style="font-size: 1.5rem; color: #ef4444; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalFindings}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Findings</p>
+                </div>
             </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Findings</th>
-                            <th>Recommendation</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Audit Execution & Reports</h3>
+                    <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Audit
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Findings</th>
+                                <th>Recommendation</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
         const findingsCount = (r.ncrs || r.findings || []).length;
         const openNCs = (r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
 
         return `
-                            <tr>
-                                <td>${r.date || '-'}</td>
-                                <td>${r.type || 'Audit'}</td>
-                                <td><span class="status-badge status-${(r.status || 'draft').toLowerCase().replace(' ', '-')}">${r.status || 'Draft'}</span></td>
-                                <td>
-                                    <span class="badge" style="background: ${findingsCount > 0 ? '#fef3c7' : '#e0f2fe'}; color: ${findingsCount > 0 ? '#d97706' : '#0284c7'};">
-                                        ${findingsCount} total
-                                    </span>
-                                    ${openNCs > 0 ? `<span class="badge" style="background: #fee2e2; color: #dc2626; margin-left: 0.25rem;">${openNCs} open</span>` : ''}
-                                </td>
-                                <td>${r.recommendation || '-'}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `}).join('')}
-                    </tbody>
-                </table>
+                                <tr>
+                                    <td>${r.date || '-'}</td>
+                                    <td>${r.type || 'Audit'}</td>
+                                    <td><span class="status-badge status-${(r.status || 'draft').toLowerCase().replace(' ', '-')}">${r.status || 'Draft'}</span></td>
+                                    <td>
+                                        <span class="badge" style="background: ${findingsCount > 0 ? '#fef3c7' : '#e0f2fe'}; color: ${findingsCount > 0 ? '#d97706' : '#0284c7'};">
+                                            ${findingsCount} total
+                                        </span>
+                                        ${openNCs > 0 ? `<span class="badge" style="background: #fee2e2; color: #dc2626; margin-left: 0.25rem;">${openNCs} open</span>` : ''}
+                                    </td>
+                                    <td>${r.recommendation || '-'}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `}).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
@@ -762,7 +855,12 @@ function renderClientReporting(client) {
 // Client findings/NCs
 function renderClientFindings(client) {
     const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
-    const allFindings = reports.flatMap(r => (r.ncrs || r.findings || []).map(f => ({ ...f, reportDate: r.date })));
+    const allFindings = reports.flatMap(r => (r.ncrs || r.findings || []).map(f => ({ ...f, reportId: r.id, reportDate: r.date })));
+
+    const totalFindings = allFindings.length;
+    const majorNCs = allFindings.filter(f => f.type === 'Major').length;
+    const minorNCs = allFindings.filter(f => f.type === 'Minor').length;
+    const openNCsCount = allFindings.filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
 
     if (allFindings.length === 0) {
         return `
@@ -774,31 +872,63 @@ function renderClientFindings(client) {
     }
 
     return `
-        <div class="card">
-            <h3 style="margin: 0 0 1rem 0;">Findings & Non-Conformities</h3>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Clause</th>
-                            <th>Type</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${allFindings.map(f => `
+        <div class="fade-in">
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-search" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalFindings}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Findings</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #ef4444;">
+                    <i class="fa-solid fa-exclamation-circle" style="font-size: 1.5rem; color: #ef4444; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${majorNCs}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Major NCs</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
+                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${minorNCs}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Minor NCs</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCsCount > 0 ? '#ef4444' : '#10b981'};">
+                    <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; color: ${openNCsCount > 0 ? '#ef4444' : '#10b981'}; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${openNCsCount}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin: 0 0 1rem 0;">Findings & Non-Conformities</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
                             <tr>
-                                <td>${f.reportDate || '-'}</td>
-                                <td>${f.clause || '-'}</td>
-                                <td><span class="badge" style="background: ${f.type === 'Major' ? '#fee2e2' : '#fef3c7'}; color: ${f.type === 'Major' ? '#dc2626' : '#d97706'};">${f.type || 'NC'}</span></td>
-                                <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.description || f.finding || '-'}</td>
-                                <td><span class="status-badge status-${(f.status || 'open').toLowerCase()}">${f.status || 'Open'}</span></td>
+                                <th>Date</th>
+                                <th>Clause</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${allFindings.map(f => `
+                                <tr>
+                                    <td>${f.reportDate || '-'}</td>
+                                    <td>${f.clause || '-'}</td>
+                                    <td><span class="badge" style="background: ${f.type === 'Major' ? '#fee2e2' : '#fef3c7'}; color: ${f.type === 'Major' ? '#dc2626' : '#d97706'};">${f.type || 'NC'}</span></td>
+                                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.description || f.finding || '-'}</td>
+                                    <td><span class="status-badge status-${(f.status || 'open').toLowerCase()}">${f.status || 'Open'}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${f.reportId})" title="View Report">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
@@ -807,6 +937,9 @@ function renderClientFindings(client) {
 // Client certificates
 function renderClientCertificates(client) {
     const certs = (window.state.certifications || []).filter(c => matchesClient(c, client));
+
+    const totalCerts = certs.length;
+    const validCertsCount = certs.filter(c => c.status === 'Valid').length;
 
     if (certs.length === 0) {
         return `
@@ -818,31 +951,52 @@ function renderClientCertificates(client) {
     }
 
     return `
-        <div class="card">
-            <h3 style="margin: 0 0 1rem 0;">Certificates</h3>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Certificate #</th>
-                            <th>Standard</th>
-                            <th>Issue Date</th>
-                            <th>Expiry Date</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${certs.map(c => `
+        <div class="fade-in">
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalCerts}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Certificates</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                    <i class="fa-solid fa-shield-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${validCertsCount}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Valid Certificates</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin: 0 0 1rem 0;">Certificates</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
                             <tr>
-                                <td style="font-weight: 500;">${c.certificateNumber || c.id}</td>
-                                <td><span class="badge" style="background: #d1fae5; color: #065f46;">${c.standard || 'ISO'}</span></td>
-                                <td>${c.issueDate || '-'}</td>
-                                <td>${c.expiryDate || '-'}</td>
-                                <td><span class="status-badge status-${(c.status || 'valid').toLowerCase()}">${c.status || 'Valid'}</span></td>
+                                <th>Certificate #</th>
+                                <th>Standard</th>
+                                <th>Issue Date</th>
+                                <th>Expiry Date</th>
+                                <th>Status</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${certs.map(c => `
+                                <tr>
+                                    <td style="font-weight: 500;">${c.certificateNumber || c.id}</td>
+                                    <td><span class="badge" style="background: #d1fae5; color: #065f46;">${c.standard || 'ISO'}</span></td>
+                                    <td>${c.issueDate || '-'}</td>
+                                    <td>${c.expiryDate || '-'}</td>
+                                    <td><span class="status-badge status-${(c.status || 'valid').toLowerCase()}">${c.status || 'Valid'}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon" onclick="alert('Viewing Certificate PDF (Simulated)')" title="View PDF">
+                                            <i class="fa-solid fa-file-pdf"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
@@ -853,4 +1007,11 @@ window.refreshClientSidebar = populateClientSidebar;
 
 // Export
 window.populateClientSidebar = populateClientSidebar;
+window.downloadReport = function (reportId) {
+    console.log('Downloading report:', reportId);
+    window.showNotification('Preparing report download...', 'info');
+    setTimeout(() => {
+        window.showNotification('Report downloaded successfully (Simulated)', 'success');
+    }, 1500);
+};
 // window.renderClientWorkspace export is not needed as selectClient handles it directly via renderClientSidebarMenu loops

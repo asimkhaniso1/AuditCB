@@ -812,7 +812,50 @@ function renderReportingModule() {
                 </div>
             </div>
 
-            <!-- Quick Help Cards (Moved to Header) -->
+            <!-- Summary Metric Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-file-lines"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Reports</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.length}</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-glasses"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Pending Review</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.filter(r => r.status === window.CONSTANTS.STATUS.IN_REVIEW).length}</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f5f3ff; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-check-double"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Approved</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.filter(r => r.status === 'Approved').length}</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0fdf4; color: #15803d; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-file-contract"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Finalized</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.filter(r => r.status === window.CONSTANTS.STATUS.FINALIZED || r.status === window.CONSTANTS.STATUS.PUBLISHED).length}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Help Cards -->
             <div style="margin-bottom: 2rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
                 <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe;">
                     <div style="font-weight: 600; color: #1d4ed8; margin-bottom: 0.5rem;"><i class="fa-solid fa-pen-ruler"></i> Draft</div>
