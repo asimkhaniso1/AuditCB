@@ -736,6 +736,10 @@ function openEditChecklistModal(id) {
     attachRemoveRowListeners();
 
     modalSave.onclick = () => {
+        // Get form values first
+        const name = document.getElementById('checklist-name').value.trim();
+        const standard = document.getElementById('checklist-standard').value;
+        const type = document.getElementById('checklist-type').value;
         const auditType = document.getElementById('checklist-audit-type').value;
         const auditScope = document.getElementById('checklist-audit-scope').value;
 
@@ -762,10 +766,6 @@ function openEditChecklistModal(id) {
                 rawRows.push({ mClause, mTitle, clause, requirement });
             }
         });
-
-        const name = document.getElementById('checklist-name').value.trim();
-        const standard = document.getElementById('checklist-standard').value;
-        const type = document.getElementById('checklist-type').value;
 
         checklist.name = name;
         checklist.standard = standard;
