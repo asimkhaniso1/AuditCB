@@ -230,10 +230,7 @@ function openCreatePlanModal() {
                     <div class="form-group">
                         <label>Audit Type</label>
                         <select class="form-control" id="plan-type">
-                            <option value="Stage 1">Stage 1</option>
-                            <option value="Stage 2">Stage 2</option>
-                            <option value="Surveillance">Surveillance</option>
-                            <option value="Recertification">Recertification</option>
+                            ${window.CONSTANTS.AUDIT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
                         </select>
                     </div>
 
@@ -579,8 +576,8 @@ function autoCalculateDays() {
         const type = document.getElementById('plan-type').value;
         let days = 0;
 
-        if (type === 'Stage 1') days = results.stage1;
-        else if (type === 'Stage 2') days = results.stage2;
+        if (type.includes('Stage 1')) days = results.stage1;
+        else if (type.includes('Stage 2') || type.includes('Recertification') || type.includes('Initial')) days = results.stage2; // Recert is typically full duration like Stage 2
         else days = results.surveillance;
 
         document.getElementById('plan-mandays').value = days.toFixed(1);
