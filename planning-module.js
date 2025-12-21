@@ -999,10 +999,13 @@ window.printAuditPlan = function (planId) {
     const checklists = state.checklists || [];
     const planChecklists = plan.selectedChecklists || [];
 
-    // Map progress
+    // Map progress correctly
     const progressMap = {};
     if (report && report.checklistProgress) {
-        report.checklistProgress.forEach(p => progressMap[`${p.checklistId} -${p.itemIdx} `] = p);
+        report.checklistProgress.forEach(p => {
+            // Normalized key: ID-Idx (String)
+            progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
+        });
     }
 
     const statusText = { 'conform': 'Conform', 'minor': 'Minor NC', 'major': 'Major NC', 'na': 'N/A', '': 'Not Checked' };
@@ -1019,9 +1022,11 @@ window.printAuditPlan = function (planId) {
                 .header { text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem; position: relative; }
                 .section { margin-bottom: 2rem; page-break-inside: avoid; }
                 h2 { background: #f2f2f2; padding: 0.5rem; border-left: 5px solid #333; margin-top: 0; }
+                h3 { margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; font-size: 1rem; }
                 table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                 th { background-color: #f8f8f8; font-weight: bold; }
+                .main-clause { background-color: #eef2ff; font-weight: bold; }
             </style>
         </head>
         <body>
@@ -1054,7 +1059,28 @@ window.printAuditPlan = function (planId) {
                     <tbody>
         `;
 
-        if (cl.items) {
+        if (cl.clauses) {
+            // Hierarchical
+            cl.clauses.forEach(clause => {
+                content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
+                clause.subClauses.forEach((item, subIdx) => {
+                    const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
+                    const prog = progressMap[key] || {};
+                    const s = prog.status || '';
+                    const c = prog.comment || '-';
+
+                    content += `
+                        <tr>
+                            <td>${item.clause || ''}</td>
+                            <td>${item.requirement || ''}</td>
+                            <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
+                            <td>${c}</td>
+                        </tr>
+                     `;
+                });
+            });
+        } else if (cl.items) {
+            // Flat
             cl.items.forEach((item, idx) => {
                 const key = `${cl.id}-${idx}`;
                 const prog = progressMap[key] || {};
@@ -1091,9 +1117,13 @@ window.printAuditPlan = function (planId) {
     `;
 
     const win = window.open('', '_blank');
-    win.document.write(content);
-    win.document.close();
-    // setTimeout(() => win.print(), 500); // Allow render
+    if (win) {
+        win.document.write(content);
+        win.document.close();
+        setTimeout(() => win.print(), 500);
+    } else {
+        alert("Pop-up blocker prevented printing. Please check your browser settings.");
+    }
 };
 
 window.closeAuditPlan = function (planId) {
