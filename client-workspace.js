@@ -121,15 +121,19 @@ function renderClientSidebarMenu(clientId) {
 
     // Client Menu Items
     navList.innerHTML = `
-        <li style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;" onclick="window.backToDashboard()">
-            <i class="fa-solid fa-arrow-left"></i> Back to Global
+        <li style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);" onclick="window.backToDashboard()">
+            <i class="fa-solid fa-arrow-left" style="color: var(--text-secondary);"></i> <span style="font-weight: 500;">Back to Global</span>
         </li>
+        
         <li class="active" onclick="window.renderClientModule(${clientId}, 'overview', this)">
             <i class="fa-solid fa-house"></i> Overview
         </li>
         <li onclick="window.renderClientModule(${clientId}, 'cycle', this)">
             <i class="fa-solid fa-timeline"></i> Audit Cycle
         </li>
+
+        <!-- Audit Operations -->
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 1rem; font-weight: 600;">Audit Operations</div>
         <li onclick="window.renderClientModule(${clientId}, 'plans', this)">
             <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
@@ -137,14 +141,20 @@ function renderClientSidebarMenu(clientId) {
             <i class="fa-solid fa-tasks"></i> Execution
         </li>
         <li onclick="window.renderClientModule(${clientId}, 'reporting', this)">
-            <i class="fa-solid fa-file-alt"></i> Reporting
+            <i class="fa-solid fa-file-pen"></i> Reporting
         </li>
+
+        <!-- Outcomes -->
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 1rem; font-weight: 600;">Outcomes</div>
         <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
             <i class="fa-solid fa-triangle-exclamation"></i> Findings
         </li>
         <li onclick="window.renderClientModule(${clientId}, 'certs', this)">
             <i class="fa-solid fa-certificate"></i> Certificates
         </li>
+
+        <!-- Records & Compliance -->
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 1rem; font-weight: 600;">Governance</div>
         <li onclick="window.renderClientModule(${clientId}, 'compliance', this)">
             <i class="fa-solid fa-shield-halved"></i> Compliance
         </li>
