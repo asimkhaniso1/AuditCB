@@ -11,8 +11,9 @@ let checklistSearchTerm = '';
 function renderChecklistLibrary() {
     const contentArea = document.getElementById('content-area');
     const userRole = state.currentUser?.role;
+    const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
-    const canEditGlobal = isCertManager;
+    const canEditGlobal = isCertManager || isAdmin;
     const checklists = state.checklists || [];
 
     // Apply filters
@@ -52,11 +53,11 @@ function renderChecklistLibrary() {
                 </button>
             </div>
 
-            <!-- Cert Manager Badge -->
+            <!-- Cert Manager/Admin Badge -->
             ${canEditGlobal ? `
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
                     <i class="fa-solid fa-shield-halved"></i>
-                    <span>Certification Manager Mode - You can create/edit/delete Global checklists</span>
+                    <span>${isCertManager ? 'Certification Manager' : 'Admin'} Mode - You can create/edit/delete Global checklists</span>
                 </div>
             ` : ''}
 
@@ -297,7 +298,9 @@ function openAddChecklistModal() {
 
     const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const userRole = state.currentUser?.role;
+    const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const canEditGlobal = isCertManager || isAdmin;
 
     modalTitle.textContent = 'Create New Checklist';
     modalBody.innerHTML = `
@@ -317,7 +320,7 @@ function openAddChecklistModal() {
                     <label>Type</label>
                     <select class="form-control" id="checklist-type">
                         <option value="custom">Custom (Personal)</option>
-                        ${isCertManager ? '<option value="global">Global (Organization-wide)</option>' : ''}
+                        ${canEditGlobal ? '<option value="global">Global (Organization-wide)</option>' : ''}
                     </select>
                 </div>
             </div>
@@ -457,11 +460,13 @@ function openEditChecklistModal(id) {
     if (!checklist) return;
 
     const userRole = state.currentUser?.role;
+    const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const canEditGlobal = isCertManager || isAdmin;
 
     // Check permission for global checklists
-    if (checklist.type === 'global' && !isCertManager) {
-        window.showNotification('Only Certification Managers can edit global checklists', 'error');
+    if (checklist.type === 'global' && !canEditGlobal) {
+        window.showNotification('Only Certification Managers or Admins can edit global checklists', 'error');
         return;
     }
 
@@ -487,9 +492,9 @@ function openEditChecklistModal(id) {
                 </div>
                 <div class="form-group">
                     <label>Type</label>
-                    <select class="form-control" id="checklist-type" ${checklist.type === 'global' && !isCertManager ? 'disabled' : ''}>
+                    <select class="form-control" id="checklist-type" ${checklist.type === 'global' && !canEditGlobal ? 'disabled' : ''}>
                         <option value="custom" ${checklist.type === 'custom' ? 'selected' : ''}>Custom (Personal)</option>
-                        ${isCertManager ? `<option value="global" ${checklist.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
+                        ${canEditGlobal ? `<option value="global" ${checklist.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                     </select>
                 </div>
             </div>
@@ -650,10 +655,12 @@ function deleteChecklist(id) {
     if (!checklist) return;
 
     const userRole = state.currentUser?.role;
+    const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const canEditGlobal = isCertManager || isAdmin;
 
-    if (checklist.type === 'global' && !isCertManager) {
-        window.showNotification('Only Certification Managers can delete global checklists', 'error');
+    if (checklist.type === 'global' && !canEditGlobal) {
+        window.showNotification('Only Certification Managers or Admins can delete global checklists', 'error');
         return;
     }
 
