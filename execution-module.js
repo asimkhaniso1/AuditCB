@@ -389,6 +389,9 @@ function renderExecutionDetail(reportId) {
                 <button class="tab-btn" data-tab="ncr">NCRs</button>
                 <button class="tab-btn" data-tab="capa">CAPA</button>
                 <button class="tab-btn" data-tab="observations">Observations</button>
+                <button class="tab-btn" data-tab="review" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                    <i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i> Review & Submit
+                </button>
                 <button class="tab-btn" data-tab="summary">Summary</button>
             </div>
 
@@ -708,6 +711,123 @@ function renderExecutionTab(report, tabName) {
             `;
             break;
 
+        case 'review':
+            // Auditor's Findings Review Screen
+            const allFindings = [];
+
+            // Collect checklist NCs
+            (report.checklistProgress || []).filter(p => p.status === 'nc').forEach((item, idx) => {
+                allFindings.push({
+                    id: `checklist-${idx}`,
+                    source: 'Checklist',
+                    type: item.ncrType || 'observation',
+                    description: item.ncrDescription || item.comment || 'Non-conformity identified',
+                    remarks: item.remarks || '',
+                    designation: item.designation || '',
+                    department: item.department || '',
+                    hasEvidence: !!item.evidenceImage
+                });
+            });
+
+            // Collect manual NCRs
+            (report.ncrs || []).forEach((ncr, idx) => {
+                allFindings.push({
+                    id: `ncr-${idx}`,
+                    source: 'Manual',
+                    type: ncr.type || 'observation',
+                    description: ncr.description || '',
+                    remarks: ncr.remarks || '',
+                    designation: ncr.designation || '',
+                    department: ncr.department || '',
+                    hasEvidence: !!ncr.evidenceImage
+                });
+            });
+
+            const isReadyToSubmit = allFindings.length === 0 || allFindings.every(f => f.type !== 'pending');
+
+            tabContent.innerHTML = `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <div>
+                            <h3 style="margin: 0;"><i class="fa-solid fa-clipboard-check" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Review Your Findings</h3>
+                            <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review all flagged items before submitting to Lead Auditor for classification.</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="window.saveChecklist(${report.id})">
+                                <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
+                            </button>
+                            <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;" onclick="window.submitToLeadAuditor(${report.id})" ${!isReadyToSubmit ? '' : ''}>
+                                <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit to Lead Auditor
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Stats -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                        <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${allFindings.length}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Total Findings</div>
+                        </div>
+                        <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc2626;">${allFindings.filter(f => f.type === 'major').length}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Major</div>
+                        </div>
+                        <div style="background: #fef3c7; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${allFindings.filter(f => f.type === 'minor').length}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Minor</div>
+                        </div>
+                        <div style="background: #f3e8ff; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;">${allFindings.filter(f => f.type === 'observation').length}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Observations</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Findings List -->
+                    ${allFindings.length > 0 ? `
+                        <div style="max-height: 500px; overflow-y: auto;">
+                            ${allFindings.map((f, idx) => `
+                                <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'};">
+                                    <div style="display: grid; grid-template-columns: 1fr 150px 150px; gap: 1rem; align-items: start;">
+                                        <div>
+                                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                                                ${f.source} Finding #${idx + 1}
+                                                ${f.hasEvidence ? '<span style="margin-left: 0.5rem; color: #10b981;"><i class="fa-solid fa-image"></i> Evidence</span>' : ''}
+                                            </div>
+                                            <div style="font-weight: 500; margin-bottom: 0.5rem;">${f.description}</div>
+                                            ${f.designation || f.department ? `
+                                                <div style="font-size: 0.85rem; color: #64748b;">
+                                                    <i class="fa-solid fa-user"></i> ${f.designation || '-'} | 
+                                                    <i class="fa-solid fa-building"></i> ${f.department || '-'}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Severity</label>
+                                            <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.85rem;">
+                                                <option value="observation" ${f.type === 'observation' ? 'selected' : ''}>Observation</option>
+                                                <option value="minor" ${f.type === 'minor' ? 'selected' : ''}>Minor NC</option>
+                                                <option value="major" ${f.type === 'major' ? 'selected' : ''}>Major NC</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Auditor Remarks</label>
+                                            <input type="text" class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Add notes..." value="${f.remarks}" style="font-size: 0.85rem;">
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 3rem; background: #f0fdf4; border-radius: 8px;">
+                            <i class="fa-solid fa-check-circle" style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;"></i>
+                            <h4 style="margin: 0 0 0.5rem 0; color: #16a34a;">No Findings Recorded</h4>
+                            <p style="color: #64748b; margin: 0;">This audit has no non-conformities. Ready to submit!</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            break;
+
         case 'summary':
             // Delegate to Reporting Module
             window.renderReportSummaryTab(report, tabContent);
@@ -808,6 +928,56 @@ window.saveChecklist = function (reportId) {
     report.checklistProgress = checklistData;
     window.saveData();
     window.showNotification('Checklist progress saved successfully');
+};
+
+// Submit findings to Lead Auditor for review
+window.submitToLeadAuditor = function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    // Save any pending changes from review screen
+    document.querySelectorAll('.review-severity').forEach(select => {
+        const findingId = select.dataset.findingId;
+        const newType = select.value;
+
+        if (findingId.startsWith('checklist-')) {
+            const idx = parseInt(findingId.split('-')[1]);
+            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
+            if (ncItems[idx]) ncItems[idx].ncrType = newType;
+        } else if (findingId.startsWith('ncr-')) {
+            const idx = parseInt(findingId.split('-')[1]);
+            if (report.ncrs && report.ncrs[idx]) report.ncrs[idx].type = newType;
+        }
+    });
+
+    document.querySelectorAll('.review-remarks').forEach(input => {
+        const findingId = input.dataset.findingId;
+        const remarks = input.value;
+
+        if (findingId.startsWith('checklist-')) {
+            const idx = parseInt(findingId.split('-')[1]);
+            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
+            if (ncItems[idx]) ncItems[idx].remarks = remarks;
+        } else if (findingId.startsWith('ncr-')) {
+            const idx = parseInt(findingId.split('-')[1]);
+            if (report.ncrs && report.ncrs[idx]) report.ncrs[idx].remarks = remarks;
+        }
+    });
+
+    // Update report status to Pending Review
+    report.status = 'Pending Review';
+    report.submittedAt = new Date().toISOString();
+    report.submittedBy = window.state.currentUser?.name || 'Auditor';
+
+    window.saveData();
+
+    // Show confirmation
+    window.showNotification('Findings submitted to Lead Auditor for review!', 'success');
+
+    // Navigate back to execution list
+    setTimeout(() => {
+        renderExecutionEnhanced();
+    }, 1500);
 };
 
 window.startDictation = function (uniqueId) {
