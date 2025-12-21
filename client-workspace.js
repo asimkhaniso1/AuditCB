@@ -105,85 +105,22 @@ function renderClientWorkspace(clientId) {
     // Update page title
     document.getElementById('page-title').textContent = client.name;
 
-    const contentArea = document.getElementById('content-area');
+    // Delegate to the comprehensive client detail view from clients-module.js
+    if (typeof window.renderClientDetail === 'function') {
+        window.renderClientDetail(clientId);
 
-    // Get stats for this client
-    const clientPlans = (window.state.auditPlans || []).filter(p => p.client === client.name || p.clientId === clientId);
-    const clientReports = (window.state.auditReports || []).filter(r => r.client === client.name || r.clientId === clientId);
-    const clientCerts = (window.state.certifications || []).filter(c => c.client === client.name || c.clientId === clientId);
-    const openNCs = clientReports.reduce((count, r) => count + ((r.findings || []).filter(f => f.status !== 'Closed').length), 0);
-
-    contentArea.innerHTML = `
-        <div class="fade-in">
-            <!-- Back Button & Client Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary btn-sm" onclick="window.backToDashboard()">
-                        <i class="fa-solid fa-arrow-left"></i>
-                    </button>
-                    <div>
-                        <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                            ${client.name}
-                            <span class="status-badge status-${(client.status || 'active').toLowerCase()}" style="font-size: 0.7rem;">${client.status || 'Active'}</span>
-                        </h2>
-                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${client.industry || 'Industry not set'} • ${client.city || ''}</p>
-                    </div>
-                </div>
-                <button class="btn btn-primary" onclick="window.openNewAuditPlanModal('${client.name}')">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit
-                </button>
-            </div>
-            
-            <!-- Summary Cards -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="document.querySelector('[data-workspace-tab=\"plans\"]').click()">
-                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.25rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${clientPlans.length}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Audit Plans</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="document.querySelector('[data-workspace-tab=\"certs\"]').click()">
-                    <i class="fa-solid fa-certificate" style="font-size: 1.25rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${clientCerts.length}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Certificates</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="document.querySelector('[data-workspace-tab=\"findings\"]').click()">
-                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${openNCs}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6; cursor: pointer;" onclick="document.querySelector('[data-workspace-tab=\"compliance\"]').click()">
-                    <i class="fa-solid fa-shield-halved" style="font-size: 1.25rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${client.compliance?.contract?.signed ? '✓' : '!'}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Compliance</p>
-                </div>
-            </div>
-            
-            <!-- Workspace Tabs -->
-            <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
-                <button class="tab-btn active" data-workspace-tab="overview">Overview</button>
-                <button class="tab-btn" data-workspace-tab="cycle">Audit Cycle</button>
-                <button class="tab-btn" data-workspace-tab="plans">Plans & Audits</button>
-                <button class="tab-btn" data-workspace-tab="findings">Findings</button>
-                <button class="tab-btn" data-workspace-tab="certs">Certificates</button>
-                <button class="tab-btn" data-workspace-tab="compliance">Compliance</button>
-                <button class="tab-btn" data-workspace-tab="docs">Documents</button>
-            </div>
-            
-            <div id="tab-content"></div>
-        </div>
-    `;
-
-    // Setup tab handlers
-    document.querySelectorAll('[data-workspace-tab]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('[data-workspace-tab]').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            renderWorkspaceTab(clientId, e.target.dataset.workspaceTab);
-        });
-    });
-
-    // Render initial tab
-    renderWorkspaceTab(clientId, 'overview');
+        // Re-apply sidebar hiding since renderClientDetail might reset layout
+        const leftSidebar = document.getElementById('sidebar');
+        if (leftSidebar) {
+            leftSidebar.classList.add('hidden');
+            leftSidebar.style.display = '';
+        }
+    } else {
+        console.error('renderClientDetail function not found');
+        // Fallback to basic view if module missing
+        const contentArea = document.getElementById('content-area');
+        contentArea.innerHTML = `<div class="card"><p>Error: Client Detail module not loaded.</p></div>`;
+    }
 }
 
 // Render individual workspace tab content
