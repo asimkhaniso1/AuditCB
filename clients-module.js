@@ -574,10 +574,142 @@ function renderClientTab(client, tabName) {
             `;
             break;
         case 'audits':
+            // Get all audits for this client
+            const clientPlans = (state.auditPlans || []).filter(p => p.client === client.name);
+            const clientReports = (state.auditReports || []).filter(r => r.client === client.name);
+
+            // Calculate totals
+            let allNCRs = [];
+            clientReports.forEach(r => {
+                (r.ncrs || []).forEach(ncr => allNCRs.push({ ...ncr, auditDate: r.date, reportId: r.id }));
+                (r.checklistProgress || []).filter(p => p.status === 'nc').forEach(ncr =>
+                    allNCRs.push({
+                        type: ncr.ncrType || 'observation',
+                        description: ncr.ncrDescription || ncr.comment,
+                        status: ncr.status || 'Open',
+                        designation: ncr.designation,
+                        department: ncr.department,
+                        evidenceImage: ncr.evidenceImage,
+                        auditDate: r.date,
+                        reportId: r.id
+                    })
+                );
+            });
+
+            const openNCRs = allNCRs.filter(n => n.status === 'Open').length;
+            const closedNCRs = allNCRs.filter(n => n.status === 'Closed').length;
+            const majorNCRs = allNCRs.filter(n => n.type === 'major').length;
+            const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
+
             tabContent.innerHTML = `
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-bar" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Summary</h3>
+                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
+                        <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${clientPlans.length}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Total Audits</div>
+                        </div>
+                        <div style="background: #fef3c7; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${allNCRs.length}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Total Findings</div>
+                        </div>
+                        <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc2626;">${majorNCRs}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Major NCs</div>
+                        </div>
+                        <div style="background: #fef9c3; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #ca8a04;">${minorNCRs}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Minor NCs</div>
+                        </div>
+                        <div style="background: ${openNCRs > 0 ? '#fee2e2' : '#dcfce7'}; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: ${openNCRs > 0 ? '#dc2626' : '#16a34a'};">${openNCRs}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Open NCRs</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Audit History Timeline -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Audit History</h3>
+                    ${clientPlans.length > 0 ? `
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${clientPlans.map(plan => {
+                const report = clientReports.find(r => r.planId == plan.id || r.date === plan.date);
+                const ncrCount = report ? (report.ncrs || []).length : 0;
+                return `
+                                    <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${plan.status === 'Completed' ? '#10b981' : '#3b82f6'};">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600;">${plan.type || 'Audit'} - ${plan.standard || client.standard}</div>
+                                            <div style="font-size: 0.85rem; color: #64748b;">
+                                                <i class="fa-solid fa-calendar"></i> ${plan.date} 
+                                                <span style="margin-left: 1rem;"><i class="fa-solid fa-user"></i> ${plan.team ? plan.team[0] : 'TBD'}</span>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 1rem;">
+                                            ${ncrCount > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${ncrCount} Findings</span>` : ''}
+                                            <span class="badge" style="background: ${plan.status === 'Completed' ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
+                                            ${report ? `<button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${report.id})"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
+                                        </div>
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; color: #64748b;">
+                            <i class="fa-solid fa-calendar-xmark" style="font-size: 2rem; margin-bottom: 0.5rem; color: #cbd5e1;"></i>
+                            <p style="margin: 0;">No audits conducted yet for this client.</p>
+                        </div>
+                    `}
+                </div>
+                
+                <!-- Findings History -->
                 <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Audit History</h3>
-                    <p style="color: var(--text-secondary);">No audit history available.</p>
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color); margin-right: 0.5rem;"></i>Findings History (All NCRs)</h3>
+                    ${allNCRs.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                        <th>Dept/Person</th>
+                                        <th>Evidence</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${allNCRs.map(ncr => `
+                                        <tr>
+                                            <td style="white-space: nowrap;">${ncr.auditDate || '-'}</td>
+                                            <td>
+                                                <span class="badge" style="background: ${ncr.type === 'major' ? '#dc2626' : ncr.type === 'minor' ? '#d97706' : '#8b5cf6'}; font-size: 0.7rem;">
+                                                    ${(ncr.type || 'OBS').toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td style="max-width: 300px;">${ncr.description || ncr.ncrDescription || '-'}</td>
+                                            <td style="font-size: 0.85rem;">
+                                                ${ncr.designation ? `<div>${ncr.designation}</div>` : ''}
+                                                ${ncr.department ? `<div style="color: #64748b;">${ncr.department}</div>` : ''}
+                                                ${!ncr.designation && !ncr.department ? '-' : ''}
+                                            </td>
+                                            <td>
+                                                ${ncr.evidenceImage ? `<a href="${ncr.evidenceImage}" target="_blank" style="color: var(--primary-color);"><i class="fa-solid fa-image"></i> View</a>` : '<span style="color: #cbd5e1;">None</span>'}
+                                            </td>
+                                            <td>
+                                                <span class="badge" style="background: ${ncr.status === 'Closed' ? '#10b981' : '#ef4444'};">${ncr.status || 'Open'}</span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; color: #64748b;">
+                            <i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #10b981;"></i>
+                            <p style="margin: 0;">No findings recorded for this client. Excellent compliance!</p>
+                        </div>
+                    `}
                 </div>
             `;
             break;
