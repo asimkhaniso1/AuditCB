@@ -239,12 +239,25 @@ window.renderClientModule = function (clientId, moduleName, clickedElement) {
 
 // ... HELPER RENDER FUNCTIONS (Same as before) ...
 
+// Helper function to match client data
+function matchesClient(item, client) {
+    // Match by clientId if available
+    if (item.clientId && client.id && item.clientId === client.id) {
+        return true;
+    }
+    // Match by client name (case-insensitive, trimmed)
+    if (item.client && client.name) {
+        return item.client.trim().toLowerCase() === client.name.trim().toLowerCase();
+    }
+    return false;
+}
+
 // Overview tab content
 function renderClientOverview(client) {
-    const clientPlans = (window.state.auditPlans || []).filter(p => p.client === client.name || p.clientId === client.id);
-    const clientCerts = (window.state.certifications || []).filter(c => c.client === client.name || c.clientId === client.id);
-    const clientReports = (window.state.auditReports || []).filter(r => r.client === client.name || r.clientId === client.id);
-    const openNCs = clientReports.reduce((count, r) => count + ((r.findings || []).filter(f => f.status !== 'Closed').length), 0);
+    const clientPlans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
+    const clientCerts = (window.state.certifications || []).filter(c => matchesClient(c, client));
+    const clientReports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
+    const openNCs = clientReports.reduce((count, r) => count + ((r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length), 0);
 
     return `
         <div class="fade-in">
@@ -297,7 +310,7 @@ function renderClientOverview(client) {
 
 // Audit cycle timeline
 function renderAuditCycleTimeline(client) {
-    const certs = (window.state.certifications || []).filter(c => c.client === client.name);
+    const certs = (window.state.certifications || []).filter(c => matchesClient(c, client));
     const latestCert = certs.sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate))[0];
 
     if (!latestCert) {
@@ -353,7 +366,7 @@ function renderAuditCycleTimeline(client) {
 
 // Client plans list
 function renderClientPlans(client) {
-    const plans = (window.state.auditPlans || []).filter(p => p.client === client.name || p.clientId === client.id);
+    const plans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
 
     if (plans.length === 0) {
         return `
@@ -409,8 +422,8 @@ function renderClientPlans(client) {
 
 // Client findings/NCs
 function renderClientFindings(client) {
-    const reports = (window.state.auditReports || []).filter(r => r.client === client.name);
-    const allFindings = reports.flatMap(r => (r.findings || []).map(f => ({ ...f, reportDate: r.date })));
+    const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
+    const allFindings = reports.flatMap(r => (r.ncrs || r.findings || []).map(f => ({ ...f, reportDate: r.date })));
 
     if (allFindings.length === 0) {
         return `
@@ -454,7 +467,7 @@ function renderClientFindings(client) {
 
 // Client certificates
 function renderClientCertificates(client) {
-    const certs = (window.state.certifications || []).filter(c => c.client === client.name);
+    const certs = (window.state.certifications || []).filter(c => matchesClient(c, client));
 
     if (certs.length === 0) {
         return `
