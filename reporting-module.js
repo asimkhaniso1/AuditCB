@@ -383,8 +383,21 @@ window.generateAuditReport = function (reportId) {
                 let clause = 'Checklist Item';
                 if (item.checklistId) {
                     const cl = state.checklists.find(c => c.id == item.checklistId);
-                    const clItem = cl?.items?.[item.itemIdx];
-                    if (clItem) clause = clItem.clause;
+                    if (cl) {
+                        if (cl.clauses && (String(item.itemIdx).includes('-'))) {
+                            // Hierarchical: mainClause-subIdx
+                            const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
+                            // find clause where mainClause matches
+                            const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
+                            if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
+                                clause = mainObj.subClauses[subIdxVal].clause;
+                            }
+                        } else {
+                            // Flat: numeric index
+                            const clItem = cl.items?.[item.itemIdx];
+                            if (clItem) clause = clItem.clause;
+                        }
+                    }
                 } else if (item.isCustom) {
                     const customItem = (report.customItems || [])[item.itemIdx];
                     if (customItem) clause = customItem.clause;
@@ -409,12 +422,22 @@ window.generateAuditReport = function (reportId) {
         const capaCount = (report.capas || []).length;
 
         // Calculate checklist progress
+        const assignedChecklists = (state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
         const totalProgress = report.checklistProgress || [];
         const conformCount = totalProgress.filter(p => p.status === 'conform').length;
         const ncCount = totalProgress.filter(p => p.status === 'nc').length;
         const naCount = totalProgress.filter(p => p.status === 'na').length;
-        const totalItems = totalProgress.length;
-        const progressPercent = totalItems > 0 ? Math.round((conformCount / totalItems) * 100) : 0;
+
+        // Calculate true total items (supporting hierarchy)
+        const totalItems = assignedChecklists.reduce((sum, c) => {
+            if (c.clauses) {
+                return sum + c.clauses.reduce((s, clause) => s + (clause.subClauses?.length || 0), 0);
+            }
+            return sum + (c.items?.length || 0);
+        }, 0) + (report.customItems?.length || 0);
+
+        const answeredCount = totalProgress.length;
+        const progressPercent = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
 
         // QR Code URL
         // Safe to not escape here as we encodeURIComponent the whole data string next
@@ -553,7 +576,7 @@ window.generateAuditReport = function (reportId) {
                         <span style="font-weight: 700; color: #3b82f6;">${progressPercent}% Complete</span>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${progressPercent}%;">${totalItems > 0 ? `${conformCount}/${totalItems}` : '0/0'}</div>
+                        <div class="progress-fill" style="width: ${progressPercent}%;">${totalItems > 0 ? `${answeredCount}/${totalItems}` : '0/0'}</div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px;">
                         <div style="text-align: center; padding: 12px; background: #f0f9ff; border-radius: 6px;">

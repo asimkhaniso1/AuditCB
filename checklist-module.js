@@ -281,18 +281,31 @@ function setupCSVUpload() {
             lines.forEach(line => {
                 if (!line.trim()) return;
 
-                // Simple CSV split (Clause, Requirement)
-                const parts = line.split(',');
+                // Split by comma, handling potential quotes (simplified)
+                const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
+
                 if (parts.length >= 2) {
-                    const clause = parts[0].trim();
-                    // Join the rest in case description has commas
-                    const requirement = parts.slice(1).join(',').trim();
+                    let mainClause = '', mainTitle = '', clause = '', requirement = '';
+
+                    if (parts.length >= 4) {
+                        // Hierarchical Format: MainClause, Title, SubClause, Requirement
+                        mainClause = parts[0];
+                        mainTitle = parts[1];
+                        clause = parts[2];
+                        requirement = parts[3];
+                    } else {
+                        // Flat Format: Clause, Requirement
+                        clause = parts[0];
+                        requirement = parts[1];
+                    }
 
                     // Basic header detection validation
-                    if (clause && requirement && clause.toLowerCase() !== 'clause') {
+                    if ((clause || requirement) && clause.toLowerCase() !== 'clause' && mainClause.toLowerCase() !== 'main clause') {
                         const newRow = document.createElement('tr');
                         newRow.className = 'checklist-item-row';
                         newRow.innerHTML = `
+                            <td><input type="text" class="form-control item-main-clause" value="${mainClause}" style="margin: 0;"></td>
+                            <td><input type="text" class="form-control item-main-title" value="${mainTitle}" style="margin: 0;"></td>
                             <td><input type="text" class="form-control item-clause" value="${clause}" style="margin: 0;"></td>
                             <td><input type="text" class="form-control item-requirement" value="${requirement}" style="margin: 0;"></td>
                             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
@@ -384,25 +397,19 @@ function openAddChecklistModal() {
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th style="width: 100px;">Clause</th>
+                                <th style="width: 70px;">Main #</th>
+                                <th style="width: 150px;">Section Title</th>
+                                <th style="width: 70px;">Sub #</th>
                                 <th>Requirement</th>
                                 <th style="width: 50px;"></th>
                             </tr>
                         </thead>
                         <tbody id="checklist-items-body">
                             <tr class="checklist-item-row">
-                                <td><input type="text" class="form-control item-clause" placeholder="e.g. 4.1" style="margin: 0;"></td>
-                                <td><input type="text" class="form-control item-requirement" placeholder="Requirement description" style="margin: 0;"></td>
-                                <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
-                            </tr>
-                            <tr class="checklist-item-row">
-                                <td><input type="text" class="form-control item-clause" placeholder="e.g. 4.2" style="margin: 0;"></td>
-                                <td><input type="text" class="form-control item-requirement" placeholder="Requirement description" style="margin: 0;"></td>
-                                <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
-                            </tr>
-                            <tr class="checklist-item-row">
-                                <td><input type="text" class="form-control item-clause" placeholder="e.g. 5.1" style="margin: 0;"></td>
-                                <td><input type="text" class="form-control item-requirement" placeholder="Requirement description" style="margin: 0;"></td>
+                                <td><input type="text" class="form-control item-main-clause" placeholder="4" style="margin: 0;"></td>
+                                <td><input type="text" class="form-control item-main-title" placeholder="Context" style="margin: 0;"></td>
+                                <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+                                <td><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
                                 <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
                             </tr>
                         </tbody>
@@ -412,7 +419,7 @@ function openAddChecklistModal() {
                 <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
                     <small style="color: var(--text-secondary);">
                         <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
-                        Tip: You can paste data from Excel (Clause | Requirement columns)
+                        Tip: You can paste data from Excel (Main Clause | Title | Sub Clause | Requirement)
                     </small>
                 </div>
             </div>
@@ -428,7 +435,9 @@ function openAddChecklistModal() {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-clause" placeholder="Clause" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-main-clause" placeholder="Main" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-main-title" placeholder="Title" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-clause" placeholder="Sub" style="margin: 0;"></td>
             <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
@@ -449,16 +458,22 @@ function openAddChecklistModal() {
         }
 
         // Collect items
-        const items = [];
+        const rawRows = [];
+        let hasMainClauses = false;
+
         document.querySelectorAll('.checklist-item-row').forEach(row => {
+            const mClause = row.querySelector('.item-main-clause').value.trim();
+            const mTitle = row.querySelector('.item-main-title').value.trim();
             const clause = row.querySelector('.item-clause').value.trim();
             const requirement = row.querySelector('.item-requirement').value.trim();
-            if (clause || requirement) {
-                items.push({ clause, requirement });
+
+            if (mClause) hasMainClauses = true;
+            if (mClause || clause || requirement) {
+                rawRows.push({ mClause, mTitle, clause, requirement });
             }
         });
 
-        if (items.length === 0) {
+        if (rawRows.length === 0) {
             window.showNotification('Please add at least one checklist item', 'error');
             return;
         }
@@ -475,9 +490,38 @@ function openAddChecklistModal() {
             auditScope,
             createdBy: state.currentUser?.name || 'Current User',
             createdAt: new Date().toISOString().split('T')[0],
-            updatedAt: new Date().toISOString().split('T')[0],
-            items
+            updatedAt: new Date().toISOString().split('T')[0]
         };
+
+        if (hasMainClauses) {
+            // Build hierarchical structure
+            const clauses = [];
+            let currentMain = null;
+
+            rawRows.forEach(row => {
+                if (row.mClause) {
+                    if (!currentMain || currentMain.mainClause !== row.mClause) {
+                        currentMain = { mainClause: row.mClause, title: row.mTitle || 'Untitled', subClauses: [] };
+                        clauses.push(currentMain);
+                    }
+                }
+
+                if (currentMain && (row.clause || row.requirement)) {
+                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
+                } else if (!currentMain && (row.clause || row.requirement)) {
+                    // Orphan items, maybe create a default group
+                    if (!clauses.length) {
+                        currentMain = { mainClause: '0', title: 'General', subClauses: [] };
+                        clauses.push(currentMain);
+                    }
+                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
+                }
+            });
+            newChecklist.clauses = clauses;
+        } else {
+            // Flat structure
+            newChecklist.items = rawRows.map(r => ({ clause: r.clause, requirement: r.requirement }));
+        }
 
         if (!state.checklists) state.checklists = [];
         state.checklists.push(newChecklist);
@@ -579,19 +623,41 @@ function openEditChecklistModal(id) {
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th style="width: 100px;">Clause</th>
+                                <th style="width: 70px;">Main #</th>
+                                <th style="width: 150px;">Section Title</th>
+                                <th style="width: 70px;">Sub #</th>
                                 <th>Requirement</th>
                                 <th style="width: 50px;"></th>
                             </tr>
                         </thead>
                         <tbody id="checklist-items-body">
-                            ${(checklist.items || []).map(item => `
-                                <tr class="checklist-item-row">
-                                    <td><input type="text" class="form-control item-clause" value="${item.clause || ''}" style="margin: 0;"></td>
-                                    <td><input type="text" class="form-control item-requirement" value="${item.requirement || ''}" style="margin: 0;"></td>
-                                    <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
-                                </tr>
-                            `).join('')}
+                            ${(() => {
+            let flatItems = [];
+            if (checklist.clauses && checklist.clauses.length > 0) {
+                checklist.clauses.forEach(main => {
+                    main.subClauses.forEach(sub => {
+                        flatItems.push({
+                            mClause: main.mainClause,
+                            mTitle: main.title,
+                            clause: sub.clause,
+                            requirement: sub.requirement
+                        });
+                    });
+                });
+            } else {
+                flatItems = (checklist.items || []).map(i => ({ mClause: '', mTitle: '', clause: i.clause, requirement: i.requirement }));
+            }
+
+            return flatItems.map(item => `
+                                    <tr class="checklist-item-row">
+                                        <td><input type="text" class="form-control item-main-clause" value="${item.mClause || ''}" style="margin: 0;"></td>
+                                        <td><input type="text" class="form-control item-main-title" value="${item.mTitle || ''}" style="margin: 0;"></td>
+                                        <td><input type="text" class="form-control item-clause" value="${item.clause || ''}" style="margin: 0;"></td>
+                                        <td><input type="text" class="form-control item-requirement" value="${item.requirement || ''}" style="margin: 0;"></td>
+                                        <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                                    </tr>
+                                `).join('');
+        })()}
                         </tbody>
                     </table>
                 </div>
@@ -607,7 +673,9 @@ function openEditChecklistModal(id) {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-clause" placeholder="Clause" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-main-clause" placeholder="Main" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-main-title" placeholder="Title" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-clause" placeholder="Sub" style="margin: 0;"></td>
             <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
@@ -618,9 +686,6 @@ function openEditChecklistModal(id) {
     attachRemoveRowListeners();
 
     modalSave.onclick = () => {
-        const name = document.getElementById('checklist-name').value.trim();
-        const standard = document.getElementById('checklist-standard').value;
-        const type = document.getElementById('checklist-type').value;
         const auditType = document.getElementById('checklist-audit-type').value;
         const auditScope = document.getElementById('checklist-audit-scope').value;
 
@@ -629,12 +694,18 @@ function openEditChecklistModal(id) {
             return;
         }
 
-        const items = [];
+        const rawRows = [];
+        let hasMainClauses = false;
+
         document.querySelectorAll('.checklist-item-row').forEach(row => {
+            const mClause = row.querySelector('.item-main-clause').value.trim();
+            const mTitle = row.querySelector('.item-main-title').value.trim();
             const clause = row.querySelector('.item-clause').value.trim();
             const requirement = row.querySelector('.item-requirement').value.trim();
-            if (clause || requirement) {
-                items.push({ clause, requirement });
+
+            if (mClause) hasMainClauses = true;
+            if (mClause || clause || requirement) {
+                rawRows.push({ mClause, mTitle, clause, requirement });
             }
         });
 
@@ -643,7 +714,36 @@ function openEditChecklistModal(id) {
         checklist.type = type;
         checklist.auditType = auditType;
         checklist.auditScope = auditScope;
-        checklist.items = items;
+        checklist.updatedAt = new Date().toISOString().split('T')[0];
+
+        if (hasMainClauses) {
+            const clauses = [];
+            let currentMain = null;
+
+            rawRows.forEach(row => {
+                if (row.mClause) {
+                    if (!currentMain || currentMain.mainClause !== row.mClause) {
+                        currentMain = { mainClause: row.mClause, title: row.mTitle || 'Untitled', subClauses: [] };
+                        clauses.push(currentMain);
+                    }
+                }
+
+                if (currentMain && (row.clause || row.requirement)) {
+                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
+                } else if (!currentMain && (row.clause || row.requirement)) {
+                    if (!clauses.length) {
+                        currentMain = { mainClause: '0', title: 'General', subClauses: [] };
+                        clauses.push(currentMain);
+                    }
+                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
+                }
+            });
+            checklist.clauses = clauses;
+            delete checklist.items; // Ensure mixed state doesn't persist
+        } else {
+            checklist.items = rawRows.map(r => ({ clause: r.clause, requirement: r.requirement }));
+            delete checklist.clauses;
+        }
         checklist.updatedAt = new Date().toISOString().split('T')[0];
 
         window.saveData();
