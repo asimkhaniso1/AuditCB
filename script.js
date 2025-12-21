@@ -1362,5 +1362,8 @@ window.switchUserRole = function (role) {
 };
 
 // Initialize
-renderRoleSwitcher();
-renderModule('dashboard');
+document.addEventListener('DOMContentLoaded', () => {
+    renderRoleSwitcher();
+    // Default to dashboard or restore state if implemented
+    renderModule('dashboard');
+});
