@@ -257,6 +257,22 @@ function renderChecklistLibrary() {
 }
 
 
+// Helper function to auto-generate ISO clause section titles
+function getClauseTitleFromNumber(clauseNum) {
+    const isoClauseTitles = {
+        '4': 'Context of the Organization',
+        '5': 'Leadership',
+        '6': 'Planning',
+        '7': 'Support',
+        '8': 'Operation',
+        '9': 'Performance Evaluation',
+        '10': 'Improvement',
+        'A': 'Annex A Controls',
+        'General': 'General Requirements'
+    };
+    return isoClauseTitles[clauseNum] || `Clause ${clauseNum}`;
+}
+
 function setupCSVUpload() {
     const csvInput = document.getElementById('csv-upload-input');
     const btnImport = document.getElementById('btn-import-csv');
@@ -288,15 +304,24 @@ function setupCSVUpload() {
                     let mainClause = '', mainTitle = '', clause = '', requirement = '';
 
                     if (parts.length >= 4) {
-                        // Hierarchical Format: MainClause, Title, SubClause, Requirement
+                        // Full Hierarchical Format: MainClause, Title, SubClause, Requirement
                         mainClause = parts[0];
                         mainTitle = parts[1];
                         clause = parts[2];
                         requirement = parts[3];
                     } else {
-                        // Flat Format: Clause, Requirement
+                        // Simple 2-Column Format: Clause, Requirement
+                        // Auto-extract main clause from sub-clause number
                         clause = parts[0];
                         requirement = parts[1];
+
+                        // Extract main clause from clause number (e.g., "4.1" → "4", "A.5" → "A", "6.1.2" → "6")
+                        const clauseParts = clause.split('.');
+                        if (clauseParts.length > 0) {
+                            mainClause = clauseParts[0].trim();
+                            // Auto-generate title based on ISO standard structure
+                            mainTitle = getClauseTitleFromNumber(mainClause);
+                        }
                     }
 
                     // Basic header detection validation
