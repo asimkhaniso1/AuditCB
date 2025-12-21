@@ -6,9 +6,10 @@
 // Initialize client sidebar on page load
 document.addEventListener('DOMContentLoaded', function () {
     setTimeout(() => {
+        console.log('Initializing client sidebar...', window.state?.clients);
         populateClientSidebar();
         setupClientSearch();
-    }, 500);
+    }, 1000); // Increased timeout to ensure state is loaded
 });
 
 // Populate the right sidebar with client list
@@ -65,8 +66,13 @@ function setupClientSearch() {
 
 // Select a client and render their workspace
 window.selectClient = function (clientId) {
+    console.log('selectClient called with ID:', clientId, 'Type:', typeof clientId);
     const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+    console.log('Found client:', client);
+    if (!client) {
+        console.error('Client not found for ID:', clientId);
+        return;
+    }
 
     // Update active state
     window.state.activeClientId = clientId;
