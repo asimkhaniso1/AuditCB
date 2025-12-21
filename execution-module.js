@@ -712,25 +712,8 @@ function renderExecutionTab(report, tabName) {
                     </div>
 
                     <!-- Filters & Actions Bar -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span style="font-size: 0.85rem; color: var(--text-secondary); margin-right: 0.5rem;">Filter:</span>
-                            <button class="filter-btn active" onclick="window.filterChecklistItems('all')" data-filter="all">
-                                <i class="fa-solid fa-list"></i> All (${totalItems})
-                            </button>
-                            <button class="filter-btn" onclick="window.filterChecklistItems('pending')" data-filter="pending">
-                                <i class="fa-solid fa-clock"></i> Pending (${pendingCount})
-                            </button>
-                            <button class="filter-btn" onclick="window.filterChecklistItems('conform')" data-filter="conform">
-                                <i class="fa-solid fa-check"></i> Conform (${conformCount})
-                            </button>
-                            <button class="filter-btn" onclick="window.filterChecklistItems('nc')" data-filter="nc">
-                                <i class="fa-solid fa-times"></i> NC (${ncCount})
-                            </button>
-                            <button class="filter-btn" onclick="window.filterChecklistItems('na')" data-filter="na">
-                                <i class="fa-solid fa-ban"></i> N/A (${naCount})
-                            </button>
-                        </div>
+                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
+
                         <div style="display: flex; gap: 0.5rem;">
                             <button class="btn btn-secondary" onclick="window.addCustomQuestion(${report.id})">
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
@@ -741,7 +724,7 @@ function renderExecutionTab(report, tabName) {
                                 </button>
                                 <div class="hidden" style="position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 220px; z-index: 1000;">
                                     <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
-                                        <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Filtered Items As:</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Items As:</div>
                                     </div>
                                     <button onclick="window.bulkUpdateStatus(${report.id}, 'conform'); this.parentElement.classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
                                         <i class="fa-solid fa-check" style="color: var(--success-color); width: 18px;"></i>
@@ -757,7 +740,7 @@ function renderExecutionTab(report, tabName) {
                                     </button>
                                     <div style="border-top: 1px solid #e2e8f0; padding: 0.75rem 1rem;">
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">
-                                            <i class="fa-solid fa-info-circle"></i> Applies to visible items only
+                                            <i class="fa-solid fa-info-circle"></i> Select items to limit scope
                                         </div>
                                     </div>
                                 </div>
