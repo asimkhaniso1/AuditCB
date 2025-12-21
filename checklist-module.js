@@ -273,6 +273,35 @@ function getClauseTitleFromNumber(clauseNum) {
     return isoClauseTitles[clauseNum] || `Clause ${clauseNum}`;
 }
 
+// Download CSV template for bulk checklist upload
+function downloadChecklistTemplate() {
+    const template = `Clause,Requirement
+4.1,Has the organization determined external and internal issues relevant to its purpose?
+4.2,Have the needs and expectations of interested parties been determined?
+4.3,Is the scope of the management system determined and documented?
+5.1,Does top management demonstrate leadership and commitment?
+5.2,Is the policy established, communicated, and understood?
+6.1,Have risks and opportunities been addressed?
+6.2,Are objectives established at relevant functions and levels?
+7.1,Are resources determined and provided?
+7.2,Are persons competent based on education, training, or experience?
+8.1,Are operational processes planned and controlled?
+9.1,Is performance monitored and measured?
+9.2,Are internal audits conducted at planned intervals?
+10.1,Are opportunities for improvement identified?
+10.2,Are nonconformities and corrective actions managed?`;
+
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'checklist_template.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    window.showNotification('Template downloaded! Edit and import it back.', 'success');
+}
+
+window.downloadChecklistTemplate = downloadChecklistTemplate;
+
 function setupCSVUpload() {
     const csvInput = document.getElementById('csv-upload-input');
     const btnImport = document.getElementById('btn-import-csv');
@@ -409,6 +438,9 @@ function openAddChecklistModal() {
                     <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items</h4>
                     <div style="display: flex; gap: 0.5rem;">
                         <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadChecklistTemplate()">
+                            <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i> Template
+                        </button>
                         <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
                             <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i> Import CSV
                         </button>
@@ -422,17 +454,13 @@ function openAddChecklistModal() {
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th style="width: 70px;">Main #</th>
-                                <th style="width: 150px;">Section Title</th>
-                                <th style="width: 70px;">Sub #</th>
+                                <th style="width: 100px;">Clause #</th>
                                 <th>Requirement</th>
                                 <th style="width: 50px;"></th>
                             </tr>
                         </thead>
                         <tbody id="checklist-items-body">
                             <tr class="checklist-item-row">
-                                <td><input type="text" class="form-control item-main-clause" placeholder="4" style="margin: 0;"></td>
-                                <td><input type="text" class="form-control item-main-title" placeholder="Context" style="margin: 0;"></td>
                                 <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
                                 <td><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
                                 <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
@@ -444,7 +472,7 @@ function openAddChecklistModal() {
                 <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
                     <small style="color: var(--text-secondary);">
                         <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
-                        Tip: You can paste data from Excel (Main Clause | Title | Sub Clause | Requirement)
+                        Tip: Just enter Clause # (e.g., 4.1) and Requirement - sections are auto-generated
                     </small>
                 </div>
             </div>
@@ -460,9 +488,7 @@ function openAddChecklistModal() {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-main-clause" placeholder="Main" style="margin: 0;"></td>
-            <td><input type="text" class="form-control item-main-title" placeholder="Title" style="margin: 0;"></td>
-            <td><input type="text" class="form-control item-clause" placeholder="Sub" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
             <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
@@ -482,18 +508,22 @@ function openAddChecklistModal() {
             return;
         }
 
-        // Collect items
+        // Collect items and auto-extract main clauses
         const rawRows = [];
-        let hasMainClauses = false;
 
         document.querySelectorAll('.checklist-item-row').forEach(row => {
-            const mClause = row.querySelector('.item-main-clause').value.trim();
-            const mTitle = row.querySelector('.item-main-title').value.trim();
-            const clause = row.querySelector('.item-clause').value.trim();
-            const requirement = row.querySelector('.item-requirement').value.trim();
+            const clauseInput = row.querySelector('.item-clause');
+            const reqInput = row.querySelector('.item-requirement');
+            if (!clauseInput || !reqInput) return;
 
-            if (mClause) hasMainClauses = true;
-            if (mClause || clause || requirement) {
+            const clause = clauseInput.value.trim();
+            const requirement = reqInput.value.trim();
+
+            if (clause || requirement) {
+                // Auto-extract main clause from clause number (e.g., "4.1" → "4")
+                const clauseParts = clause.split('.');
+                const mClause = clauseParts[0] || '';
+                const mTitle = getClauseTitleFromNumber(mClause);
                 rawRows.push({ mClause, mTitle, clause, requirement });
             }
         });
@@ -635,6 +665,9 @@ function openEditChecklistModal(id) {
                     <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses?.length || 0), 0) : (checklist.items?.length || 0)})</h4>
                     <div style="display: flex; gap: 0.5rem;">
                         <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadChecklistTemplate()">
+                            <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i> Template
+                        </button>
                         <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
                             <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i> Import CSV
                         </button>
@@ -648,9 +681,7 @@ function openEditChecklistModal(id) {
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th style="width: 70px;">Main #</th>
-                                <th style="width: 150px;">Section Title</th>
-                                <th style="width: 70px;">Sub #</th>
+                                <th style="width: 100px;">Clause #</th>
                                 <th>Requirement</th>
                                 <th style="width: 50px;"></th>
                             </tr>
@@ -662,21 +693,17 @@ function openEditChecklistModal(id) {
                 checklist.clauses.forEach(main => {
                     main.subClauses.forEach(sub => {
                         flatItems.push({
-                            mClause: main.mainClause,
-                            mTitle: main.title,
                             clause: sub.clause,
                             requirement: sub.requirement
                         });
                     });
                 });
             } else {
-                flatItems = (checklist.items || []).map(i => ({ mClause: '', mTitle: '', clause: i.clause, requirement: i.requirement }));
+                flatItems = (checklist.items || []).map(i => ({ clause: i.clause, requirement: i.requirement }));
             }
 
             return flatItems.map(item => `
                                     <tr class="checklist-item-row">
-                                        <td><input type="text" class="form-control item-main-clause" value="${item.mClause || ''}" style="margin: 0;"></td>
-                                        <td><input type="text" class="form-control item-main-title" value="${item.mTitle || ''}" style="margin: 0;"></td>
                                         <td><input type="text" class="form-control item-clause" value="${item.clause || ''}" style="margin: 0;"></td>
                                         <td><input type="text" class="form-control item-requirement" value="${item.requirement || ''}" style="margin: 0;"></td>
                                         <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
@@ -698,9 +725,7 @@ function openEditChecklistModal(id) {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-main-clause" placeholder="Main" style="margin: 0;"></td>
-            <td><input type="text" class="form-control item-main-title" placeholder="Title" style="margin: 0;"></td>
-            <td><input type="text" class="form-control item-clause" placeholder="Sub" style="margin: 0;"></td>
+            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
             <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
@@ -720,19 +745,27 @@ function openEditChecklistModal(id) {
         }
 
         const rawRows = [];
-        let hasMainClauses = false;
 
         document.querySelectorAll('.checklist-item-row').forEach(row => {
-            const mClause = row.querySelector('.item-main-clause').value.trim();
-            const mTitle = row.querySelector('.item-main-title').value.trim();
-            const clause = row.querySelector('.item-clause').value.trim();
-            const requirement = row.querySelector('.item-requirement').value.trim();
+            const clauseInput = row.querySelector('.item-clause');
+            const reqInput = row.querySelector('.item-requirement');
+            if (!clauseInput || !reqInput) return;
 
-            if (mClause) hasMainClauses = true;
-            if (mClause || clause || requirement) {
+            const clause = clauseInput.value.trim();
+            const requirement = reqInput.value.trim();
+
+            if (clause || requirement) {
+                // Auto-extract main clause from clause number (e.g., "4.1" → "4")
+                const clauseParts = clause.split('.');
+                const mClause = clauseParts[0] || '';
+                const mTitle = getClauseTitleFromNumber(mClause);
                 rawRows.push({ mClause, mTitle, clause, requirement });
             }
         });
+
+        const name = document.getElementById('checklist-name').value.trim();
+        const standard = document.getElementById('checklist-standard').value;
+        const type = document.getElementById('checklist-type').value;
 
         checklist.name = name;
         checklist.standard = standard;
@@ -741,34 +774,25 @@ function openEditChecklistModal(id) {
         checklist.auditScope = auditScope;
         checklist.updatedAt = new Date().toISOString().split('T')[0];
 
-        if (hasMainClauses) {
-            const clauses = [];
-            let currentMain = null;
-
-            rawRows.forEach(row => {
-                if (row.mClause) {
-                    if (!currentMain || currentMain.mainClause !== row.mClause) {
-                        currentMain = { mainClause: row.mClause, title: row.mTitle || 'Untitled', subClauses: [] };
-                        clauses.push(currentMain);
-                    }
-                }
-
-                if (currentMain && (row.clause || row.requirement)) {
-                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
-                } else if (!currentMain && (row.clause || row.requirement)) {
-                    if (!clauses.length) {
-                        currentMain = { mainClause: '0', title: 'General', subClauses: [] };
-                        clauses.push(currentMain);
-                    }
-                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
-                }
-            });
-            checklist.clauses = clauses;
-            delete checklist.items; // Ensure mixed state doesn't persist
-        } else {
-            checklist.items = rawRows.map(r => ({ clause: r.clause, requirement: r.requirement }));
-            delete checklist.clauses;
-        }
+        // Always build hierarchical structure from extracted main clauses
+        const clauseGroups = {};
+        rawRows.forEach(row => {
+            if (!clauseGroups[row.mClause]) {
+                clauseGroups[row.mClause] = {
+                    mainClause: row.mClause,
+                    title: row.mTitle,
+                    subClauses: []
+                };
+            }
+            if (row.clause || row.requirement) {
+                clauseGroups[row.mClause].subClauses.push({
+                    clause: row.clause,
+                    requirement: row.requirement
+                });
+            }
+        });
+        checklist.clauses = Object.values(clauseGroups);
+        delete checklist.items; // Remove old format
         checklist.updatedAt = new Date().toISOString().split('T')[0];
 
         window.saveData();
@@ -824,39 +848,53 @@ function viewChecklistDetail(id) {
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                     Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses?.length || 0), 0) : (checklist.items?.length || 0)})
                 </h3>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 80px;">#</th>
-                                <th style="width: 120px;">Clause</th>
-                                <th>Requirement</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${checklist.clauses ? checklist.clauses.map(mainClause => `
-                                <tr style="background-color: #f8fafc;">
-                                    <td colspan="3" style="font-weight: 600; color: var(--primary-color);">
-                                        Clause ${mainClause.mainClause}: ${mainClause.title}
-                                    </td>
+                
+                ${checklist.clauses ? checklist.clauses.map((mainClause, idx) => `
+                    <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                        <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); cursor: pointer; user-select: none;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.querySelector('.accordion-icon').style.transform = this.nextElementSibling.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${mainClause.mainClause}</span>
+                                <span style="font-weight: 600; color: #1e293b;">${mainClause.title}</span>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">(${mainClause.subClauses?.length || 0} items)</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-down accordion-icon" style="transition: transform 0.3s; transform: ${idx === 0 ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
+                        </div>
+                        <div class="accordion-content" style="display: ${idx === 0 ? 'block' : 'none'}; padding: 0; background: white;">
+                            <table style="width: 100%; margin: 0;">
+                                <tbody>
+                                    ${mainClause.subClauses.map((sub, subIdx) => `
+                                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                                            <td style="width: 60px; padding: 0.75rem 1rem; font-weight: 500; color: var(--text-secondary);">${subIdx + 1}</td>
+                                            <td style="width: 100px; padding: 0.75rem;"><span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${sub.clause}</span></td>
+                                            <td style="padding: 0.75rem;">${sub.requirement}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `).join('') : `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">#</th>
+                                    <th style="width: 120px;">Clause</th>
+                                    <th>Requirement</th>
                                 </tr>
-                                ${mainClause.subClauses.map((sub, idx) => `
+                            </thead>
+                            <tbody>
+                                ${(checklist.items || []).map((item, idx) => `
                                     <tr>
-                                        <td style="font-weight: 500; color: var(--text-secondary); padding-left: 2rem;">${idx + 1}</td>
-                                        <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${sub.clause}</span></td>
-                                        <td>${sub.requirement}</td>
+                                        <td style="font-weight: 500; color: var(--text-secondary);">${idx + 1}</td>
+                                        <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${item.clause || '-'}</span></td>
+                                        <td>${item.requirement || '-'}</td>
                                     </tr>
                                 `).join('')}
-                            `).join('') : (checklist.items || []).map((item, idx) => `
-                                <tr>
-                                    <td style="font-weight: 500; color: var(--text-secondary);">${idx + 1}</td>
-                                    <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${item.clause || '-'}</span></td>
-                                    <td>${item.requirement || '-'}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
+                            </tbody>
+                        </table>
+                    </div>
+                `}
             </div>
         </div>
     `;
