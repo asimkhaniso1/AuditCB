@@ -510,8 +510,8 @@ function renderExecutionTab(report, tabName) {
                              </div>
                              <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">
                              
+
                              <div style="position: relative;">
-                                <textarea id="ncr-desc-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Short description of NC and Evidence...">${saved.ncrDescription || ''}</textarea>
                                 <textarea id="ncr-transcript-${uniqueId}" class="form-control form-control-sm" rows="2" placeholder="Voice Transcript..." style="margin-top: 5px; background: #f8fafc; font-family: monospace; font-size: 0.85rem;">${saved.transcript || ''}</textarea>
                                 <button type="button" class="btn btn-sm btn-light" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 5px; bottom: 5px; color: var(--primary-color); border: 1px solid #ddd;" title="Dictate (10s limit)">
                                     <i class="fa-solid fa-microphone"></i>
