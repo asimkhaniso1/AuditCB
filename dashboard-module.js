@@ -162,7 +162,7 @@ function renderDashboardEnhanced() {
             <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); border: none;">
                 <h3 style="margin: 0 0 1rem 0; color: #1e293b;"><i class="fa-solid fa-bolt" style="margin-right: 0.5rem; color: #8b5cf6;"></i>Quick Actions</h3>
                 <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
-                    <button class="btn" onclick="window.renderModule('planning')" style="background: white; color: #667eea; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <button class="btn" onclick="window.renderModule('audit-planning')" style="background: white; color: #667eea; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <i class="fa-solid fa-clipboard-list" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                         <span style="font-size: 0.8rem;">Plan Audit</span>
                     </button>
@@ -352,6 +352,8 @@ function renderAuditTrendsChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (e) => window.renderModule('audit-programs'),
+            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
             plugins: {
                 legend: {
                     position: 'bottom'
@@ -383,6 +385,8 @@ function renderNCRDistributionChart(major, minor) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (e) => window.renderModule('audit-reporting'),
+            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
             plugins: {
                 legend: {
                     position: 'bottom'
@@ -413,6 +417,8 @@ function renderIndustryChart(industryStats) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (e) => window.renderModule('clients'),
+            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
             plugins: {
                 legend: {
                     display: false
@@ -451,6 +457,8 @@ function renderStandardsChart(standardStats) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (e) => window.renderModule('clients'),
+            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
             plugins: {
                 legend: {
                     position: 'bottom'

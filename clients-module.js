@@ -38,7 +38,6 @@ function renderClientsEnhanced() {
                     <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showClientAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
-                    ${window.addExportButtons ? window.addExportButtons('clients') : ''}
                     <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
