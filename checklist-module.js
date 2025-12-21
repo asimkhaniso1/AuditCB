@@ -6,6 +6,8 @@
 // State for filtering
 let checklistFilterStandard = 'all';
 let checklistFilterType = 'all';
+let checklistFilterAuditType = 'all';
+let checklistFilterScope = 'all';
 let checklistSearchTerm = '';
 
 function renderChecklistLibrary() {
@@ -20,10 +22,12 @@ function renderChecklistLibrary() {
     let filtered = checklists.filter(c => {
         const matchStandard = checklistFilterStandard === 'all' || c.standard === checklistFilterStandard;
         const matchType = checklistFilterType === 'all' || c.type === checklistFilterType;
+        const matchAuditType = checklistFilterAuditType === 'all' || c.auditType === checklistFilterAuditType;
+        const matchScope = checklistFilterScope === 'all' || c.auditScope === checklistFilterScope;
         const matchSearch = checklistSearchTerm === '' ||
             c.name.toLowerCase().includes(checklistSearchTerm.toLowerCase()) ||
             c.standard.toLowerCase().includes(checklistSearchTerm.toLowerCase());
-        return matchStandard && matchType && matchSearch;
+        return matchStandard && matchType && matchAuditType && matchScope && matchSearch;
     });
 
     // Separate global and custom
@@ -31,21 +35,31 @@ function renderChecklistLibrary() {
     const customChecklists = filtered.filter(c => c.type === 'custom');
 
     const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
+    const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
     const html = `
         <div class="fade-in">
             <!-- Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap; flex: 1;">
-                    <input type="text" id="checklist-search" placeholder="Search checklists..." value="${checklistSearchTerm}" style="max-width: 250px; margin-bottom: 0;">
-                    <select id="checklist-filter-standard" style="max-width: 180px; margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
+                    <input type="text" id="checklist-search" placeholder="Search..." value="${checklistSearchTerm}" style="max-width: 180px; margin-bottom: 0;">
+                    <select id="checklist-filter-standard" style="max-width: 150px; margin-bottom: 0;">
                         <option value="all">All Standards</option>
                         ${standards.map(s => `<option value="${s}" ${checklistFilterStandard === s ? 'selected' : ''}>${s}</option>`).join('')}
                     </select>
-                    <select id="checklist-filter-type" style="max-width: 150px; margin-bottom: 0;">
+                    <select id="checklist-filter-type" style="max-width: 120px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterType === 'all' ? 'selected' : ''}>All Types</option>
-                        <option value="global" ${checklistFilterType === 'global' ? 'selected' : ''}>Global Only</option>
-                        <option value="custom" ${checklistFilterType === 'custom' ? 'selected' : ''}>Custom Only</option>
+                        <option value="global" ${checklistFilterType === 'global' ? 'selected' : ''}>Global</option>
+                        <option value="custom" ${checklistFilterType === 'custom' ? 'selected' : ''}>Custom</option>
+                    </select>
+                    <select id="checklist-filter-audittype" style="max-width: 160px; margin-bottom: 0;">
+                        <option value="all" ${checklistFilterAuditType === 'all' ? 'selected' : ''}>All Audit Types</option>
+                        ${auditTypes.map(t => `<option value="${t}" ${checklistFilterAuditType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                    <select id="checklist-filter-scope" style="max-width: 140px; margin-bottom: 0;">
+                        <option value="all" ${checklistFilterScope === 'all' ? 'selected' : ''}>All Scopes</option>
+                        ${auditScopes.map(s => `<option value="${s}" ${checklistFilterScope === s ? 'selected' : ''}>${s}</option>`).join('')}
                     </select>
                 </div>
                 <button id="btn-new-checklist" class="btn btn-primary">
@@ -76,7 +90,7 @@ function renderChecklistLibrary() {
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Custom</p>
                 </div>
                 <div class="card" style="text-align: center; padding: 1rem;">
-                    <p style="font-size: 2rem; font-weight: 700; color: #d97706; margin: 0;">${checklists.reduce((sum, c) => sum + (c.items?.length || 0), 0)}</p>
+                    <p style="font-size: 2rem; font-weight: 700; color: #d97706; margin: 0;">${checklists.reduce((sum, c) => sum + (c.clauses ? c.clauses.reduce((s, cl) => s + (cl.subClauses?.length || 0), 0) : (c.items?.length || 0)), 0)}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Items</p>
                 </div>
             </div>
@@ -108,7 +122,7 @@ function renderChecklistLibrary() {
                                     <tr>
                                         <td style="font-weight: 500;">${c.name}</td>
                                         <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.standard}</span></td>
-                                        <td>${c.items?.length || 0} items</td>
+                                        <td>${c.clauses ? c.clauses.length + ' clauses' : (c.items?.length || 0) + ' items'}</td>
                                         <td>${c.updatedAt || c.createdAt}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
@@ -162,7 +176,7 @@ function renderChecklistLibrary() {
                                     <tr>
                                         <td style="font-weight: 500;">${c.name}</td>
                                         <td><span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.standard}</span></td>
-                                        <td>${c.items?.length || 0} items</td>
+                                        <td>${c.clauses ? c.clauses.length + ' clauses' : (c.items?.length || 0) + ' items'}</td>
                                         <td>${c.createdBy || 'Unknown'}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
@@ -207,6 +221,16 @@ function renderChecklistLibrary() {
 
     document.getElementById('checklist-filter-type')?.addEventListener('change', (e) => {
         checklistFilterType = e.target.value;
+        renderChecklistLibrary();
+    });
+
+    document.getElementById('checklist-filter-audittype')?.addEventListener('change', (e) => {
+        checklistFilterAuditType = e.target.value;
+        renderChecklistLibrary();
+    });
+
+    document.getElementById('checklist-filter-scope')?.addEventListener('change', (e) => {
+        checklistFilterScope = e.target.value;
         renderChecklistLibrary();
     });
 
@@ -302,6 +326,9 @@ function openAddChecklistModal() {
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
     const canEditGlobal = isCertManager || isAdmin;
 
+    const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
+    const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
+
     modalTitle.textContent = 'Create New Checklist';
     modalBody.innerHTML = `
         <form id="checklist-form">
@@ -321,6 +348,20 @@ function openAddChecklistModal() {
                     <select class="form-control" id="checklist-type">
                         <option value="custom">Custom (Personal)</option>
                         ${canEditGlobal ? '<option value="global">Global (Organization-wide)</option>' : ''}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Audit Type</label>
+                    <select class="form-control" id="checklist-audit-type">
+                        <option value="">-- Select --</option>
+                        ${auditTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Audit Scope</label>
+                    <select class="form-control" id="checklist-audit-scope">
+                        <option value="">-- Select --</option>
+                        ${auditScopes.map(s => `<option value="${s}">${s}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -422,12 +463,17 @@ function openAddChecklistModal() {
             return;
         }
 
+        const auditType = document.getElementById('checklist-audit-type').value;
+        const auditScope = document.getElementById('checklist-audit-scope').value;
+
         const newChecklist = {
             id: Date.now(),
             name,
             standard,
             type,
-            createdBy: 'Current User', // Would come from auth in production
+            auditType,
+            auditScope,
+            createdBy: state.currentUser?.name || 'Current User',
             createdAt: new Date().toISOString().split('T')[0],
             updatedAt: new Date().toISOString().split('T')[0],
             items

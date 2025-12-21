@@ -57,6 +57,21 @@ window.CONSTANTS = {
         CONDITIONAL: 'Conditional Certification (pending closure of NCs)',
         DO_NOT_RECOMMEND: 'Do Not Recommend'
     },
+    AUDIT_TYPES: [
+        'Stage 1 (Documentation Review)',
+        'Stage 2 (Implementation Audit)',
+        'Surveillance',
+        'Recertification',
+        'Special/Follow-up',
+        'Transfer'
+    ],
+    AUDIT_SCOPES: [
+        'Full System',
+        'Process-specific',
+        'Department-specific',
+        'Site-specific',
+        'Multi-site'
+    ],
     COLORS: {
         PRIMARY: 'var(--primary-color)',
         SECONDARY: 'var(--secondary-color)',

@@ -281,6 +281,8 @@ const state = {
             name: 'ISO 9001:2015 Comprehensive Audit Checklist',
             standard: 'ISO 9001:2015',
             type: 'global',
+            auditType: 'Stage 2 (Implementation Audit)',
+            auditScope: 'Full System',
             createdBy: 'System Admin',
             createdAt: '2024-01-01',
             updatedAt: '2025-01-01',
