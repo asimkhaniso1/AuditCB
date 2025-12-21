@@ -304,10 +304,15 @@ function renderClientOverview(client) {
     const totalSites = (client.sites || []).length;
     const totalEmployees = client.employees || 0;
 
+    // Organization Data (Placeholder/Extraction)
+    const departments = client.departments || ['Operations', 'Quality', 'HR', 'Sales', 'IT']; // Mock if missing
+    const designations = [...new Set((client.contacts || []).map(c => c.designation).filter(Boolean))];
+    if (designations.length === 0) designations.push('Manager', 'Director', 'Officer');
+
     return `
         <div class="fade-in">
             <!-- Action Bar -->
-            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 1rem;">
                 <button class="btn btn-outline-primary" onclick="window.openEditClientModal(${client.id})">
                     <i class="fa-solid fa-pen" style="margin-right: 0.5rem;"></i>Edit Client
                 </button>
@@ -316,197 +321,204 @@ function renderClientOverview(client) {
                 </button>
             </div>
 
-            <!-- Enhanced Summary Cards -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'plans', null)">
-                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${completedAudits} completed • ${upcomingAudits} upcoming</p>
+            <!-- Sub-Tabs Navigation -->
+            <div class="tabs" style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; gap: 1rem;">
+                <div class="tab-item active" onclick="window.switchClientOverviewTab(this, 'dashboard', ${client.id})" style="padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid var(--primary-color); color: var(--primary-color); font-weight: 500;">
+                    <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>Dashboard
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'certs', null)">
-                    <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientCerts.length}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Certificates</p>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${validCerts} valid</p>
+                <div class="tab-item" onclick="window.switchClientOverviewTab(this, 'profile')" style="padding: 0.5rem 1rem; cursor: pointer; color: var(--text-secondary);">
+                    <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>Profile
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'findings', null)">
-                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${openNCs === 0 ? 'No issues' : 'Requires attention'}</p>
+                <div class="tab-item" onclick="window.switchClientOverviewTab(this, 'contacts')" style="padding: 0.5rem 1rem; cursor: pointer; color: var(--text-secondary);">
+                    <i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Contacts
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'compliance', null)">
-                    <i class="fa-solid fa-shield-halved" style="font-size: 1.5rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${client.compliance?.contract?.signed ? '✓' : '!'}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Compliance</p>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${client.compliance?.contract?.signed ? 'Contract signed' : 'Pending'}</p>
+                <div class="tab-item" onclick="window.switchClientOverviewTab(this, 'organization')" style="padding: 0.5rem 1rem; cursor: pointer; color: var(--text-secondary);">
+                    <i class="fa-solid fa-sitemap" style="margin-right: 0.5rem;"></i>Organization
                 </div>
             </div>
 
-            <!-- Client Information Grid -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
-                <!-- Company Details -->
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Details</h3>
-                        <button class="btn btn-sm btn-icon" onclick="window.openEditClientModal(${client.id})" title="Edit">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
+            <!-- TAB: DASHBOARD -->
+            <div id="tab-dashboard" class="tab-content">
+                <!-- Summary Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'plans', null)">
+                        <i class="fa-solid fa-clipboard-list" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
                     </div>
-                    <div style="display: grid; gap: 0.75rem;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>Standard:</strong> 
-                            <span>${client.standard || '-'}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>Industry:</strong> 
-                            <span>${client.industry || '-'}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>Status:</strong> 
-                            <span class="status-badge status-${(client.status || 'active').toLowerCase()}">${client.status || 'Active'}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>Employees:</strong> 
-                            <span>${totalEmployees.toLocaleString()}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>Shifts:</strong> 
-                            <span>${client.shifts || 'No'}</span>
-                        </div>
-                        ${client.website ? `
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>Website:</strong> 
-                            <a href="${client.website}" target="_blank" style="color: var(--primary-color);">
-                                <i class="fa-solid fa-external-link-alt" style="font-size: 0.8rem;"></i> Visit
-                            </a>
-                        </div>
-                        ` : ''}
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'certs', null)">
+                        <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientCerts.length}</p>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Certificates</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'findings', null)">
+                        <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
+                    </div>
+                     <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
+                        <i class="fa-solid fa-users" style="font-size: 1.5rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalEmployees}</p>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Employees</p>
                     </div>
                 </div>
 
-                <!-- Primary Contact -->
-                <div class="card">
-                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-user" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Primary Contact</h3>
-                    <div style="display: grid; gap: 0.75rem;">
-                        ${(client.contacts && client.contacts.length > 0) ? `
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Name:</strong> 
-                                <span>${client.contacts[0].name}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Designation:</strong> 
-                                <span>${client.contacts[0].designation || '-'}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Email:</strong> 
-                                <a href="mailto:${client.contacts[0].email}" style="color: var(--primary-color);">${client.contacts[0].email}</a>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Phone:</strong> 
-                                <a href="tel:${client.contacts[0].phone}" style="color: var(--primary-color);">${client.contacts[0].phone}</a>
-                            </div>
-                        ` : `
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Name:</strong> 
-                                <span>${client.contactName || client.contact || '-'}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Email:</strong> 
-                                <span>${client.email || '-'}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>Phone:</strong> 
-                                <span>${client.phone || '-'}</span>
-                            </div>
-                        `}
-                        ${client.contacts && client.contacts.length > 1 ? `
-                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.renderClientModule(${client.id}, 'compliance', null)" style="width: 100%;">
-                                View All Contacts (${client.contacts.length})
-                            </button>
+                <!-- Dashboard Charts -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                    <div class="card" style="min-height: 300px;">
+                        <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-bar" style="margin-right: 0.5rem; color: var(--primary-color);"></i>NCR Analysis</h3>
+                        <div style="position: relative; height: 220px; width: 100%;">
+                            <canvas id="ncrTrendChart"></canvas>
                         </div>
-                        ` : ''}
+                    </div>
+                    <div class="card" style="min-height: 300px;">
+                        <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Performance</h3>
+                        <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center;">
+                            <canvas id="auditPerformanceChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Dashboard Charts -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-                <div class="card" style="min-height: 300px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;"><i class="fa-solid fa-chart-bar" style="margin-right: 0.5rem; color: var(--primary-color);"></i>NCR Analysis</h3>
-                        <select id="ncrChartFilter" style="font-size: 0.8rem; padding: 2px 5px;">
-                            <option>Last 12 Months</option>
-                            <option>All Time</option>
-                        </select>
+            <!-- TAB: PROFILE -->
+            <div id="tab-profile" class="tab-content" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                     <!-- Company Details -->
+                    <div class="card">
+                         <h3 style="margin: 0 0 1rem 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">Company Details</h3>
+                        <div style="display: grid; gap: 1rem;">
+                            <div style="display: flex; justify-content: space-between;"><strong>Name:</strong> <span>${client.name}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Standard:</strong> <span>${client.standard || '-'}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Industry:</strong> <span>${client.industry || '-'}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Employees:</strong> <span>${totalEmployees}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Website:</strong> <a href="${client.website || '#'}" target="_blank">${client.website || '-'}</a></div>
+                            <div style="display: flex; justify-content: space-between;"><strong>Address:</strong> <span style="text-align: right; max-width: 50%;">${client.address || '-'}</span></div>
+                        </div>
                     </div>
-                    <div style="position: relative; height: 220px; width: 100%;">
-                        <canvas id="ncrTrendChart"></canvas>
-                    </div>
-                </div>
-                <div class="card" style="min-height: 300px;">
-                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Performance</h3>
-                    <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center;">
-                        <canvas id="auditPerformanceChart"></canvas>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Sites Information -->
-            ${totalSites > 0 ? `
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">
-                        <i class="fa-solid fa-map-marker-alt" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                        Sites (${totalSites})
-                    </h3>
-                    <button class="btn btn-sm btn-primary" onclick="window.openEditClientModal(${client.id})">
-                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Site
-                    </button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Site Name</th>
-                                <th>Address</th>
-                                <th>City</th>
-                                <th>Employees</th>
-                                <th>Shift Work</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${client.sites.map(site => `
-                                <tr>
-                                    <td style="font-weight: 500;">${site.name}</td>
-                                    <td>${site.address || '-'}</td>
-                                    <td>${site.city || '-'}, ${site.country || '-'}</td>
-                                    <td>${site.employees || '-'}</td>
-                                    <td>
-                                        <span class="badge" style="background: ${site.shift === 'Yes' ? '#fef3c7' : '#e0f2fe'}; color: ${site.shift === 'Yes' ? '#d97706' : '#0284c7'};">
-                                            ${site.shift || 'No'}
-                                        </span>
-                                    </td>
+                    <!-- Sites -->
+                    <div class="card">
+                         <h3 style="margin: 0 0 1rem 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">Sites (${totalSites})</h3>
+                        ${totalSites > 0 ? `
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid #f1f5f9; text-align: left;">
+                                    <th style="padding: 0.5rem;">Site Name</th>
+                                    <th style="padding: 0.5rem;">City</th>
+                                    <th style="padding: 0.5rem;">Shift</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${client.sites.map(site => `
+                                <tr>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${site.name}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${site.city || '-'}</td>
+                                    <td style="padding: 0.5rem; border-bottom: 1px solid #f8fafc;">${site.shift || 'No'}</td>
+                                </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ` : '<p style="color: var(--text-secondary); text-align: center;">No sites configured.</p>'}
+                    </div>
                 </div>
             </div>
-            ` : `
-            <div class="card" style="text-align: center; padding: 2rem;">
-                <i class="fa-solid fa-map-marker-alt" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                <p style="color: var(--text-secondary); margin-bottom: 1rem;">No sites added yet</p>
-                <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add First Site
-                </button>
+
+            <!-- TAB: CONTACTS -->
+            <div id="tab-contacts" class="tab-content" style="display: none;">
+                <div class="card">
+                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Client Contacts</h3>
+                        <button class="btn btn-sm btn-primary"><i class="fa-solid fa-plus"></i> Add Contact</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Designation</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Department</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(client.contacts || []).map(contact => `
+                                <tr>
+                                    <td style="font-weight: 500;">${contact.name}</td>
+                                    <td>${contact.designation || '-'}</td>
+                                    <td><a href="mailto:${contact.email}" style="color: var(--primary-color);">${contact.email}</a></td>
+                                    <td>${contact.phone || '-'}</td>
+                                    <td>${contact.department || '-'}</td>
+                                </tr>
+                                `).join('') || '<tr><td colspan="5" style="text-align: center;">No contacts found.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            `}
+
+             <!-- TAB: ORGANIZATION -->
+            <div id="tab-organization" class="tab-content" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="card">
+                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;">Departments</h3>
+                            <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <ul style="list-style: none; padding: 0;">
+                            ${departments.map(dept => `
+                            <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                                <span>${dept}</span>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
+                            </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                     <div class="card">
+                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;">Designations</h3>
+                            <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <ul style="list-style: none; padding: 0;">
+                            ${designations.map(desig => `
+                            <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                                <span>${desig}</span>
+                                <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
+                            </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
         </div>
     `;
 }
+
+// Sub-Tab Switching Logic
+window.switchClientOverviewTab = function (element, tabId, clientId) {
+    const navItems = element.parentElement.querySelectorAll('.tab-item');
+    navItems.forEach(item => {
+        item.classList.remove('active');
+        item.style.borderBottom = 'none';
+        item.style.color = 'var(--text-secondary)';
+        item.style.fontWeight = 'normal';
+    });
+    element.classList.add('active');
+    element.style.borderBottom = '2px solid var(--primary-color)';
+    element.style.color = 'var(--primary-color)';
+    element.style.fontWeight = '500';
+
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(content => content.style.display = 'none'); // Scope this better if multiple instances? No, single view.
+
+    const target = document.getElementById('tab-' + tabId);
+    if (target) target.style.display = 'block';
+
+    if (tabId === 'dashboard' && clientId) {
+        if (window.initClientDashboardCharts) window.initClientDashboardCharts(clientId);
+    }
+};
 
 // Audit cycle timeline
 function renderAuditCycleTimeline(client) {
