@@ -88,26 +88,102 @@ function renderDashboardEnhanced() {
 
     const html = `
         <div class="fade-in">
-            <!-- Header with Quick Actions -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <div>
-                    <h2 style="margin: 0;">Dashboard Overview</h2>
-                    <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">
-                        <i class="fa-solid fa-calendar"></i> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
+            <!-- Header Section -->
+            <div style="margin-bottom: 2rem;">
+                <h2 style="margin: 0; font-size: 1.75rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">AuditCB360 Dashboard</h2>
+                <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">
+                    <i class="fa-solid fa-calendar"></i> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    <span style="margin-left: 1rem; padding-left: 1rem; border-left: 1px solid #e2e8f0;">
+                        <i class="fa-solid fa-user" style="color: var(--primary-color);"></i> ${state.currentUser.name || 'User'} (${state.currentUser.role})
+                    </span>
+                </p>
+            </div>
+
+            <!-- Quick Stats Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Active Clients -->
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Active Clients</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${activeClients}</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-building" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${totalClients} total clients</div>
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-primary" onclick="window.renderModule('planning')">
-                        <i class="fa-solid fa-plus"></i> New Audit Plan
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.renderModule('clients')">
-                        <i class="fa-solid fa-building"></i> Manage Clients
-                    </button>
+
+                <!-- Upcoming Audits -->
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(240, 147, 251, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Upcoming Audits</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${upcomingAudits}</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} completed</div>
+                </div>
+
+                <!-- Open NCRs -->
+                <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(250, 112, 154, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Open NCRs</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${openNCRs}</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${closedNCRs} closed</div>
+                </div>
+
+                <!-- Compliance Score -->
+                <div style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(48, 207, 208, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Avg Compliance</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${avgComplianceScore}%</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-chart-line" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">Across ${auditReports.length} audits</div>
                 </div>
             </div>
 
-            <!-- Enhanced KPI Cards -->
-            <!-- Analytics Removed as per request (Only Charts) -->
+            <!-- Quick Actions -->
+            <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); border: none;">
+                <h3 style="margin: 0 0 1rem 0; color: #1e293b;"><i class="fa-solid fa-bolt" style="margin-right: 0.5rem; color: #8b5cf6;"></i>Quick Actions</h3>
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+                    <button class="btn" onclick="window.renderModule('planning')" style="background: white; color: #667eea; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-clipboard-list" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <span style="font-size: 0.8rem;">Plan Audit</span>
+                    </button>
+                    <button class="btn" onclick="window.renderModule('audit-execution')" style="background: white; color: #f5576c; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-play" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <span style="font-size: 0.8rem;">Execute Audit</span>
+                    </button>
+                    <button class="btn" onclick="window.renderModule('audit-reporting')" style="background: white; color: #fee140; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-file-signature" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <span style="font-size: 0.8rem;">Review Report</span>
+                    </button>
+                    <button class="btn" onclick="window.renderModule('clients')" style="background: white; color: #30cfd0; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-building" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <span style="font-size: 0.8rem;">Add Client</span>
+                    </button>
+                    <button class="btn" onclick="window.renderModule('certification')" style="background: white; color: #8b5cf6; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-award" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <span style="font-size: 0.8rem;">Certify</span>
+                    </button>
+                </div>
+            </div>
 
             <!-- Charts Row -->
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
