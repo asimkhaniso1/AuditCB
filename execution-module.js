@@ -566,10 +566,11 @@ function renderExecutionTab(report, tabName) {
 
                             return `
                                         <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-                                            <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); cursor: pointer; user-select: none;" onclick="window.toggleAccordion('${sectionId}')">
-                                                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${clause.mainClause}</span>
-                                                    <span style="font-weight: 600; color: #1e293b;">${clause.title}</span>
+                                            <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); user-select: none;">
+                                                <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                                                    <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" onclick="event.stopPropagation(); window.toggleSectionSelection('${sectionId}')" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
+                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">Clause ${clause.mainClause}</span>
+                                                    <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" onclick="window.toggleAccordion('${sectionId}')">${clause.title}</span>
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${clause.subClauses.length} items)</span>
                                                 </div>
                                                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -577,7 +578,7 @@ function renderExecutionTab(report, tabName) {
                                                         <div style="width: ${progressPct}%; height: 100%; background: ${progressPct === 100 ? '#10b981' : '#3b82f6'}; transition: width 0.3s;"></div>
                                                     </div>
                                                     <span style="font-size: 0.8rem; color: var(--text-secondary);">${completed}/${total}</span>
-                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s;"></i>
+                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')"></i>
                                                 </div>
                                             </div>
                                             <div class="accordion-content" id="${sectionId}" style="display: ${clauseIdx === 0 ? 'block' : 'none'}; padding: 1rem; background: white;">
@@ -1770,3 +1771,24 @@ window.captureScreenEvidence = async function (uniqueId) {
     }
 };
 window.renderExecutionDetail = renderExecutionDetail;
+
+// Toggle selection of all items in a section
+window.toggleSectionSelection = function (sectionId) {
+    const checkbox = document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
+    const sectionContent = document.getElementById(sectionId);
+
+    if (!sectionContent) return;
+
+    const items = sectionContent.querySelectorAll('.checklist-item');
+    items.forEach(item => {
+        if (checkbox.checked) {
+            item.classList.add('selected-item');
+            item.style.background = '#eff6ff';
+            item.style.borderLeft = '4px solid var(--primary-color)';
+        } else {
+            item.classList.remove('selected-item');
+            item.style.background = '';
+            item.style.borderLeft = '';
+        }
+    });
+};
