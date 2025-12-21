@@ -537,7 +537,6 @@ function renderClientTab(client, tabName) {
                                     <tr>
                                         <th>Department Name</th>
                                         <th>Head of Department</th>
-                                        <th>Employee Count</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -546,7 +545,6 @@ function renderClientTab(client, tabName) {
                                         <tr>
                                             <td style="font-weight: 500;">${dept.name}</td>
                                             <td>${dept.head || '-'}</td>
-                                            <td><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i>${dept.employeeCount || 0}</td>
                                             <td>
                                                 <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
                                                     <i class="fa-solid fa-pen"></i>
@@ -1550,10 +1548,6 @@ function addDepartment(clientId) {
                 <label>Head of Department</label>
                 <input type="text" id="dept-head" placeholder="e.g., John Doe">
             </div>
-            <div class="form-group">
-                <label>Employee Count</label>
-                <input type="number" id="dept-employees" placeholder="0" min="0">
-            </div>
         </form>
         `,
         () => {
@@ -1565,8 +1559,7 @@ function addDepartment(clientId) {
 
             const department = {
                 name,
-                head: document.getElementById('dept-head').value.trim(),
-                employeeCount: parseInt(document.getElementById('dept-employees').value) || 0
+                head: document.getElementById('dept-head').value.trim()
             };
 
             if (!client.departments) client.departments = [];
@@ -1599,10 +1592,6 @@ function editDepartment(clientId, deptIndex) {
                 <label>Head of Department</label>
                 <input type="text" id="dept-head" value="${dept.head || ''}">
             </div>
-            <div class="form-group">
-                <label>Employee Count</label>
-                <input type="number" id="dept-employees" value="${dept.employeeCount || 0}" min="0">
-            </div>
         </form>
         `,
         () => {
@@ -1614,8 +1603,7 @@ function editDepartment(clientId, deptIndex) {
 
             client.departments[deptIndex] = {
                 name,
-                head: document.getElementById('dept-head').value.trim(),
-                employeeCount: parseInt(document.getElementById('dept-employees').value) || 0
+                head: document.getElementById('dept-head').value.trim()
             };
 
             window.saveData();
@@ -1654,10 +1642,10 @@ function bulkUploadDepartments(clientId) {
                 <i class="fa-solid fa-info-circle"></i> Paste department list in CSV format (one per line):
             </p>
             <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
-                Department Name, Head of Department, Employee Count<br>
-                Quality Assurance, John Doe, 15<br>
-                Production, Jane Smith, 50<br>
-                Human Resources, Bob Johnson, 8
+                Department Name, Head of Department<br>
+                Quality Assurance, John Doe<br>
+                Production, Jane Smith<br>
+                Human Resources, Bob Johnson
             </p>
         </div>
         <form id="bulk-dept-form">
