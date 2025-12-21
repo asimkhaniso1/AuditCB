@@ -318,7 +318,7 @@ function renderAuditCycleTimeline(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No certification cycle started yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openNewAuditPlanModal('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openCreatePlanModal('${client.name}')">
                     Start Stage 1 Audit
                 </button>
             </div>
@@ -373,7 +373,7 @@ function renderClientPlans(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-clipboard-list" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit plans for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openNewAuditPlanModal('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openCreatePlanModal('${client.name}')">
                     Create First Audit Plan
                 </button>
             </div>
@@ -384,7 +384,7 @@ function renderClientPlans(client) {
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Audit Plans</h3>
-                <button class="btn btn-sm btn-primary" onclick="window.openNewAuditPlanModal('${client.name}')">
+                <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
                 </button>
             </div>
@@ -409,7 +409,7 @@ function renderClientPlans(client) {
                                 <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
                                 <td>${p.lead || '-'}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlanDetail(${p.id})"><i class="fa-solid fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan(${p.id})"><i class="fa-solid fa-eye"></i></button>
                                 </td>
                             </tr>
                         `).join('')}
