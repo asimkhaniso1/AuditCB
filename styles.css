@@ -1251,8 +1251,7 @@ textarea:focus:invalid {
     z-index: 2;
 }
 
-font-style: italic;
-}
+
 
 /* Date input native picker styling */
 .modal-body input[type="date"] {

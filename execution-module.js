@@ -1181,28 +1181,58 @@ window.filterChecklistItems = function (filterType) {
     });
 };
 
-// Bulk update status for all currently visible (filtered) items
+// Bulk update status - prioritizes selected items, falls back to filtered items
 window.bulkUpdateStatus = function (reportId, status) {
-    const visibleItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
+    // Check if any items are selected via checkboxes
+    let targetItems = document.querySelectorAll('.checklist-item.selected-item');
+    let useSelection = targetItems.length > 0;
 
-    if (visibleItems.length === 0) {
+    // If no items selected, fall back to filtered items
+    if (!useSelection) {
+        targetItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
+    }
+
+    if (targetItems.length === 0) {
         window.showNotification('No items to update', 'warning');
         return;
     }
 
-    const confirmMsg = `Mark ${visibleItems.length} filtered item(s) as "${status.toUpperCase()}"?`;
+    const confirmMsg = useSelection
+        ? `Mark ${targetItems.length} selected item(s) as "${status.toUpperCase()}"?`
+        : `Mark ${targetItems.length} filtered item(s) as "${status.toUpperCase()}"?`;
+
     if (!confirm(confirmMsg)) return;
 
     let updatedCount = 0;
-    visibleItems.forEach(item => {
+    targetItems.forEach(item => {
         const uniqueId = item.id.replace('row-', '');
         window.setChecklistStatus(uniqueId, status);
         updatedCount++;
     });
 
+    // Clear selections if items were selected
+    if (useSelection) {
+        document.querySelectorAll('.section-checkbox').forEach(cb => cb.checked = false);
+        document.querySelectorAll('.checklist-item.selected-item').forEach(item => {
+            item.classList.remove('selected-item');
+            item.style.background = '';
+            item.style.borderLeft = '';
+        });
+    }
+
     // Close dropdown
     const menu = document.getElementById(`bulk-actions-menu-${reportId}`);
     if (menu) menu.classList.add('hidden');
+
+    // Also try to close the relative one if it exists (from the new UI)
+    const relativeMenu = document.querySelector('.btn-outline-secondary + .hidden');
+    if (relativeMenu && !relativeMenu.classList.contains('hidden')) {
+        relativeMenu.classList.add('hidden');
+    } else {
+        // In case it was toggled open and doesn't have hidden class
+        const openRelativeMenu = document.querySelector('.btn-outline-secondary + div:not(.hidden)');
+        if (openRelativeMenu) openRelativeMenu.classList.add('hidden');
+    }
 
     window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
     window.saveChecklist(reportId);
