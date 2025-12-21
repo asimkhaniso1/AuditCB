@@ -126,7 +126,7 @@ function renderReportSummaryTab(report, tabContent) {
 
     tabContent.innerHTML = `
         <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
                     <h3 style="margin: 0;">Audit Report Drafting</h3>
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review findings and finalize report content.</p>
@@ -140,6 +140,33 @@ function renderReportSummaryTab(report, tabContent) {
                     <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> AI Draft (Cert Manager Only)
                 </span>
                 `}
+            </div>
+
+            <!--Role - Based Workflow Cards-- >
+            <div style="margin-bottom: 2rem; background: ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER ? '#f0fdf4' : '#eff6ff'}; border: 1px solid ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER ? '#bbf7d0' : '#bfdbfe'}; border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    <div style="width: 56px; height: 56px; border-radius: 50%; background: white; color: ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER ? '#16a34a' : '#2563eb'}; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                        <i class="fa-solid ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER ? 'fa-signature' : 'fa-pencil-ruler'}"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">Active Role: ${userRole}</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">
+                            ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER ? 'Approval Required' : 'Drafting & Review'}
+                        </div>
+                        <div style="color: #64748b; margin-top: 0.25rem;">
+                            ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER
+            ? 'Verify technical correctness, ensure all NCs are addressed, and issue the final decision.'
+            : 'Consolidate findings, draft the executive summary, and submit for Certification Manager review.'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: right; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 2rem;">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">Current Status</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: ${userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER ? '#16a34a' : '#2563eb'};">
+                        ${h(report.status)}
+                    </div>
+                </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
@@ -207,8 +234,8 @@ function renderReportSummaryTab(report, tabContent) {
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        </div >
+        `;
 }
 
 // Submit report for QA Review
@@ -330,22 +357,22 @@ window.generateAIConclusion = function (reportId) {
     setTimeout(() => {
         const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${plan.standard || 'the standard'}. The primary objective was to verify compliance and effectiveness of the management system.
 
-During the audit, a total of ${ncrCount} non-conformities were identified (${majorCount} Major, ${minorCount} Minor). The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
+During the audit, a total of ${ncrCount} non - conformities were identified(${majorCount} Major, ${minorCount} Minor).The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
 
-Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance. Key processes are generally well-defined, though specific lapses were noted in operational controls as detailed in the findings.`;
+        Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance.Key processes are generally well - defined, though specific lapses were noted in operational controls as detailed in the findings.`;
 
         const strengths = `- Strong commitment from top management towards quality objectives.
 - Documentation structure is comprehensive and easily accessible.
 - Employee awareness regarding policy and objectives is commendable.
-- Infrastructure and resources are well-maintained.`;
+- Infrastructure and resources are well - maintained.`;
 
         const improvements = `- Need to strengthen the internal audit mechanism to capture process deviations earlier.
 - Document control for external origin documents needs review.
 - Training records for temporary staff could be better organized.`;
 
         const conclusion = ncrCount === 0
-            ? `Based on the audit results, the management system is found to be properly maintained and compliant with ${plan.standard}. No non-conformities were raised. It is recommended to continue certification.`
-            : `The management system is generally effective, with the exception of the identified non-conformities. The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days. Subject to the acceptance of the corrective actions, certification is recommended.`;
+            ? `Based on the audit results, the management system is found to be properly maintained and compliant with ${plan.standard}. No non - conformities were raised.It is recommended to continue certification.`
+            : `The management system is generally effective, with the exception of the identified non - conformities.The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days.Subject to the acceptance of the corrective actions, certification is recommended.`;
 
         if (document.getElementById('exec-summary')) document.getElementById('exec-summary').value = execSummary;
         if (document.getElementById('strengths')) document.getElementById('strengths').value = strengths;
@@ -441,7 +468,7 @@ window.generateAuditReport = function (reportId) {
 
         // QR Code URL
         // Safe to not escape here as we encodeURIComponent the whole data string next
-        const qrData = `REP-${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}%`;
+        const qrData = `REP - ${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}% `;
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
 
         // Compliance Score Logic

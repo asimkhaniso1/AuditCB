@@ -56,6 +56,11 @@
 - ✅ Approved explanation
 - ✅ Finalized explanation
 
+**Role-Based Action Cards (Inside Detail View):**
+- ✅ Dynamic "Drafting & Review" card for Lead Auditors
+- ✅ Dynamic "Approval Required" card for Certification Managers
+- ✅ Clear instructions based on active user role
+
 **Action Buttons:**
 - ✅ "Manage Report" → `window.openReportingDetail(id)`
 
