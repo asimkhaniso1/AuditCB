@@ -570,14 +570,59 @@ window.openModal = openModal;
 window.closeModal = closeModal;
 window.renderModule = renderModule;
 
-// State Management
+// State Management with Performance Optimizations
+let saveTimeout;
+let lastSaveSize = 0;
+
 function saveState() {
-    try {
-        localStorage.setItem('auditCB360State', JSON.stringify(state));
-    } catch (e) {
-        console.warn('LocalStorage not available:', e);
-    }
+    // Debounce saves to prevent excessive localStorage writes
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+        try {
+            const stateJSON = JSON.stringify(state);
+            const sizeInMB = new Blob([stateJSON]).size / 1024 / 1024;
+            lastSaveSize = sizeInMB;
+
+            // Check storage quota (warn at 4.5MB, 90% of typical 5MB limit)
+            if (sizeInMB > 4.5) {
+                console.warn(`Storage usage high: ${sizeInMB.toFixed(2)}MB / 5MB`);
+                window.showNotification(
+                    `Storage usage: ${sizeInMB.toFixed(2)}MB. Consider exporting old data.`,
+                    'warning'
+                );
+            }
+
+            localStorage.setItem('auditCB360State', stateJSON);
+        } catch (e) {
+            console.error('Save failed:', e);
+            if (e.name === 'QuotaExceededError') {
+                window.showNotification(
+                    'Storage limit exceeded! Please export and clear old data.',
+                    'error'
+                );
+            } else {
+                console.warn('LocalStorage not available:', e);
+            }
+        }
+    }, 500); // Wait 500ms before saving
 }
+
+// Get current storage usage
+function getStorageStats() {
+    return {
+        sizeMB: lastSaveSize,
+        percent: (lastSaveSize / 5) * 100,
+        itemCount: {
+            clients: state.clients?.length || 0,
+            auditors: state.auditors?.length || 0,
+            auditPlans: state.auditPlans?.length || 0,
+            auditReports: state.auditReports?.length || 0,
+            checklists: state.checklists?.length || 0
+        }
+    };
+}
+
+window.getStorageStats = getStorageStats;
 
 function loadState() {
     try {
