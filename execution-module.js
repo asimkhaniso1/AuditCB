@@ -455,6 +455,9 @@ function renderExecutionDetail(reportId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="checklist">Checklist</button>
+                <button class="tab-btn" data-tab="meetings" style="background: #eff6ff; color: #1d4ed8;">
+                    <i class="fa-solid fa-handshake" style="margin-right: 0.25rem;"></i>Meetings
+                </button>
                 <button class="tab-btn" data-tab="ncr">NCRs</button>
                 <button class="tab-btn" data-tab="capa">CAPA</button>
                 <button class="tab-btn" data-tab="observations">Observations</button>
@@ -1037,6 +1040,83 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Delegate to Reporting Module
             window.renderReportSummaryTab(report, tabContent);
             break;
+
+        case 'meetings':
+            // ISO 17021-1 Opening/Closing Meeting Records
+            const openingMeeting = report.openingMeeting || {};
+            const closingMeeting = report.closingMeeting || {};
+
+            tabContent.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <!-- Opening Meeting -->
+                    <div class="card" style="margin: 0; border-left: 4px solid #16a34a;">
+                        <h3 style="margin: 0 0 1rem 0; color: #16a34a;">
+                            <i class="fa-solid fa-door-open" style="margin-right: 0.5rem;"></i>Opening Meeting
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" id="opening-date" class="form-control" value="${openingMeeting.date || report.date || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Time</label>
+                                <input type="time" id="opening-time" class="form-control" value="${openingMeeting.time || '09:00'}">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Attendees (one per line: Name - Role - Organization)</label>
+                            <textarea id="opening-attendees" class="form-control" rows="4" placeholder="John Smith - Lead Auditor - CB Name&#10;Jane Doe - Quality Manager - Client Name">${openingMeeting.attendees || ''}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Meeting Notes</label>
+                            <textarea id="opening-notes" class="form-control" rows="3" placeholder="Key points discussed, scope confirmed, agenda presented...">${openingMeeting.notes || ''}</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Closing Meeting -->
+                    <div class="card" style="margin: 0; border-left: 4px solid #dc2626;">
+                        <h3 style="margin: 0 0 1rem 0; color: #dc2626;">
+                            <i class="fa-solid fa-door-closed" style="margin-right: 0.5rem;"></i>Closing Meeting
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" id="closing-date" class="form-control" value="${closingMeeting.date || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Time</label>
+                                <input type="time" id="closing-time" class="form-control" value="${closingMeeting.time || '17:00'}">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Attendees (one per line: Name - Role - Organization)</label>
+                            <textarea id="closing-attendees" class="form-control" rows="4" placeholder="John Smith - Lead Auditor - CB Name&#10;Jane Doe - Quality Manager - Client Name">${closingMeeting.attendees || ''}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Findings Summary Presented</label>
+                            <textarea id="closing-summary" class="form-control" rows="2" placeholder="Summary of findings as presented to client...">${closingMeeting.summary || ''}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Client Response/Agreement</label>
+                            <textarea id="closing-response" class="form-control" rows="2" placeholder="Client's response to findings...">${closingMeeting.response || ''}</textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1.5rem; text-align: right;">
+                    <button class="btn btn-primary" onclick="window.saveMeetingRecords(${report.id})">
+                        <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>Save Meeting Records
+                    </button>
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                        <strong>ISO 17021-1 Requirement:</strong> Maintain records of opening and closing meetings including attendees and key discussions (Clause 9.4.7).
+                    </p>
+                </div>
+            `;
+            break;
     }
 }
 
@@ -1611,6 +1691,30 @@ function saveObservations(reportId) {
     window.saveData();
     window.showNotification('Observations saved successfully');
 }
+
+// Save Opening/Closing Meeting Records (ISO 17021-1 Clause 9.4.7)
+window.saveMeetingRecords = function (reportId) {
+    const report = window.state.auditReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    report.openingMeeting = {
+        date: document.getElementById('opening-date')?.value || '',
+        time: document.getElementById('opening-time')?.value || '',
+        attendees: document.getElementById('opening-attendees')?.value || '',
+        notes: document.getElementById('opening-notes')?.value || ''
+    };
+
+    report.closingMeeting = {
+        date: document.getElementById('closing-date')?.value || '',
+        time: document.getElementById('closing-time')?.value || '',
+        attendees: document.getElementById('closing-attendees')?.value || '',
+        summary: document.getElementById('closing-summary')?.value || '',
+        response: document.getElementById('closing-response')?.value || ''
+    };
+
+    window.saveData();
+    window.showNotification('Meeting records saved successfully', 'success');
+};
 
 // Export functions
 window.renderAuditExecutionEnhanced = renderAuditExecutionEnhanced;

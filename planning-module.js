@@ -273,6 +273,48 @@ function openCreatePlanModal() {
                         ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
                     </select>
                 </div>
+                
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+                
+                <!-- ISO 17021-1 Compliance Section -->
+                <div style="background: #eff6ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bfdbfe; margin-bottom: 1rem;">
+                    <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #1d4ed8;">
+                        <i class="fa-solid fa-shield-halved"></i> ISO 17021-1 Compliance
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group" style="margin: 0;">
+                            <label>Audit Type</label>
+                            <select class="form-control" id="plan-audit-type">
+                                <option value="Stage 1">Stage 1 (Documentation Review)</option>
+                                <option value="Stage 2" selected>Stage 2 (Implementation Audit)</option>
+                                <option value="Surveillance">Surveillance Audit</option>
+                                <option value="Recertification">Recertification Audit</option>
+                                <option value="Special">Special/Follow-up Audit</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label>Audit Method</label>
+                            <select class="form-control" id="plan-audit-method">
+                                <option value="On-site" selected>On-site</option>
+                                <option value="Remote">Remote (ICT-based)</option>
+                                <option value="Hybrid">Hybrid (On-site + Remote)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin: 0 0 1rem 0;">
+                        <label>Impartiality Assessment <span style="color: #dc2626;">*</span></label>
+                        <select class="form-control" id="plan-impartiality-risk">
+                            <option value="None" selected>No risk identified</option>
+                            <option value="Low">Low risk - Mitigated</option>
+                            <option value="Medium">Medium risk - Requires monitoring</option>
+                            <option value="High">High risk - Not recommended</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label>Impartiality Notes (if any risk identified)</label>
+                        <textarea class="form-control" id="plan-impartiality-notes" rows="2" placeholder="Describe any potential conflicts of interest and mitigation actions..."></textarea>
+                    </div>
+                </div>
             </form>
         </div>
 
@@ -598,6 +640,12 @@ function saveAuditPlan() {
     const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
     const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 
+    // ISO 17021-1 Fields
+    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
+    const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
+    const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
+    const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
+
     // Get selected sites
     const selectedSites = [];
     document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
@@ -620,10 +668,19 @@ function saveAuditPlan() {
             type: type,
             standard: standard,
             team: team,
-            selectedSites: selectedSites, // Store selected sites with geotags
+            selectedSites: selectedSites,
             manDays: manDays,
             onsiteDays: onsiteDays,
-            status: 'Draft'
+            status: 'Draft',
+            // ISO 17021-1 Compliance Fields
+            auditType: auditType,
+            auditMethod: auditMethod,
+            impartialityAssessment: {
+                risk: impartialityRisk,
+                notes: impartialityNotes,
+                assessedBy: state.currentUser?.name || 'System',
+                assessedDate: new Date().toISOString().split('T')[0]
+            }
         };
 
         state.auditPlans.push(newPlan);
