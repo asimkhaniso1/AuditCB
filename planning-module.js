@@ -1735,6 +1735,76 @@ function goToStep1() {
     currentPlanStep = 1;
 }
 
+function goToStep2() {
+    // Validate Step 1
+    const client = document.getElementById('plan-client').value;
+    const date = document.getElementById('plan-date').value;
+
+    if (!client || !date) {
+        window.showNotification('Please fill in all required fields (Client, Date)', 'error');
+        return;
+    }
+
+    document.getElementById('step-1-content').style.display = 'none';
+    document.getElementById('step-2-content').style.display = 'block';
+
+    document.getElementById('step-indicator-1').style.color = 'var(--text-secondary)';
+    document.getElementById('step-indicator-1').style.fontWeight = 'normal';
+    document.querySelector('#step-indicator-1').innerHTML = '<i class="fa-solid fa-check-circle" style="color: var(--success-color);"></i> 1. Plan Details';
+
+    document.getElementById('step-indicator-2').style.color = 'var(--primary-color)';
+    document.getElementById('step-indicator-2').style.fontWeight = 'bold';
+
+    const modalSave = document.getElementById('modal-save');
+    const modalCancel = document.getElementById('modal-cancel');
+
+    modalSave.textContent = 'Save Plan';
+    modalSave.onclick = () => saveAuditPlan();
+
+    modalCancel.textContent = 'Back';
+    modalCancel.onclick = () => goToStep1();
+
+    const tbody = document.getElementById('agenda-tbody');
+    if (tbody.children.length === 0) {
+        // Auto-populate default rows
+        addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
+        addAgendaRow({ day: 'Day 1', time: '09:30 - 10:30', item: 'Site Tour', dept: 'All', auditor: 'All' });
+        addAgendaRow({ day: 'Day 1', time: '16:00 - 17:00', item: 'Closing Meeting', dept: 'Top Management', auditor: 'All' });
+    }
+
+    currentPlanStep = 2;
+}
+
+function addAgendaRow(data = null) {
+    const tbody = document.getElementById('agenda-tbody');
+    const tr = document.createElement('tr');
+
+    // Default values
+    const day = data?.day || 'Day 1';
+    const time = data?.time || '';
+    const item = data?.item || '';
+    const dept = data?.dept || '';
+    const auditor = data?.auditor || '';
+
+    tr.innerHTML = `
+        <td><input type="text" class="form-control" value="${day}" placeholder="Day 1" style="font-size: 0.85rem;"></td>
+        <td><input type="text" class="form-control" value="${time}" placeholder="09:00 - 10:00" style="font-size: 0.85rem;"></td>
+        <td><input type="text" class="form-control" value="${item}" placeholder="Activity" style="font-size: 0.85rem;"></td>
+        <td><input type="text" class="form-control" value="${dept}" placeholder="Dept." style="font-size: 0.85rem;"></td>
+        <td><input type="text" class="form-control" value="${auditor}" placeholder="Auditor" style="font-size: 0.85rem;"></td>
+        <td style="text-align: center;">
+            <button type="button" class="btn btn-sm btn-icon" onclick="deleteAgendaRow(this)" style="color: var(--danger-color);">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function deleteAgendaRow(btn) {
+    btn.closest('tr').remove();
+}
+
 
 function saveAuditPlan() {
     const clientName = document.getElementById('plan-client').value;
@@ -1866,6 +1936,7 @@ async function generateAIAgenda() {
 // Exports
 window.generateAIAgenda = generateAIAgenda;
 window.addAgendaRow = addAgendaRow;
+window.deleteAgendaRow = deleteAgendaRow; // Added export
 window.saveAuditPlan = saveAuditPlan;
 window.goToStep2 = goToStep2;
 window.goToStep1 = goToStep1;
