@@ -1578,6 +1578,7 @@ function saveObservations(reportId) {
 
 // Export functions
 window.renderAuditExecutionEnhanced = renderAuditExecutionEnhanced;
+window.renderAuditExecution = renderAuditExecutionEnhanced;
 window.renderExecutionDetail = renderExecutionDetail;
 window.saveChecklist = saveChecklist;
 window.createNCR = createNCR;
