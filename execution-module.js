@@ -370,18 +370,7 @@ function renderExecutionDetail(reportId) {
                     </button>
                 </div>
                 
-                 <!-- Progress Bar -->
-                <div>
-                     <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                        <strong>Checklist Completion</strong>
-                        <strong style="color: var(--primary-color);">${progress}%</strong>
-                     </div>
-                     <div style="height: 1.2rem; background: #f1f5f9; border-radius: 1rem; overflow: hidden; border: 1px solid #e2e8f0;">
-                        <div style="width: ${progress}%; background: linear-gradient(90deg, var(--primary-color), #3b82f6); height: 100%; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: bold;">
-                             ${progress > 5 ? `${completedItems}/${totalItems}` : ''}
-                        </div>
-                     </div>
-                </div>
+
             </div>
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
@@ -574,9 +563,7 @@ function renderExecutionTab(report, tabName) {
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${clause.subClauses.length} items)</span>
                                                 </div>
                                                 <div style="display: flex; align-items: center; gap: 1rem;">
-                                                    <div style="width: 100px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
-                                                        <div style="width: ${progressPct}%; height: 100%; background: ${progressPct === 100 ? '#10b981' : '#3b82f6'}; transition: width 0.3s;"></div>
-                                                    </div>
+
                                                     <span style="font-size: 0.8rem; color: var(--text-secondary);">${completed}/${total}</span>
                                                     <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')"></i>
                                                 </div>
