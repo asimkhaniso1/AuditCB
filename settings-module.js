@@ -341,9 +341,9 @@ window.addDesignation = function () {
 
         window.state.orgStructure.push({
             id: Date.now(),
-            title: title,
-            department: document.getElementById('designation-dept').value.trim(),
-            reportsTo: document.getElementById('designation-reports').value.trim() || null
+            title: window.Sanitizer.sanitizeText(title),
+            department: window.Sanitizer.sanitizeText(document.getElementById('designation-dept').value.trim()),
+            reportsTo: window.Sanitizer.sanitizeText(document.getElementById('designation-reports').value.trim()) || null
         });
 
         window.saveData();
@@ -720,6 +720,65 @@ function restoreData(input) {
     reader.readAsText(file);
     input.value = '';
 }
+
+// ============================================
+// SAVE FUNCTIONS WITH SANITIZATION
+// ============================================
+
+window.saveCBProfile = function () {
+    const settings = window.state.cbSettings;
+    settings.cbName = window.Sanitizer.sanitizeText(document.getElementById('cb-name').value);
+    settings.cbTagline = window.Sanitizer.sanitizeText(document.getElementById('cb-tagline').value);
+    settings.cbEmail = window.Sanitizer.sanitizeEmail(document.getElementById('cb-email').value);
+    settings.cbPhone = window.Sanitizer.sanitizeText(document.getElementById('cb-phone').value);
+    settings.cbWebsite = window.Sanitizer.sanitizeUrl(document.getElementById('cb-website').value);
+    settings.cbAddress = window.Sanitizer.sanitizeText(document.getElementById('cb-address').value);
+    settings.logoUrl = window.Sanitizer.sanitizeUrl(document.getElementById('cb-logo').value);
+    settings.primaryColor = window.Sanitizer.sanitizeText(document.getElementById('primary-color').value);
+    settings.secondaryColor = window.Sanitizer.sanitizeText(document.getElementById('secondary-color').value);
+
+    window.saveData();
+    window.showNotification('CB Profile saved successfully', 'success');
+};
+
+window.saveAccreditation = function () {
+    const settings = window.state.cbSettings;
+    settings.accreditationBody = window.Sanitizer.sanitizeText(document.getElementById('ab-name').value);
+    settings.accreditationNumber = window.Sanitizer.sanitizeText(document.getElementById('ab-number').value);
+    settings.accreditationExpiry = document.getElementById('ab-expiry').value;
+    settings.iafMlaStatus = document.getElementById('iaf-mla').checked;
+
+    settings.standardsOffered = Array.from(document.querySelectorAll('.standard-checkbox:checked')).map(cb => window.Sanitizer.sanitizeText(cb.value));
+
+    window.saveData();
+    window.showNotification('Accreditation settings saved', 'success');
+};
+
+window.saveQualityPolicy = function () {
+    const settings = window.state.cbSettings;
+    settings.qualityPolicy = window.Sanitizer.sanitizeText(document.getElementById('quality-policy').value);
+    settings.msScope = window.Sanitizer.sanitizeText(document.getElementById('ms-scope').value);
+    settings.policyLastReviewed = document.getElementById('policy-reviewed').value;
+    settings.policyApprovedBy = window.Sanitizer.sanitizeText(document.getElementById('policy-approved').value);
+
+    window.saveData();
+    window.showNotification('Quality Policy saved', 'success');
+};
+
+window.saveDefaults = function () {
+    const settings = window.state.cbSettings;
+    settings.certificateNumberFormat = window.Sanitizer.sanitizeText(document.getElementById('cert-format').value);
+    settings.dateFormat = document.getElementById('date-format').value;
+    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration').value);
+    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration').value);
+    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead').value);
+    settings.sessionTimeout = parseInt(document.getElementById('session-timeout').value);
+    settings.currency = document.getElementById('currency').value;
+    settings.manDayCalculationMode = document.getElementById('manday-mode').value;
+
+    window.saveData();
+    window.showNotification('System defaults saved', 'success');
+};
 
 // Export functions
 window.renderSettings = renderSettings;
