@@ -223,10 +223,16 @@ function renderAuditorDetail(auditorId) {
                     <i class="fa-solid fa-user" style="margin-right: 0.25rem;"></i>Profile
                 </button>
                 <button class="tab-btn" data-tab="qualifications">
-                    <i class="fa-solid fa-graduation-cap" style="margin-right: 0.25rem;"></i>Qualifications & Training
+                    <i class="fa-solid fa-graduation-cap" style="margin-right: 0.25rem;"></i>Qualifications
                 </button>
                 <button class="tab-btn" data-tab="activity">
-                    <i class="fa-solid fa-calendar-check" style="margin-right: 0.25rem;"></i>Audit Activity
+                    <i class="fa-solid fa-calendar-check" style="margin-right: 0.25rem;"></i>Activity
+                </button>
+                <button class="tab-btn" data-tab="performance">
+                    <i class="fa-solid fa-chart-line" style="margin-right: 0.25rem;"></i>Performance
+                </button>
+                <button class="tab-btn" data-tab="complaints">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.25rem;"></i>Complaints
                 </button>
                 <button class="tab-btn" data-tab="documents">
                     <i class="fa-solid fa-folder-open" style="margin-right: 0.25rem;"></i>Documents
@@ -723,8 +729,170 @@ function renderAuditorTab(auditor, tabName) {
                 </div>
             `;
 
-            // Append all sections to the activity tab
-            tabContent.innerHTML += perfSummaryHTML + witnessAuditsHTML + performanceReviewsHTML + reportReviewsHTML + linkedComplaintsHTML + auditHistoryHTML;
+            // Append only core activity sections
+            tabContent.innerHTML += perfSummaryHTML + witnessAuditsHTML + auditHistoryHTML;
+            break;
+        case 'performance':
+            // Performance tab - Performance Reviews + Report Reviews
+            const perfEvaluations = auditor.evaluations || { performanceReviews: [], reportReviews: [] };
+            const perfReviews = perfEvaluations.performanceReviews || [];
+            const rptReviews = perfEvaluations.reportReviews || [];
+
+            tabContent.innerHTML = `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
+                            Performance Reviews
+                        </h3>
+                        <button class="btn btn-sm btn-secondary" onclick="window.addPerformanceReview(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
+                        </button>
+                    </div>
+                    ${perfReviews.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Review Type</th>
+                                        <th>Overall Rating</th>
+                                        <th>Reviewed By</th>
+                                        <th>Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${perfReviews.map(r => `
+                                        <tr>
+                                            <td>${r.date}</td>
+                                            <td>${r.type}</td>
+                                            <td>
+                                                <span style="background: ${r.rating >= 4 ? '#d1fae5' : r.rating >= 3 ? '#fef3c7' : '#fee2e2'}; 
+                                                    color: ${r.rating >= 4 ? '#065f46' : r.rating >= 3 ? '#92400e' : '#991b1b'};
+                                                    padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
+                                                    ${r.rating}/5
+                                                </span>
+                                            </td>
+                                            <td>${r.reviewedBy}</td>
+                                            <td><span class="status-badge status-${r.outcome?.toLowerCase() || 'pending'}">${r.outcome || 'Pending'}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #f1f5f9; border-radius: 8px;">
+                            <p style="color: #64748b; margin: 0;">No performance reviews recorded yet.</p>
+                        </div>
+                    `}
+                </div>
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
+                            Report Reviews
+                        </h3>
+                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" onclick="window.addReportReview(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Report Review
+                        </button>
+                    </div>
+                    ${rptReviews.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Report Type</th>
+                                        <th>Client</th>
+                                        <th>Quality</th>
+                                        <th>Completeness</th>
+                                        <th>Technical</th>
+                                        <th>Reviewer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rptReviews.map(r => `
+                                        <tr>
+                                            <td>${r.reviewDate}</td>
+                                            <td>${r.reportType}</td>
+                                            <td>${r.client}</td>
+                                            <td>${r.qualityRating}/5</td>
+                                            <td>${r.completenessRating}/5</td>
+                                            <td>${r.technicalRating}/5</td>
+                                            <td>${r.reviewer}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #fdf4ff; border-radius: 8px;">
+                            <p style="color: #6b21a8; margin: 0;">No report reviews recorded yet.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            break;
+        case 'complaints':
+            // Complaints tab - Linked Complaints
+            const complaintEvaluations = auditor.evaluations || { linkedComplaints: [] };
+            const auditLinkedComplaints = complaintEvaluations.linkedComplaints || [];
+
+            tabContent.innerHTML = `
+                <div class="card" style="border-left: 4px solid ${auditLinkedComplaints.length > 0 ? '#dc2626' : '#9ca3af'};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem; color: ${auditLinkedComplaints.length > 0 ? '#dc2626' : '#6b7280'};"></i>
+                            Linked Complaints
+                        </h3>
+                        <span style="background: ${auditLinkedComplaints.length > 0 ? '#fee2e2' : '#f3f4f6'}; color: ${auditLinkedComplaints.length > 0 ? '#991b1b' : '#6b7280'}; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem;">
+                            ${auditLinkedComplaints.length} complaint${auditLinkedComplaints.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
+                        Customer complaints linked to this auditor per ISO 17021-1 Clause 9.10.
+                    </p>
+                    ${auditLinkedComplaints.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Complaint ID</th>
+                                        <th>Subject</th>
+                                        <th>Type</th>
+                                        <th>Severity</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${auditLinkedComplaints.map(c => `
+                                        <tr>
+                                            <td>${c.date}</td>
+                                            <td><strong>CMP-${String(c.complaintId).padStart(3, '0')}</strong></td>
+                                            <td>${c.subject}</td>
+                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${c.type}</span></td>
+                                            <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
+                                            <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="window.viewComplaintDetail(${c.complaintId})">
+                                                    <i class="fa-solid fa-eye" style="margin-right: 0.25rem;"></i>View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 3rem; background: #f9fafb; border-radius: 8px;">
+                            <i class="fa-solid fa-check-circle" style="font-size: 2rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                            <p style="color: #6b7280; margin: 0;">No complaints linked to this auditor. Good standing!</p>
+                        </div>
+                    `}
+                </div>
+            `;
             break;
         case 'qualifications':
             // Get qualifications or generate from standards
@@ -2710,7 +2878,7 @@ window.addPerformanceReview = function (auditorId) {
         window.showNotification('Performance review added', 'success');
         renderAuditorDetail(auditorId);
         setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+            document.querySelector('.tab-btn[data-tab="performance"]')?.click();
         }, 100);
     };
 
@@ -2788,7 +2956,7 @@ window.addReportReview = function (auditorId) {
         window.showNotification('Report review added', 'success');
         renderAuditorDetail(auditorId);
         setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+            document.querySelector('.tab-btn[data-tab="performance"]')?.click();
         }, 100);
     };
 

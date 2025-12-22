@@ -93,7 +93,26 @@ const state = {
             pictureUrl: 'https://randomuser.me/api/portraits/men/1.jpg',
             customerRating: 5,
             dateJoined: '2018-03-15',
-            softSkills: { communication: 'excellent', reportWriting: 'excellent', analyticalSkills: 'excellent', attentionToDetail: 'good', interviewingSkills: 'excellent', timeManagement: 'good' }
+            softSkills: { communication: 'excellent', reportWriting: 'excellent', analyticalSkills: 'excellent', attentionToDetail: 'good', interviewingSkills: 'excellent', timeManagement: 'good' },
+            evaluations: {
+                witnessAudits: [
+                    { date: '2024-06-15', client: 'Tech Solutions Ltd', standard: 'ISO 9001', witnessedBy: 'Quality Manager', rating: 5, notes: 'Excellent audit technique and client rapport.' },
+                    { date: '2023-03-20', client: 'Global Manufacturing', standard: 'ISO 14001', witnessedBy: 'Technical Director', rating: 4, notes: 'Good coverage of environmental aspects.' }
+                ],
+                performanceReviews: [
+                    { date: '2024-09-01', type: 'Annual Review', rating: 5, reviewedBy: 'Certification Manager', outcome: 'Approved', notes: 'Outstanding performance. Recommended for lead auditor on complex audits.' },
+                    { date: '2023-09-01', type: 'Annual Review', rating: 4, reviewedBy: 'Certification Manager', outcome: 'Approved', notes: 'Strong performance. Minor improvement in time management suggested.' }
+                ],
+                reportReviews: [
+                    { reviewDate: '2024-11-10', reportType: 'Stage 2', client: 'Tech Solutions Ltd', reviewer: 'Quality Manager', qualityRating: 5, completenessRating: 5, technicalRating: 4, notes: 'Well-structured report with clear findings.' }
+                ],
+                linkedComplaints: [
+                    { complaintId: 1, date: '2024-03-25', type: 'Auditor Conduct', severity: 'Low', subject: 'Auditor scheduling concern', status: 'Closed' }
+                ],
+                nextWitnessAuditDue: '2027-06-15',
+                firstTimeAuditor: false,
+                lastWitnessDate: '2024-06-15'
+            }
         },
         {
             id: 2,
@@ -118,7 +137,19 @@ const state = {
             pictureUrl: 'https://randomuser.me/api/portraits/women/2.jpg',
             customerRating: 4,
             dateJoined: '2020-07-01',
-            softSkills: { communication: 'good', reportWriting: 'excellent', analyticalSkills: 'excellent', attentionToDetail: 'excellent', interviewingSkills: 'good', timeManagement: 'excellent' }
+            softSkills: { communication: 'good', reportWriting: 'excellent', analyticalSkills: 'excellent', attentionToDetail: 'excellent', interviewingSkills: 'good', timeManagement: 'excellent' },
+            evaluations: {
+                witnessAudits: [],
+                performanceReviews: [
+                    { date: '2024-08-15', type: 'Annual Review', rating: 4, reviewedBy: 'Certification Manager', outcome: 'Approved', notes: 'Good performance. Continue development in witness audit scenarios.' }
+                ],
+                reportReviews: [],
+                linkedComplaints: [
+                    { complaintId: 2, date: '2024-10-15', type: 'Impartiality', severity: 'Medium', subject: 'Potential conflict of interest concern', status: 'Investigation' },
+                    { complaintId: 3, date: '2024-12-01', type: 'Service Quality', severity: 'High', subject: 'Audit report quality issue', status: 'Investigation' }
+                ],
+                firstTimeAuditor: true
+            }
         },
         {
             id: 3,
@@ -574,6 +605,24 @@ const state = {
                 { date: '2024-02-22', action: 'Under Review', user: 'John Smith', notes: 'Assigned to committee' },
                 { date: '2024-03-15', action: 'Resolved', user: 'Committee Chair', notes: 'Decision communicated to client' }
             ]
+        },
+        {
+            id: 2,
+            clientId: 2,
+            clientName: 'Global Manufacturing',
+            type: 'Audit Process',
+            subject: 'Appeal regarding audit scope',
+            description: 'Client appeals the inclusion of warehouse operations in the audit scope, claiming it was not agreed upon.',
+            dateReceived: '2024-11-10',
+            dueDate: '2024-12-10',
+            status: 'Under Review',
+            assignedTo: 'Impartiality Committee',
+            resolution: '',
+            dateResolved: '',
+            history: [
+                { date: '2024-11-10', action: 'Received', user: 'Admin', notes: 'Appeal logged' },
+                { date: '2024-11-12', action: 'Under Review', user: 'Certification Manager', notes: 'Reviewing original audit plan' }
+            ]
         }
     ],
     complaints: [
@@ -583,6 +632,8 @@ const state = {
             clientName: 'Global Manufacturing',
             relatedAuditId: 2,
             type: 'Auditor Conduct',
+            severity: 'Low',
+            auditorsInvolved: [1],
             subject: 'Auditor scheduling concern',
             description: 'Client raised concern about late arrival of auditor on Day 2 of the audit.',
             dateReceived: '2024-03-25',
@@ -598,6 +649,53 @@ const state = {
                 { date: '2024-03-26', action: 'Acknowledged', user: 'Quality Manager', notes: 'Acknowledgment sent to client' },
                 { date: '2024-04-01', action: 'Investigation', user: 'Quality Manager', notes: 'Auditor interviewed' },
                 { date: '2024-04-05', action: 'Closed', user: 'Quality Manager', notes: 'Resolution communicated' }
+            ]
+        },
+        {
+            id: 2,
+            source: 'Public',
+            clientName: '',
+            relatedAuditId: null,
+            type: 'Impartiality',
+            severity: 'Medium',
+            auditorsInvolved: [2],
+            subject: 'Potential conflict of interest concern',
+            description: 'Anonymous report suggesting an auditor may have prior business relationship with a certified client.',
+            dateReceived: '2024-10-15',
+            dueDate: '2024-11-15',
+            status: 'Investigation',
+            investigator: 'Impartiality Committee',
+            findings: '',
+            correctiveAction: '',
+            resolution: '',
+            dateResolved: '',
+            history: [
+                { date: '2024-10-15', action: 'Received', user: 'Admin', notes: 'Complaint logged from anonymous source' },
+                { date: '2024-10-16', action: 'Acknowledged', user: 'Certification Manager', notes: 'Escalated to Impartiality Committee' },
+                { date: '2024-10-20', action: 'Investigation', user: 'Impartiality Committee', notes: 'Reviewing auditor assignments and declarations' }
+            ]
+        },
+        {
+            id: 3,
+            source: 'Client',
+            clientName: 'SecureData Corp',
+            relatedAuditId: 3,
+            type: 'Service Quality',
+            severity: 'High',
+            auditorsInvolved: [2],
+            subject: 'Audit report quality issue',
+            description: 'Client reports that the Stage 1 audit report contained factual errors regarding their IT infrastructure.',
+            dateReceived: '2024-12-01',
+            dueDate: '2024-12-15',
+            status: 'Investigation',
+            investigator: 'Technical Review Panel',
+            findings: '',
+            correctiveAction: '',
+            resolution: '',
+            dateResolved: '',
+            history: [
+                { date: '2024-12-01', action: 'Received', user: 'Admin', notes: 'Complaint logged' },
+                { date: '2024-12-02', action: 'Acknowledged', user: 'Quality Manager', notes: 'Report under technical review' }
             ]
         }
     ],
