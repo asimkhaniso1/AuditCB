@@ -296,6 +296,15 @@ window.viewManagementReview = function (reviewId) {
 window.openNewManagementReviewModal = function () {
     document.getElementById('modal-title').textContent = 'New Management Review';
     document.getElementById('modal-body').innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px;">
+            <div style="flex: 1;">
+                <strong style="color: #0369a1;">AI-Powered Review Generation</strong>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #0284c7;">Automatically analyze clients, auditors, appeals, and complaints data</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="window.generateManagementReviewInputs()" id="ai-generate-btn">
+                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i>AI Generate
+            </button>
+        </div>
         <form id="review-form" style="max-height: 500px; overflow-y: auto;">
             <div class="form-group">
                 <label>Review Date <span style="color: var(--danger-color);">*</span></label>
@@ -518,4 +527,73 @@ window.printManagementReview = function (reviewId) {
         </html>
     `);
     printWindow.document.close();
+};
+
+// ============================================
+// AI-POWERED MANAGEMENT REVIEW GENERATION
+// ============================================
+
+window.generateManagementReviewInputs = async function() {
+    const btn = document.getElementById('ai-generate-btn');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+
+    try {
+        const clients = window.state.clients || [];
+        const auditors = window.state.auditors || [];
+        const appeals = window.state.appeals || [];
+        const complaints = window.state.complaints || [];
+        const certifications = window.state.certifications || [];
+        const internalAudits = window.state.internalAudits || {};
+
+        const stats = {
+            totalClients: clients.length,
+            activeClients: clients.filter(c => c.status === 'Active').length,
+            totalAuditors: auditors.length,
+            totalAppeals: appeals.length,
+            openAppeals: appeals.filter(a => a.status === 'Open' || a.status === 'Under Review').length,
+            totalComplaints: complaints.length,
+            openComplaints: complaints.filter(c => c.status === 'Open' || c.status === 'Investigating').length,
+            totalCertifications: certifications.length,
+            activeCertifications: certifications.filter(c => c.status === 'Valid').length,
+            internalAuditFindings: internalAudits.findings?.length || 0,
+            openFindings: internalAudits.findings?.filter(f => f.status !== 'Closed').length || 0
+        };
+
+        const prompt = `You are an ISO 17021-1 expert. Generate Management Review inputs based on this data:
+- Clients: ${stats.totalClients} (Active: ${stats.activeClients})
+- Auditors: ${stats.totalAuditors}
+- Certifications: ${stats.totalCertifications} (Active: ${stats.activeCertifications})
+- Appeals: ${stats.totalAppeals} (Open: ${stats.openAppeals})
+- Complaints: ${stats.totalComplaints} (Open: ${stats.openComplaints})
+- Internal Findings: ${stats.internalAuditFindings} (Open: ${stats.openFindings})
+
+Return JSON: {"internalAuditResults":"","customerFeedback":"","processPerformance":"","nonconformities":"","changes":"","resourceNeeds":"","improvementOpportunities":[],"resourceDecisions":[],"systemChanges":[]}`;
+
+        const response = await window.callGeminiAPI(prompt);
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        const reviewData = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+
+        document.getElementById('input-audits').value = reviewData.internalAuditResults || '';
+        document.getElementById('input-feedback').value = reviewData.customerFeedback || '';
+        document.getElementById('input-performance').value = reviewData.processPerformance || '';
+        document.getElementById('input-ncrs').value = reviewData.nonconformities || '';
+        document.getElementById('input-changes').value = reviewData.changes || '';
+        document.getElementById('input-resources').value = reviewData.resourceNeeds || '';
+        document.getElementById('output-improvements').value = (reviewData.improvementOpportunities || []).join('\n');
+        document.getElementById('output-resources').value = (reviewData.resourceDecisions || []).join('\n');
+        document.getElementById('output-changes').value = (reviewData.systemChanges || []).join('\n');
+
+        const nextReview = new Date();
+        nextReview.setMonth(nextReview.getMonth() + 6);
+        document.getElementById('next-review-date').value = nextReview.toISOString().split('T')[0];
+
+        window.showNotification('Management review generated!', 'success');
+    } catch (error) {
+        window.showNotification('Failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
 };
