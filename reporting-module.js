@@ -590,6 +590,23 @@ window.generateAuditReport = function (reportId) {
                     <tr><td>Report Status</td><td><strong>${h(report.status)}</strong></td></tr>
                 </table>
 
+                <!-- Client Organization Context -->
+                <h2>Organization Context</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                    <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #92400e;">Goods & Services</h3>
+                        ${(client.goodsServices && client.goodsServices.length > 0) ?
+                `<ul style="margin: 0; padding-left: 20px;">${client.goodsServices.map(g => `<li>${h(g.name)}${g.category ? ` (${g.category})` : ''}</li>`).join('')}</ul>` :
+                '<p style="color: #92400e; margin: 0; font-style: italic;">Not defined in Account Setup</p>'}
+                    </div>
+                    <div style="background: #ecfeff; padding: 15px; border-radius: 8px; border-left: 4px solid #06b6d4;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #0891b2;">Key Processes</h3>
+                        ${(client.keyProcesses && client.keyProcesses.length > 0) ?
+                `<ul style="margin: 0; padding-left: 20px;">${client.keyProcesses.map(p => `<li>${h(p.name)}${p.category === 'Core' ? ' <strong>(Core)</strong>' : ''}</li>`).join('')}</ul>` :
+                '<p style="color: #0891b2; margin: 0; font-style: italic;">Not defined in Account Setup</p>'}
+                    </div>
+                </div>
+
                 <h1>2. Executive Summary</h1>
                 <p><strong>Overview:</strong></p>
                 <div style="margin-bottom: 2rem; background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6;">

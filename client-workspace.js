@@ -1025,6 +1025,30 @@ function renderClientCertificates(client) {
                 </div>
             </div>
 
+            <!-- Client Context: Goods/Services & Processes (from Org Setup) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="margin: 0;">
+                    <h4 style="margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-boxes-stacked" style="color: #f59e0b;"></i> Goods & Services
+                    </h4>
+                    ${(client.goodsServices && client.goodsServices.length > 0) ? `
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${client.goodsServices.map(g => `<span class="badge" style="background: #fef3c7; color: #92400e;">${g.name}</span>`).join('')}
+                        </div>
+                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
+                </div>
+                <div class="card" style="margin: 0;">
+                    <h4 style="margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-diagram-project" style="color: #06b6d4;"></i> Key Processes
+                    </h4>
+                    ${(client.keyProcesses && client.keyProcesses.length > 0) ? `
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${p.category === 'Core' ? '#065f46' : '#0369a1'};">${p.name}</span>`).join('')}
+                        </div>
+                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
+                </div>
+            </div>
+
             <div class="card">
                 <h3 style="margin: 0 0 1rem 0;">Certificates</h3>
                 <div class="table-container">

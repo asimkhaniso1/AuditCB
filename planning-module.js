@@ -843,6 +843,34 @@ function viewAuditPlan(id) {
                         ${(plan.selectedSites || []).map(s => `<div>• ${s.name}</div>`).join('') || 'All Sites'}
                    </div>
                 </div>
+            </div>
+
+            <!-- Client Context Row (from Org Setup) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0;">
+                    <h4 style="margin-top: 0; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-boxes-stacked" style="color: #f59e0b;"></i> Goods & Services
+                    </h4>
+                    ${(client?.goodsServices && client.goodsServices.length > 0) ? `
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${client.goodsServices.map(g => `<span class="badge" style="background: #fef3c7; color: #92400e;">${g.name}</span>`).join('')}
+                        </div>
+                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
+                </div>
+                <div class="card" style="margin: 0;">
+                    <h4 style="margin-top: 0; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-diagram-project" style="color: #06b6d4;"></i> Key Processes
+                    </h4>
+                    ${(client?.keyProcesses && client.keyProcesses.length > 0) ? `
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${p.category === 'Core' ? '#065f46' : '#0369a1'};">${p.name}</span>`).join('')}
+                        </div>
+                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
+                </div>
+            </div>
+
+            <!-- Details Grid (Row 2) - Schedule & Checklists -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
 
                 <!-- Team -->
                 <div class="card" style="margin: 0;">
