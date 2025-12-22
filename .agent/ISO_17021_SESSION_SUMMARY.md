@@ -233,9 +233,9 @@ Three major ISO 17021-1 compliance features implemented in one session.
 | File | Changes | Purpose |
 |------|---------|---------|
 | `ncr-capa-module.js` | New File | Full NCR-CAPA implementation |
-| `settings-module.js` | +200 lines | Added CB Policies tab |
+| `settings-module.js` | +250 lines | Added CB Policies tab & Fixed Permissions Logic |
 | `client-workspace.js` | +20 lines | Added NCR sidebar link and routing |
-| `index.html` | +1 line | Added script tag |
+| `index.html` | +2 lines | Added script tag & Restored Clients link |
 | `script.js` | +5 lines | Added global routing case |
 
 ---
