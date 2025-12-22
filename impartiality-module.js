@@ -1,0 +1,378 @@
+// ============================================
+// IMPARTIALITY COMMITTEE MODULE
+// ISO 17021-1 Clause 5.2
+// ============================================
+
+// Initialize state
+if (!window.state.impartialityCommittee) {
+    window.state.impartialityCommittee = {
+        members: [
+            {
+                id: 1,
+                name: 'Dr. Sarah Mitchell',
+                organization: 'Independent Quality Consultant',
+                role: 'Chairperson',
+                expertise: 'Quality Management Systems',
+                appointedDate: '2023-01-15',
+                termEnd: '2026-01-14',
+                status: 'Active'
+            },
+            {
+                id: 2,
+                name: 'John Anderson',
+                organization: 'Industry Association Representative',
+                role: 'Member',
+                expertise: 'Manufacturing Standards',
+                appointedDate: '2023-01-15',
+                termEnd: '2026-01-14',
+                status: 'Active'
+            }
+        ],
+        meetings: [
+            {
+                id: 1,
+                date: '2024-03-15',
+                attendees: [1, 2],
+                threatsReviewed: [
+                    {
+                        threat: 'Auditor previously worked for client',
+                        client: 'Tech Solutions Ltd',
+                        safeguard: 'Assigned different auditor',
+                        decision: 'Approved'
+                    }
+                ],
+                decisions: ['Approved new auditor competence criteria'],
+                nextMeetingDate: '2024-06-15'
+            }
+        ],
+        threats: [
+            {
+                id: 1,
+                date: '2024-02-10',
+                type: 'Self-Interest',
+                description: 'Auditor has financial interest in client company',
+                client: 'Global Manufacturing',
+                identifiedBy: 'Quality Manager',
+                safeguard: 'Auditor recused from assignment',
+                status: 'Resolved',
+                reviewedByCommittee: true,
+                committeeDecision: 'Safeguard adequate'
+            }
+        ]
+    };
+}
+
+function renderImpartialityModule() {
+    const contentArea = document.getElementById('content-area');
+    const data = window.state.impartialityCommittee;
+
+    contentArea.innerHTML = `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h2 style="margin-bottom: 0.5rem;">
+                        <i class="fa-solid fa-balance-scale" style="margin-right: 0.5rem; color: #7c3aed;"></i>
+                        Impartiality Committee
+                    </h2>
+                    <p style="color: var(--text-secondary); margin: 0;">ISO 17021-1 Clause 5.2 - Safeguarding Impartiality</p>
+                </div>
+                <button class="btn btn-primary" onclick="window.openAddCommitteeMemberModal()">
+                    <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i>Add Member
+                </button>
+            </div>
+
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 2rem; font-weight: 700; color: #7c3aed; margin: 0;">${data.members.filter(m => m.status === 'Active').length}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Active Members</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 2rem; font-weight: 700; color: #0284c7; margin: 0;">${data.meetings.length}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Meetings Held</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 2rem; font-weight: 700; color: #059669; margin: 0;">${data.threats.filter(t => t.status === 'Resolved').length}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Threats Resolved</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 1rem;">
+                    <p style="font-size: 2rem; font-weight: 700; color: #dc2626; margin: 0;">${data.threats.filter(t => t.status === 'Open').length}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open Threats</p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                <button class="tab-btn active" onclick="switchImpartialityTab(this, 'members')">Committee Members</button>
+                <button class="tab-btn" onclick="switchImpartialityTab(this, 'meetings')">Meetings</button>
+                <button class="tab-btn" onclick="switchImpartialityTab(this, 'threats')">Threat Register</button>
+            </div>
+
+            <!-- Tab: Members -->
+            <div id="members" class="impartiality-tab-content">
+                <div class="card">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Organization</th>
+                                    <th>Role</th>
+                                    <th>Expertise</th>
+                                    <th>Term</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.members.map(m => `
+                                    <tr>
+                                        <td><strong>${window.UTILS.escapeHtml(m.name)}</strong></td>
+                                        <td>${window.UTILS.escapeHtml(m.organization)}</td>
+                                        <td>${window.UTILS.escapeHtml(m.role)}</td>
+                                        <td>${window.UTILS.escapeHtml(m.expertise)}</td>
+                                        <td>${window.UTILS.escapeHtml(m.appointedDate)} - ${window.UTILS.escapeHtml(m.termEnd)}</td>
+                                        <td><span class="badge ${m.status === 'Active' ? 'bg-green' : 'bg-gray'}">${window.UTILS.escapeHtml(m.status)}</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-icon" onclick="editCommitteeMember(${m.id})" title="Edit">
+                                                <i class="fa-solid fa-edit"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Meetings -->
+            <div id="meetings" class="impartiality-tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Committee Meetings</h3>
+                    <button class="btn btn-primary btn-sm" onclick="window.openAddMeetingModal()">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Record Meeting
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Attendees</th>
+                                    <th>Threats Reviewed</th>
+                                    <th>Decisions</th>
+                                    <th>Next Meeting</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.meetings.map(mtg => `
+                                    <tr>
+                                        <td><strong>${window.UTILS.escapeHtml(mtg.date)}</strong></td>
+                                        <td>${mtg.attendees.length} members</td>
+                                        <td>${mtg.threatsReviewed.length} threats</td>
+                                        <td>${mtg.decisions.length} decisions</td>
+                                        <td>${window.UTILS.escapeHtml(mtg.nextMeetingDate || 'TBD')}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-icon" onclick="viewMeeting(${mtg.id})" title="View Details">
+                                                <i class="fa-solid fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Threats -->
+            <div id="threats" class="impartiality-tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Impartiality Threat Register</h3>
+                    <button class="btn btn-primary btn-sm" onclick="window.openAddThreatModal()">
+                        <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>Log Threat
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Client</th>
+                                    <th>Safeguard</th>
+                                    <th>Status</th>
+                                    <th>Committee Review</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.threats.map(t => `
+                                    <tr>
+                                        <td>${window.UTILS.escapeHtml(t.date)}</td>
+                                        <td><span class="badge bg-orange">${window.UTILS.escapeHtml(t.type)}</span></td>
+                                        <td>${window.UTILS.escapeHtml(t.description)}</td>
+                                        <td>${window.UTILS.escapeHtml(t.client)}</td>
+                                        <td>${window.UTILS.escapeHtml(t.safeguard)}</td>
+                                        <td><span class="badge ${t.status === 'Resolved' ? 'bg-green' : 'bg-red'}">${window.UTILS.escapeHtml(t.status)}</span></td>
+                                        <td>${t.reviewedByCommittee ? '<i class="fa-solid fa-check" style="color: green;"></i> Yes' : '<i class="fa-solid fa-times" style="color: red;"></i> No'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.switchImpartialityTab = function (btn, tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.impartiality-tab-content').forEach(c => c.style.display = 'none');
+
+    btn.classList.add('active');
+    document.getElementById(tabId).style.display = 'block';
+};
+
+window.openAddCommitteeMemberModal = function () {
+    document.getElementById('modal-title').textContent = 'Add Committee Member';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="member-form">
+            <div class="form-group">
+                <label>Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="member-name" required>
+            </div>
+            <div class="form-group">
+                <label>Organization <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="member-org" required>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select class="form-control" id="member-role">
+                    <option value="Chairperson">Chairperson</option>
+                    <option value="Member">Member</option>
+                    <option value="Observer">Observer</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Expertise</label>
+                <input type="text" class="form-control" id="member-expertise" placeholder="e.g., Quality Management">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Appointed Date</label>
+                    <input type="date" class="form-control" id="member-appointed" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label>Term End Date</label>
+                    <input type="date" class="form-control" id="member-term-end">
+                </div>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const name = document.getElementById('member-name').value.trim();
+        const org = document.getElementById('member-org').value.trim();
+
+        if (!name || !org) {
+            window.showNotification('Please fill in required fields', 'error');
+            return;
+        }
+
+        const newMember = {
+            id: Date.now(),
+            name,
+            organization: org,
+            role: document.getElementById('member-role').value,
+            expertise: document.getElementById('member-expertise').value,
+            appointedDate: document.getElementById('member-appointed').value,
+            termEnd: document.getElementById('member-term-end').value,
+            status: 'Active'
+        };
+
+        window.state.impartialityCommittee.members.push(newMember);
+        window.saveData();
+        window.closeModal();
+        renderImpartialityModule();
+        window.showNotification('Committee member added successfully', 'success');
+    };
+
+    window.openModal();
+};
+
+window.openAddThreatModal = function () {
+    const clients = window.state.clients || [];
+
+    document.getElementById('modal-title').textContent = 'Log Impartiality Threat';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="threat-form">
+            <div class="form-group">
+                <label>Threat Type <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="threat-type" required>
+                    <option value="">-- Select --</option>
+                    <option value="Self-Interest">Self-Interest</option>
+                    <option value="Self-Review">Self-Review</option>
+                    <option value="Familiarity">Familiarity</option>
+                    <option value="Intimidation">Intimidation</option>
+                    <option value="Advocacy">Advocacy</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="threat-description" rows="3" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Related Client</label>
+                <select class="form-control" id="threat-client">
+                    <option value="">-- Select --</option>
+                    ${clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Safeguard Implemented <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="threat-safeguard" rows="2" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Identified By</label>
+                <input type="text" class="form-control" id="threat-identified-by">
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const type = document.getElementById('threat-type').value;
+        const description = document.getElementById('threat-description').value.trim();
+        const safeguard = document.getElementById('threat-safeguard').value.trim();
+
+        if (!type || !description || !safeguard) {
+            window.showNotification('Please fill in required fields', 'error');
+            return;
+        }
+
+        const newThreat = {
+            id: Date.now(),
+            date: new Date().toISOString().split('T')[0],
+            type,
+            description,
+            client: document.getElementById('threat-client').value,
+            safeguard,
+            identifiedBy: document.getElementById('threat-identified-by').value,
+            status: 'Open',
+            reviewedByCommittee: false
+        };
+
+        window.state.impartialityCommittee.threats.push(newThreat);
+        window.saveData();
+        window.closeModal();
+        renderImpartialityModule();
+        window.showNotification('Threat logged successfully', 'success');
+    };
+
+    window.openModal();
+};

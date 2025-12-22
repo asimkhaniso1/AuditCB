@@ -1158,6 +1158,7 @@ async function renderModule(moduleName) {
         'audit-reporting': 'Audit Reporting Dashboard',
         'certification': 'Certification Decisions',
         'documents': 'Document Management',
+        'impartiality': 'Impartiality Committee',
         'settings': 'Settings'
     };
     pageTitle.textContent = titleMap[moduleName] || 'Dashboard';
@@ -1229,6 +1230,13 @@ async function renderModule(moduleName) {
             case 'appeals-complaints':
                 if (typeof renderAppealsComplaintsModule === 'function') {
                     renderAppealsComplaintsModule();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
+            case 'impartiality':
+                if (typeof renderImpartialityModule === 'function') {
+                    renderImpartialityModule();
                 } else {
                     renderPlaceholder(moduleName);
                 }
