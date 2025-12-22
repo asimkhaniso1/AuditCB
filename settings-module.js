@@ -69,6 +69,58 @@ if (!window.state.rolePermissions) {
     };
 }
 
+// Initialize CB Policies (NCR Criteria, Certification Decisions, etc.)
+if (!window.state.cbPolicies) {
+    window.state.cbPolicies = {
+        ncrCriteria: {
+            major: [
+                'Complete absence of a required process or procedure',
+                'Systematic failure affecting product/service conformity',
+                'Breakdown of the management system or major element',
+                'A minor NC from previous audit not corrected within agreed timeframe',
+                'Significant risk to health, safety, or environment',
+                'Fraudulent or misleading records or data'
+            ],
+            minor: [
+                'Isolated lapse in following a documented procedure',
+                'Single instance of incomplete documentation',
+                'Minor gap in record keeping that does not affect system effectiveness',
+                'Opportunity to strengthen existing controls identified'
+            ],
+            observation: [
+                'Potential for improvement identified',
+                'Emerging risk that may become NC if not addressed',
+                'Best practice recommendation',
+                'Clarification or enhancement of existing practice'
+            ]
+        },
+        certDecisionRules: {
+            grant: 'No Major NCs; all Minor NCs have acceptable corrective action plans',
+            deny: 'Unresolved Major NCs; multiple critical system failures',
+            suspend: 'Major NC identified during surveillance; client request; failure to permit audits',
+            withdraw: 'Continued suspension beyond 6 months; fraudulent use of certificate; client request',
+            reduce: 'Scope reduction when part of system no longer meets requirements',
+            expand: 'Successful audit of additional scope areas'
+        },
+        capaTimelines: {
+            majorCorrection: 90,
+            minorCorrection: 30,
+            observationResponse: 0,
+            capaVerification: 'Before next surveillance or within 90 days'
+        },
+        auditFrequency: {
+            surveillance: '12 months (max)',
+            recertification: '36 months',
+            transferAudit: 'Before transfer completion'
+        },
+        competenceCriteria: {
+            leadAuditor: '5 audits as auditor + lead auditor course + witness audit',
+            auditor: 'Sector knowledge + auditor course + 4 shadow audits',
+            technicalExpert: 'Sector expertise but no ISO 17021 auditor qualification required'
+        }
+    };
+}
+
 function renderSettings() {
     const html = `
         <div class="fade-in">
@@ -81,6 +133,7 @@ function renderSettings() {
                     <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
                     <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
                     <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('cbpolicies', this)">CB Policies</button>
                     <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Backup</button>
                 </div>
 
@@ -107,6 +160,7 @@ function switchSettingsTab(tabName, btnElement) {
         case 'policy': container.innerHTML = getQualityPolicyHTML(); break;
         case 'defaults': container.innerHTML = getDefaultsHTML(); break;
         case 'data': container.innerHTML = getDataManagementHTML(); break;
+        case 'cbpolicies': container.innerHTML = getCBPoliciesHTML(); break;
     }
 }
 
@@ -765,6 +819,158 @@ function getDataManagementHTML() {
     `;
 }
 
+// ============================================
+// TAB 9: CB POLICIES & CRITERIA (ISO 17021 Clause 9.9)
+// ============================================
+
+function getCBPoliciesHTML() {
+    const policies = window.state.cbPolicies;
+
+    return `
+        <div class="fade-in">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-gavel" style="margin-right: 0.5rem;"></i>
+                CB Policies & Criteria
+            </h3>
+            
+            <!-- NCR Classification -->
+            <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 1rem; color: #dc2626;">
+                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                    NCR Classification Criteria (ISO 17021 Clause 9.9)
+                </h4>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                    <!-- Major NC -->
+                    <div style="background: #fef2f2; border-radius: 8px; padding: 1rem; border-left: 4px solid #dc2626;">
+                        <h5 style="color: #dc2626; margin-bottom: 0.5rem;">
+                            <i class="fa-solid fa-circle-xmark"></i> Major NC
+                        </h5>
+                        <ul style="font-size: 0.85rem; padding-left: 1.2rem; margin: 0;">
+                            ${policies.ncrCriteria.major.map(c => `<li style="margin-bottom: 0.3rem;">${window.UTILS.escapeHtml(c)}</li>`).join('')}
+                        </ul>
+                        <button class="btn btn-sm" onclick="editNCRCriteria('major')" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                            <i class="fa-solid fa-edit"></i> Edit
+                        </button>
+                    </div>
+                    
+                    <!-- Minor NC -->
+                    <div style="background: #fffbeb; border-radius: 8px; padding: 1rem; border-left: 4px solid #f59e0b;">
+                        <h5 style="color: #d97706; margin-bottom: 0.5rem;">
+                            <i class="fa-solid fa-circle-exclamation"></i> Minor NC
+                        </h5>
+                        <ul style="font-size: 0.85rem; padding-left: 1.2rem; margin: 0;">
+                            ${policies.ncrCriteria.minor.map(c => `<li style="margin-bottom: 0.3rem;">${window.UTILS.escapeHtml(c)}</li>`).join('')}
+                        </ul>
+                        <button class="btn btn-sm" onclick="editNCRCriteria('minor')" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                            <i class="fa-solid fa-edit"></i> Edit
+                        </button>
+                    </div>
+                    
+                    <!-- Observation -->
+                    <div style="background: #eff6ff; border-radius: 8px; padding: 1rem; border-left: 4px solid #3b82f6;">
+                        <h5 style="color: #1d4ed8; margin-bottom: 0.5rem;">
+                            <i class="fa-solid fa-lightbulb"></i> Observation/OFI
+                        </h5>
+                        <ul style="font-size: 0.85rem; padding-left: 1.2rem; margin: 0;">
+                            ${policies.ncrCriteria.observation.map(c => `<li style="margin-bottom: 0.3rem;">${window.UTILS.escapeHtml(c)}</li>`).join('')}
+                        </ul>
+                        <button class="btn btn-sm" onclick="editNCRCriteria('observation')" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                            <i class="fa-solid fa-edit"></i> Edit
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Certification Decisions -->
+            <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 1rem; color: #059669;">
+                    <i class="fa-solid fa-stamp" style="margin-right: 0.5rem;"></i>
+                    Certification Decision Rules
+                </h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Decision</th>
+                                <th>Criteria</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(policies.certDecisionRules).map(([key, value]) => `
+                                <tr>
+                                    <td><span class="badge" style="background: ${key === 'grant' || key === 'expand' ? '#059669' : key === 'deny' || key === 'withdraw' ? '#dc2626' : '#f59e0b'}; color: white; text-transform: capitalize;">${key}</span></td>
+                                    <td>${window.UTILS.escapeHtml(value)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon" onclick="editCertDecision('${key}')" title="Edit">
+                                            <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- CAPA Timelines & Audit Frequency -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: #7c3aed;">
+                        <i class="fa-solid fa-clock" style="margin-right: 0.5rem;"></i>
+                        CAPA Timelines
+                    </h4>
+                    <div class="form-group">
+                        <label>Major NC Correction (days)</label>
+                        <input type="number" class="form-control" id="capa-major" value="${policies.capaTimelines.majorCorrection}">
+                    </div>
+                    <div class="form-group">
+                        <label>Minor NC Correction (days)</label>
+                        <input type="number" class="form-control" id="capa-minor" value="${policies.capaTimelines.minorCorrection}">
+                    </div>
+                    <div class="form-group">
+                        <label>Verification Timing</label>
+                        <input type="text" class="form-control" id="capa-verify" value="${window.UTILS.escapeHtml(policies.capaTimelines.capaVerification)}">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="saveCAPATimelines()">
+                        <i class="fa-solid fa-save"></i> Save Timelines
+                    </button>
+                </div>
+                
+                <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: #0284c7;">
+                        <i class="fa-solid fa-calendar-days" style="margin-right: 0.5rem;"></i>
+                        Audit Frequency
+                    </h4>
+                    <div class="form-group">
+                        <label>Surveillance Interval</label>
+                        <input type="text" class="form-control" id="freq-surv" value="${window.UTILS.escapeHtml(policies.auditFrequency.surveillance)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Recertification Cycle</label>
+                        <input type="text" class="form-control" id="freq-recert" value="${window.UTILS.escapeHtml(policies.auditFrequency.recertification)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Transfer Audit Timing</label>
+                        <input type="text" class="form-control" id="freq-transfer" value="${window.UTILS.escapeHtml(policies.auditFrequency.transferAudit)}">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="saveAuditFrequency()">
+                        <i class="fa-solid fa-save"></i> Save Frequency
+                    </button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">
+                <small style="color: #065f46;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    <strong>ISO 17021-1 Compliance:</strong> These policies define your CB's criteria for audit findings classification (Clause 9.9) and certification decisions (Clause 9.7).
+                </small>
+            </div>
+        </div>
+    `;
+}
+
 function backupData() {
     try {
         const dataStr = JSON.stringify(window.state, null, 2);
@@ -1125,6 +1331,72 @@ window.deleteRetentionPolicy = function (policyId) {
         switchSettingsTab('retention', document.querySelectorAll('.tab-btn')[4]);
         window.showNotification('Retention policy deleted', 'success');
     }
+};
+
+// ============================================
+// CB POLICIES HELPER FUNCTIONS
+// ============================================
+
+window.editNCRCriteria = function (type) {
+    const criteria = window.state.cbPolicies.ncrCriteria[type];
+    const labels = { major: 'Major NC', minor: 'Minor NC', observation: 'Observation/OFI' };
+
+    document.getElementById('modal-title').textContent = `Edit ${labels[type]} Criteria`;
+    document.getElementById('modal-body').innerHTML = `
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Enter each criteria on a new line:</p>
+        <textarea class="form-control" id="ncr-criteria-text" rows="8" style="font-size: 0.9rem;">${criteria.join('\n')}</textarea>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const lines = document.getElementById('ncr-criteria-text').value.split('\n').filter(l => l.trim());
+        window.state.cbPolicies.ncrCriteria[type] = lines.map(l => window.Sanitizer.sanitizeText(l.trim()));
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('cbpolicies', document.querySelectorAll('.tab-btn')[7]);
+        window.showNotification(`${labels[type]} criteria updated`, 'success');
+    };
+
+    window.openModal();
+};
+
+window.editCertDecision = function (decision) {
+    const value = window.state.cbPolicies.certDecisionRules[decision];
+
+    document.getElementById('modal-title').textContent = `Edit "${decision}" Decision Rule`;
+    document.getElementById('modal-body').innerHTML = `
+        <div class="form-group">
+            <label>Criteria for "${decision}" decision:</label>
+            <textarea class="form-control" id="cert-decision-text" rows="4">${window.UTILS.escapeHtml(value)}</textarea>
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        window.state.cbPolicies.certDecisionRules[decision] = window.Sanitizer.sanitizeText(document.getElementById('cert-decision-text').value.trim());
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('cbpolicies', document.querySelectorAll('.tab-btn')[7]);
+        window.showNotification('Certification decision rule updated', 'success');
+    };
+
+    window.openModal();
+};
+
+window.saveCAPATimelines = function () {
+    window.state.cbPolicies.capaTimelines.majorCorrection = parseInt(document.getElementById('capa-major').value) || 90;
+    window.state.cbPolicies.capaTimelines.minorCorrection = parseInt(document.getElementById('capa-minor').value) || 30;
+    window.state.cbPolicies.capaTimelines.capaVerification = window.Sanitizer.sanitizeText(document.getElementById('capa-verify').value);
+    window.saveData();
+    window.showNotification('CAPA timelines saved', 'success');
+};
+
+window.saveAuditFrequency = function () {
+    window.state.cbPolicies.auditFrequency.surveillance = window.Sanitizer.sanitizeText(document.getElementById('freq-surv').value);
+    window.state.cbPolicies.auditFrequency.recertification = window.Sanitizer.sanitizeText(document.getElementById('freq-recert').value);
+    window.state.cbPolicies.auditFrequency.transferAudit = window.Sanitizer.sanitizeText(document.getElementById('freq-transfer').value);
+    window.saveData();
+    window.showNotification('Audit frequency saved', 'success');
 };
 
 // Export functions
