@@ -1316,8 +1316,8 @@ async function renderModule(moduleName) {
                 }
                 break;
             case 'settings':
-                if (typeof renderSettingsEnhanced === 'function') {
-                    renderSettingsEnhanced();
+                if (typeof renderSettings === 'function') {
+                    renderSettings();
                 } else {
                     renderPlaceholder(moduleName);
                 }
