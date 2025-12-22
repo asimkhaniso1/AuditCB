@@ -303,9 +303,6 @@ function renderClientDetail(clientId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Summary</button>
-                <button class="tab-btn" data-tab="client_org" style="background: #fdf4ff; color: #a21caf;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Account Setup
-                </button>
                 <button class="tab-btn" data-tab="scopes">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>Scopes & Certs
                 </button>
