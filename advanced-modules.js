@@ -431,13 +431,38 @@ function renderAuditorTab(auditor, tabName) {
 
             // Add Evaluations Section (ISO 17021-1 Clause 7.2 - Auditor Performance Monitoring)
             const evaluations = auditor.evaluations || { witnessAudits: [], performanceReviews: [] };
-            const nextWitness = evaluations.nextWitnessAuditDue || 'Not scheduled';
             const witnessAudits = evaluations.witnessAudits || [];
             const performanceReviews = evaluations.performanceReviews || [];
+            const reportReviews = evaluations.reportReviews || []; // New feature
+            const linkedComplaints = evaluations.linkedComplaints || []; // New feature
+
+            // Witness Audit Due Calculation Logic
+            let nextWitness = evaluations.nextWitnessAuditDue || 'Not scheduled';
+            let nextWitnessColor = '#3b82f6'; // Default Blue
+            let nextWitnessText = nextWitness;
+            const isFirstTime = evaluations.firstTimeAuditor;
+
+            if (isFirstTime && witnessAudits.length === 0) {
+                nextWitnessColor = '#dc2626'; // Red
+                nextWitnessText = 'REQUIRED (First Time)';
+            } else if (nextWitness !== 'Not scheduled') {
+                const today = new Date();
+                const dueDate = new Date(nextWitness);
+                const monthsUntil = (dueDate - today) / (1000 * 60 * 60 * 24 * 30);
+
+                if (dueDate < today) {
+                    nextWitnessColor = '#dc2626'; // Red
+                    nextWitnessText = `${nextWitness} (Overdue)`;
+                } else if (monthsUntil <= 6) {
+                    nextWitnessColor = '#f59e0b'; // Orange
+                }
+            } else if (witnessAudits.length === 0) {
+                nextWitnessColor = '#dc2626'; // Red
+            }
 
             // Performance Summary Cards
             const perfSummaryHTML = `
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0;">
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin: 1.5rem 0;">
                     <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
                         <i class="fa-solid fa-eye" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
                         <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${witnessAudits.length}</p>
@@ -446,16 +471,21 @@ function renderAuditorTab(auditor, tabName) {
                     <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
                         <i class="fa-solid fa-chart-line" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
                         <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${performanceReviews.length}</p>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Performance Reviews</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Perf. Reviews</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
+                        <i class="fa-solid fa-file-signature" style="font-size: 1.5rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${reportReviews.length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Report Reviews</p>
                     </div>
                     <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${auditor.customerRating && auditor.customerRating >= 4 ? '#10b981' : '#f59e0b'};">
                         <i class="fa-solid fa-star" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
                         <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${auditor.customerRating || '-'}/5</p>
                         <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Avg Rating</p>
                     </div>
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'};">
-                        <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'}; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 0.9rem; font-weight: 600; margin: 0;">${nextWitness}</p>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${nextWitnessColor};">
+                        <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: ${nextWitnessColor}; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 0.9rem; font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${nextWitnessText}">${nextWitnessText}</p>
                         <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Next Witness Due</p>
                     </div>
                 </div>
@@ -576,6 +606,103 @@ function renderAuditorTab(auditor, tabName) {
                 `).join('')
                 : '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No audit history available yet.</td></tr>';
 
+            // Report Reviews Section
+            const reportReviewsHTML = `
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
+                            Report Reviews
+                        </h3>
+                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" onclick="window.addReportReview(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Report Review
+                        </button>
+                    </div>
+                    ${reportReviews.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Report Type</th>
+                                        <th>Client</th>
+                                        <th>Quality</th>
+                                        <th>Completeness</th>
+                                        <th>Technical</th>
+                                        <th>Reviewer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${reportReviews.map(r => `
+                                        <tr>
+                                            <td>${r.reviewDate}</td>
+                                            <td>${r.reportType}</td>
+                                            <td>${r.client}</td>
+                                            <td>${r.qualityRating}/5</td>
+                                            <td>${r.completenessRating}/5</td>
+                                            <td>${r.technicalRating}/5</td>
+                                            <td>${r.reviewer}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #fdf4ff; border-radius: 8px;">
+                            <p style="color: #6b21a8; margin: 0;">No report reviews recorded yet.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            // Linked Complaints Section
+            const linkedComplaintsHTML = `
+                <div class="card" style="margin-top: 1.5rem; border-left: 4px solid ${linkedComplaints.length > 0 ? '#dc2626' : '#9ca3af'};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem; color: ${linkedComplaints.length > 0 ? '#dc2626' : '#6b7280'};"></i>
+                            Linked Complaints
+                        </h3>
+                    </div>
+                    ${linkedComplaints.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>ID</th>
+                                        <th>Subject</th>
+                                        <th>Severity</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${linkedComplaints.map(c => `
+                                        <tr>
+                                            <td>${c.date}</td>
+                                            <td>CMP-${String(c.complaintId).padStart(3, '0')}</td>
+                                            <td>${c.subject}</td>
+                                            <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
+                                            <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="window.viewComplaintDetail(${c.complaintId})">
+                                                    View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #f9fafb; border-radius: 8px;">
+                            <p style="color: #6b7280; margin: 0;">No complaints linked to this auditor.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+
             const auditHistoryHTML = `
                 <div class="card" style="margin-top: 1.5rem;">
                     <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-history" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit History</h3>
@@ -597,7 +724,7 @@ function renderAuditorTab(auditor, tabName) {
             `;
 
             // Append all sections to the activity tab
-            tabContent.innerHTML += perfSummaryHTML + witnessAuditsHTML + performanceReviewsHTML + auditHistoryHTML;
+            tabContent.innerHTML += perfSummaryHTML + witnessAuditsHTML + performanceReviewsHTML + reportReviewsHTML + linkedComplaintsHTML + auditHistoryHTML;
             break;
         case 'qualifications':
             // Get qualifications or generate from standards
@@ -2461,6 +2588,10 @@ window.addWitnessAudit = function (auditorId) {
                     <label>Observations/Notes</label>
                     <textarea id="witness-notes" class="form-control" rows="4" placeholder="Enter observations, strengths, areas for improvement..."></textarea>
                 </div>
+                <div class="form-group" style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                    <input type="checkbox" id="first-time-audit">
+                    <label for="first-time-audit" style="margin: 0; font-weight: 500;">This is a First-Time Auditor Witness Audit</label>
+                </div>
             </div>
         </form>
     `;
@@ -2483,6 +2614,18 @@ window.addWitnessAudit = function (auditorId) {
             rating: parseInt(document.getElementById('witness-rating').value),
             notes: document.getElementById('witness-notes').value
         });
+
+        // Update auditor evaluation status
+        const isFirstTime = document.getElementById('first-time-audit').checked;
+        if (isFirstTime) {
+            auditor.evaluations.firstTimeAuditor = false; // Requirement met
+        }
+
+        // Calculate next witness due date (3 years rule per ISO 17021-1)
+        const witnessDate = new Date(document.getElementById('witness-date').value);
+        witnessDate.setFullYear(witnessDate.getFullYear() + 3);
+        auditor.evaluations.nextWitnessAuditDue = witnessDate.toISOString().split('T')[0];
+        auditor.evaluations.lastWitnessDate = document.getElementById('witness-date').value;
 
         window.saveData();
         window.closeModal();
@@ -2565,6 +2708,84 @@ window.addPerformanceReview = function (auditorId) {
         window.saveData();
         window.closeModal();
         window.showNotification('Performance review added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+// Add Report Review (Office-based)
+window.addReportReview = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Report Review';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="report-review-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Review Date</label>
+                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="form-group">
+                    <label>Report Type</label>
+                    <select id="report-type" class="form-control">
+                        <option value="Stage 1 Audit">Stage 1 Audit</option>
+                        <option value="Stage 2 Audit">Stage 2 Audit</option>
+                        <option value="Surveillance Audit">Surveillance Audit</option>
+                        <option value="Recertification Audit">Recertification Audit</option>
+                        <option value="Special Audit">Special Audit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Client</label>
+                    <input type="text" id="audit-client" class="form-control" placeholder="Client Name" required>
+                </div>
+                <div class="form-group">
+                    <label>Reviewer</label>
+                    <input type="text" id="reviewer-name" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Quality Rating (1-5)</label>
+                    <input type="number" id="quality-rating" class="form-control" min="1" max="5" value="4" required>
+                </div>
+                <div class="form-group">
+                    <label>Completeness Rating (1-5)</label>
+                    <input type="number" id="completeness-rating" class="form-control" min="1" max="5" value="5" required>
+                </div>
+                 <div class="form-group">
+                    <label>Technical Accuracy (1-5)</label>
+                    <input type="number" id="technical-rating" class="form-control" min="1" max="5" value="4" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Feedback/Notes</label>
+                    <textarea id="review-notes" class="form-control" rows="4" placeholder="Enter feedback on the report..."></textarea>
+                </div>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [], reportReviews: [] };
+        if (!auditor.evaluations.reportReviews) auditor.evaluations.reportReviews = [];
+
+        auditor.evaluations.reportReviews.unshift({
+            reviewDate: document.getElementById('review-date').value,
+            reportType: document.getElementById('report-type').value,
+            client: document.getElementById('audit-client').value,
+            reviewer: document.getElementById('reviewer-name').value,
+            qualityRating: parseInt(document.getElementById('quality-rating').value),
+            completenessRating: parseInt(document.getElementById('completeness-rating').value),
+            technicalRating: parseInt(document.getElementById('technical-rating').value),
+            notes: document.getElementById('review-notes').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Report review added', 'success');
         renderAuditorDetail(auditorId);
         setTimeout(() => {
             document.querySelector('.tab-btn[data-tab="activity"]')?.click();

@@ -1164,6 +1164,20 @@ async function renderModule(moduleName) {
 }
 
 function renderDashboard() {
+    // Audit Compliance Alerts
+    const alerts = [];
+    (state.auditors || []).forEach(aud => {
+        const evals = aud.evaluations || {};
+        const nextDue = evals.nextWitnessAuditDue;
+        const isFirstTime = evals.firstTimeAuditor;
+        const witnessAudits = evals.witnessAudits || [];
+
+        if (isFirstTime && witnessAudits.length === 0) {
+            alerts.push({ type: 'First Time', msg: `${aud.name} - Witness Required`, id: aud.id, severity: 'high' });
+        } else if (nextDue && new Date(nextDue) < new Date()) {
+            alerts.push({ type: 'Overdue', msg: `${aud.name} - Overdue`, id: aud.id, severity: 'critical' });
+        }
+    });
     const dashboardHTML = `
         <div class="dashboard-grid fade-in">
             <div class="card stat-card">
@@ -1184,9 +1198,29 @@ function renderDashboard() {
             </div>
         </div>
         
-        <div class="card fade-in" style="margin-top: 2rem;">
-            <h3>Recent Activity</h3>
-            <p style="color: var(--text-secondary); margin-top: 1rem;">No recent activity to show.</p>
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-top: 2rem;">
+            <div class="card fade-in">
+                <h3>Recent Activity</h3>
+                <p style="color: var(--text-secondary); margin-top: 1rem;">No recent activity to show.</p>
+            </div>
+
+            <div class="card fade-in">
+                <h3><i class="fa-solid fa-bell" style="color: #f59e0b; margin-right: 0.5rem;"></i>Compliance Alerts</h3>
+                ${alerts.length > 0 ? `
+                    <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                        ${alerts.map(alert => `
+                            <div style="padding: 0.75rem; border-radius: 6px; background: ${alert.severity === 'critical' ? '#fee2e2' : '#fef3c7'}; border-left: 4px solid ${alert.severity === 'critical' ? '#dc2626' : '#d97706'}; cursor: pointer;" onclick="state.currentModule = 'auditors'; renderAuditors(); setTimeout(() => renderAuditorDetail(${alert.id}), 100);">
+                                <div style="font-weight: 600; font-size: 0.9rem; color: ${alert.severity === 'critical' ? '#991b1b' : '#92400e'};">${alert.type}</div>
+                                <div style="font-size: 0.85rem; color: ${alert.severity === 'critical' ? '#7f1d1d' : '#78350f'};">${alert.msg}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <p style="color: var(--text-secondary); margin-top: 1rem; font-size: 0.9rem;">
+                        <i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i>All compliance checks passed.
+                    </p>
+                `}
+            </div>
         </div>
     `;
     contentArea.innerHTML = dashboardHTML;

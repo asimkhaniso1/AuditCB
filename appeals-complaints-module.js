@@ -321,6 +321,7 @@ window.openNewAppealModal = function () {
 // ============================================
 window.openNewComplaintModal = function () {
     const clients = window.state.clients || [];
+    const auditors = window.state.auditors || [];
 
     document.getElementById('modal-title').textContent = 'Log New Complaint';
     document.getElementById('modal-body').innerHTML = `
@@ -344,15 +345,32 @@ window.openNewComplaintModal = function () {
                     </select>
                 </div>
             </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div>
+                    <label>Complaint Type</label>
+                    <select id="complaint-type" class="form-control" required>
+                        <option value="Service Quality">Service Quality</option>
+                        <option value="Auditor Conduct">Auditor Conduct</option>
+                        <option value="Impartiality">Impartiality Concern</option>
+                        <option value="Confidentiality">Confidentiality Breach</option>
+                        <option value="Certification Decision">Certification Decision</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Severity</label>
+                    <select id="complaint-severity" class="form-control" required>
+                        <option value="Low">Low</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                    </select>
+                </div>
+            </div>
             <div style="margin-top: 1rem;">
-                <label>Complaint Type</label>
-                <select id="complaint-type" class="form-control" required>
-                    <option value="Service Quality">Service Quality</option>
-                    <option value="Auditor Conduct">Auditor Conduct</option>
-                    <option value="Impartiality">Impartiality Concern</option>
-                    <option value="Confidentiality">Confidentiality Breach</option>
-                    <option value="Certification Decision">Certification Decision</option>
-                    <option value="Other">Other</option>
+                <label>Auditors Involved (Hold Ctrl/Cmd to select multiple)</label>
+                <select id="complaint-auditors" class="form-control" multiple style="height: 80px;">
+                    ${auditors.map(a => `<option value="${a.id}">${a.name} (${a.role})</option>`).join('')}
                 </select>
             </div>
             <div style="margin-top: 1rem;">
@@ -381,12 +399,17 @@ window.openNewComplaintModal = function () {
     `;
 
     document.getElementById('modal-save').onclick = function () {
+        const auditorSelect = document.getElementById('complaint-auditors');
+        const selectedAuditorIds = Array.from(auditorSelect.selectedOptions).map(opt => parseInt(opt.value));
+
         const newComplaint = {
             id: (window.state.complaints.length > 0 ? Math.max(...window.state.complaints.map(c => c.id)) : 0) + 1,
             source: document.getElementById('complaint-source').value,
             clientName: document.getElementById('complaint-client').value,
             relatedAuditId: null,
             type: document.getElementById('complaint-type').value,
+            severity: document.getElementById('complaint-severity').value,
+            auditorsInvolved: selectedAuditorIds,
             subject: document.getElementById('complaint-subject').value,
             description: document.getElementById('complaint-description').value,
             dateReceived: document.getElementById('complaint-date').value,
@@ -406,6 +429,23 @@ window.openNewComplaintModal = function () {
             window.showNotification('Please fill in all required fields', 'error');
             return;
         }
+
+        // Link complaint to selected auditors
+        selectedAuditorIds.forEach(audId => {
+            const auditor = window.state.auditors.find(a => a.id === audId);
+            if (auditor) {
+                if (!auditor.evaluations) auditor.evaluations = {};
+                if (!auditor.evaluations.linkedComplaints) auditor.evaluations.linkedComplaints = [];
+                auditor.evaluations.linkedComplaints.push({
+                    complaintId: newComplaint.id,
+                    date: newComplaint.dateReceived,
+                    type: newComplaint.type,
+                    severity: newComplaint.severity,
+                    subject: newComplaint.subject,
+                    status: newComplaint.status
+                });
+            }
+        });
 
         window.state.complaints.push(newComplaint);
         window.saveData();
