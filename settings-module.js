@@ -443,8 +443,21 @@ function getPermissionsHTML() {
                                 <td><strong>${role}</strong></td>
                                 ${modules.map(module => {
         const perm = permissions[role][module];
-        const color = perm === 'full' ? 'green' : perm === 'view' || perm === 'assigned' || perm === 'own' ? 'orange' : 'gray';
-        return `<td><span class="badge" style="background: ${color}; color: white;">${perm}</span></td>`;
+        const colors = {
+            'full': '#059669',
+            'view': '#f59e0b',
+            'assigned': '#0284c7',
+            'own': '#8b5cf6',
+            'none': '#6b7280'
+        };
+        return `<td>
+                                        <span class="badge" 
+                                            onclick="cyclePermission('${role}', '${module}')" 
+                                            style="background: ${colors[perm] || '#6b7280'}; color: white; cursor: pointer; user-select: none;"
+                                            title="Click to change">
+                                            ${perm}
+                                        </span>
+                                    </td>`;
     }).join('')}
                             </tr>
                         `).join('')}
@@ -456,6 +469,7 @@ function getPermissionsHTML() {
                 <small style="color: #065f46;">
                     <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
                     <strong>Permission Levels:</strong> full = all actions, view = read-only, assigned = own assigned items, own = own data only, none = no access
+                    <br><strong>Click badges to change permissions</strong>
                 </small>
             </div>
         </div>
@@ -468,20 +482,32 @@ function getPermissionsHTML() {
 
 function getRetentionHTML() {
     const retentionPolicies = window.state.retentionPolicies || [
-        { type: 'Audit Reports', period: '6 years', basis: 'ISO 17021-1' },
-        { type: 'Certificates', period: '10 years', basis: 'Accreditation Requirements' },
-        { type: 'NCR Evidence', period: '6 years', basis: 'ISO 17021-1' },
-        { type: 'Training Records', period: '10 years', basis: 'HR Policy' },
-        { type: 'Impartiality Records', period: '5 years', basis: 'ISO 17021-1' },
-        { type: 'Management Review Minutes', period: '5 years', basis: 'ISO 17021-1' }
+        { id: 1, type: 'Audit Reports', period: '6 years', basis: 'ISO 17021-1' },
+        { id: 2, type: 'Certificates', period: '10 years', basis: 'Accreditation Requirements' },
+        { id: 3, type: 'NCR Evidence', period: '6 years', basis: 'ISO 17021-1' },
+        { id: 4, type: 'Training Records', period: '10 years', basis: 'HR Policy' },
+        { id: 5, type: 'Impartiality Records', period: '5 years', basis: 'ISO 17021-1' },
+        { id: 6, type: 'Management Review Minutes', period: '5 years', basis: 'ISO 17021-1' }
     ];
+
+    // Ensure policies are saved to state
+    if (!window.state.retentionPolicies) {
+        window.state.retentionPolicies = retentionPolicies;
+        window.saveData();
+    }
 
     return `
         <div class="fade-in">
-            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-                <i class="fa-solid fa-archive" style="margin-right: 0.5rem;"></i>
-                Record Retention Policy
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
+                    <i class="fa-solid fa-archive" style="margin-right: 0.5rem;"></i>
+                    Record Retention Policy
+                </h3>
+                <button class="btn btn-primary" onclick="addRetentionPolicy()">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
+                    Add Policy
+                </button>
+            </div>
             
             <div class="table-container">
                 <table>
@@ -490,6 +516,7 @@ function getRetentionHTML() {
                             <th>Record Type</th>
                             <th>Retention Period</th>
                             <th>Legal Basis</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -498,6 +525,14 @@ function getRetentionHTML() {
                                 <td><strong>${window.UTILS.escapeHtml(policy.type)}</strong></td>
                                 <td><span class="badge bg-blue">${window.UTILS.escapeHtml(policy.period)}</span></td>
                                 <td>${window.UTILS.escapeHtml(policy.basis)}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-icon" onclick="editRetentionPolicy(${policy.id})" title="Edit">
+                                        <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="deleteRetentionPolicy(${policy.id})" title="Delete">
+                                        <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                    </button>
+                                </td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -972,6 +1007,124 @@ window.saveDefaults = function () {
 
     window.saveData();
     window.showNotification('System defaults saved', 'success');
+};
+
+// ============================================
+// PERMISSIONS HELPER FUNCTIONS
+// ============================================
+
+window.cyclePermission = function (role, module) {
+    const permissionLevels = ['none', 'view', 'assigned', 'own', 'full'];
+    const currentPerm = window.state.rolePermissions[role][module];
+    const currentIndex = permissionLevels.indexOf(currentPerm);
+    const nextIndex = (currentIndex + 1) % permissionLevels.length;
+
+    window.state.rolePermissions[role][module] = permissionLevels[nextIndex];
+    window.saveData();
+    switchSettingsTab('permissions', document.querySelectorAll('.tab-btn')[3]);
+    window.showNotification(`${role} ${module} permission changed to ${permissionLevels[nextIndex]}`, 'success');
+};
+
+// ============================================
+// RETENTION POLICY HELPER FUNCTIONS
+// ============================================
+
+window.addRetentionPolicy = function () {
+    document.getElementById('modal-title').textContent = 'Add Retention Policy';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="retention-form">
+            <div class="form-group">
+                <label>Record Type <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="retention-type" placeholder="e.g., Contract Documents" required>
+            </div>
+            <div class="form-group">
+                <label>Retention Period <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="retention-period" placeholder="e.g., 7 years" required>
+            </div>
+            <div class="form-group">
+                <label>Legal Basis <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="retention-basis" placeholder="e.g., Commercial Law" required>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const type = document.getElementById('retention-type').value.trim();
+        const period = document.getElementById('retention-period').value.trim();
+        const basis = document.getElementById('retention-basis').value.trim();
+
+        if (!type || !period || !basis) {
+            window.showNotification('Please fill all required fields', 'error');
+            return;
+        }
+
+        if (!window.state.retentionPolicies) {
+            window.state.retentionPolicies = [];
+        }
+
+        const newId = Math.max(...window.state.retentionPolicies.map(p => p.id || 0), 0) + 1;
+
+        window.state.retentionPolicies.push({
+            id: newId,
+            type: window.Sanitizer.sanitizeText(type),
+            period: window.Sanitizer.sanitizeText(period),
+            basis: window.Sanitizer.sanitizeText(basis)
+        });
+
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('retention', document.querySelectorAll('.tab-btn')[4]);
+        window.showNotification('Retention policy added', 'success');
+    };
+
+    window.openModal();
+};
+
+window.editRetentionPolicy = function (policyId) {
+    const policy = window.state.retentionPolicies.find(p => p.id === policyId);
+    if (!policy) return;
+
+    document.getElementById('modal-title').textContent = 'Edit Retention Policy';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="retention-form">
+            <div class="form-group">
+                <label>Record Type <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="retention-type" value="${window.UTILS.escapeHtml(policy.type)}" required>
+            </div>
+            <div class="form-group">
+                <label>Retention Period <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="retention-period" value="${window.UTILS.escapeHtml(policy.period)}" required>
+            </div>
+            <div class="form-group">
+                <label>Legal Basis <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="retention-basis" value="${window.UTILS.escapeHtml(policy.basis)}" required>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        policy.type = window.Sanitizer.sanitizeText(document.getElementById('retention-type').value.trim());
+        policy.period = window.Sanitizer.sanitizeText(document.getElementById('retention-period').value.trim());
+        policy.basis = window.Sanitizer.sanitizeText(document.getElementById('retention-basis').value.trim());
+
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('retention', document.querySelectorAll('.tab-btn')[4]);
+        window.showNotification('Retention policy updated', 'success');
+    };
+
+    window.openModal();
+};
+
+window.deleteRetentionPolicy = function (policyId) {
+    if (confirm('Delete this retention policy?')) {
+        window.state.retentionPolicies = window.state.retentionPolicies.filter(p => p.id !== policyId);
+        window.saveData();
+        switchSettingsTab('retention', document.querySelectorAll('.tab-btn')[4]);
+        window.showNotification('Retention policy deleted', 'success');
+    }
 };
 
 // Export functions
