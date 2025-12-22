@@ -1428,3 +1428,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Default to dashboard or restore state if implemented
     renderModule('dashboard');
 });
+
+// Client Sidebar Toggle
+const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+const clientSidebar = document.getElementById('client-sidebar');
+
+if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener('click', () => {
+        clientSidebar.classList.toggle('collapsed');
+        const isCollapsed = clientSidebar.classList.contains('collapsed');
+        sidebarToggleBtn.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    });
+}
