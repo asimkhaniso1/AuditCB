@@ -1159,6 +1159,7 @@ async function renderModule(moduleName) {
         'certification': 'Certification Decisions',
         'documents': 'Document Management',
         'impartiality': 'Impartiality Committee',
+        'management-review': 'Management Review',
         'settings': 'Settings'
     };
     pageTitle.textContent = titleMap[moduleName] || 'Dashboard';
@@ -1237,6 +1238,13 @@ async function renderModule(moduleName) {
             case 'impartiality':
                 if (typeof renderImpartialityModule === 'function') {
                     renderImpartialityModule();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
+            case 'management-review':
+                if (typeof renderManagementReviewModule === 'function') {
+                    renderManagementReviewModule();
                 } else {
                     renderPlaceholder(moduleName);
                 }
