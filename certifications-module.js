@@ -501,25 +501,94 @@ window.openCertActionModal = function (certId) {
     const cert = state.certifications.find(c => c.id === certId);
     if (!cert) return;
 
-    // Simple prompt for now
-    const action = prompt("Enter action (suspend/withdraw):", "suspend");
-    if (!action) return;
+    document.getElementById('modal-title').textContent = 'Suspend/Withdraw Certificate';
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border-radius: 8px;">
+            <strong>Certificate:</strong> ${window.UTILS.escapeHtml(cert.id)}<br>
+            <strong>Client:</strong> ${window.UTILS.escapeHtml(cert.client)}
+        </div>
+        <form id="cert-action-form">
+            <div class="form-group">
+                <label>Action <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="cert-action-type" required>
+                    <option value="suspend">Suspend Certificate</option>
+                    <option value="withdraw">Withdraw Certificate</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Reason <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="cert-action-reason" rows="3" required placeholder="Enter reason for this action..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Effective Date</label>
+                <input type="date" class="form-control" id="cert-action-date" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            
+            <hr style="margin: 1.5rem 0;">
+            
+            <h4 style="margin-bottom: 1rem; color: #0369a1;">
+                <i class="fa-solid fa-building-columns" style="margin-right: 0.5rem;"></i>
+                Accreditation Body Notification (ISO 17021 Clause 9.6)
+            </h4>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" id="ab-notified" style="width: 18px; height: 18px;">
+                    <span>AB has been notified of this action</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label>AB Notification Date</label>
+                <input type="date" class="form-control" id="ab-notification-date">
+            </div>
+            <div class="form-group">
+                <label>AB Reference/Notes</label>
+                <input type="text" class="form-control" id="ab-reference" placeholder="e.g., Email ref, letter number...">
+            </div>
+        </form>
+    `;
 
-    const reason = prompt("Enter reason for " + action + ":");
-    if (!reason) return;
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const action = document.getElementById('cert-action-type').value;
+        const reason = document.getElementById('cert-action-reason').value.trim();
+        const effectiveDate = document.getElementById('cert-action-date').value;
+        const abNotified = document.getElementById('ab-notified').checked;
+        const abNotificationDate = document.getElementById('ab-notification-date').value;
+        const abReference = document.getElementById('ab-reference').value.trim();
 
-    if (action.toLowerCase() === 'suspend') {
-        cert.status = window.CONSTANTS.CERT_STATUS.SUSPENDED;
-    } else if (action.toLowerCase() === 'withdraw') {
-        cert.status = window.CONSTANTS.CERT_STATUS.WITHDRAWN;
-    } else {
-        return; // invalid
-    }
-    cert.statusReason = reason;
-    cert.history.push({ date: new Date().toISOString().split('T')[0], action: action, user: 'Admin', reason: reason });
+        if (!reason) {
+            window.showNotification('Please enter a reason', 'error');
+            return;
+        }
 
-    window.saveData();
-    renderCertificationModule();
+        if (action === 'suspend') {
+            cert.status = window.CONSTANTS.CERT_STATUS.SUSPENDED;
+        } else if (action === 'withdraw') {
+            cert.status = window.CONSTANTS.CERT_STATUS.WITHDRAWN;
+        }
+
+        cert.statusReason = reason;
+        cert.statusEffectiveDate = effectiveDate;
+        cert.abNotified = abNotified;
+        cert.abNotificationDate = abNotificationDate || null;
+        cert.abReference = abReference || null;
+
+        cert.history.push({
+            date: new Date().toISOString().split('T')[0],
+            action: action,
+            user: 'Admin',
+            reason: reason,
+            abNotified: abNotified,
+            abNotificationDate: abNotificationDate
+        });
+
+        window.saveData();
+        window.closeModal();
+        renderCertificationModule();
+        window.showNotification(`Certificate ${action}ed successfully`, 'success');
+    };
+
+    window.openModal();
 };
 
 window.restoreCertificate = function (certId) {
