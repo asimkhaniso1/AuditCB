@@ -303,6 +303,11 @@ function renderClientDetail(clientId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Summary</button>
+                ${window.state.activeClientId ? `
+                <button class="tab-btn" data-tab="client_org" style="background: #fdf4ff; color: #a21caf;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Account Setup
+                </button>
+                ` : ''}
                 <button class="tab-btn" data-tab="scopes">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>Scopes & Certs
                 </button>
@@ -1455,8 +1460,12 @@ function openAddClientModal() {
         window.state.clients.push(newClient);
         window.saveData();
         window.closeModal();
-        renderClientsEnhanced();
-        window.showNotification('Client added successfully', 'success');
+        window.showNotification('Client created! Complete the Account Setup wizard.', 'success');
+
+        // Redirect to Client Workspace Settings to complete the 7-step wizard
+        setTimeout(() => {
+            window.location.hash = `client/${newClient.id}/settings`;
+        }, 300);
     };
 }
 
