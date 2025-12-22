@@ -243,16 +243,16 @@ function submitForReview(reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
-    report.conclusion = document.getElementById('conclusion')?.value || '';
-    report.recommendation = document.getElementById('recommendation')?.value || '';
-    if (document.getElementById('exec-summary')) report.execSummary = document.getElementById('exec-summary').value;
-    if (document.getElementById('strengths')) report.strengths = document.getElementById('strengths').value;
-    if (document.getElementById('improvements')) report.improvements = document.getElementById('improvements').value;
+    report.conclusion = Sanitizer.sanitizeText(document.getElementById('conclusion')?.value || '');
+    report.recommendation = document.getElementById('recommendation')?.value || ''; // Select box, safe
+    if (document.getElementById('exec-summary')) report.execSummary = Sanitizer.sanitizeText(document.getElementById('exec-summary').value);
+    if (document.getElementById('strengths')) report.strengths = Sanitizer.sanitizeText(document.getElementById('strengths').value);
+    if (document.getElementById('improvements')) report.improvements = Sanitizer.sanitizeText(document.getElementById('improvements').value);
 
     report.status = window.CONSTANTS.STATUS.IN_REVIEW;
     window.saveData();
     window.renderExecutionDetail(reportId);
-    window.showNotification('Report submitted for QA review');
+    window.showNotification('Report submitted for QA review', 'success');
 }
 
 // Approve Report (Certification Manager Step)
@@ -332,10 +332,10 @@ window.saveReportDraft = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
-    report.execSummary = document.getElementById('exec-summary')?.value || '';
-    report.conclusion = document.getElementById('conclusion')?.value || '';
-    report.strengths = document.getElementById('strengths')?.value || '';
-    report.improvements = document.getElementById('improvements')?.value || '';
+    report.execSummary = Sanitizer.sanitizeText(document.getElementById('exec-summary')?.value || '');
+    report.conclusion = Sanitizer.sanitizeText(document.getElementById('conclusion')?.value || '');
+    report.strengths = Sanitizer.sanitizeText(document.getElementById('strengths')?.value || '');
+    report.improvements = Sanitizer.sanitizeText(document.getElementById('improvements')?.value || '');
     report.recommendation = document.getElementById('recommendation')?.value || '';
 
     window.saveData();

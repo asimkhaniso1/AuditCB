@@ -24,6 +24,10 @@ The following functions have been refactored to include input validation (via `V
 - [x] `saveChecklist` - Sanitized comments, ncr descriptions, transcripts, and evidence notes.
 - [x] `createNCR` - Validated Type/Description. Sanitized all text inputs and evidence fields.
 
+### 6. Reporting Module (`reporting-module.js`)
+- [x] `submitForReview` - Sanitized executive summary, conclusions, strengths, improvements.
+- [x] `saveReportDraft` - Sanitized all free-text draft fields.
+
 ## Utilities Created
 - `validation.js`: Core validation engine.
 - `sanitization.js`: DOMPurify wrapper.
