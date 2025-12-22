@@ -164,6 +164,11 @@ function renderClientSidebarMenu(clientId) {
         <li onclick="window.renderClientModule(${clientId}, 'docs', this)">
             <i class="fa-solid fa-folder-open"></i> Documents
         </li>
+        
+        <!-- Settings -->
+        <li style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;" onclick="window.renderClientModule(${clientId}, 'settings', this)">
+            <i class="fa-solid fa-cog"></i> Settings
+        </li>
     `;
 }
 
@@ -281,6 +286,24 @@ window.renderClientModule = function (clientId, moduleName, clickedElement) {
                 renderClientTab(client, 'documents');
             } else {
                 contentArea.innerHTML = 'Module not loaded';
+            }
+            break;
+        case 'settings':
+            if (typeof renderClientDetail === 'function') {
+                renderClientDetail(client.id);
+                // Try to switch to 'client_org' tab if it exists (for managers), otherwise stay on defaults
+                setTimeout(() => {
+                    const orgTab = document.querySelector('.tab-btn[data-tab="client_org"]');
+                    if (orgTab) {
+                        orgTab.click();
+                    } else {
+                        // If no org tab (e.g. auditor), maybe just show info
+                        const infoTab = document.querySelector('.tab-btn[data-tab="info"]');
+                        if (infoTab) infoTab.click();
+                    }
+                }, 100);
+            } else {
+                contentArea.innerHTML = 'Settings not available';
             }
             break;
     }
