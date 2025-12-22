@@ -1160,6 +1160,7 @@ async function renderModule(moduleName) {
         'documents': 'Document Management',
         'impartiality': 'Impartiality Committee',
         'management-review': 'Management Review',
+        'internal-audit': 'Internal Audit',
         'settings': 'Settings'
     };
     pageTitle.textContent = titleMap[moduleName] || 'Dashboard';
@@ -1245,6 +1246,13 @@ async function renderModule(moduleName) {
             case 'management-review':
                 if (typeof renderManagementReviewModule === 'function') {
                     renderManagementReviewModule();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
+            case 'internal-audit':
+                if (typeof renderInternalAuditModule === 'function') {
+                    renderInternalAuditModule();
                 } else {
                     renderPlaceholder(moduleName);
                 }
