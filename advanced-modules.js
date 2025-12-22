@@ -438,10 +438,10 @@ function renderAuditorTab(auditor, tabName) {
             }));
 
             // Calculate status for each qualification
-            const today = new Date();
+            const todayDate = new Date();
             const getQualStatus = (expiryDate) => {
                 const expiry = new Date(expiryDate);
-                const daysUntil = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+                const daysUntil = Math.ceil((expiry - todayDate) / (1000 * 60 * 60 * 24));
                 if (daysUntil < 0) return { status: 'Expired', color: '#dc2626', bg: '#fef2f2' };
                 if (daysUntil <= 30) return { status: 'Expiring Soon', color: '#d97706', bg: '#fffbeb' };
                 if (daysUntil <= 90) return { status: 'Renew Soon', color: '#2563eb', bg: '#eff6ff' };
