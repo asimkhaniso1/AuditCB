@@ -14,6 +14,11 @@ function renderAuditPlanningEnhanced() {
         return plan.client.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
+
+    // Permission Check
+    const userRole = window.state.currentUser.role;
+    const isManager = userRole === 'Certification Manager' || userRole === 'Admin';
+
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
@@ -33,9 +38,9 @@ function renderAuditPlanningEnhanced() {
             </td>
             <td><span class="status-badge status-${(plan.status || 'draft').toLowerCase()}">${window.UTILS.escapeHtml(plan.status)}</span></td>
             <td>
-                <button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
+                ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
                     <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
-                </button>
+                </button>` : ''}
                 <button class="btn btn-sm" onclick="window.viewAuditPlan(${plan.id})" title="View Details">
                     <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                 </button>
@@ -51,9 +56,9 @@ function renderAuditPlanningEnhanced() {
                     <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanningAnalytics()" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showPlanningAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showPlanningAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
-                    <button id="btn-create-plan" class="btn btn-primary">
+                    ${isManager ? `<button id="btn-create-plan" class="btn btn-primary">
                         <i class="fa-solid fa-plus"></i> Create Audit Plan
-                    </button>
+                    </button>` : ''}
                 </div>
             </div>
 

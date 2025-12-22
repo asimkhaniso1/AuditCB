@@ -1,248 +1,46 @@
-# ISO 17021 Implementation - Session Summary
 
-**Date:** 2025-12-22  
-**Commits:** `0c63862`, `c10f7bb`
-
----
-
-## ✅ Features Implemented
-
-### 1. Public Directory (ISO 17021 Clause 9.3) - 95% Complete
-
-**Purpose:** Publicly accessible directory of certified clients
-
-**Features:**
-- Privacy controls (show/hide columns)
-- CSV export functionality  
-- HTML embed code generator
-- Active/All certificates filter
-- Full XSS sanitization
-
-**Status:** Functions complete, HTML tab requires manual insertion (see `.agent/public-directory-tab.html`)
-
----
-
-### 2. Multi-Site Sampling Calculator (ISO 17021 Clause 7.2.4) - 100% Complete
-
-**Purpose:** IAF MD 1 compliant site sampling for multi-site audits
-
-**Formula:**
-```
-Base Sample = √n
-Adjusted = Base × Risk Factor × Maturity Factor
-Final = max(Adjusted, 25% of total sites)
-```
-
-**Features:**
-- Risk adjustments (Low: 0.8×, Medium: 1.0×, High: 1.2×)
-- Maturity adjustments (Low: 1.2×, Normal: 1.0×, High: 0.8×)
-- Mandatory sites tracking
-- Detailed calculation breakdown
-
-**Location:** `advanced-modules.js`
-
----
-
-### 3. Impartiality Committee Module (ISO 17021 Clause 5.2) - 100% Complete
-
-**Purpose:** Committee for safeguarding impartiality
-
-**Features:**
-- **Committee Members Management:**
-  - Name, organization, role, expertise
-  - Term tracking (appointed date, term end)
-  - Status (Active/Inactive)
-  
-- **Meeting Records:**
-  - Date, attendees
-  - Threats reviewed
-  - Decisions made
-  - Next meeting date
-
-- **Threat Register:**
-  - Threat types (Self-Interest, Self-Review, Familiarity, Intimidation, Advocacy)
-  - Description, related client
-  - Safeguards implemented
-  - Committee review status
-  - Resolution tracking
-
-**Navigation:** Sidebar → Impartiality (shield icon)
-
----
-
-## 📊 Updated Gap Analysis
-
-| Requirement | Before | After | Status |
-|-------------|--------|-------|--------|
-| **Clause 5.2** - Impartiality Committee | ❌ Missing | ✅ Implemented | Complete |
-| **Clause 7.2.4** - Multi-Site Sampling | ❌ Missing | ✅ Implemented | Complete |
-| **Clause 9.3** - Public Directory | ❌ Missing | ⚠️ Partial | 95% Complete |
-
-**Updated Compliance Score:**
-- ✅ Implemented: 21 (+3)
-- ⚠️ Partial: 18 (-1)
-- ❌ Missing: 12 (-2)
-
----
-
-## 🎯 Next Priority Items (High)
-
-1. **Management Review Module** (Clause 8.5)
-   - Input/output structure
-   - Action items tracking
-   - Meeting minutes
-
-2. **Internal Audit of CB** (Clause 8.6)
-   - Self-audit scheduling
-   - Findings management
-   - Corrective actions
-
-3. **Impartiality Threat Register Enhancement**
-   - Link threats to specific auditors
-   - Auto-notify committee of new threats
-   - Trend analysis
-
----
-
-## 📁 Files Modified
-
-| File | Changes | Purpose |
-|------|---------|---------|
-| `impartiality-module.js` | +586 lines | New module for Clause 5.2 |
-| `index.html` | +3 lines | Navigation + script tag |
-| `script.js` | +8 lines | Module routing |
-| `certifications-module.js` | +148 lines | Public Directory functions |
-| `advanced-modules.js` | +234 lines | Multi-Site Sampling Calculator |
-
-**Total:** 5 files, ~979 lines added
-
----
-
-## 🧪 Testing Checklist
-
-### Impartiality Committee
-
-- [ ] Navigate to Impartiality module
-- [ ] Add new committee member
-- [ ] Log a new threat (e.g., Self-Interest)
-- [ ] Record a committee meeting
-- [ ] Verify threat appears in register
-- [ ] Check summary cards update correctly
-
-### Multi-Site Sampling Calculator
-
-- [ ] Call `window.renderMultiSiteSamplingCalculator()`
-- [ ] Test with 25 sites, Medium risk → expect 7 sites
-- [ ] Test with 100 sites, Low risk, High maturity → expect 25 sites (minimum)
-- [ ] Verify calculation breakdown is accurate
-
-### Public Directory
-
-- [ ] Navigate to Certifications → Public Directory tab
-- [ ] Toggle privacy checkboxes
-- [ ] Export CSV and verify data
-- [ ] Generate embed code and test in HTML file
-
----
-
-## 🔗 Integration Notes
-
-### Impartiality Module
-- **Dependencies:** `window.UTILS.escapeHtml()`, `window.state.clients`
-- **State:** `window.state.impartialityCommittee` (auto-initialized)
-- **Navigation:** Fully integrated in sidebar
-
-### Multi-Site Sampling
-- **Standalone:** Currently accessible via `window.renderMultiSiteSamplingCalculator()`
-- **Suggested:** Add button in Planning module or sidebar
-
-### Public Directory
-- **Partial Integration:** Tab button and functions complete
-- **Manual Step:** Insert HTML from `.agent/public-directory-tab.html` at line 210 of `certifications-module.js`
-
----
-
-## 📝 Compliance Summary
-
-**ISO 17021-1 Clause Coverage:**
-
-- ✅ **Clause 5.2** - Impartiality Committee fully implemented with:
-  - Member management
-  - Meeting records
-  - Threat register with safeguards
-  
-- ✅ **Clause 7.2.4** - Multi-Site Sampling per IAF MD 1:
-  - Square root formula
-  - Risk/maturity adjustments
-  - 25% minimum enforcement
-  
-- ⚠️ **Clause 9.3** - Public Directory (95% complete):
-  - CSV export ✅
-  - HTML embed ✅
-  - Privacy controls ✅
-  - Manual HTML insertion pending
-
----
-
-## 🚀 Deployment Status
-
-**Git Status:** All changes committed and pushed
-- Commit 1: `0c63862` - Public Directory + Multi-Site Sampling
-- Commit 2: `c10f7bb` - Impartiality Committee
-
-**Ready for Testing:** Yes (except Public Directory HTML insertion)
-
-**Production Ready:** After manual HTML insertion and testing
-
----
-
-**Session Complete!** 🎉
-
-Three major ISO 17021-1 compliance features implemented in one session.
-
-### 4. NCR & CAPA Module (Clause 9.9 & 9.5) - 100% Complete
-
-**Purpose:** Comprehensive management of Non-Conformities and Corrective Actions for both Clients and Internal CB Operations.
-
-**Features:**
-- **Dual-Level Support:** Client-level NCRs and Internal CB NCRs (accessible via Client Workspace).
-- **Register:** Filterable list of all NCRs.
-- **CAPA Tracker:** dedicated view for tracking open corrective actions.
-- **Verification:** Workflow for verifying effectiveness of implemented CAPAs.
-- **Analytics:** Dashboard showing effectiveness rates, open vs closed, and severity distribution.
-- **Context-Aware:** Automatically scopes data to the active client workspace.
-
-**Status:** Fully Implemented and Integrated into Client Workspace sidebar.
-
-### 5. CB Policies & Criteria (Clause 8.6 & 9.6) - 100% Complete
-
-**Purpose:** Configuration of critical CB policies.
-
-**Features:**
-- NCR Classification Criteria (Major/Minor/Observation)
-- Certification Decision Rules
-- CAPA Timeline configurations
-- Audit Frequency rules
-
-**Location:** Settings Module -> CB Policies tab.
-
----
-
-## 📁 Files Modified (Update)
-
-| File | Changes | Purpose |
-|------|---------|---------|
-| `ncr-capa-module.js` | New File | Full NCR-CAPA implementation |
-| `settings-module.js` | +250 lines | Added CB Policies tab & Fixed Permissions Logic |
-| `client-workspace.js` | +20 lines | Added NCR sidebar link and routing |
-| `index.html` | +2 lines | Added script tag & Restored Clients link |
-| `script.js` | +5 lines | Added global routing case |
-
----
-
-## 🎯 Revised Next Priority Items
-
-1. **Management Review Module** (Clause 8.5)
-2. **Certification Module Enhancements** (Link Blocking logic to NCRs)
-3. **Internal Audit Scheduling** (Complementing the NCR module)
-
+# Session Summary: Permission Controls & Feature Hardening
+
+## Overview
+Implemented comprehensive role-based access control (RBAC) for the Client Management module. features are now restricted to "Certification Manager" and "Admin" roles, satisfying the requirement to secure client organization data.
+
+## Key Changes
+1.  **Permission Implementation**:
+    *   Used `window.state.currentUser.role` to conditionally render UI elements.
+    *   Allowed Roles: `Certification Manager`, `Admin`.
+
+2.  **Restricted Features (`clients-module.js`)**:
+    *   **Client Org Setup Tab**: Hidden for unauthorized users.
+    *   **Client Management**:
+        *   "New Client" button.
+        *   "Edit Client" buttons (List & Detail views).
+        *   "Import" and "Template" buttons (Bulk Upload).
+    *   **Organization Structure**:
+        *   Site Management: Add, Edit, Delete buttons.
+        *   Department Management: Add, Edit, Delete, Bulk Upload.
+        *   Contact Management: Add, Edit, Delete.
+    *   **Compliance & Profile**:
+        *   Application Status updates.
+        *   Contract & NDA Details editing.
+        *   Client Change Logging.
+        *   Company Profile: AI Generation and Manual Edit.
+    *   **Documents**:
+        *   Upload Document.
+        *   Delete Document.
+
+## Files Modified
+*   `clients-module.js`: Applied RBAC logic to `renderClientsEnhanced`, `renderClientDetail`, `getClientOrgSetupHTML` (access), `getClientDepartmentsHTML`, `getClientContactsHTML`, `getClientComplianceHTML`, `getClientProfileHTML`, and `getClientDocumentsHTML`.
+
+### Expanded Security Controls (Auditor & Planning Modules)
+*   **Auditor Management (`advanced-modules.js`)**:
+    *   **Add Auditor**: Restricted to 'Certification Manager' and 'Admin'.
+    *   **Edit Auditor**: Restricted to 'Certification Manager' and 'Admin'.
+*   **Audit Planning (`planning-module.js`)**:
+    *   **Create Audit Plan**: Restricted to 'Certification Manager' and 'Admin'.
+    *   **Edit Plan**: Restricted to 'Certification Manager' and 'Admin'.
+
+## Next Steps
+*   **Public Directory**: Task 3 remains 'Testing' status.
+*   **Reporting**: Check permissions for final audit report approval.
+*   **Backend Validation**: Future backend integration required.
+*   **Testing**: Verify roles across all secured modules.

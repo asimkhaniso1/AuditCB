@@ -11,6 +11,11 @@ function renderAuditorsEnhanced() {
     const filterRole = state.auditorFilterRole || 'All';
 
 
+
+    // Permission Check
+    const userRole = window.state.currentUser.role;
+    const isAuthorized = userRole === 'Certification Manager' || userRole === 'Admin';
+
     // Pagination State
     if (!state.auditorPagination) {
         state.auditorPagination = { currentPage: 1, itemsPerPage: 10 };
@@ -40,7 +45,7 @@ function renderAuditorsEnhanced() {
             <td><span style="background: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(auditor.role)}</span></td>
             <td>${(auditor.standards || []).map(s => window.UTILS.escapeHtml(s)).join(', ')}</td>
             <td>
-                <button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button>
+                ${isAuthorized ? `<button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button>` : ''}
                 <button class="btn btn-sm view-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
             </td>
         </tr>
@@ -54,7 +59,7 @@ function renderAuditorsEnhanced() {
                      <button class="btn btn-sm btn-outline-secondary" onclick="toggleAuditorAnalytics()" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showAuditorAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showAuditorAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
-                    <button id="btn-add-auditor" class="btn btn-primary" style="white-space: nowrap;"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>
+                    ${isAuthorized ? `<button id="btn-add-auditor" class="btn btn-primary" style="white-space: nowrap;"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>` : ''}
                 </div>
             </div>
 

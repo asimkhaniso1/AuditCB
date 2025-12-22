@@ -42,7 +42,9 @@ function renderClientsEnhanced() {
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
             <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
             <td>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
+                ` : ''}
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
             </td>
         </tr>
@@ -52,13 +54,24 @@ function renderClientsEnhanced() {
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Client Management</h2>
-                 <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="downloadImportTemplate()" style="white-space: nowrap;" title="Restricted to Cert Managers">
+                            <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
+                        </button>
+                         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('client-import-file').click()" style="white-space: nowrap;" title="Restricted to Cert Managers">
+                            <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
+                        </button>
+                    ` : ''}
                     <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
-                        <i class="fa-solid ${state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showClientAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
+                        <i class="fa-solid ${state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                     </button>
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                     <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
+                    ` : ''}
                 </div>
             </div>
 
@@ -166,7 +179,14 @@ function renderClientsEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Event listeners
-    document.getElementById('btn-new-client')?.addEventListener('click', openAddClientModal);
+    document.getElementById('btn-new-client')?.addEventListener('click', openNewClientModal);
+
+    document.getElementById('client-import-file')?.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            importClientsFromExcel(e.target.files[0]);
+            e.target.value = ''; // Reset
+        }
+    });
 
     document.getElementById('client-search')?.addEventListener('input', (e) => {
         state.clientSearchTerm = e.target.value;
@@ -247,9 +267,11 @@ function renderClientDetail(clientId) {
                     <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient(${client.id})">
                         <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
                     </button>
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
+                    ` : ''}
                     <button class="btn btn-secondary" onclick="window.renderClientsEnhanced()">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </button>
@@ -285,6 +307,11 @@ function renderClientDetail(clientId) {
                 <button class="tab-btn" data-tab="departments">Departments</button>
                 <button class="tab-btn" data-tab="audits">Audits</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="tab-btn" data-tab="client_org" style="background: #fdf4ff; color: #a21caf;">
+                    <i class="fa-solid fa-sitemap" style="margin-right: 0.25rem;"></i>Client Org Setup
+                </button>
+                ` : ''}
                 <button class="tab-btn" data-tab="compliance" style="background: #eff6ff; color: #1d4ed8;">
                     <i class="fa-solid fa-shield-halved" style="margin-right: 0.25rem;"></i>Compliance
                 </button>
@@ -298,666 +325,720 @@ function renderClientDetail(clientId) {
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tab-btn');
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            renderClientTab(client, e.target.getAttribute('data-tab'));
+            btn.classList.add('active');
+            renderClientTab(client, btn.getAttribute('data-tab'));
         });
     });
 
     renderClientTab(client, 'info');
 }
 
+// Helper functions for tab content
+function getClientInfoHTML(client) {
+    // Find auditors that match this client's industry
+    const matchingAuditors = state.auditors.filter(a =>
+        a.industries && a.industries.includes(client.industry)
+    );
+
+    // Calculate total employees: sum of site employees if they exist, otherwise use company level
+    let totalEmployees = client.employees || 0;
+    if (client.sites && client.sites.length > 0) {
+        const siteEmployeesSum = client.sites.reduce((sum, site) => sum + (site.employees || 0), 0);
+        // If sites have employee data, use that sum; otherwise use company level
+        if (siteEmployeesSum > 0) {
+            totalEmployees = siteEmployeesSum;
+        }
+    }
+
+    return `
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">Company Information</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                <!-- Basic Info -->
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Company Name</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(client.name)}</p>
+                </div>
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Website</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;">
+                        ${client.website ? `<a href="${window.UTILS.escapeHtml(client.website)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-globe" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(client.website)}</a>` : '-'}
+                    </p>
+                </div>
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Standard</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(client.standard)}</p>
+                </div>
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Industry</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;">
+                        <span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
+                            <i class="fa-solid fa-industry" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(client.industry || 'Not Specified')}
+                        </span>
+                    </p>
+                </div>
+
+                <!-- Operational Data -->
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Total Employees</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i> ${totalEmployees}</p>
+                </div>
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Sites</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-building" style="color: var(--text-secondary); margin-right: 5px;"></i> ${(client.sites && client.sites.length) || 1}</p>
+                </div>
+                <div>
+                     <label style="color: var(--text-secondary); font-size: 0.875rem;">Shift Work</label>
+                     <p style="font-weight: 500; margin-top: 0.25rem;">${client.shifts === 'Yes' ? 'Yes (Multiple Shifts)' : 'No (General Shift Only)'}</p>
+                </div>
+                <div>
+                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Next Audit Date</label>
+                    <p style="font-weight: 500; margin-top: 0.25rem;">${client.nextAudit}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sites / Locations -->
+        <div class="card" style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-secondary" onclick="addSite(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
+                </button>
+                ` : ''}
+            </div>
+            ${(client.sites && client.sites.length > 0) ? `
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Site Name</th>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>Employees</th>
+                                <th>Shift</th>
+                                <th>Geotag</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${client.sites.map((s, index) => `
+                                <tr>
+                                    <td style="font-weight: 500;">${window.UTILS.escapeHtml(s.name)}</td>
+                                    <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
+                                    <td>${window.UTILS.escapeHtml(s.city || '-')}, ${window.UTILS.escapeHtml(s.country || '')}</td>
+                                    <td>
+                                        ${s.employees ? `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-users" style="margin-right: 4px;"></i>${s.employees}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
+                                    </td>
+                                    <td>
+                                        ${s.shift ? `<span style="background: ${s.shift === 'Yes' ? '#fef3c7' : '#f1f5f9'}; color: ${s.shift === 'Yes' ? '#d97706' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${s.shift === 'Yes' ? 'Multi-Shift' : 'General'}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
+                                    </td>
+                                    <td>
+                                        ${s.geotag ? `<a href="https://maps.google.com/?q=${window.UTILS.escapeHtml(s.geotag)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(s.geotag)}</a>` : '-'}
+                                    </td>
+                                    <td>
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite(${client.id}, ${index})">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No sites added yet.</p>
+            `}
+        </div>
+
+        <!-- Matching Auditors -->
+        <div class="card" style="margin-top: 1.5rem;">
+            <h3 style="margin-bottom: 1rem;">
+                <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
+                Auditors with ${client.industry || 'Matching'} Industry Experience
+            </h3>
+            ${matchingAuditors.length > 0 ? `
+                <div style="display: grid; gap: 0.75rem;">
+                    ${matchingAuditors.map(a => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                                    ${a.name.split(' ').map(n => n[0]).join('')}
+                                </div>
+                                <div>
+                                    <p style="font-weight: 500; margin: 0;">${window.UTILS.escapeHtml(a.name)}</p>
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${window.UTILS.escapeHtml(a.role)} • ${a.experience || 0} years exp</p>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : `
+                <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    No auditors found with ${client.industry || 'this'} industry experience. 
+                    <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
+                </p>
+            `}
+        </div>
+    `;
+}
+
+function getClientProfileHTML(client) {
+    const profile = client.profile || '';
+    const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
+
+    return `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Profile</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">
+                        <i class="fa-solid fa-clock"></i> Last updated: ${lastUpdated}
+                    </p>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        ${client.website ? `
+                            <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
+                                <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate from Website
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">
+                            <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i> Edit Manually
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+            
+            ${profile ? `
+                <div style="background: #f8fafc; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); line-height: 1.8;">
+                    <div style="white-space: pre-wrap; color: var(--text-primary);">${window.UTILS.escapeHtml(profile)}</div>
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
+                    <i class="fa-solid fa-file-lines" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">No company profile generated yet.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        ${client.website ?
+            'Click "AI Generate from Website" to automatically create a company profile summary.' :
+            'Add a website URL in the client information to enable AI generation, or edit manually.'}
+                    </p>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                            ${client.website ? `
+                                <button class="btn btn-primary btn-sm" onclick="window.generateCompanyProfile(${client.id})">
+                                    <i class="fa-solid fa-sparkles"></i> AI Generate
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-outline-secondary btn-sm" onclick="window.editCompanyProfile(${client.id})">
+                                <i class="fa-solid fa-pen"></i> Write Manually
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `}
+            
+            <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid #bae6fd;">
+                <p style="font-size: 0.85rem; color: #0369a1; margin: 0;">
+                    <i class="fa-solid fa-info-circle"></i> <strong>Usage:</strong> This profile summary will be included in the "Organization Overview" section of audit reports.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+function getClientContactsHTML(client) {
+    return `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Contact
+                </button>
+                ` : ''}
+            </div>
+            ${(client.contacts && client.contacts.length > 0) ? `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Designation</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${client.contacts.map((c, index) => `
+                                <tr>
+                                    <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
+                                    <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.designation || '-')}</span></td>
+                                    <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${window.UTILS.escapeHtml(c.phone || '-')}</td>
+                                    <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
+                                    <td>
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact(${client.id}, ${index})">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No contact persons added yet.</p>
+            `}
+        </div>
+    `;
+}
+
+function getClientDepartmentsHTML(client) {
+    const departments = client.departments || [];
+    return `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.addDepartment(${client.id})">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Department
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+            ${departments.length > 0 ? `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Department Name</th>
+                                <th>Head of Department</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${departments.map((dept, index) => `
+                                <tr>
+                                    <td style="font-weight: 500;">${window.UTILS.escapeHtml(dept.name)}</td>
+                                    <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
+                                    <td>
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment(${client.id}, ${index})">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
+                    <i class="fa-solid fa-sitemap" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment(${client.id})">Add Manually</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function getClientAuditsHTML(client) {
+    // Get all audits for this client
+    const clientPlans = (state.auditPlans || []).filter(p => p.client === client.name);
+    const clientReports = (state.auditReports || []).filter(r => r.client === client.name);
+
+    // Calculate totals
+    let allNCRs = [];
+    clientReports.forEach(r => {
+        (r.ncrs || []).forEach(ncr => allNCRs.push({ ...ncr, auditDate: r.date, reportId: r.id }));
+        (r.checklistProgress || []).filter(p => p.status === 'nc').forEach(ncr =>
+            allNCRs.push({
+                type: ncr.ncrType || 'observation',
+                description: ncr.ncrDescription || ncr.comment,
+                status: ncr.status || 'Open',
+                designation: ncr.designation,
+                department: ncr.department,
+                evidenceImage: ncr.evidenceImage,
+                auditDate: r.date,
+                reportId: r.id
+            })
+        );
+    });
+
+    const openNCRs = allNCRs.filter(n => n.status === 'Open').length;
+    const closedNCRs = allNCRs.filter(n => n.status === 'Closed').length;
+    const majorNCRs = allNCRs.filter(n => n.type === 'major').length;
+    const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
+
+    return `
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-bar" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Summary</h3>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
+                <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${clientPlans.length}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Total Audits</div>
+                </div>
+                <div style="background: #fef3c7; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${allNCRs.length}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Total Findings</div>
+                </div>
+                <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #dc2626;">${majorNCRs}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Major NCs</div>
+                </div>
+                <div style="background: #fef9c3; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #ca8a04;">${minorNCRs}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Minor NCs</div>
+                </div>
+                <div style="background: ${openNCRs > 0 ? '#fee2e2' : '#dcfce7'}; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: ${openNCRs > 0 ? '#dc2626' : '#16a34a'};">${openNCRs}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Open NCRs</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Audit History Timeline -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Audit History</h3>
+            ${clientPlans.length > 0 ? `
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    ${clientPlans.map(plan => {
+        const report = clientReports.find(r => r.planId == plan.id || r.date === plan.date);
+        const ncrCount = report ? (report.ncrs || []).length : 0;
+        return `
+                            <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${plan.status === 'Completed' ? '#10b981' : '#3b82f6'};">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600;">${plan.type || 'Audit'} - ${plan.standard || client.standard}</div>
+                                    <div style="font-size: 0.85rem; color: #64748b;">
+                                        <i class="fa-solid fa-calendar"></i> ${plan.date} 
+                                        <span style="margin-left: 1rem;"><i class="fa-solid fa-user"></i> ${plan.team ? plan.team[0] : 'TBD'}</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    ${ncrCount > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${ncrCount} Findings</span>` : ''}
+                                    <span class="badge" style="background: ${plan.status === 'Completed' ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
+                                    ${report ? `<button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${report.id})"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
+                                </div>
+                            </div>
+                        `;
+    }).join('')}
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 2rem; color: #64748b;">
+                    <i class="fa-solid fa-calendar-xmark" style="font-size: 2rem; margin-bottom: 0.5rem; color: #cbd5e1;"></i>
+                    <p style="margin: 0;">No audits conducted yet for this client.</p>
+                </div>
+            `}
+        </div>
+        
+        <!-- Findings History -->
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color); margin-right: 0.5rem;"></i>Findings History (All NCRs)</h3>
+            ${allNCRs.length > 0 ? `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Dept/Person</th>
+                                <th>Evidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${allNCRs.map(ncr => `
+                                <tr>
+                                    <td style="white-space: nowrap;">${ncr.auditDate || '-'}</td>
+                                    <td>
+                                        <span class="badge" style="background: ${ncr.type === 'major' ? '#dc2626' : ncr.type === 'minor' ? '#d97706' : '#8b5cf6'}; font-size: 0.7rem;">
+                                            ${(ncr.type || 'OBS').toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td style="max-width: 300px;">${ncr.description || ncr.ncrDescription || '-'}</td>
+                                    <td style="font-size: 0.85rem;">
+                                        ${ncr.designation ? `<div>${ncr.designation}</div>` : ''}
+                                        ${ncr.department ? `<div style="color: #64748b;">${ncr.department}</div>` : ''}
+                                        ${!ncr.designation && !ncr.department ? '-' : ''}
+                                    </td>
+                                    <td>
+                                        ${ncr.evidenceImage ? `<a href="${ncr.evidenceImage}" target="_blank" style="color: var(--primary-color);"><i class="fa-solid fa-image"></i> View</a>` : '<span style="color: #cbd5e1;">None</span>'}
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background: ${ncr.status === 'Closed' ? '#10b981' : '#ef4444'};">${ncr.status || 'Open'}</span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 2rem; color: #64748b;">
+                    <i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #10b981;"></i>
+                    <p style="margin: 0;">No findings recorded for this client. Excellent compliance!</p>
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function getClientDocumentsHTML(client) {
+    const docs = client.documents || [];
+    return `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Documents</h3>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">
+                    <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
+                </button>
+                ` : ''}
+            </div>
+            
+            ${docs.length > 0 ? `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Document Name</th>
+                                <th>Type</th>
+                                <th>Date Uploaded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${docs.map(doc => `
+                                <tr>
+                                    <td>
+                                        <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
+                                        ${window.UTILS.escapeHtml(doc.name)}
+                                    </td>
+                                    <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.category || 'General')}</span></td>
+                                    <td>${window.UTILS.escapeHtml(doc.date)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
+                    <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
+                    ` : ''}
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function getClientComplianceHTML(client) {
+    // ISO 17021-1 Client Compliance Tab
+    const compliance = client.compliance || {};
+    const appStatus = compliance.applicationStatus || 'Active';
+    const contract = compliance.contract || {};
+    const nda = compliance.nda || {};
+    const changesLog = compliance.changesLog || [];
+
+    const statusColors = {
+        'Inquiry': '#3b82f6',
+        'Application Received': '#8b5cf6',
+        'Under Review': '#f59e0b',
+        'Contract Sent': '#06b6d4',
+        'Contract Signed': '#10b981',
+        'Active': '#16a34a'
+    };
+
+    return `
+        <div class="card" style="margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};">
+            <h3 style="margin: 0 0 1rem 0;">
+                <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                Application Status
+            </h3>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                ${['Inquiry', 'Application Received', 'Under Review', 'Contract Sent', 'Contract Signed', 'Active'].map(s => `
+                    <span style="padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; 
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
+                        background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
+                        color: ${appStatus === s ? 'white' : '#64748b'};"
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus(${client.id}, '${s}')"` : ''}>
+                        ${s}
+                    </span>
+                `).join('')}
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <!-- Contract Card -->
+            <div class="card" style="margin: 0; border-left: 4px solid ${contract.signed ? '#10b981' : '#f59e0b'};">
+                <h4 style="margin: 0 0 1rem 0;">
+                    <i class="fa-solid fa-file-contract" style="margin-right: 0.5rem; color: ${contract.signed ? '#10b981' : '#f59e0b'};"></i>
+                    Certification Contract
+                </h4>
+                ${contract.signed ? `
+                    <div style="background: #f0fdf4; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <p style="margin: 0 0 0.5rem 0;"><strong>Contract #:</strong> ${contract.number || 'N/A'}</p>
+                        <p style="margin: 0 0 0.5rem 0;"><strong>Signed Date:</strong> ${contract.signedDate || 'N/A'}</p>
+                        <p style="margin: 0;"><strong>Valid Until:</strong> ${contract.validUntil || 'N/A'}</p>
+                    </div>
+                ` : `
+                    <div style="background: #fef3c7; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: #92400e;">
+                            <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                            No contract on file
+                        </p>
+                    </div>
+                `}
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-secondary" onclick="window.editClientContract(${client.id})">
+                    <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
+                </button>
+                ` : ''}
+            </div>
+            
+            <!-- NDA Card -->
+            <div class="card" style="margin: 0; border-left: 4px solid ${nda.signed ? '#10b981' : '#dc2626'};">
+                <h4 style="margin: 0 0 1rem 0;">
+                    <i class="fa-solid fa-user-lock" style="margin-right: 0.5rem; color: ${nda.signed ? '#10b981' : '#dc2626'};"></i>
+                    Confidentiality Agreement (NDA)
+                </h4>
+                ${nda.signed ? `
+                    <div style="background: #f0fdf4; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <p style="margin: 0 0 0.5rem 0;"><strong>Signed Date:</strong> ${nda.signedDate || 'N/A'}</p>
+                        <p style="margin: 0;"><strong>Signed By:</strong> ${nda.signedBy || 'N/A'}</p>
+                    </div>
+                ` : `
+                    <div style="background: #fee2e2; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: #991b1b;">
+                            <i class="fa-solid fa-exclamation-circle" style="margin-right: 0.5rem;"></i>
+                            NDA not signed - Required per ISO 17021-1
+                        </p>
+                    </div>
+                `}
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA(${client.id})">
+                    <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
+                </button>
+                ` : ''}
+            </div>
+        </div>
+        
+        <!-- Client Changes Log -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h4 style="margin: 0;">
+                    <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                    Client Changes Log (ISO 9.6)
+                </h4>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
+                </button>
+                ` : ''}
+            </div>
+            <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
+                Track significant changes to client's organization, processes, or scope (ISO 17021-1 Clause 9.6.2)
+            </p>
+            ${changesLog.length > 0 ? `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Change Type</th>
+                                <th>Description</th>
+                                <th>Reported By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${changesLog.map(log => `
+                                <tr>
+                                    <td>${log.date}</td>
+                                    <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${log.type}</span></td>
+                                    <td>${log.description}</td>
+                                    <td>${log.reportedBy}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px;">
+                    <i class="fa-solid fa-clipboard-check" style="font-size: 2rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="color: #64748b; margin: 0;">No changes logged. Client stable.</p>
+                </div>
+            `}
+        </div>
+        
+        <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+            <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                <strong>ISO 17021-1:</strong> Maintain records of contracts/agreements (Cl. 9.2), confidentiality arrangements (Cl. 5.6), and significant changes notified by clients (Cl. 9.6.2).
+            </p>
+        </div>
+    `;
+}
+
 function renderClientTab(client, tabName) {
     const tabContent = document.getElementById('tab-content');
 
-    switch (tabName) {
-        case 'info':
-            // Find auditors that match this client's industry
-            const matchingAuditors = state.auditors.filter(a =>
-                a.industries && a.industries.includes(client.industry)
-            );
-
-            // Calculate total employees: sum of site employees if they exist, otherwise use company level
-            let totalEmployees = client.employees || 0;
-            if (client.sites && client.sites.length > 0) {
-                const siteEmployeesSum = client.sites.reduce((sum, site) => sum + (site.employees || 0), 0);
-                // If sites have employee data, use that sum; otherwise use company level
-                if (siteEmployeesSum > 0) {
-                    totalEmployees = siteEmployeesSum;
-                }
-            }
-
-            tabContent.innerHTML = `
-                <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Company Information</h3>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
-                        <!-- Basic Info -->
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Company Name</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(client.name)}</p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Website</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">
-                                ${client.website ? `<a href="${window.UTILS.escapeHtml(client.website)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-globe" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(client.website)}</a>` : '-'}
-                            </p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Standard</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(client.standard)}</p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Industry</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">
-                                <span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
-                                    <i class="fa-solid fa-industry" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(client.industry || 'Not Specified')}
-                                </span>
-                            </p>
-                        </div>
-
-                        <!-- Operational Data -->
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Total Employees</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-users" style="color: var(--text-secondary); margin-right: 5px;"></i> ${totalEmployees}</p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Sites</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-building" style="color: var(--text-secondary); margin-right: 5px;"></i> ${(client.sites && client.sites.length) || 1}</p>
-                        </div>
-                        <div>
-                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Shift Work</label>
-                             <p style="font-weight: 500; margin-top: 0.25rem;">${client.shifts === 'Yes' ? 'Yes (Multiple Shifts)' : 'No (General Shift Only)'}</p>
-                        </div>
-                        <div>
-                            <label style="color: var(--text-secondary); font-size: 0.875rem;">Next Audit Date</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.nextAudit}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sites / Locations -->
-                <div class="card" style="margin-top: 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
-                        <button class="btn btn-sm btn-secondary" onclick="addSite(${client.id})">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
-                        </button>
-                    </div>
-                    ${(client.sites && client.sites.length > 0) ? `
-
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Site Name</th>
-                                        <th>Address</th>
-                                        <th>City</th>
-                                        <th>Employees</th>
-                                        <th>Shift</th>
-                                        <th>Geotag</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${client.sites.map((s, index) => `
-                                        <tr>
-                                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(s.name)}</td>
-                                            <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
-                                            <td>${window.UTILS.escapeHtml(s.city || '-')}, ${window.UTILS.escapeHtml(s.country || '')}</td>
-                                            <td>
-                                                ${s.employees ? `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-users" style="margin-right: 4px;"></i>${s.employees}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
-                                            </td>
-                                            <td>
-                                                ${s.shift ? `<span style="background: ${s.shift === 'Yes' ? '#fef3c7' : '#f1f5f9'}; color: ${s.shift === 'Yes' ? '#d97706' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${s.shift === 'Yes' ? 'Multi-Shift' : 'General'}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
-                                            </td>
-                                            <td>
-                                                ${s.geotag ? `<a href="https://maps.google.com/?q=${window.UTILS.escapeHtml(s.geotag)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(s.geotag)}</a>` : '-'}
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
-                                                    <i class="fa-solid fa-pen"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite(${client.id}, ${index})">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No sites added yet.</p>
-                    `}
-                </div>
-
-                <!-- Matching Auditors -->
-                <div class="card" style="margin-top: 1.5rem;">
-                    <h3 style="margin-bottom: 1rem;">
-                        <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
-                        Auditors with ${client.industry || 'Matching'} Industry Experience
-                    </h3>
-                    ${matchingAuditors.length > 0 ? `
-                        <div style="display: grid; gap: 0.75rem;">
-                            ${matchingAuditors.map(a => `
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                                    <div style="display: flex; align-items: center; gap: 1rem;">
-                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600;">
-                                            ${a.name.split(' ').map(n => n[0]).join('')}
-                                        </div>
-                                        <div>
-                                            <p style="font-weight: 500; margin: 0;">${window.UTILS.escapeHtml(a.name)}</p>
-                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${window.UTILS.escapeHtml(a.role)} • ${a.experience || 0} years exp</p>
-                                        </div>
-                                    </div>
-                                    <div style="display: flex; gap: 0.5rem;">
-                                        ${(a.standards || []).map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('')}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : `
-                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
-                            <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                            No auditors found with ${client.industry || 'this'} industry experience. 
-                            <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
-                        </p>
-                    `}
-                </div>
-            `;
-            break;
-        case 'profile':
-            const profile = client.profile || '';
-            const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
-
-            tabContent.innerHTML = `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <div>
-                            <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Company Profile</h3>
-                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">
-                                <i class="fa-solid fa-clock"></i> Last updated: ${lastUpdated}
-                            </p>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            ${client.website ? `
-                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
-                                    <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate from Website
-                                </button>
-                            ` : ''}
-                            <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">
-                                <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i> Edit Manually
-                            </button>
-                        </div>
-                    </div>
-                    
-                    ${profile ? `
-                        <div style="background: #f8fafc; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); line-height: 1.8;">
-                            <div style="white-space: pre-wrap; color: var(--text-primary);">${window.UTILS.escapeHtml(profile)}</div>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
-                            <i class="fa-solid fa-file-lines" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No company profile generated yet.</p>
-                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                                ${client.website ?
-                    'Click "AI Generate from Website" to automatically create a company profile summary.' :
-                    'Add a website URL in the client information to enable AI generation, or edit manually.'}
-                            </p>
-                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                                ${client.website ? `
-                                    <button class="btn btn-primary btn-sm" onclick="window.generateCompanyProfile(${client.id})">
-                                        <i class="fa-solid fa-sparkles"></i> AI Generate
-                                    </button>
-                                ` : ''}
-                                <button class="btn btn-outline-secondary btn-sm" onclick="window.editCompanyProfile(${client.id})">
-                                    <i class="fa-solid fa-pen"></i> Write Manually
-                                </button>
-                            </div>
-                        </div>
-                    `}
-                    
-                    <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid #bae6fd;">
-                        <p style="font-size: 0.85rem; color: #0369a1; margin: 0;">
-                            <i class="fa-solid fa-info-circle"></i> <strong>Usage:</strong> This profile summary will be included in the "Organization Overview" section of audit reports.
-                        </p>
-                    </div>
-                </div>
-            `;
-            break;
-        case 'contacts':
-            tabContent.innerHTML = `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
-                        <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Contact
-                        </button>
-                    </div>
-                    ${(client.contacts && client.contacts.length > 0) ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Designation</th>
-                                        <th>Phone</th>
-                                        <th>Email</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${client.contacts.map((c, index) => `
-                                        <tr>
-                                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
-                                            <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.designation || '-')}</span></td>
-                                            <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${window.UTILS.escapeHtml(c.phone || '-')}</td>
-                                            <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
-                                                    <i class="fa-solid fa-pen"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact(${client.id}, ${index})">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No contact persons added yet.</p>
-                    `}
-                </div>
-            `;
-            break;
-        case 'departments':
-            const departments = client.departments || [];
-            tabContent.innerHTML = `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">
-                                <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
-                            </button>
-                            <button class="btn btn-sm btn-secondary" onclick="window.addDepartment(${client.id})">
-                                <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Department
-                            </button>
-                        </div>
-                    </div>
-                    ${departments.length > 0 ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Department Name</th>
-                                        <th>Head of Department</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${departments.map((dept, index) => `
-                                        <tr>
-                                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(dept.name)}</td>
-                                            <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
-                                            <td>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
-                                                    <i class="fa-solid fa-pen"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment(${client.id}, ${index})">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
-                            <i class="fa-solid fa-sitemap" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
-                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                                <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment(${client.id})">Add Manually</button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
-                            </div>
-                        </div>
-                    `}
-                </div>
-            `;
-            break;
-        case 'audits':
-            // Get all audits for this client
-            const clientPlans = (state.auditPlans || []).filter(p => p.client === client.name);
-            const clientReports = (state.auditReports || []).filter(r => r.client === client.name);
-
-            // Calculate totals
-            let allNCRs = [];
-            clientReports.forEach(r => {
-                (r.ncrs || []).forEach(ncr => allNCRs.push({ ...ncr, auditDate: r.date, reportId: r.id }));
-                (r.checklistProgress || []).filter(p => p.status === 'nc').forEach(ncr =>
-                    allNCRs.push({
-                        type: ncr.ncrType || 'observation',
-                        description: ncr.ncrDescription || ncr.comment,
-                        status: ncr.status || 'Open',
-                        designation: ncr.designation,
-                        department: ncr.department,
-                        evidenceImage: ncr.evidenceImage,
-                        auditDate: r.date,
-                        reportId: r.id
-                    })
-                );
-            });
-
-            const openNCRs = allNCRs.filter(n => n.status === 'Open').length;
-            const closedNCRs = allNCRs.filter(n => n.status === 'Closed').length;
-            const majorNCRs = allNCRs.filter(n => n.type === 'major').length;
-            const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
-
-            tabContent.innerHTML = `
-                <div class="card" style="margin-bottom: 1.5rem;">
-                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-bar" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Summary</h3>
-                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
-                        <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${clientPlans.length}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Total Audits</div>
-                        </div>
-                        <div style="background: #fef3c7; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${allNCRs.length}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Total Findings</div>
-                        </div>
-                        <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc2626;">${majorNCRs}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Major NCs</div>
-                        </div>
-                        <div style="background: #fef9c3; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #ca8a04;">${minorNCRs}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Minor NCs</div>
-                        </div>
-                        <div style="background: ${openNCRs > 0 ? '#fee2e2' : '#dcfce7'}; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: ${openNCRs > 0 ? '#dc2626' : '#16a34a'};">${openNCRs}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Open NCRs</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Audit History Timeline -->
-                <div class="card" style="margin-bottom: 1.5rem;">
-                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Audit History</h3>
-                    ${clientPlans.length > 0 ? `
-                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            ${clientPlans.map(plan => {
-                const report = clientReports.find(r => r.planId == plan.id || r.date === plan.date);
-                const ncrCount = report ? (report.ncrs || []).length : 0;
-                return `
-                                    <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${plan.status === 'Completed' ? '#10b981' : '#3b82f6'};">
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 600;">${plan.type || 'Audit'} - ${plan.standard || client.standard}</div>
-                                            <div style="font-size: 0.85rem; color: #64748b;">
-                                                <i class="fa-solid fa-calendar"></i> ${plan.date} 
-                                                <span style="margin-left: 1rem;"><i class="fa-solid fa-user"></i> ${plan.team ? plan.team[0] : 'TBD'}</span>
-                                            </div>
-                                        </div>
-                                        <div style="display: flex; align-items: center; gap: 1rem;">
-                                            ${ncrCount > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${ncrCount} Findings</span>` : ''}
-                                            <span class="badge" style="background: ${plan.status === 'Completed' ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
-                                            ${report ? `<button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${report.id})"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
-                                        </div>
-                                    </div>
-                                `;
-            }).join('')}
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 2rem; color: #64748b;">
-                            <i class="fa-solid fa-calendar-xmark" style="font-size: 2rem; margin-bottom: 0.5rem; color: #cbd5e1;"></i>
-                            <p style="margin: 0;">No audits conducted yet for this client.</p>
-                        </div>
-                    `}
-                </div>
-                
-                <!-- Findings History -->
-                <div class="card">
-                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color); margin-right: 0.5rem;"></i>Findings History (All NCRs)</h3>
-                    ${allNCRs.length > 0 ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Type</th>
-                                        <th>Description</th>
-                                        <th>Dept/Person</th>
-                                        <th>Evidence</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${allNCRs.map(ncr => `
-                                        <tr>
-                                            <td style="white-space: nowrap;">${ncr.auditDate || '-'}</td>
-                                            <td>
-                                                <span class="badge" style="background: ${ncr.type === 'major' ? '#dc2626' : ncr.type === 'minor' ? '#d97706' : '#8b5cf6'}; font-size: 0.7rem;">
-                                                    ${(ncr.type || 'OBS').toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td style="max-width: 300px;">${ncr.description || ncr.ncrDescription || '-'}</td>
-                                            <td style="font-size: 0.85rem;">
-                                                ${ncr.designation ? `<div>${ncr.designation}</div>` : ''}
-                                                ${ncr.department ? `<div style="color: #64748b;">${ncr.department}</div>` : ''}
-                                                ${!ncr.designation && !ncr.department ? '-' : ''}
-                                            </td>
-                                            <td>
-                                                ${ncr.evidenceImage ? `<a href="${ncr.evidenceImage}" target="_blank" style="color: var(--primary-color);"><i class="fa-solid fa-image"></i> View</a>` : '<span style="color: #cbd5e1;">None</span>'}
-                                            </td>
-                                            <td>
-                                                <span class="badge" style="background: ${ncr.status === 'Closed' ? '#10b981' : '#ef4444'};">${ncr.status || 'Open'}</span>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 2rem; color: #64748b;">
-                            <i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #10b981;"></i>
-                            <p style="margin: 0;">No findings recorded for this client. Excellent compliance!</p>
-                        </div>
-                    `}
-                </div>
-            `;
-            break;
-        case 'documents':
-            const docs = client.documents || [];
-            tabContent.innerHTML = `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">Documents</h3>
-                        <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">
-                            <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
-                        </button>
-                    </div>
-                    
-                    ${docs.length > 0 ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Document Name</th>
-                                        <th>Type</th>
-                                        <th>Date Uploaded</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${docs.map(doc => `
-                                        <tr>
-                                            <td>
-                                                <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
-                                                ${window.UTILS.escapeHtml(doc.name)}
-                                            </td>
-                                            <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.category || 'General')}</span></td>
-                                            <td>${window.UTILS.escapeHtml(doc.date)}</td>
-                                            <td>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
-                            <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
-                            <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
-                        </div>
-                    `}
-                </div>
-            `;
-            break;
-
-        case 'compliance':
-            // ISO 17021-1 Client Compliance Tab
-            const compliance = client.compliance || {};
-            const appStatus = compliance.applicationStatus || 'Active';
-            const contract = compliance.contract || {};
-            const nda = compliance.nda || {};
-            const changesLog = compliance.changesLog || [];
-
-            const statusColors = {
-                'Inquiry': '#3b82f6',
-                'Application Received': '#8b5cf6',
-                'Under Review': '#f59e0b',
-                'Contract Sent': '#06b6d4',
-                'Contract Signed': '#10b981',
-                'Active': '#16a34a'
-            };
-
-            tabContent.innerHTML = `
-                <div class="card" style="margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};">
-                    <h3 style="margin: 0 0 1rem 0;">
-                        <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                        Application Status
-                    </h3>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-                        ${['Inquiry', 'Application Received', 'Under Review', 'Contract Sent', 'Contract Signed', 'Active'].map(s => `
-                            <span style="padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; cursor: pointer; 
-                                background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
-                                color: ${appStatus === s ? 'white' : '#64748b'};"
-                                onclick="window.updateClientApplicationStatus(${client.id}, '${s}')">
-                                ${s}
-                            </span>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <!-- Contract Card -->
-                    <div class="card" style="margin: 0; border-left: 4px solid ${contract.signed ? '#10b981' : '#f59e0b'};">
-                        <h4 style="margin: 0 0 1rem 0;">
-                            <i class="fa-solid fa-file-contract" style="margin-right: 0.5rem; color: ${contract.signed ? '#10b981' : '#f59e0b'};"></i>
-                            Certification Contract
-                        </h4>
-                        ${contract.signed ? `
-                            <div style="background: #f0fdf4; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
-                                <p style="margin: 0 0 0.5rem 0;"><strong>Contract #:</strong> ${contract.number || 'N/A'}</p>
-                                <p style="margin: 0 0 0.5rem 0;"><strong>Signed Date:</strong> ${contract.signedDate || 'N/A'}</p>
-                                <p style="margin: 0;"><strong>Valid Until:</strong> ${contract.validUntil || 'N/A'}</p>
-                            </div>
-                        ` : `
-                            <div style="background: #fef3c7; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
-                                <p style="margin: 0; color: #92400e;">
-                                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
-                                    No contract on file
-                                </p>
-                            </div>
-                        `}
-                        <button class="btn btn-sm btn-secondary" onclick="window.editClientContract(${client.id})">
-                            <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
-                        </button>
-                    </div>
-                    
-                    <!-- NDA Card -->
-                    <div class="card" style="margin: 0; border-left: 4px solid ${nda.signed ? '#10b981' : '#dc2626'};">
-                        <h4 style="margin: 0 0 1rem 0;">
-                            <i class="fa-solid fa-user-lock" style="margin-right: 0.5rem; color: ${nda.signed ? '#10b981' : '#dc2626'};"></i>
-                            Confidentiality Agreement (NDA)
-                        </h4>
-                        ${nda.signed ? `
-                            <div style="background: #f0fdf4; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
-                                <p style="margin: 0 0 0.5rem 0;"><strong>Signed Date:</strong> ${nda.signedDate || 'N/A'}</p>
-                                <p style="margin: 0;"><strong>Signed By:</strong> ${nda.signedBy || 'N/A'}</p>
-                            </div>
-                        ` : `
-                            <div style="background: #fee2e2; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
-                                <p style="margin: 0; color: #991b1b;">
-                                    <i class="fa-solid fa-exclamation-circle" style="margin-right: 0.5rem;"></i>
-                                    NDA not signed - Required per ISO 17021-1
-                                </p>
-                            </div>
-                        `}
-                        <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA(${client.id})">
-                            <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Client Changes Log -->
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h4 style="margin: 0;">
-                            <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                            Client Changes Log (ISO 9.6)
-                        </h4>
-                        <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog(${client.id})">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
-                        </button>
-                    </div>
-                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
-                        Track significant changes to client's organization, processes, or scope (ISO 17021-1 Clause 9.6.2)
-                    </p>
-                    ${changesLog.length > 0 ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Change Type</th>
-                                        <th>Description</th>
-                                        <th>Reported By</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${changesLog.map(log => `
-                                        <tr>
-                                            <td>${log.date}</td>
-                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${log.type}</span></td>
-                                            <td>${log.description}</td>
-                                            <td>${log.reportedBy}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px;">
-                            <i class="fa-solid fa-clipboard-check" style="font-size: 2rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                            <p style="color: #64748b; margin: 0;">No changes logged. Client stable.</p>
-                        </div>
-                    `}
-                </div>
-                
-                <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
-                    <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
-                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                        <strong>ISO 17021-1:</strong> Maintain records of contracts/agreements (Cl. 9.2), confidentiality arrangements (Cl. 5.6), and significant changes notified by clients (Cl. 9.6.2).
-                    </p>
-                </div>
-            `;
-            break;
+    if (tabName === 'info') {
+        tabContent.innerHTML = getClientInfoHTML(client);
+    } else if (tabName === 'client_org') {
+        tabContent.innerHTML = getClientOrgSetupHTML(client);
+    } else if (tabName === 'profile') {
+        tabContent.innerHTML = getClientProfileHTML(client);
+    } else if (tabName === 'contacts') {
+        tabContent.innerHTML = getClientContactsHTML(client);
+    } else if (tabName === 'departments') {
+        tabContent.innerHTML = getClientDepartmentsHTML(client);
+    } else if (tabName === 'audits') {
+        tabContent.innerHTML = getClientAuditsHTML(client);
+    } else if (tabName === 'documents') {
+        tabContent.innerHTML = getClientDocumentsHTML(client);
+    } else if (tabName === 'compliance') {
+        tabContent.innerHTML = getClientComplianceHTML(client);
     }
 }
 
@@ -1240,7 +1321,7 @@ function openEditClientModal(clientId) {
                 <div class="form-group">
                     <label>Standard(s)</label>
                     <select class="form-control" id="client-standard" multiple style="height: 100px;">
-                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
         `<option value="${std}" ${(client.standard || '').split(', ').includes(std) ? 'selected' : ''}>${std}</option>`
     ).join('')}
                     </select>
@@ -1873,7 +1954,7 @@ function addDepartment(clientId) {
 
 function editDepartment(clientId, deptIndex) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client || !client.departments || !client.departments[deptIndex]) return;
+    if (!client) return;
 
     const dept = client.departments[deptIndex];
 
@@ -1914,7 +1995,7 @@ function editDepartment(clientId, deptIndex) {
 
 function deleteDepartment(clientId, deptIndex) {
     const client = state.clients.find(c => c.id === clientId);
-    if (!client || !client.departments || !client.departments[deptIndex]) return;
+    if (!client) return;
 
     const dept = client.departments[deptIndex];
 
@@ -2344,3 +2425,222 @@ window.addClientChangeLog = function (clientId) {
 
     window.openModal();
 };
+
+// ============================================
+// BULK IMPORT / EXPORT FUNCTIONS
+// ============================================
+
+// ============================================
+// CLIENT ORG SETUP TAB (Scopes & Certificates)
+// ============================================
+function getClientOrgSetupHTML(client) {
+    const certs = client.certificates || [];
+
+    return `
+        <div class="fade-in">
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">
+                <i class="fa-solid fa-certificate"></i> Certification Scopes & History
+            </h3>
+            
+            ${certs.length === 0 ? '<p>No certification scopes defined.</p>' : `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Standard / Cert No</th>
+                            <th style="width: 30%;">Scope of Certification</th>
+                            <th>Applicable Sites</th>
+                            <th>Dates (Cycle)</th>
+                            <th>Revision</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${certs.map(cert => `
+                        <tr>
+                            <td>
+                                <strong>${window.UTILS.escapeHtml(cert.standard)}</strong><br>
+                                <span style="font-size:0.85rem; color:#666;">${window.UTILS.escapeHtml(cert.certificateNo || 'N/A')}</span>
+                            </td>
+                            <td>
+                                <div style="max-height: 80px; overflow-y: auto; font-size: 0.9rem;">
+                                    ${window.UTILS.escapeHtml(cert.scope || 'N/A')}
+                                </div>
+                            </td>
+                            <td>
+                                ${cert.applicableSites ?
+            cert.applicableSites.split(',').map(s => `<span class="badge" style="background:#f3f4f6; border:1px solid #d1d5db; color:#374151; margin:2px;">${window.UTILS.escapeHtml(s.trim())}</span>`).join('')
+            : '<span class="badge" style="background:#d1fae5; color:#065f46;">All Sites</span>'}
+                            </td>
+                             <td>
+                                <div style="font-size: 0.85rem;">
+                                    <div><strong>Initial:</strong> ${cert.initialDate || '-'}</div>
+                                    <div><strong>Issue:</strong> ${cert.currentIssue || '-'}</div>
+                                    <div><strong>Expiry:</strong> ${cert.expiryDate || '-'}</div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge" style="background:#e0edff; color:#1d4ed8;">Rev ${window.UTILS.escapeHtml(cert.revision || '00')}</span>
+                            </td>
+                             <td>
+                                <span class="status-badge status-${(cert.status || 'Active').toLowerCase()}">${window.UTILS.escapeHtml(cert.status)}</span>
+                            </td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            `}
+        </div>
+    `;
+}
+
+// Update Template Download for New Column
+window.downloadImportTemplate = function () {
+    // 1. Define Sheets Data (Headers + Sample)
+    const clientsData = [
+        ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date"],
+        ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01"]
+    ];
+
+    const certsData = [
+        ["Client Name", "Standard", "Scope", "Status", "Certificate No", "Applicable Sites", "Initial Date", "Current Issue", "Expiry Date", "Revision No"],
+        ["Sample Corp", "ISO 9001:2015", "Design and Manuf. of Widgets", "Active", "CERT-001", "Head Office", "2020-01-01", "2023-01-01", "2026-01-01", "01"]
+    ];
+
+    const sitesData = [
+        ["Client Name", "Site Name", "Address", "City", "Country", "Employees", "Shift Work"],
+        ["Sample Corp", "Head Office", "123 Main St", "New York", "USA", "80", "No"],
+        ["Sample Corp", "Factory", "456 Ind Park", "Chicago", "USA", "20", "Yes"]
+    ];
+
+    const contactsData = [
+        ["Client Name", "Full Name", "Designation", "Department", "Email", "Phone"],
+        ["Sample Corp", "John Doe", "Quality Manager", "Quality", "john@sample.com", "555-0100"],
+        ["Sample Corp", "Jane Smith", "Director", "Management", "jane@sample.com", "555-0101"]
+    ];
+
+    // 2. Create Workbook
+    const wb = XLSX.utils.book_new();
+    const wsClients = XLSX.utils.aoa_to_sheet(clientsData);
+    const wsCerts = XLSX.utils.aoa_to_sheet(certsData);
+    const wsSites = XLSX.utils.aoa_to_sheet(sitesData);
+    const wsContacts = XLSX.utils.aoa_to_sheet(contactsData);
+
+    XLSX.utils.book_append_sheet(wb, wsClients, "Clients");
+    XLSX.utils.book_append_sheet(wb, wsCerts, "Certificates");
+    XLSX.utils.book_append_sheet(wb, wsSites, "Sites");
+    XLSX.utils.book_append_sheet(wb, wsContacts, "Contacts");
+
+    // 3. Download
+    XLSX.writeFile(wb, 'AuditCB_Client_Import_Template.xlsx');
+};
+
+// Update Import Logic for 'Applicable Sites'
+window.importClientsFromExcel = function (file) {
+    window.showNotification('Reading file...', 'info');
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+
+            // Validate Sheets
+            if (!workbook.Sheets['Clients']) throw new Error("Missing 'Clients' sheet");
+
+            const clientsRaw = XLSX.utils.sheet_to_json(workbook.Sheets['Clients']);
+            const certsRaw = workbook.Sheets['Certificates'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Certificates']) : [];
+            const sitesRaw = workbook.Sheets['Sites'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Sites']) : [];
+            const contactsRaw = workbook.Sheets['Contacts'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Contacts']) : [];
+
+            let importedCount = 0;
+            let updatedCount = 0;
+
+            clientsRaw.forEach(row => {
+                const name = row['Client Name'];
+                if (!name) return;
+
+                // Check existing
+                let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+                if (client) {
+                    updatedCount++;
+                } else {
+                    client = {
+                        id: Date.now() + Math.floor(Math.random() * 1000), // Random ID
+                        name: window.Sanitizer.sanitizeText(name),
+                        certificates: [],
+                        sites: [],
+                        contacts: []
+                    };
+                    window.state.clients.push(client);
+                    importedCount++;
+                }
+
+                // Update Basic Fields
+                client.status = window.Sanitizer.sanitizeText(row['Status'] || 'Active');
+                client.industry = window.Sanitizer.sanitizeText(row['Industry'] || '');
+                client.employees = parseInt(row['Employee Count']) || 0;
+                client.website = window.Sanitizer.sanitizeText(row['Website'] || '');
+                client.nextAudit = row['Next Audit Date'] || '';
+
+                // Process Linked Certificates
+                const clientCerts = certsRaw.filter(c => c['Client Name'] === name);
+                client.certificates = clientCerts.map(c => ({
+                    standard: window.Sanitizer.sanitizeText(c['Standard']),
+                    scope: window.Sanitizer.sanitizeText(c['Scope']),
+                    status: window.Sanitizer.sanitizeText(c['Status']),
+                    certificateNo: window.Sanitizer.sanitizeText(c['Certificate No']),
+                    applicableSites: window.Sanitizer.sanitizeText(c['Applicable Sites'] || ''),
+                    initialDate: c['Initial Date'],
+                    currentIssue: c['Current Issue'],
+                    expiryDate: c['Expiry Date'],
+                    revision: window.Sanitizer.sanitizeText(c['Revision No'] || '00')
+                }));
+
+                // Backward Compatibility: derived fields
+                if (client.certificates.length > 0) {
+                    client.standard = client.certificates.map(c => c.standard).join(', ');
+                    client.scope = client.certificates[0].scope; // Primary scope
+                }
+
+                // Process Linked Sites
+                const clientSites = sitesRaw.filter(s => s['Client Name'] === name);
+                client.sites = clientSites.map(s => ({
+                    name: window.Sanitizer.sanitizeText(s['Site Name']),
+                    address: window.Sanitizer.sanitizeText(s['Address']),
+                    city: window.Sanitizer.sanitizeText(s['City']),
+                    country: window.Sanitizer.sanitizeText(s['Country']),
+                    employees: parseInt(s['Employees']) || 0,
+                    shift: window.Sanitizer.sanitizeText(s['Shift Work'] || 'No')
+                }));
+
+                // Process Linked Contacts
+                const clientContacts = contactsRaw.filter(c => c['Client Name'] === name);
+                client.contacts = clientContacts.map(c => ({
+                    name: window.Sanitizer.sanitizeText(c['Full Name']),
+                    designation: window.Sanitizer.sanitizeText(c['Designation']),
+                    department: window.Sanitizer.sanitizeText(c['Department'] || ''),
+                    email: window.Sanitizer.sanitizeText(c['Email']),
+                    phone: window.Sanitizer.sanitizeText(c['Phone'] || '')
+                }));
+            });
+
+            window.saveData();
+            window.showNotification(`Import Successful: ${importedCount} created, ${updatedCount} updated`, 'success');
+            renderClientsEnhanced();
+
+        } catch (err) {
+            console.error(err);
+            window.showNotification('Import Failed: ' + err.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+// Exports
+window.renderClientsModule = renderClientsEnhanced;
+// Ensure other helpers are exposed if defined locally but used in HTML
+if (typeof openNewClientModal !== 'undefined') window.openNewClientModal = openNewClientModal;
+if (typeof openEditClientModal !== 'undefined') window.openEditClientModal = openEditClientModal;
+if (typeof initiateAuditPlanFromClient !== 'undefined') window.initiateAuditPlanFromClient = initiateAuditPlanFromClient;
+if (typeof renderClientDetail !== 'undefined') window.renderClientDetail = renderClientDetail;
