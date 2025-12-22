@@ -2,35 +2,35 @@
 // CLIENTS MODULE
 // ============================================
 
-const state = window.state;
+// state is defined globally in script.js as window.state
 
 function renderClientsEnhanced() {
-    const searchTerm = state.clientSearchTerm || '';
-    const filterStatus = state.clientFilterStatus || 'All';
+    const searchTerm = window.state.clientSearchTerm || '';
+    const filterStatus = window.state.clientFilterStatus || 'All';
 
 
     // Pagination State
-    if (!state.clientPagination) {
-        state.clientPagination = { currentPage: 1, itemsPerPage: 10 };
+    if (!window.state.clientPagination) {
+        window.state.clientPagination = { currentPage: 1, itemsPerPage: 10 };
     }
 
-    let filteredClients = state.clients.filter(client => {
+    let filteredClients = window.state.clients.filter(client => {
         const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
         return matchesSearch && matchesStatus;
     });
 
     const totalItems = filteredClients.length;
-    const totalPages = Math.ceil(totalItems / state.clientPagination.itemsPerPage);
+    const totalPages = Math.ceil(totalItems / window.state.clientPagination.itemsPerPage);
 
     // Ensure currentPage is valid
-    if (state.clientPagination.currentPage > totalPages && totalPages > 0) {
-        state.clientPagination.currentPage = totalPages;
+    if (window.state.clientPagination.currentPage > totalPages && totalPages > 0) {
+        window.state.clientPagination.currentPage = totalPages;
     }
-    if (state.clientPagination.currentPage < 1) state.clientPagination.currentPage = 1;
+    if (window.state.clientPagination.currentPage < 1) window.state.clientPagination.currentPage = 1;
 
-    const startIndex = (state.clientPagination.currentPage - 1) * state.clientPagination.itemsPerPage;
-    const paginatedClients = filteredClients.slice(startIndex, startIndex + state.clientPagination.itemsPerPage);
+    const startIndex = (window.state.clientPagination.currentPage - 1) * window.state.clientPagination.itemsPerPage;
+    const paginatedClients = filteredClients.slice(startIndex, startIndex + window.state.clientPagination.itemsPerPage);
 
     const rows = paginatedClients.map(client => `
         <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;">
@@ -43,7 +43,7 @@ function renderClientsEnhanced() {
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
             <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
             <td>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
@@ -56,7 +56,7 @@ function renderClientsEnhanced() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Client Management</h2>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
                         <button class="btn btn-sm btn-outline-secondary" onclick="downloadImportTemplate()" style="white-space: nowrap;" title="Restricted to Cert Managers">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
@@ -66,9 +66,9 @@ function renderClientsEnhanced() {
                         </button>
                     ` : ''}
                     <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
-                        <i class="fa-solid ${state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
+                        <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                     </button>
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
@@ -76,7 +76,7 @@ function renderClientsEnhanced() {
                 </div>
             </div>
 
-            ${state.showClientAnalytics !== false ? `
+            ${window.state.showClientAnalytics !== false ? `
             <div class="fade-in" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
                 <!-- Total Clients -->
                 <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
@@ -85,7 +85,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Clients</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.clients.length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.length}</div>
                     </div>
                 </div>
 
@@ -96,7 +96,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Active</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.clients.filter(c => c.status === 'Active').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.filter(c => c.status === 'Active').length}</div>
                     </div>
                 </div>
 
@@ -107,7 +107,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Inactive</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.clients.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
                     </div>
                 </div>
                 
@@ -118,7 +118,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Sites</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.clients.reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
                     </div>
                 </div>
             </div>
@@ -156,20 +156,20 @@ function renderClientsEnhanced() {
             ${totalItems > 0 ? `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 0.5rem;">
                 <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                    Showing ${startIndex + 1} to ${Math.min(startIndex + state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
+                    Showing ${startIndex + 1} to ${Math.min(startIndex + window.state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${state.clientPagination.currentPage - 1})" ${state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${window.state.clientPagination.currentPage - 1})" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
-                    <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${state.clientPagination.currentPage} of ${totalPages}</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${state.clientPagination.currentPage + 1})" ${state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
+                    <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${window.state.clientPagination.currentPage} of ${totalPages}</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${window.state.clientPagination.currentPage + 1})" ${window.state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
                         Next <i class="fa-solid fa-chevron-right"></i>
                     </button>
                     <select onchange="window.changeClientItemsPerPage(this.value)" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
-                        <option value="10" ${state.clientPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
-                        <option value="25" ${state.clientPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
-                        <option value="50" ${state.clientPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
+                        <option value="10" ${window.state.clientPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
+                        <option value="25" ${window.state.clientPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
+                        <option value="50" ${window.state.clientPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
                     </select>
                 </div>
             </div>
@@ -190,12 +190,12 @@ function renderClientsEnhanced() {
     });
 
     document.getElementById('client-search')?.addEventListener('input', (e) => {
-        state.clientSearchTerm = e.target.value;
+        window.state.clientSearchTerm = e.target.value;
         renderClientsEnhanced();
     });
 
     document.getElementById('client-filter')?.addEventListener('change', (e) => {
-        state.clientFilterStatus = e.target.value;
+        window.state.clientFilterStatus = e.target.value;
         renderClientsEnhanced();
     });
 
@@ -219,35 +219,35 @@ function renderClientsEnhanced() {
 
     // Helper for toggle
     window.toggleClientAnalytics = function () {
-        if (state.showClientAnalytics === undefined) state.showClientAnalytics = true;
-        state.showClientAnalytics = !state.showClientAnalytics;
+        if (window.state.showClientAnalytics === undefined) window.state.showClientAnalytics = true;
+        window.state.showClientAnalytics = !window.state.showClientAnalytics;
         renderClientsEnhanced();
     };
 }
 
 window.changeClientPage = function (page) {
-    if (window.state.clientPagination) {
-        window.state.clientPagination.currentPage = page;
+    if (window.window.state.clientPagination) {
+        window.window.state.clientPagination.currentPage = page;
         renderClientsEnhanced();
     }
 };
 
 window.changeClientItemsPerPage = function (val) {
-    if (window.state.clientPagination) {
-        window.state.clientPagination.itemsPerPage = parseInt(val, 10);
-        window.state.clientPagination.currentPage = 1; // Reset to first page
+    if (window.window.state.clientPagination) {
+        window.window.state.clientPagination.itemsPerPage = parseInt(val, 10);
+        window.window.state.clientPagination.currentPage = 1; // Reset to first page
         renderClientsEnhanced();
     }
 };
 
 function renderClientDetail(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     // Calculate performance metrics
-    const totalAudits = state.auditPlans.filter(p => p.client === client.name).length;
-    const completedAudits = state.auditPlans.filter(p => p.client === client.name && p.status === 'Completed').length;
-    const pendingAudits = state.auditPlans.filter(p => p.client === client.name && (p.status === 'Draft' || p.status === 'Confirmed')).length;
+    const totalAudits = window.state.auditPlans.filter(p => p.client === client.name).length;
+    const completedAudits = window.state.auditPlans.filter(p => p.client === client.name && p.status === 'Completed').length;
+    const pendingAudits = window.state.auditPlans.filter(p => p.client === client.name && (p.status === 'Draft' || p.status === 'Confirmed')).length;
     const certificationStatus = client.status === 'Active' ? 'Certified' : client.status;
 
     const html = `
@@ -268,7 +268,7 @@ function renderClientDetail(clientId) {
                     <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient(${client.id})">
                         <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
                     </button>
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
@@ -333,7 +333,7 @@ function renderClientDetail(clientId) {
 }
 
 window.switchClientDetailTab = function (clientId, tabName) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -350,7 +350,7 @@ window.switchClientDetailTab = function (clientId, tabName) {
 // Helper functions for tab content
 function getClientInfoHTML(client) {
     // Find auditors that match this client's industry
-    const matchingAuditors = state.auditors.filter(a =>
+    const matchingAuditors = window.state.auditors.filter(a =>
         a.industries && a.industries.includes(client.industry)
     );
 
@@ -456,7 +456,7 @@ function getClientSitesHTML(client) {
         <div class="card" style="margin-top: 1.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="addSite(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
                 </button>
@@ -493,7 +493,7 @@ function getClientSitesHTML(client) {
                                         ${s.geotag ? `<a href="https://maps.google.com/?q=${window.UTILS.escapeHtml(s.geotag)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(s.geotag)}</a>` : '-'}
                                     </td>
                                     <td>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
                                             <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
                                                 <i class="fa-solid fa-pen"></i>
@@ -513,7 +513,7 @@ function getClientSitesHTML(client) {
                 <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;">
                     <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">No sites or branch locations added yet.</p>
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" onclick="addSite(${client.id})">
                         <i class="fa-solid fa-plus"></i> Add First Site
                     </button>
@@ -539,7 +539,7 @@ function getClientProfileHTML(client) {
                 </p>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                         ${client.website ? `
                             <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
                                 <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate from Website
@@ -566,7 +566,7 @@ function getClientProfileHTML(client) {
             'Add a website URL in the client information to enable AI generation, or edit manually.'}
                     </p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                             ${client.website ? `
                                 <button class="btn btn-primary btn-sm" onclick="window.generateCompanyProfile(${client.id})">
                                     <i class="fa-solid fa-sparkles"></i> AI Generate
@@ -594,7 +594,7 @@ function getClientContactsHTML(client) {
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Contact
                 </button>
@@ -620,7 +620,7 @@ function getClientContactsHTML(client) {
                                     <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${window.UTILS.escapeHtml(c.phone || '-')}</td>
                                     <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                     <td>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
@@ -648,7 +648,7 @@ function getClientDepartmentsHTML(client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
@@ -674,7 +674,7 @@ function getClientDepartmentsHTML(client) {
                                     <td style="font-weight: 500;">${window.UTILS.escapeHtml(dept.name)}</td>
                                     <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                     <td>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
@@ -693,7 +693,7 @@ function getClientDepartmentsHTML(client) {
                     <i class="fa-solid fa-sitemap" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                         <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment(${client.id})">Add Manually</button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
                         ` : ''}
@@ -714,7 +714,7 @@ function getClientGoodsServicesHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-boxes-stacked" style="margin-right: 0.5rem; color: #f59e0b;"></i>Goods & Services</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Products and services offered by the organization</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
             <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">
                 <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Item
             </button>
@@ -738,7 +738,7 @@ function getClientGoodsServicesHTML(client) {
                                 <td><span class="badge" style="background: #fef3c7; color: #d97706;">${window.UTILS.escapeHtml(item.category || 'General')}</span></td>
                                 <td style="font-size: 0.9rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.description || '-')}</td>
                                 <td>
-                                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                                     <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editGoodsService(${client.id}, ${index})"><i class="fa-solid fa-pen"></i></button>
                                     <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
@@ -769,7 +769,7 @@ function getClientKeyProcessesHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem; color: #06b6d4;"></i>Key Processes</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Core business processes for audit planning</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
             <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">
                 <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Process
             </button>
@@ -793,7 +793,7 @@ function getClientKeyProcessesHTML(client) {
                                 <td><span class="badge" style="background: ${proc.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${proc.category === 'Core' ? '#065f46' : '#0369a1'};">${window.UTILS.escapeHtml(proc.category || 'Support')}</span></td>
                                 <td>${window.UTILS.escapeHtml(proc.owner || '-')}</td>
                                 <td>
-                                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                                     <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-pen"></i></button>
                                     <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
@@ -824,7 +824,7 @@ function getClientDesignationsHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-id-badge" style="margin-right: 0.5rem; color: #84cc16;"></i>Designations</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Job titles and roles within the organization</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
             <button class="btn btn-sm btn-secondary" onclick="window.addDesignation(${client.id})">
                 <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Designation
             </button>
@@ -837,7 +837,7 @@ function getClientDesignationsHTML(client) {
                         <i class="fa-solid fa-user-tie" style="color: #16a34a;"></i>
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
@@ -856,8 +856,8 @@ function getClientDesignationsHTML(client) {
 
 function getClientAuditsHTML(client) {
     // Get all audits for this client
-    const clientPlans = (state.auditPlans || []).filter(p => p.client === client.name);
-    const clientReports = (state.auditReports || []).filter(r => r.client === client.name);
+    const clientPlans = (window.state.auditPlans || []).filter(p => p.client === client.name);
+    const clientReports = (window.state.auditReports || []).filter(r => r.client === client.name);
 
     // Calculate totals
     let allNCRs = [];
@@ -1001,7 +1001,7 @@ function getClientDocumentsHTML(client) {
     < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Documents</h3>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">
                     <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                 </button>
@@ -1030,7 +1030,7 @@ function getClientDocumentsHTML(client) {
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
@@ -1043,7 +1043,7 @@ function getClientDocumentsHTML(client) {
                 <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
                     <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
                     ` : ''}
                 </div>
@@ -1078,10 +1078,10 @@ function getClientComplianceHTML(client) {
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
                 ${['Inquiry', 'Application Received', 'Under Review', 'Contract Sent', 'Contract Signed', 'Active'].map(s => `
                     <span style="padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; 
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
+                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
                         background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
                         color: ${appStatus === s ? 'white' : '#64748b'};"
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus(${client.id}, '${s}')"` : ''}>
+                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus(${client.id}, '${s}')"` : ''}>
                         ${s}
                     </span>
                 `).join('')}
@@ -1109,7 +1109,7 @@ function getClientComplianceHTML(client) {
                         </p>
                     </div>
                 `}
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="window.editClientContract(${client.id})">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
                 </button>
@@ -1135,7 +1135,7 @@ function getClientComplianceHTML(client) {
                         </p>
                     </div>
                 `}
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA(${client.id})">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
                 </button>
@@ -1150,7 +1150,7 @@ function getClientComplianceHTML(client) {
                     <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                     Client Changes Log (ISO 9.6)
                 </h4>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
                 </button>
@@ -1455,7 +1455,7 @@ function openAddClientModal() {
         };
 
         // 6. Save
-        state.clients.push(newClient);
+        window.state.clients.push(newClient);
         window.saveData();
         window.closeModal();
         renderClientsEnhanced();
@@ -1464,7 +1464,7 @@ function openAddClientModal() {
 }
 
 function openEditClientModal(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -1643,7 +1643,7 @@ function openEditClientModal(clientId) {
 
 // Add Contact Person Modal
 function addContactPerson(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -1695,7 +1695,7 @@ function addContactPerson(clientId) {
 
 // Add Site Modal
 function addSite(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -1780,7 +1780,7 @@ function addSite(clientId) {
 
 // Upload Document Modal
 window.openUploadDocumentModal = function (clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -1869,7 +1869,7 @@ window.openUploadDocumentModal = function (clientId) {
 
 // Delete Document Helper
 window.deleteDocument = function (clientId, docId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.documents) return;
 
     if (confirm('Are you sure you want to delete this document?')) {
@@ -1892,7 +1892,7 @@ window.addSite = addSite;
 
 // Edit Site Modal
 window.editSite = function (clientId, siteIndex) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.sites || !client.sites[siteIndex]) return;
 
     const site = client.sites[siteIndex];
@@ -1977,7 +1977,7 @@ window.editSite = function (clientId, siteIndex) {
 
 // Delete Site
 window.deleteSite = function (clientId, siteIndex) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.sites) return;
 
     if (confirm('Are you sure you want to delete this site?')) {
@@ -1990,7 +1990,7 @@ window.deleteSite = function (clientId, siteIndex) {
 
 // Edit Contact Modal
 window.editContact = function (clientId, contactIndex) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.contacts || !client.contacts[contactIndex]) return;
 
     const contact = client.contacts[contactIndex];
@@ -2043,7 +2043,7 @@ window.editContact = function (clientId, contactIndex) {
 
 // Delete Contact
 window.deleteContact = function (clientId, contactIndex) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.contacts) return;
 
     if (confirm('Are you sure you want to delete this contact?')) {
@@ -2060,7 +2060,7 @@ window.initiateAuditPlanFromClient = function (clientId) {
     // Navigate to Audit Planning module
     window.renderModule('planning');
 
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.window.state.clients.find(c => c.id === clientId);
     const clientName = client ? client.name : '';
 
     if (!clientName) return;
@@ -2086,7 +2086,7 @@ window.initiateAuditPlanFromClient = function (clientId) {
 
 // Department Management Functions
 function addDepartment(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     window.openModal(
@@ -2128,7 +2128,7 @@ function addDepartment(clientId) {
 }
 
 function editDepartment(clientId, deptIndex) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const dept = client.departments[deptIndex];
@@ -2169,7 +2169,7 @@ function editDepartment(clientId, deptIndex) {
 }
 
 function deleteDepartment(clientId, deptIndex) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const dept = client.departments[deptIndex];
@@ -2184,7 +2184,7 @@ function deleteDepartment(clientId, deptIndex) {
 }
 
 function bulkUploadDepartments(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     window.openModal(
@@ -2275,7 +2275,7 @@ window.bulkUploadDepartments = bulkUploadDepartments;
 // GOODS/SERVICES CRUD FUNCTIONS
 // ============================================
 window.addGoodsService = function (clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     window.openModal('Add Goods/Service', `
@@ -2307,7 +2307,7 @@ window.addGoodsService = function (clientId) {
 };
 
 window.editGoodsService = function (clientId, index) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.goodsServices || !client.goodsServices[index]) return;
     const item = client.goodsServices[index];
     window.openModal('Edit Goods/Service', `
@@ -2325,7 +2325,7 @@ window.editGoodsService = function (clientId, index) {
 
 window.deleteGoodsService = function (clientId, index) {
     if (!confirm('Delete this item?')) return;
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (client && client.goodsServices) { client.goodsServices.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 2); window.showNotification('Goods/Service deleted'); }
 };
 
@@ -2333,7 +2333,7 @@ window.deleteGoodsService = function (clientId, index) {
 // KEY PROCESSES CRUD FUNCTIONS
 // ============================================
 window.addKeyProcess = function (clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
     window.openModal('Add Key Process', `
         <form id="process-form">
@@ -2352,7 +2352,7 @@ window.addKeyProcess = function (clientId) {
 };
 
 window.editKeyProcess = function (clientId, index) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
     const proc = client.keyProcesses[index];
     window.openModal('Edit Key Process', `
@@ -2370,7 +2370,7 @@ window.editKeyProcess = function (clientId, index) {
 
 window.deleteKeyProcess = function (clientId, index) {
     if (!confirm('Delete this process?')) return;
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (client && client.keyProcesses) { client.keyProcesses.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 3); window.showNotification('Process deleted'); }
 };
 
@@ -2378,7 +2378,7 @@ window.deleteKeyProcess = function (clientId, index) {
 // DESIGNATIONS CRUD FUNCTIONS
 // ============================================
 window.addDesignation = function (clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
     const deptOptions = (client.departments || []).map(d => `<option value="${window.UTILS.escapeHtml(d.name)}">${window.UTILS.escapeHtml(d.name)}</option>`).join('');
     window.openModal('Add Designation', `
@@ -2398,13 +2398,13 @@ window.addDesignation = function (clientId) {
 
 window.deleteDesignation = function (clientId, index) {
     if (!confirm('Delete this designation?')) return;
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (client && client.designations) { client.designations.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 6); window.showNotification('Designation deleted'); }
 };
 
 // Company Profile Functions
 function generateCompanyProfile(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.website) {
         window.showNotification('Website URL is required for AI generation', 'error');
         return;
@@ -2550,7 +2550,7 @@ function generateCompanyProfile(clientId) {
 }
 
 function editCompanyProfile(clientId) {
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const currentProfile = client.profile || '';
@@ -2611,7 +2611,7 @@ window.editCompanyProfile = editCompanyProfile;
 // ============================================
 
 window.updateClientApplicationStatus = function (clientId, newStatus) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     if (!client.compliance) client.compliance = {};
@@ -2630,7 +2630,7 @@ window.updateClientApplicationStatus = function (clientId, newStatus) {
 };
 
 window.editClientContract = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const contract = client.compliance?.contract || {};
@@ -2683,7 +2683,7 @@ window.editClientContract = function (clientId) {
 };
 
 window.editClientNDA = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     const nda = client.compliance?.nda || {};
@@ -2737,7 +2737,7 @@ window.editClientNDA = function (clientId) {
 };
 
 window.addClientChangeLog = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     document.getElementById('modal-title').textContent = 'Log Client Change';
@@ -2767,7 +2767,7 @@ window.addClientChangeLog = function (clientId) {
             </div>
             <div class="form-group">
                 <label>Reported By</label>
-                <input type="text" id="change-reported-by" class="form-control" value="${window.state.currentUser?.name || ''}" placeholder="Who reported this change?">
+                <input type="text" id="change-reported-by" class="form-control" value="${window.window.state.currentUser?.name || ''}" placeholder="Who reported this change?">
             </div>
             <div style="padding: 1rem; background: #fef3c7; border-radius: 6px; margin-top: 1rem;">
                 <p style="margin: 0; font-size: 0.85rem; color: #92400e;">
@@ -2912,7 +2912,7 @@ getClientOrgSetupHTML.renderWizardStep = function (client, step) {
 
 window.setSetupWizardStep = function (clientId, step) {
     if (step < 1 || step > 7) return;
-    const client = state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (client) {
         client._wizardStep = step;
         const tabContent = document.getElementById('tab-content');
@@ -2994,7 +2994,7 @@ function getClientCertificatesHTML(client) {
 
 // Sub-Tab Switching for Org Setup
 window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     // UI Feedback
@@ -3092,7 +3092,7 @@ window.importClientsFromExcel = function (file) {
                 if (!name) return;
 
                 // Check existing
-                let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+                let client = window.window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
                 if (client) {
                     updatedCount++;
                 } else {
@@ -3103,7 +3103,7 @@ window.importClientsFromExcel = function (file) {
                         sites: [],
                         contacts: []
                     };
-                    window.state.clients.push(client);
+                    window.window.state.clients.push(client);
                     importedCount++;
                 }
 
