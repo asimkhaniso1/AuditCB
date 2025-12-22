@@ -360,12 +360,6 @@ function getAPISettingsHTML() {
                 </div>
             </div>
         </div>
-        <script>
-            function toggleVis(id) {
-                const x = document.getElementById(id);
-                if (x.type === "password") { x.type = "text"; } else { x.type = "password"; }
-            }
-        </script>
     `;
 }
 
@@ -377,3 +371,8 @@ function saveAPISettings() {
     window.saveData();
     window.showNotification('API Settings saved successfully', 'success');
 }
+
+window.toggleVis = function (id) {
+    const x = document.getElementById(id);
+    if (x.type === "password") { x.type = "text"; } else { x.type = "password"; }
+};
