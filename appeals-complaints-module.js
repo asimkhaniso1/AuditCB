@@ -399,36 +399,101 @@ window.openNewComplaintModal = function () {
     `;
 
     document.getElementById('modal-save').onclick = function () {
+        // Define field mapping
+        const fieldIds = {
+            source: 'complaint-source',
+            clientName: 'complaint-client',
+            type: 'complaint-type',
+            severity: 'complaint-severity',
+            subject: 'complaint-subject',
+            description: 'complaint-description',
+            dateReceived: 'complaint-date',
+            dueDate: 'complaint-due',
+            investigator: 'complaint-investigator'
+        };
+
+        // Define validation rules
+        const rules = {
+            source: [
+                { rule: 'required', fieldName: 'Source' },
+                { rule: 'inList', allowed: ['Client', 'Public', 'Internal', 'Regulatory'], fieldName: 'Source' }
+            ],
+            subject: [
+                { rule: 'required', fieldName: 'Subject' },
+                { rule: 'length', min: 10, max: 200, fieldName: 'Subject' },
+                { rule: 'noHtmlTags', fieldName: 'Subject' }
+            ],
+            description: [
+                { rule: 'required', fieldName: 'Description' },
+                { rule: 'length', min: 20, max: 2000, fieldName: 'Description' }
+            ],
+            type: [
+                { rule: 'required', fieldName: 'Complaint Type' }
+            ],
+            severity: [
+                { rule: 'required', fieldName: 'Severity' },
+                { rule: 'inList', allowed: ['Low', 'Medium', 'High', 'Critical'], fieldName: 'Severity' }
+            ],
+            dateReceived: [
+                { rule: 'required', fieldName: 'Date Received' },
+                { rule: 'date', fieldName: 'Date Received' }
+            ],
+            investigator: [
+                { rule: 'required', fieldName: 'Investigator' },
+                { rule: 'length', min: 2, max: 100, fieldName: 'Investigator' }
+            ]
+        };
+
+        // Validate form
+        const validationResult = Validator.validateFormElements(fieldIds, rules);
+
+        if (!validationResult.valid) {
+            Validator.displayErrors(validationResult.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
+        }
+
+        // Clear any previous errors
+        Validator.clearErrors(fieldIds);
+
+        // Sanitize form data
+        const cleanData = Sanitizer.sanitizeFormData(
+            validationResult.formData,
+            ['source', 'clientName', 'type', 'severity', 'subject', 'description', 'investigator'] // All as text
+        );
+
+        // Get selected auditors
         const auditorSelect = document.getElementById('complaint-auditors');
         const selectedAuditorIds = Array.from(auditorSelect.selectedOptions).map(opt => parseInt(opt.value));
 
+        // Create complaint with sanitized data
         const newComplaint = {
             id: (window.state.complaints.length > 0 ? Math.max(...window.state.complaints.map(c => c.id)) : 0) + 1,
-            source: document.getElementById('complaint-source').value,
-            clientName: document.getElementById('complaint-client').value,
+            source: cleanData.source,
+            clientName: cleanData.clientName || '',
             relatedAuditId: null,
-            type: document.getElementById('complaint-type').value,
-            severity: document.getElementById('complaint-severity').value,
+            type: cleanData.type,
+            severity: cleanData.severity,
             auditorsInvolved: selectedAuditorIds,
-            subject: document.getElementById('complaint-subject').value,
-            description: document.getElementById('complaint-description').value,
-            dateReceived: document.getElementById('complaint-date').value,
-            dueDate: document.getElementById('complaint-due').value,
+            subject: cleanData.subject,
+            description: cleanData.description,
+            dateReceived: cleanData.dateReceived,
+            dueDate: cleanData.dueDate || '',
             status: 'Received',
-            investigator: document.getElementById('complaint-investigator').value,
+            investigator: cleanData.investigator,
             findings: '',
             correctiveAction: '',
             resolution: '',
             dateResolved: '',
             history: [
-                { date: new Date().toISOString().split('T')[0], action: 'Received', user: window.state.currentUser.name, notes: 'Complaint logged in register' }
+                {
+                    date: new Date().toISOString().split('T')[0],
+                    action: 'Received',
+                    user: window.state.currentUser.name,
+                    notes: 'Complaint logged in register'
+                }
             ]
         };
-
-        if (!newComplaint.subject || !newComplaint.description) {
-            window.showNotification('Please fill in all required fields', 'error');
-            return;
-        }
 
         // Link complaint to selected auditors
         selectedAuditorIds.forEach(audId => {
