@@ -2,8 +2,11 @@
 // AUDITCB360 - MAIN APPLICATION SCRIPT
 // ============================================
 
+const DATA_VERSION = '1.2'; // Increment to force state reset
+
 // Application State
 const state = {
+    version: DATA_VERSION,
     // Current User Context (For Demo Roles)
     currentUser: {
         name: 'Demo Manager',
@@ -774,7 +777,14 @@ function loadState() {
         const saved = localStorage.getItem('auditCB360State');
         if (saved) {
             const data = JSON.parse(saved);
-            Object.assign(state, data);
+            // Check version compatibility
+            if (data.version === DATA_VERSION) {
+                Object.assign(state, data);
+            } else {
+                console.log(`Version mismatch (Store: ${data.version}, App: ${DATA_VERSION}). Resetting to defaults.`);
+                // Do not load saved data, keep strictly default mock data
+                // We'll save the new default state naturally on next edit
+            }
         }
 
         // Migrate checklists to hierarchical format if needed
