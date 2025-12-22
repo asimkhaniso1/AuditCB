@@ -1869,67 +1869,117 @@ function openAddAuditorModal() {
     window.openModal();
 
     modalSave.onclick = () => {
-        const name = document.getElementById('auditor-name').value;
-        const role = document.getElementById('auditor-role').value;
-        const standardsSelect = document.getElementById('auditor-standards');
-        const standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
-
-        // New fields
-        const age = parseInt(document.getElementById('auditor-age').value) || null;
-        const experience = parseInt(document.getElementById('auditor-experience').value) || 0;
-        const email = document.getElementById('auditor-email').value;
-        const phone = document.getElementById('auditor-phone').value;
-        const location = document.getElementById('auditor-location').value;
-        const manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
-        const domainExpertise = document.getElementById('auditor-domain').value.split(',').map(s => s.trim()).filter(s => s);
-        const industries = document.getElementById('auditor-industries').value.split(',').map(s => s.trim()).filter(s => s);
-
-        // Academic qualifications
-        const degree = document.getElementById('auditor-degree').value;
-        const fieldOfStudy = document.getElementById('auditor-field').value;
-        const specialization = document.getElementById('auditor-specialization').value;
-
-        // Travel & Availability
-        const hasPassport = document.getElementById('auditor-passport').value === 'yes';
-        const willingToTravel = document.getElementById('auditor-travel').value;
-        const languages = document.getElementById('auditor-languages').value.split(',').map(s => s.trim()).filter(s => s);
-        const pictureUrl = document.getElementById('auditor-picture').value;
-        const customerRating = parseInt(document.getElementById('auditor-rating').value) || null;
-
-        // Joining date
-        const dateJoined = document.getElementById('auditor-joined').value;
-
-        // Soft Skills
-        const softSkills = {
-            communication: document.getElementById('auditor-communication').value,
-            reportWriting: document.getElementById('auditor-writing').value,
-            analyticalSkills: document.getElementById('auditor-analytical').value,
-            attentionToDetail: document.getElementById('auditor-attention').value,
-            interviewingSkills: document.getElementById('auditor-interviewing').value,
-            timeManagement: document.getElementById('auditor-time-management').value
+        // 1. Define Fields
+        const fieldIds = {
+            name: 'auditor-name',
+            email: 'auditor-email',
+            phone: 'auditor-phone',
+            age: 'auditor-age',
+            experience: 'auditor-experience',
+            manDayRate: 'auditor-rate',
+            location: 'auditor-location',
+            pictureUrl: 'auditor-picture',
+            specialization: 'auditor-specialization',
+            domainExpertise: 'auditor-domain',
+            industries: 'auditor-industries',
+            languages: 'auditor-languages'
         };
 
-        if (name && standards.length > 0) {
-            const newAuditor = {
-                id: Date.now(),
-                name, role, standards,
-                age, experience, email, phone, location,
-                manDayRate, domainExpertise, industries,
-                education: { degree, fieldOfStudy, specialization },
-                hasPassport, willingToTravel, languages, pictureUrl, customerRating,
-                dateJoined, softSkills,
-                auditHistory: []
-            };
+        // 2. Define Validation Rules
+        const rules = {
+            name: [
+                { rule: 'required', fieldName: 'Full Name' },
+                { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
+                { rule: 'noHtmlTags', fieldName: 'Full Name' }
+            ],
+            email: [
+                { rule: 'email', fieldName: 'Email' } // Optional but must be valid if present
+            ],
+            age: [
+                { rule: 'range', min: 18, max: 90, fieldName: 'Age' }
+            ],
+            experience: [
+                { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
+            ],
+            manDayRate: [
+                { rule: 'number', fieldName: 'Man-Day Rate' }
+            ],
+            pictureUrl: [
+                { rule: 'url', fieldName: 'Profile Picture URL' }
+            ]
+        };
 
-
-            state.auditors.push(newAuditor);
-            window.saveData();
-            window.closeModal();
-            renderAuditorsEnhanced();
-            window.showNotification('Auditor added successfully');
-        } else {
-            window.showNotification('Please fill in all required fields', 'error');
+        // 3. Validate
+        // Check core fields first
+        const standardsSelect = document.getElementById('auditor-standards');
+        if (standardsSelect.selectedOptions.length === 0) {
+            window.showNotification('Please select at least one Qualified Standard', 'error');
+            return;
         }
+
+        const result = Validator.validateFormElements(fieldIds, rules);
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
+        }
+        Validator.clearErrors(fieldIds);
+
+        // 4. Sanitize Data
+        const cleanData = Sanitizer.sanitizeFormData(result.formData,
+            ['name', 'email', 'phone', 'location', 'specialization', 'domainExpertise', 'industries', 'languages'] // Treat as text
+        );
+
+        // 5. Construct Object
+        const standards = Array.from(standardsSelect.selectedOptions).map(opt => opt.value); // Values are safe (from select)
+
+        const newAuditor = {
+            id: Date.now(),
+            name: cleanData.name,
+            role: document.getElementById('auditor-role').value, // Select
+            standards: standards,
+            age: parseInt(cleanData.age) || null,
+            experience: parseInt(cleanData.experience) || 0,
+            email: cleanData.email,
+            phone: cleanData.phone,
+            location: cleanData.location,
+            manDayRate: parseInt(cleanData.manDayRate) || 0,
+
+            // Split and sanitize arrays
+            domainExpertise: cleanData.domainExpertise.split(',').map(s => s.trim()).filter(s => s),
+            industries: cleanData.industries.split(',').map(s => s.trim()).filter(s => s),
+            languages: cleanData.languages.split(',').map(s => s.trim()).filter(s => s),
+
+            education: {
+                degree: document.getElementById('auditor-degree').value, // Select
+                fieldOfStudy: document.getElementById('auditor-field').value, // Select
+                specialization: cleanData.specialization
+            },
+
+            hasPassport: document.getElementById('auditor-passport').value === 'yes',
+            willingToTravel: document.getElementById('auditor-travel').value,
+            pictureUrl: Sanitizer.sanitizeURL(cleanData.pictureUrl),
+            customerRating: parseInt(document.getElementById('auditor-rating').value) || null,
+            dateJoined: document.getElementById('auditor-joined').value,
+
+            softSkills: {
+                communication: document.getElementById('auditor-communication').value,
+                reportWriting: document.getElementById('auditor-writing').value,
+                analyticalSkills: document.getElementById('auditor-analytical').value,
+                attentionToDetail: document.getElementById('auditor-attention').value,
+                interviewingSkills: document.getElementById('auditor-interviewing').value,
+                timeManagement: document.getElementById('auditor-time-management').value
+            },
+
+            auditHistory: []
+        };
+
+        // 6. Save
+        state.auditors.push(newAuditor);
+        window.saveData();
+        window.closeModal();
+        renderAuditorsEnhanced();
+        window.showNotification('Auditor added successfully', 'success');
     };
 }
 
@@ -2044,37 +2094,90 @@ function openEditAuditorModal(auditorId) {
     window.openModal();
 
     modalSave.onclick = () => {
-        const name = document.getElementById('auditor-name').value;
-        const role = document.getElementById('auditor-role').value;
+        // 1. Define Fields
+        const fieldIds = {
+            name: 'auditor-name',
+            email: 'auditor-email',
+            phone: 'auditor-phone',
+            experience: 'auditor-experience',
+            manDayRate: 'auditor-rate',
+            customerRating: 'auditor-rating',
+            location: 'auditor-location',
+            pictureUrl: 'auditor-picture',
+            industries: 'auditor-industries', // Note: this is a select multiple in edit implementation
+            languages: 'auditor-languages'
+        };
+
+        // 2. Define Validation Rules
+        const rules = {
+            name: [
+                { rule: 'required', fieldName: 'Full Name' },
+                { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
+                { rule: 'noHtmlTags', fieldName: 'Full Name' }
+            ],
+            email: [
+                { rule: 'email', fieldName: 'Email' }
+            ],
+            experience: [
+                { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
+            ],
+            manDayRate: [
+                { rule: 'number', fieldName: 'Man-Day Rate' }
+            ],
+            pictureUrl: [
+                { rule: 'url', fieldName: 'Profile Picture URL' }
+            ]
+        };
+
+        // 3. Validate
+        // Special check for standards (required)
         const standardsSelect = document.getElementById('auditor-standards');
-        const standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
-        const industriesSelect = document.getElementById('auditor-industries');
-        const selectedIndustries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
-
-        if (name && standards.length > 0) {
-            auditor.name = name;
-            auditor.role = role;
-            auditor.standards = standards;
-            auditor.industries = selectedIndustries;
-            auditor.email = document.getElementById('auditor-email').value;
-            auditor.phone = document.getElementById('auditor-phone').value;
-            auditor.location = document.getElementById('auditor-location').value;
-            auditor.pictureUrl = document.getElementById('auditor-picture').value;
-            auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
-            auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
-            auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
-            auditor.dateJoined = document.getElementById('auditor-date-joined').value;
-            auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
-            auditor.willingToTravel = document.getElementById('auditor-travel').value;
-            auditor.languages = document.getElementById('auditor-languages').value.split(',').map(l => l.trim()).filter(l => l);
-
-            window.saveData();
-            window.closeModal();
-            renderAuditorDetail(auditorId);
-            window.showNotification('Auditor updated successfully');
-        } else {
-            window.showNotification('Please fill in all required fields', 'error');
+        if (standardsSelect.selectedOptions.length === 0) {
+            window.showNotification('Please select at least one Qualified Standard', 'error');
+            return;
         }
+
+        const result = Validator.validateFormElements(fieldIds, rules);
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
+        }
+        Validator.clearErrors(fieldIds);
+
+        // 4. Sanitize Data
+        // Note: For select multiple (industries), we get values from DOM separately, so no need to sanitize as text input
+        const cleanData = Sanitizer.sanitizeFormData(result.formData,
+            ['name', 'email', 'phone', 'location', 'languages'] // Treat as text
+        );
+
+        // 5. Update Object
+        auditor.name = cleanData.name;
+        auditor.role = document.getElementById('auditor-role').value;
+        auditor.standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
+
+        const industriesSelect = document.getElementById('auditor-industries');
+        auditor.industries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
+
+        auditor.email = cleanData.email;
+        auditor.phone = cleanData.phone;
+        auditor.location = cleanData.location;
+        auditor.pictureUrl = Sanitizer.sanitizeURL(result.formData.pictureUrl); // Use sanitized URL
+
+        auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
+        auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
+        auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
+        auditor.dateJoined = document.getElementById('auditor-date-joined').value;
+
+        auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
+        auditor.willingToTravel = document.getElementById('auditor-travel').value;
+        auditor.languages = cleanData.languages.split(',').map(l => l.trim()).filter(l => l);
+
+        // 6. Save
+        window.saveData();
+        window.closeModal();
+        renderAuditorDetail(auditorId);
+        window.showNotification('Auditor updated successfully', 'success');
     };
 }
 // Add Training Modal
