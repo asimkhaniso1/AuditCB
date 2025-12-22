@@ -427,27 +427,108 @@ function renderAuditorTab(auditor, tabName) {
             }, 100);
             break;
         case 'competence':
+            // Get qualifications or generate from standards
+            const qualifications = auditor.qualifications || auditor.standards.map(std => ({
+                standard: std,
+                level: auditor.role === 'Lead Auditor' ? 'Lead Auditor' : 'Auditor',
+                issueDate: '2022-01-15',
+                expiryDate: '2025-12-31',
+                certNumber: `CERT-${std.replace(/\s+/g, '-').toUpperCase()}-${auditor.id}`,
+                issuingBody: 'IRCA'
+            }));
+
+            // Calculate status for each qualification
+            const today = new Date();
+            const getQualStatus = (expiryDate) => {
+                const expiry = new Date(expiryDate);
+                const daysUntil = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+                if (daysUntil < 0) return { status: 'Expired', color: '#dc2626', bg: '#fef2f2' };
+                if (daysUntil <= 30) return { status: 'Expiring Soon', color: '#d97706', bg: '#fffbeb' };
+                if (daysUntil <= 90) return { status: 'Renew Soon', color: '#2563eb', bg: '#eff6ff' };
+                return { status: 'Active', color: '#16a34a', bg: '#f0fdf4' };
+            };
+
+            // CPD hours calculation
+            const totalCPD = (auditor.trainings || []).reduce((sum, t) => sum + (t.cpdHours || 0), 0);
+            const requiredCPD = 40;
+
             tabContent.innerHTML = `
+                <!-- CPD Summary -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                        <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${qualifications.length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Qualifications</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${totalCPD >= requiredCPD ? '#16a34a' : '#f59e0b'};">
+                        <i class="fa-solid fa-graduation-cap" style="font-size: 1.5rem; color: ${totalCPD >= requiredCPD ? '#16a34a' : '#f59e0b'}; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${totalCPD}/${requiredCPD}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">CPD Hours</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${qualifications.some(q => getQualStatus(q.expiryDate).status === 'Expired') ? '#dc2626' : '#16a34a'};">
+                        <i class="fa-solid fa-shield-halved" style="font-size: 1.5rem; color: ${qualifications.some(q => getQualStatus(q.expiryDate).status === 'Expired') ? '#dc2626' : '#16a34a'}; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${qualifications.filter(q => getQualStatus(q.expiryDate).status === 'Active').length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Active Certs</p>
+                    </div>
+                </div>
+
                 <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Competence & Qualifications</h3>
-                    <table class="table-container">
-                        <thead>
-                            <tr>
-                                <th>Standard</th>
-                                <th>Level</th>
-                                <th>Valid Until</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${auditor.standards.map(std => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Qualifications & Certifications</h3>
+                        <button class="btn btn-sm btn-primary" onclick="window.openAddQualificationModal(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Qualification
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
                                 <tr>
-                                    <td>${std}</td>
-                                    <td><span style="background: var(--success-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">Lead Auditor</span></td>
-                                    <td>2025-12-31</td>
+                                    <th>Standard</th>
+                                    <th>Level</th>
+                                    <th>Cert Number</th>
+                                    <th>Issuing Body</th>
+                                    <th>Issue Date</th>
+                                    <th>Expiry Date</th>
+                                    <th>Status</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${qualifications.map(q => {
+                const status = getQualStatus(q.expiryDate);
+                return `
+                                    <tr>
+                                        <td style="font-weight: 500;">${q.standard}</td>
+                                        <td><span style="background: ${q.level === 'Lead Auditor' ? '#dbeafe' : '#f1f5f9'}; color: ${q.level === 'Lead Auditor' ? '#1e40af' : '#475569'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${q.level}</span></td>
+                                        <td style="font-family: monospace; font-size: 0.85rem;">${q.certNumber}</td>
+                                        <td>${q.issuingBody}</td>
+                                        <td>${q.issueDate}</td>
+                                        <td>${q.expiryDate}</td>
+                                        <td><span style="background: ${status.bg}; color: ${status.color}; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${status.status}</span></td>
+                                    </tr>
+                                    `;
+            }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Industry Competence -->
+                <div class="card" style="margin-top: 1rem;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-industry" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Industry Competence</h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        ${(auditor.industries || ['Manufacturing', 'IT']).map(ind => `
+                            <span style="background: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
+                                <i class="fa-solid fa-check-circle" style="margin-right: 0.25rem;"></i>${ind}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                        <strong>ISO 17021-1 Clause 7.2:</strong> Auditor competence must be maintained and monitored. Qualifications require renewal before expiry.
+                    </p>
                 </div>
             `;
             break;
@@ -2104,6 +2185,195 @@ window.addPerformanceReview = function (auditorId) {
         renderAuditorDetail(auditorId);
         setTimeout(() => {
             document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+// Add Training Record
+window.openAddTrainingModal = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Training Record';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="training-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Course/Training Name <span style="color: red;">*</span></label>
+                    <input type="text" id="training-course" class="form-control" placeholder="e.g. ISO 9001:2015 Lead Auditor Course" required>
+                </div>
+                <div class="form-group">
+                    <label>Training Provider</label>
+                    <input type="text" id="training-provider" class="form-control" placeholder="e.g. BSI, IRCA, DNV">
+                </div>
+                <div class="form-group">
+                    <label>Completion Date</label>
+                    <input type="date" id="training-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label>Duration (Hours)</label>
+                    <input type="number" id="training-duration" class="form-control" placeholder="40" min="1">
+                </div>
+                <div class="form-group">
+                    <label>CPD Hours</label>
+                    <input type="number" id="training-cpd" class="form-control" placeholder="40" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Training Type</label>
+                <select id="training-type" class="form-control">
+                    <option value="Lead Auditor Course">Lead Auditor Course</option>
+                    <option value="Internal Auditor Course">Internal Auditor Course</option>
+                    <option value="Transition Training">Transition Training</option>
+                    <option value="Technical Training">Technical Training</option>
+                    <option value="Industry-Specific Training">Industry-Specific Training</option>
+                    <option value="Refresher Training">Refresher Training</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="training-certificate" style="width: auto;">
+                    Certificate Obtained
+                </label>
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea id="training-notes" class="form-control" rows="2" placeholder="Additional notes..."></textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        const course = document.getElementById('training-course').value;
+        if (!course) {
+            window.showNotification('Please enter the course name', 'error');
+            return;
+        }
+
+        if (!auditor.trainings) auditor.trainings = [];
+
+        auditor.trainings.unshift({
+            course: course,
+            provider: document.getElementById('training-provider').value || 'Unknown',
+            date: document.getElementById('training-date').value,
+            duration: document.getElementById('training-duration').value + ' hours',
+            cpdHours: parseInt(document.getElementById('training-cpd').value) || 0,
+            type: document.getElementById('training-type').value,
+            certificate: document.getElementById('training-certificate').checked,
+            notes: document.getElementById('training-notes').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Training record added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="training"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+// Add Qualification
+window.openAddQualificationModal = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Qualification';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="qual-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Standard <span style="color: red;">*</span></label>
+                    <select id="qual-standard" class="form-control">
+                        <option value="ISO 9001:2015">ISO 9001:2015</option>
+                        <option value="ISO 14001:2015">ISO 14001:2015</option>
+                        <option value="ISO 45001:2018">ISO 45001:2018</option>
+                        <option value="ISO 27001:2022">ISO 27001:2022</option>
+                        <option value="ISO 22000:2018">ISO 22000:2018</option>
+                        <option value="ISO 50001:2018">ISO 50001:2018</option>
+                        <option value="ISO 13485:2016">ISO 13485:2016</option>
+                        <option value="IATF 16949:2016">IATF 16949:2016</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Qualification Level</label>
+                    <select id="qual-level" class="form-control">
+                        <option value="Lead Auditor">Lead Auditor</option>
+                        <option value="Auditor">Auditor</option>
+                        <option value="Provisional Auditor">Provisional Auditor</option>
+                        <option value="Technical Expert">Technical Expert</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Certificate Number</label>
+                    <input type="text" id="qual-cert-number" class="form-control" placeholder="e.g. IRCA/12345/2024">
+                </div>
+                <div class="form-group">
+                    <label>Issuing Body</label>
+                    <select id="qual-issuing-body" class="form-control">
+                        <option value="IRCA">IRCA</option>
+                        <option value="Exemplar Global">Exemplar Global</option>
+                        <option value="PECB">PECB</option>
+                        <option value="CQI">CQI</option>
+                        <option value="Internal">Internal (CB Approved)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Issue Date</label>
+                    <input type="date" id="qual-issue-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label>Expiry Date</label>
+                    <input type="date" id="qual-expiry-date" class="form-control" value="${new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
+                </div>
+            </div>
+            <div style="padding: 0.75rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
+                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    Qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
+                </p>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        const standard = document.getElementById('qual-standard').value;
+
+        if (!auditor.qualifications) auditor.qualifications = [];
+
+        // Check if standard already exists
+        const exists = auditor.qualifications.some(q => q.standard === standard);
+        if (exists) {
+            if (!confirm('This auditor already has a qualification for ' + standard + '. Add anyway?')) {
+                return;
+            }
+        }
+
+        auditor.qualifications.push({
+            standard: standard,
+            level: document.getElementById('qual-level').value,
+            certNumber: document.getElementById('qual-cert-number').value || `CERT-${Date.now()}`,
+            issuingBody: document.getElementById('qual-issuing-body').value,
+            issueDate: document.getElementById('qual-issue-date').value,
+            expiryDate: document.getElementById('qual-expiry-date').value
+        });
+
+        // Also add to standards array if not present
+        if (!auditor.standards.includes(standard.split(':')[0])) {
+            auditor.standards.push(standard.split(':')[0]);
+        }
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Qualification added successfully', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="competence"]')?.click();
         }, 100);
     };
 
