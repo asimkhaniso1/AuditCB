@@ -1807,40 +1807,90 @@ function deleteAgendaRow(btn) {
 
 
 function saveAuditPlan() {
-    const clientName = document.getElementById('plan-client').value;
-    if (!clientName) return;
+    // 1. Define Fields
+    const fieldIds = {
+        client: 'plan-client',
+        date: 'plan-date',
+        type: 'plan-type',
+        leadAuditor: 'plan-lead-auditor',
+        manDays: 'plan-mandays',
+        onsiteDays: 'plan-onsite-days'
+        // Standard & Team are multi-selects handled separately or via generic rules if we mapped them
+    };
 
-    // Collect Step 1 Data
+    // 2. Define Rules
+    const rules = {
+        client: [{ rule: 'required', fieldName: 'Client' }],
+        date: [{ rule: 'required', fieldName: 'Date' }],
+        manDays: [
+            { rule: 'required', fieldName: 'Man-Days' },
+            { rule: 'number', fieldName: 'Man-Days' },
+            { rule: 'range', min: 0.1, max: 1000, fieldName: 'Man-Days' }
+        ],
+        onsiteDays: [
+            { rule: 'number', fieldName: 'Onsite Days' }
+        ]
+    };
+
+    // 3. Validate Step 1
+    const result = Validator.validateFormElements(fieldIds, rules);
+    if (!result.valid) {
+        Validator.displayErrors(result.errors, fieldIds);
+        window.showNotification('Please fix the form errors', 'error');
+        return;
+    }
+    Validator.clearErrors(fieldIds);
+
+    // 4. Collect & Sanitize Data
+    const clientName = document.getElementById('plan-client').value;
     const date = document.getElementById('plan-date').value;
     const type = document.getElementById('plan-type').value;
-    const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
+
+    // Safely map multi-selects
+    const standardSelect = document.getElementById('plan-standard');
+    const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
+
+    // Validate Leads/Team
     const leadAuditor = document.getElementById('plan-lead-auditor').value;
-    const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
+    const teamSelect = document.getElementById('plan-team');
+    const team = Array.from(teamSelect.selectedOptions).map(o => o.value);
+
+    if (!leadAuditor) {
+        window.showNotification('Lead Auditor is required', 'error');
+        return;
+    }
+
     const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
     const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 
     const selectedSites = [];
     document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
         selectedSites.push({
-            name: cb.dataset.name,
+            name: cb.dataset.name, // Usually safe as it comes from dataset, but...
             geotag: cb.dataset.geotag || null
         });
     });
 
-    // Collect Agenda (Step 2)
+    // 5. Collect & Sanitize Agenda (Step 2)
     const agenda = [];
-    document.querySelectorAll('#agenda-tbody tr').forEach(row => {
-        const inputs = row.querySelectorAll('input, select');
-        agenda.push({
-            day: inputs[0].value,
-            time: inputs[1].value,
-            item: inputs[2].value,
-            dept: inputs[3].value,
-            auditor: inputs[4].value
-        });
-    });
+    const agendaRows = document.querySelectorAll('#agenda-tbody tr');
 
-    // Construct Plan Object
+    for (const row of agendaRows) {
+        const inputs = row.querySelectorAll('input, select');
+
+        // Manual validation for agenda rows?
+        // Let's just sanitize them for now
+
+        agenda.push({
+            day: Sanitizer.sanitizeText(inputs[0].value),
+            time: Sanitizer.sanitizeText(inputs[1].value),
+            item: Sanitizer.sanitizeText(inputs[2].value), // Critical: Activity description
+            dept: Sanitizer.sanitizeText(inputs[3].value),
+            auditor: inputs[4].value // Select value
+        });
+    }
+
+    // 6. Construct Plan Object
     const planData = {
         client: clientName,
         date: date,
@@ -1858,14 +1908,17 @@ function saveAuditPlan() {
     if (window.editingPlanId) {
         const index = state.auditPlans.findIndex(p => p.id === window.editingPlanId);
         if (index !== -1) {
-            state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
-            window.showNotification('Audit Plan updated successfully');
+            state.auditPlans[index] = { ...state.auditPlans[index], ...planData }; // Merge
+            window.showNotification('Audit Plan updated successfully', 'success');
         }
     } else {
-        planData.id = Date.now();
-        planData.progress = 0;
-        state.auditPlans.push(planData);
-        window.showNotification('Audit Plan created successfully');
+        const newPlan = {
+            id: Date.now(),
+            progress: 0,
+            ...planData
+        };
+        state.auditPlans.push(newPlan);
+        window.showNotification('Audit Plan created successfully', 'success');
     }
 
     window.saveData();
