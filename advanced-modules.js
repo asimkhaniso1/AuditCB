@@ -428,6 +428,176 @@ function renderAuditorTab(auditor, tabName) {
                 dateFilter?.addEventListener('change', applyFilters);
                 locationFilter?.addEventListener('input', applyFilters);
             }, 100);
+
+            // Add Evaluations Section (ISO 17021-1 Clause 7.2 - Auditor Performance Monitoring)
+            const evaluations = auditor.evaluations || { witnessAudits: [], performanceReviews: [] };
+            const nextWitness = evaluations.nextWitnessAuditDue || 'Not scheduled';
+            const witnessAudits = evaluations.witnessAudits || [];
+            const performanceReviews = evaluations.performanceReviews || [];
+
+            // Performance Summary Cards
+            const perfSummaryHTML = `
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0;">
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                        <i class="fa-solid fa-eye" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${witnessAudits.length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Witness Audits</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                        <i class="fa-solid fa-chart-line" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${performanceReviews.length}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Performance Reviews</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${auditor.customerRating && auditor.customerRating >= 4 ? '#10b981' : '#f59e0b'};">
+                        <i class="fa-solid fa-star" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${auditor.customerRating || '-'}/5</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Avg Rating</p>
+                    </div>
+                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'};">
+                        <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'}; margin-bottom: 0.5rem;"></i>
+                        <p style="font-size: 0.9rem; font-weight: 600; margin: 0;">${nextWitness}</p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Next Witness Due</p>
+                    </div>
+                </div>
+            `;
+
+            // Witness Audits Section
+            const witnessAuditsHTML = `
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-eye" style="margin-right: 0.5rem; color: #3b82f6;"></i>
+                            Witness Audits
+                        </h3>
+                        <button class="btn btn-sm btn-primary" onclick="window.addWitnessAudit(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Record Witness Audit
+                        </button>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
+                        ISO 17021-1 Clause 7.2.12 requires periodic observation of auditors during audits.
+                    </p>
+                    ${witnessAudits.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Client</th>
+                                        <th>Standard</th>
+                                        <th>Witnessed By</th>
+                                        <th>Rating</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${witnessAudits.map(w => `
+                                        <tr>
+                                            <td>${w.date}</td>
+                                            <td>${w.client}</td>
+                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${w.standard}</span></td>
+                                            <td>${w.witnessedBy}</td>
+                                            <td>
+                                                <span style="color: #fbbf24;">${'★'.repeat(w.rating || 0)}${'☆'.repeat(5 - (w.rating || 0))}</span>
+                                            </td>
+                                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${w.notes || ''}">${w.notes || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #fef3c7; border-radius: 8px;">
+                            <i class="fa-solid fa-exclamation-triangle" style="font-size: 2rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                            <p style="color: #92400e; margin: 0;">No witness audits recorded. Schedule monitoring per ISO 17021-1.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            // Performance Reviews Section
+            const performanceReviewsHTML = `
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">
+                            <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
+                            Performance Reviews
+                        </h3>
+                        <button class="btn btn-sm btn-secondary" onclick="window.addPerformanceReview(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
+                        </button>
+                    </div>
+                    ${performanceReviews.length > 0 ? `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Review Type</th>
+                                        <th>Overall Rating</th>
+                                        <th>Reviewed By</th>
+                                        <th>Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${performanceReviews.map(r => `
+                                        <tr>
+                                            <td>${r.date}</td>
+                                            <td>${r.type}</td>
+                                            <td>
+                                                <span style="background: ${r.rating >= 4 ? '#d1fae5' : r.rating >= 3 ? '#fef3c7' : '#fee2e2'}; 
+                                                    color: ${r.rating >= 4 ? '#065f46' : r.rating >= 3 ? '#92400e' : '#991b1b'};
+                                                    padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
+                                                    ${r.rating}/5
+                                                </span>
+                                            </td>
+                                            <td>${r.reviewedBy}</td>
+                                            <td><span class="status-badge status-${r.outcome?.toLowerCase() || 'pending'}">${r.outcome || 'Pending'}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : `
+                        <div style="text-align: center; padding: 2rem; background: #f1f5f9; border-radius: 8px;">
+                            <p style="color: #64748b; margin: 0;">No performance reviews recorded yet.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            // Audit History Section
+            const historyRows = (auditor.auditHistory || []).length > 0
+                ? auditor.auditHistory.map(h => `
+                    <tr>
+                        <td>${h.client}</td>
+                        <td>${h.date}</td>
+                        <td><span class="status-badge status-completed">${h.type}</span></td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No audit history available yet.</td></tr>';
+
+            const auditHistoryHTML = `
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-history" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit History</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Date</th>
+                                    <th>Audit Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${historyRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            // Append all sections to the activity tab
+            tabContent.innerHTML += perfSummaryHTML + witnessAuditsHTML + performanceReviewsHTML + auditHistoryHTML;
             break;
         case 'qualifications':
             // Get qualifications or generate from standards
@@ -589,178 +759,6 @@ function renderAuditorTab(auditor, tabName) {
                     <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openAuditorUploadModal(${auditor.id})">
                         <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                     </button>
-                </div>
-            `;
-            break;
-        case 'history':
-            const historyRows = (auditor.auditHistory || []).length > 0
-                ? auditor.auditHistory.map(h => `
-                    <tr>
-                        <td>${h.client}</td>
-                        <td>${h.date}</td>
-                        <td><span class="status-badge status-completed">${h.type}</span></td>
-                    </tr>
-                `).join('')
-                : '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No audit history available yet.</td></tr>';
-
-            tabContent.innerHTML = `
-                <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Audit History</h3>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Client</th>
-                                    <th>Date</th>
-                                    <th>Audit Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${historyRows}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-            break;
-
-        case 'evaluations':
-            // ISO 17021-1 Clause 7.2 - Auditor Performance Monitoring
-            const evaluations = auditor.evaluations || { witnessAudits: [], performanceReviews: [] };
-            const nextWitness = evaluations.nextWitnessAuditDue || 'Not scheduled';
-            const witnessAudits = evaluations.witnessAudits || [];
-            const performanceReviews = evaluations.performanceReviews || [];
-
-            tabContent.innerHTML = `
-                <!-- Performance Summary -->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
-                        <i class="fa-solid fa-eye" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${witnessAudits.length}</p>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Witness Audits</p>
-                    </div>
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
-                        <i class="fa-solid fa-chart-line" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${performanceReviews.length}</p>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Performance Reviews</p>
-                    </div>
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${auditor.customerRating && auditor.customerRating >= 4 ? '#10b981' : '#f59e0b'};">
-                        <i class="fa-solid fa-star" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">${auditor.customerRating || '-'}/5</p>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Avg Rating</p>
-                    </div>
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'};">
-                        <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: ${nextWitness === 'Not scheduled' ? '#dc2626' : '#3b82f6'}; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 0.9rem; font-weight: 600; margin: 0;">${nextWitness}</p>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Next Witness Due</p>
-                    </div>
-                </div>
-                
-                <!-- Witness Audits -->
-                <div class="card" style="margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">
-                            <i class="fa-solid fa-eye" style="margin-right: 0.5rem; color: #3b82f6;"></i>
-                            Witness Audits
-                        </h3>
-                        <button class="btn btn-sm btn-primary" onclick="window.addWitnessAudit(${auditor.id})">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Record Witness Audit
-                        </button>
-                    </div>
-                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
-                        ISO 17021-1 Clause 7.2.12 requires periodic observation of auditors during audits.
-                    </p>
-                    ${witnessAudits.length > 0 ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Client</th>
-                                        <th>Standard</th>
-                                        <th>Witnessed By</th>
-                                        <th>Rating</th>
-                                        <th>Notes</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${witnessAudits.map(w => `
-                                        <tr>
-                                            <td>${w.date}</td>
-                                            <td>${w.client}</td>
-                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${w.standard}</span></td>
-                                            <td>${w.witnessedBy}</td>
-                                            <td>
-                                                <span style="color: #fbbf24;">${'★'.repeat(w.rating || 0)}${'☆'.repeat(5 - (w.rating || 0))}</span>
-                                            </td>
-                                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${w.notes || ''}">${w.notes || '-'}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 2rem; background: #fef3c7; border-radius: 8px;">
-                            <i class="fa-solid fa-exclamation-triangle" style="font-size: 2rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
-                            <p style="color: #92400e; margin: 0;">No witness audits recorded. Schedule monitoring per ISO 17021-1.</p>
-                        </div>
-                    `}
-                </div>
-                
-                <!-- Performance Reviews -->
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">
-                            <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
-                            Performance Reviews
-                        </h3>
-                        <button class="btn btn-sm btn-secondary" onclick="window.addPerformanceReview(${auditor.id})">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
-                        </button>
-                    </div>
-                    ${performanceReviews.length > 0 ? `
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Review Type</th>
-                                        <th>Overall Rating</th>
-                                        <th>Reviewed By</th>
-                                        <th>Outcome</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${performanceReviews.map(r => `
-                                        <tr>
-                                            <td>${r.date}</td>
-                                            <td>${r.type}</td>
-                                            <td>
-                                                <span style="background: ${r.rating >= 4 ? '#d1fae5' : r.rating >= 3 ? '#fef3c7' : '#fee2e2'}; 
-                                                    color: ${r.rating >= 4 ? '#065f46' : r.rating >= 3 ? '#92400e' : '#991b1b'};
-                                                    padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
-                                                    ${r.rating}/5
-                                                </span>
-                                            </td>
-                                            <td>${r.reviewedBy}</td>
-                                            <td><span class="status-badge status-${r.outcome?.toLowerCase() || 'pending'}">${r.outcome || 'Pending'}</span></td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 2rem; background: #f1f5f9; border-radius: 8px;">
-                            <p style="color: #64748b; margin: 0;">No performance reviews recorded yet.</p>
-                        </div>
-                    `}
-                </div>
-                
-                <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
-                    <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
-                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                        <strong>ISO 17021-1 Clause 7.2:</strong> The CB shall monitor auditor competence through office reviews, feedback analysis, and witness audits. New qualifications require witness observation.
-                    </p>
                 </div>
             `;
             break;
