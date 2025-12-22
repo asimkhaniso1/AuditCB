@@ -1039,64 +1039,116 @@ function openAddClientModal() {
     window.openModal();
 
     modalSave.onclick = () => {
-        const name = document.getElementById('client-name').value;
-        const standard = Array.from(document.getElementById('client-standard').selectedOptions).map(o => o.value).join(', ');
-        const nextAudit = document.getElementById('client-next-audit').value;
+        // 1. Define Fields
+        const fieldIds = {
+            name: 'client-name',
+            industry: 'client-industry',
+            website: 'client-website',
+            contactName: 'client-contact-name',
+            contactDesignation: 'client-contact-designation',
+            contactPhone: 'client-contact-phone',
+            contactEmail: 'client-contact-email',
+            address: 'client-address',
+            city: 'client-city',
+            country: 'client-country',
+            geotag: 'client-geotag',
+            employees: 'client-employees',
+            siteCount: 'client-sites',
+            nextAudit: 'client-next-audit'
+        };
 
-        // Contact
-        const contactName = document.getElementById('client-contact-name').value;
-        const contactDesignation = document.getElementById('client-contact-designation').value;
-        const contactPhone = document.getElementById('client-contact-phone').value;
-        const contactEmail = document.getElementById('client-contact-email').value;
-        const website = document.getElementById('client-website').value;
+        // 2. Define Rules
+        const rules = {
+            name: [
+                { rule: 'required', fieldName: 'Company Name' },
+                { rule: 'length', min: 2, max: 200 },
+                { rule: 'noHtmlTags' }
+            ],
+            contactEmail: [
+                { rule: 'email', fieldName: 'Contact Email' }
+            ],
+            website: [
+                { rule: 'url', fieldName: 'Website' }
+            ],
+            employees: [
+                { rule: 'number', fieldName: 'Total Employees' },
+                { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
+            ],
+            siteCount: [
+                { rule: 'number', fieldName: 'Number of Sites' },
+                { rule: 'range', min: 1, max: 1000, fieldName: 'Number of Sites' }
+            ],
+            nextAudit: [
+                { rule: 'required', fieldName: 'Next Audit Date' },
+                { rule: 'date' }
+            ]
+        };
 
-        // Location
-        const address = document.getElementById('client-address').value;
-        const city = document.getElementById('client-city').value;
-        const country = document.getElementById('client-country').value;
-        const geotag = document.getElementById('client-geotag').value;
+        // 3. Validate
+        // Check standards select
+        const standardSelect = document.getElementById('client-standard');
+        if (standardSelect.selectedOptions.length === 0) {
+            window.showNotification('Please select at least one standard', 'error');
+            return;
+        }
 
-        // Operational
-        const employees = parseInt(document.getElementById('client-employees').value) || 0;
-        const siteCount = parseInt(document.getElementById('client-sites').value) || 1;
-        const shifts = document.getElementById('client-shifts').value;
-        const industry = document.getElementById('client-industry').value;
+        const result = Validator.validateFormElements(fieldIds, rules);
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
+        }
+        Validator.clearErrors(fieldIds);
+
+        // 4. Sanitize
+        const cleanData = Sanitizer.sanitizeFormData(result.formData,
+            ['name', 'contactName', 'contactDesignation', 'contactPhone',
+                'address', 'city', 'country', 'geotag'] // Sanitize as text
+        );
+
+        // 5. Construct Object
+        const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', '); // Safe values
 
         // Build contacts array
         const contacts = [];
-        if (contactName) {
+        if (cleanData.contactName) {
             contacts.push({
-                name: contactName,
-                designation: contactDesignation,
-                phone: contactPhone,
-                email: contactEmail
+                name: cleanData.contactName,
+                designation: cleanData.contactDesignation,
+                phone: cleanData.contactPhone,
+                email: cleanData.contactEmail // already validated email
             });
         }
 
-        // Build sites array (primary site from form, more can be added later)
+        // Build sites array
         const sites = [{
             name: 'Head Office',
-            address: address,
-            city: city,
-            country: country,
-            geotag: geotag
+            address: cleanData.address,
+            city: cleanData.city,
+            country: cleanData.country,
+            geotag: cleanData.geotag
         }];
 
-        if (name && nextAudit) {
-            const newClient = {
-                id: Date.now(),
-                name, standard, nextAudit, industry,
-                status: 'Active',
-                website, contacts, sites,
-                employees, shifts
-            };
+        const newClient = {
+            id: Date.now(),
+            name: cleanData.name,
+            standard: standard,
+            nextAudit: cleanData.nextAudit,
+            industry: document.getElementById('client-industry').value, // select value
+            status: 'Active',
+            website: Sanitizer.sanitizeURL(cleanData.website),
+            contacts: contacts,
+            sites: sites,
+            employees: parseInt(cleanData.employees) || 0,
+            shifts: document.getElementById('client-shifts').value // select value
+        };
 
-            state.clients.push(newClient);
-            window.saveData();
-            window.closeModal();
-            renderClientsEnhanced();
-            window.showNotification('Client added successfully');
-        }
+        // 6. Save
+        state.clients.push(newClient);
+        window.saveData();
+        window.closeModal();
+        renderClientsEnhanced();
+        window.showNotification('Client added successfully', 'success');
     };
 }
 
@@ -1213,26 +1265,68 @@ function openEditClientModal(clientId) {
     window.openModal();
 
     modalSave.onclick = () => {
-        const name = document.getElementById('client-name').value;
-        const standard = Array.from(document.getElementById('client-standard').selectedOptions).map(o => o.value).join(', ');
-        const status = document.getElementById('client-status').value;
-        const nextAudit = document.getElementById('client-next-audit').value;
+        // 1. Define Fields
+        const fieldIds = {
+            name: 'client-name',
+            industry: 'client-industry',
+            website: 'client-website',
+            employees: 'client-employees',
+            nextAudit: 'client-next-audit'
+        };
 
-        if (name) {
-            client.name = name;
-            client.standard = standard;
-            client.status = status;
-            client.nextAudit = nextAudit;
-            client.industry = document.getElementById('client-industry').value;
-            client.website = document.getElementById('client-website').value;
-            client.employees = parseInt(document.getElementById('client-employees').value) || 0;
-            client.shifts = document.getElementById('client-shifts').value;
+        // 2. Define Rules
+        const rules = {
+            name: [
+                { rule: 'required', fieldName: 'Company Name' },
+                { rule: 'length', min: 2, max: 200 },
+                { rule: 'noHtmlTags' }
+            ],
+            website: [
+                { rule: 'url', fieldName: 'Website' }
+            ],
+            employees: [
+                { rule: 'number', fieldName: 'Total Employees' },
+                { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
+            ],
+            nextAudit: [
+                { rule: 'date', fieldName: 'Next Audit Date' }
+            ]
+        };
 
-            window.saveData();
-            window.closeModal();
-            renderClientDetail(clientId);
-            window.showNotification('Client updated successfully');
+        // 3. Validate
+        // Check standards select
+        const standardSelect = document.getElementById('client-standard');
+        if (standardSelect.selectedOptions.length === 0) {
+            window.showNotification('Please select at least one standard', 'error');
+            return;
         }
+
+        const result = Validator.validateFormElements(fieldIds, rules);
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
+        }
+        Validator.clearErrors(fieldIds);
+
+        // 4. Sanitize (only name needs text sanitization here)
+        const cleanData = Sanitizer.sanitizeFormData(result.formData, ['name']);
+
+        // 5. Update Object
+        client.name = cleanData.name;
+        client.standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
+        client.status = document.getElementById('client-status').value;
+        client.nextAudit = cleanData.nextAudit;
+        client.industry = document.getElementById('client-industry').value;
+        client.website = Sanitizer.sanitizeURL(cleanData.website);
+        client.employees = parseInt(cleanData.employees) || 0;
+        client.shifts = document.getElementById('client-shifts').value;
+
+        // 6. Save
+        window.saveData();
+        window.closeModal();
+        renderClientDetail(clientId);
+        window.showNotification('Client updated successfully', 'success');
     };
 }
 
