@@ -141,12 +141,12 @@ function renderAppealsTab(appeals) {
                     ${appeals.map(a => `
                         <tr>
                             <td><strong>APP-${String(a.id).padStart(3, '0')}</strong></td>
-                            <td>${a.clientName || '-'}</td>
-                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${a.type}</span></td>
-                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.subject}">${a.subject}</td>
-                            <td>${a.dateReceived}</td>
-                            <td>${a.dueDate || '-'}</td>
-                            <td><span class="badge" style="background: ${getStatusColor(a.status)}; color: white;">${a.status}</span></td>
+                            <td>${window.UTILS.escapeHtml(a.clientName || '-')}</td>
+                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(a.type)}</span></td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(a.subject)}">${window.UTILS.escapeHtml(a.subject)}</td>
+                            <td>${window.UTILS.escapeHtml(a.dateReceived)}</td>
+                            <td>${window.UTILS.escapeHtml(a.dueDate || '-')}</td>
+                            <td><span class="badge" style="background: ${getStatusColor(a.status)}; color: white;">${window.UTILS.escapeHtml(a.status)}</span></td>
                             <td>
                                 <button class="btn btn-sm btn-outline-primary" onclick="window.viewAppealDetail(${a.id})">
                                     <i class="fa-solid fa-eye"></i> View
@@ -201,12 +201,12 @@ function renderComplaintsTab(complaints) {
                     ${complaints.map(c => `
                         <tr>
                             <td><strong>CMP-${String(c.id).padStart(3, '0')}</strong></td>
-                            <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.source}</span></td>
-                            <td><span class="badge" style="background: #fef3c7; color: #92400e;">${c.type}</span></td>
-                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.subject}">${c.subject}</td>
-                            <td>${c.dateReceived}</td>
-                            <td>${c.dueDate || '-'}</td>
-                            <td><span class="badge" style="background: ${getStatusColor(c.status)}; color: white;">${c.status}</span></td>
+                            <td><span class="badge" style="background: #f3f4f6; color: #374151;">${window.UTILS.escapeHtml(c.source)}</span></td>
+                            <td><span class="badge" style="background: #fef3c7; color: #92400e;">${window.UTILS.escapeHtml(c.type)}</span></td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(c.subject)}">${window.UTILS.escapeHtml(c.subject)}</td>
+                            <td>${window.UTILS.escapeHtml(c.dateReceived)}</td>
+                            <td>${window.UTILS.escapeHtml(c.dueDate || '-')}</td>
+                            <td><span class="badge" style="background: ${getStatusColor(c.status)}; color: white;">${window.UTILS.escapeHtml(c.status)}</span></td>
                             <td>
                                 <button class="btn btn-sm btn-outline-primary" onclick="window.viewComplaintDetail(${c.id})">
                                     <i class="fa-solid fa-eye"></i> View
@@ -239,7 +239,7 @@ window.openNewAppealModal = function () {
                     <label>Client</label>
                     <select id="appeal-client" class="form-control" required>
                         <option value="">Select Client</option>
-                        ${clients.map(c => `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`).join('')}
+                        ${clients.map(c => `<option value="${c.id}" data-name="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                     </select>
                 </div>
                 <div>
@@ -341,7 +341,7 @@ window.openNewComplaintModal = function () {
                     <label>Related Client (if applicable)</label>
                     <select id="complaint-client" class="form-control">
                         <option value="">Not Applicable</option>
-                        ${clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                        ${clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -370,7 +370,7 @@ window.openNewComplaintModal = function () {
             <div style="margin-top: 1rem;">
                 <label>Auditors Involved (Hold Ctrl/Cmd to select multiple)</label>
                 <select id="complaint-auditors" class="form-control" multiple style="height: 80px;">
-                    ${auditors.map(a => `<option value="${a.id}">${a.name} (${a.role})</option>`).join('')}
+                    ${auditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)} (${window.UTILS.escapeHtml(a.role)})</option>`).join('')}
                 </select>
             </div>
             <div style="margin-top: 1rem;">
@@ -552,30 +552,30 @@ window.viewAppealDetail = function (id) {
             <div class="card" style="margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                     <div>
-                        <h2 style="margin: 0;">APP-${String(appeal.id).padStart(3, '0')}: ${appeal.subject}</h2>
+                        <h2 style="margin: 0;">APP-${String(appeal.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(appeal.subject)}</h2>
                         <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary);">
-                            ${appeal.clientName} • ${appeal.type}
+                            ${window.UTILS.escapeHtml(appeal.clientName)} • ${window.UTILS.escapeHtml(appeal.type)}
                         </p>
                     </div>
-                    <span class="badge" style="background: ${getStatusColor(appeal.status)}; color: white; font-size: 1rem; padding: 0.5rem 1rem;">${appeal.status}</span>
+                    <span class="badge" style="background: ${getStatusColor(appeal.status)}; color: white; font-size: 1rem; padding: 0.5rem 1rem;">${window.UTILS.escapeHtml(appeal.status)}</span>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 8px;">
-                    <div><strong>Date Received:</strong><br>${appeal.dateReceived}</div>
-                    <div><strong>Due Date:</strong><br>${appeal.dueDate || 'Not Set'}</div>
-                    <div><strong>Assigned To:</strong><br>${appeal.assignedTo}</div>
-                    <div><strong>Date Resolved:</strong><br>${appeal.dateResolved || 'Pending'}</div>
+                    <div><strong>Date Received:</strong><br>${window.UTILS.escapeHtml(appeal.dateReceived)}</div>
+                    <div><strong>Due Date:</strong><br>${window.UTILS.escapeHtml(appeal.dueDate || 'Not Set')}</div>
+                    <div><strong>Assigned To:</strong><br>${window.UTILS.escapeHtml(appeal.assignedTo)}</div>
+                    <div><strong>Date Resolved:</strong><br>${window.UTILS.escapeHtml(appeal.dateResolved || 'Pending')}</div>
                 </div>
                 
                 <div style="margin-bottom: 1.5rem;">
                     <h4>Description</h4>
-                    <p style="background: #f8fafc; padding: 1rem; border-radius: 6px;">${appeal.description}</p>
+                    <p style="background: #f8fafc; padding: 1rem; border-radius: 6px;">${window.UTILS.escapeHtml(appeal.description)}</p>
                 </div>
                 
                 ${appeal.resolution ? `
                 <div style="margin-bottom: 1.5rem;">
                     <h4>Resolution</h4>
-                    <p style="background: #f0fdf4; padding: 1rem; border-radius: 6px; border-left: 4px solid #10b981;">${appeal.resolution}</p>
+                    <p style="background: #f0fdf4; padding: 1rem; border-radius: 6px; border-left: 4px solid #10b981;">${window.UTILS.escapeHtml(appeal.resolution)}</p>
                 </div>
                 ` : ''}
                 
@@ -597,11 +597,11 @@ window.viewAppealDetail = function (id) {
                 <div style="margin-top: 1rem;">
                     ${(appeal.history || []).map((h, idx) => `
                         <div style="display: flex; gap: 1rem; padding: 1rem 0; ${idx < appeal.history.length - 1 ? 'border-bottom: 1px solid #f1f5f9;' : ''}">
-                            <div style="width: 100px; flex-shrink: 0; font-size: 0.85rem; color: var(--text-secondary);">${h.date}</div>
+                            <div style="width: 100px; flex-shrink: 0; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(h.date)}</div>
                             <div style="flex: 1;">
-                                <strong style="color: ${getStatusColor(h.action)};">${h.action}</strong>
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;"> by ${h.user}</span>
-                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">${h.notes}</p>
+                                <strong style="color: ${getStatusColor(h.action)};">${window.UTILS.escapeHtml(h.action)}</strong>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;"> by ${window.UTILS.escapeHtml(h.user)}</span>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">${window.UTILS.escapeHtml(h.notes)}</p>
                             </div>
                         </div>
                     `).join('')}
@@ -643,45 +643,45 @@ window.viewComplaintDetail = function (id) {
             <div class="card" style="margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                     <div>
-                        <h2 style="margin: 0;">CMP-${String(complaint.id).padStart(3, '0')}: ${complaint.subject}</h2>
+                        <h2 style="margin: 0;">CMP-${String(complaint.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(complaint.subject)}</h2>
                         <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary);">
-                            Source: ${complaint.source} • Type: ${complaint.type}
-                            ${complaint.clientName ? ` • Client: ${complaint.clientName}` : ''}
+                            Source: ${window.UTILS.escapeHtml(complaint.source)} • Type: ${window.UTILS.escapeHtml(complaint.type)}
+                            ${complaint.clientName ? ` • Client: ${window.UTILS.escapeHtml(complaint.clientName)}` : ''}
                         </p>
                     </div>
-                    <span class="badge" style="background: ${getStatusColor(complaint.status)}; color: white; font-size: 1rem; padding: 0.5rem 1rem;">${complaint.status}</span>
+                    <span class="badge" style="background: ${getStatusColor(complaint.status)}; color: white; font-size: 1rem; padding: 0.5rem 1rem;">${window.UTILS.escapeHtml(complaint.status)}</span>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 8px;">
-                    <div><strong>Date Received:</strong><br>${complaint.dateReceived}</div>
-                    <div><strong>Due Date:</strong><br>${complaint.dueDate || 'Not Set'}</div>
-                    <div><strong>Investigator:</strong><br>${complaint.investigator}</div>
-                    <div><strong>Date Resolved:</strong><br>${complaint.dateResolved || 'Pending'}</div>
+                    <div><strong>Date Received:</strong><br>${window.UTILS.escapeHtml(complaint.dateReceived)}</div>
+                    <div><strong>Due Date:</strong><br>${window.UTILS.escapeHtml(complaint.dueDate || 'Not Set')}</div>
+                    <div><strong>Investigator:</strong><br>${window.UTILS.escapeHtml(complaint.investigator)}</div>
+                    <div><strong>Date Resolved:</strong><br>${window.UTILS.escapeHtml(complaint.dateResolved || 'Pending')}</div>
                 </div>
                 
                 <div style="margin-bottom: 1.5rem;">
                     <h4>Description</h4>
-                    <p style="background: #f8fafc; padding: 1rem; border-radius: 6px;">${complaint.description}</p>
+                    <p style="background: #f8fafc; padding: 1rem; border-radius: 6px;">${window.UTILS.escapeHtml(complaint.description)}</p>
                 </div>
                 
                 ${complaint.findings ? `
                 <div style="margin-bottom: 1.5rem;">
                     <h4>Investigation Findings</h4>
-                    <p style="background: #fef3c7; padding: 1rem; border-radius: 6px; border-left: 4px solid #f59e0b;">${complaint.findings}</p>
+                    <p style="background: #fef3c7; padding: 1rem; border-radius: 6px; border-left: 4px solid #f59e0b;">${window.UTILS.escapeHtml(complaint.findings)}</p>
                 </div>
                 ` : ''}
                 
                 ${complaint.correctiveAction ? `
                 <div style="margin-bottom: 1.5rem;">
                     <h4>Corrective Action</h4>
-                    <p style="background: #e0f2fe; padding: 1rem; border-radius: 6px; border-left: 4px solid #0284c7;">${complaint.correctiveAction}</p>
+                    <p style="background: #e0f2fe; padding: 1rem; border-radius: 6px; border-left: 4px solid #0284c7;">${window.UTILS.escapeHtml(complaint.correctiveAction)}</p>
                 </div>
                 ` : ''}
                 
                 ${complaint.resolution ? `
                 <div style="margin-bottom: 1.5rem;">
                     <h4>Resolution</h4>
-                    <p style="background: #f0fdf4; padding: 1rem; border-radius: 6px; border-left: 4px solid #10b981;">${complaint.resolution}</p>
+                    <p style="background: #f0fdf4; padding: 1rem; border-radius: 6px; border-left: 4px solid #10b981;">${window.UTILS.escapeHtml(complaint.resolution)}</p>
                 </div>
                 ` : ''}
                 
@@ -703,11 +703,11 @@ window.viewComplaintDetail = function (id) {
                 <div style="margin-top: 1rem;">
                     ${(complaint.history || []).map((h, idx) => `
                         <div style="display: flex; gap: 1rem; padding: 1rem 0; ${idx < complaint.history.length - 1 ? 'border-bottom: 1px solid #f1f5f9;' : ''}">
-                            <div style="width: 100px; flex-shrink: 0; font-size: 0.85rem; color: var(--text-secondary);">${h.date}</div>
+                            <div style="width: 100px; flex-shrink: 0; font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(h.date)}</div>
                             <div style="flex: 1;">
-                                <strong style="color: ${getStatusColor(h.action)};">${h.action}</strong>
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;"> by ${h.user}</span>
-                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">${h.notes}</p>
+                                <strong style="color: ${getStatusColor(h.action)};">${window.UTILS.escapeHtml(h.action)}</strong>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;"> by ${window.UTILS.escapeHtml(h.user)}</span>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">${window.UTILS.escapeHtml(h.notes)}</p>
                             </div>
                         </div>
                     `).join('')}

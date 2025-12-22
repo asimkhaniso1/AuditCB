@@ -262,8 +262,8 @@ const Utils = {
 
 ## Security Checklist
 
-- [ ] Input sanitization implemented
-- [ ] API keys removed from client
+- [x] Input sanitization implemented (Planning & Checklist Modules)
+- [x] API keys removed from client (Fixed in ai-service.js & settings-module.js)
 - [ ] HTTPS enforced (if deployed)
 - [ ] Content Security Policy headers
 - [ ] Rate limiting on API endpoints

@@ -255,8 +255,8 @@ function renderRetentionRecordsList(records) {
                 <tbody>
                     ${records.map(r => `
                         <tr>
-                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${r.type}</span></td>
-                            <td style="font-weight: 500;">${r.name}</td>
+                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(r.type)}</span></td>
+                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(r.name)}</td>
                             <td>${r.date}</td>
                             <td>${r.age}</td>
                             <td>
@@ -270,7 +270,7 @@ function renderRetentionRecordsList(records) {
         }
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-secondary" onclick="window.showArchiveOptions('${r.type}', '${r.name}')">
+                                <button class="btn btn-sm btn-secondary" onclick="window.showArchiveOptions('${r.type}', decodeURIComponent('${encodeURIComponent(r.name)}'))">
                                     <i class="fa-solid fa-archive"></i>
                                 </button>
                             </td>
@@ -304,7 +304,7 @@ window.showArchiveOptions = function (type, name) {
     document.getElementById('modal-body').innerHTML = `
         <div style="margin-bottom: 1rem;">
             <p><strong>Record Type:</strong> ${type}</p>
-            <p><strong>Reference:</strong> ${name}</p>
+            <p><strong>Reference:</strong> ${window.UTILS.escapeHtml(name)}</p>
         </div>
         <div class="form-group">
             <label>Disposition Action</label>
@@ -454,8 +454,8 @@ window.exportRetentionReport = function () {
                     <tr><th>Type</th><th>Reference</th><th>Date</th><th>Age</th><th>Overdue</th></tr>
                     ${stats.expiredRecords.map(r => `
                         <tr class="expired">
-                            <td>${r.type}</td>
-                            <td>${r.name}</td>
+                            <td>${window.UTILS.escapeHtml(r.type)}</td>
+                            <td>${window.UTILS.escapeHtml(r.name)}</td>
                             <td>${r.date}</td>
                             <td>${r.age} years</td>
                             <td>${r.yearsOver} years</td>

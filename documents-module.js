@@ -33,15 +33,15 @@ function renderDocuments() {
                         <i class="fa-solid ${getDocumentIcon(doc.type)}"></i>
                     </div>
                     <div>
-                        <div style="font-weight: 500;">${doc.title}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${doc.size}</div>
+                        <div style="font-weight: 500;">${window.UTILS.escapeHtml(doc.title)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.size)}</div>
                     </div>
                 </div>
             </td>
-            <td>${doc.type}</td>
-            <td>${doc.client}</td>
-            <td>${doc.date}</td>
-            <td><span class="status-badge status-${doc.status.toLowerCase()}">${doc.status}</span></td>
+            <td>${window.UTILS.escapeHtml(doc.type)}</td>
+            <td>${window.UTILS.escapeHtml(doc.client)}</td>
+            <td>${window.UTILS.escapeHtml(doc.date)}</td>
+            <td><span class="status-badge status-${(doc.status || '').toLowerCase()}">${window.UTILS.escapeHtml(doc.status)}</span></td>
             <td>
                 <button class="btn btn-sm" onclick="downloadDocument(${doc.id})" title="Download">
                     <i class="fa-solid fa-download" style="color: var(--primary-color);"></i>
@@ -172,7 +172,7 @@ function openUploadModal() {
                 <label>Related Client</label>
                 <select class="form-control" id="doc-client">
                     <option value="">-- Select Client --</option>
-                    ${state.clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">

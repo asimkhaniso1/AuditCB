@@ -718,6 +718,21 @@ window.openModal = openModal;
 window.closeModal = closeModal;
 window.renderModule = renderModule;
 
+// Global Error Handling
+window.addEventListener('error', (event) => {
+    console.error('Global Error:', event.error);
+    if (window.showNotification) {
+        window.showNotification('An unexpected error occurred. Please refresh the page.', 'error');
+    }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled Promise Rejection:', event.reason);
+    if (window.showNotification) {
+        window.showNotification('Operation failed. Check console for details.', 'error');
+    }
+});
+
 // State Management with Performance Optimizations
 let saveTimeout;
 let lastSaveSize = 0;
@@ -1355,12 +1370,12 @@ function renderAuditExecution() {
 }
 
 function renderCertification() {
-    const rows = state.certificationDecisions.map(decision => `
+    const rows = (state.certificationDecisions || []).map(decision => `
         <tr>
-            <td>${decision.client}</td>
-            <td>${decision.standard}</td>
-            <td>${decision.date}</td>
-            <td><span class="status-badge status-${decision.decision.toLowerCase().replace(' ', '-')}">${decision.decision}</span></td>
+            <td>${window.UTILS.escapeHtml(decision.client)}</td>
+            <td>${window.UTILS.escapeHtml(decision.standard)}</td>
+            <td>${window.UTILS.escapeHtml(decision.date)}</td>
+            <td><span class="status-badge status-${window.UTILS.escapeHtml(decision.decision || '').toLowerCase().replace(' ', '-')}">${window.UTILS.escapeHtml(decision.decision)}</span></td>
             <td>
                 <button class="btn btn-sm" style="color: var(--primary-color);"><i class="fa-solid fa-file-certificate"></i></button>
             </td>

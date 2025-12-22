@@ -94,7 +94,7 @@ function renderDashboardEnhanced() {
                 <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">
                     <i class="fa-solid fa-calendar"></i> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     <span style="margin-left: 1rem; padding-left: 1rem; border-left: 1px solid #e2e8f0;">
-                        <i class="fa-solid fa-user" style="color: var(--primary-color);"></i> ${state.currentUser.name || 'User'} (${state.currentUser.role})
+                        <i class="fa-solid fa-user" style="color: var(--primary-color);"></i> ${window.UTILS.escapeHtml(state.currentUser.name || 'User')} (${window.UTILS.escapeHtml(state.currentUser.role)})
                     </span>
                 </p>
             </div>
@@ -285,9 +285,9 @@ function renderDashboardEnhanced() {
                                 <div style="padding: 0.75rem; background: #f8fafc; border-radius: 6px; border-left: 3px solid var(--primary-color);">
                                     <div style="display: flex; justify-content: space-between; align-items: start;">
                                         <div>
-                                            <p style="margin: 0; font-weight: 500;">${activity.title}</p>
+                                            <p style="margin: 0; font-weight: 500;">${window.UTILS.escapeHtml(activity.title)}</p>
                                             <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
-                                                <i class="fa-solid fa-calendar"></i> ${activity.date}
+                                                <i class="fa-solid fa-calendar"></i> ${window.UTILS.escapeHtml(activity.date)}
                                             </p>
                                         </div>
                                         <span class="status-badge status-${activity.status.toLowerCase()}">${activity.status}</span>

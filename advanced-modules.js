@@ -10,17 +10,35 @@ function renderAuditorsEnhanced() {
     const searchTerm = state.auditorSearchTerm || '';
     const filterRole = state.auditorFilterRole || 'All';
 
+
+    // Pagination State
+    if (!state.auditorPagination) {
+        state.auditorPagination = { currentPage: 1, itemsPerPage: 10 };
+    }
+
     let filteredAuditors = state.auditors.filter(auditor => {
         const matchesSearch = auditor.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesRole = filterRole === 'All' || auditor.role === filterRole;
         return matchesSearch && matchesRole;
     });
 
-    const rows = filteredAuditors.map(auditor => `
+    const totalItems = filteredAuditors.length;
+    const totalPages = Math.ceil(totalItems / state.auditorPagination.itemsPerPage);
+
+    // Ensure currentPage is valid
+    if (state.auditorPagination.currentPage > totalPages && totalPages > 0) {
+        state.auditorPagination.currentPage = totalPages;
+    }
+    if (state.auditorPagination.currentPage < 1) state.auditorPagination.currentPage = 1;
+
+    const startIndex = (state.auditorPagination.currentPage - 1) * state.auditorPagination.itemsPerPage;
+    const paginatedAuditors = filteredAuditors.slice(startIndex, startIndex + state.auditorPagination.itemsPerPage);
+
+    const rows = paginatedAuditors.map(auditor => `
         <tr class="auditor-row" data-auditor-id="${auditor.id}" style="cursor: pointer;">
-            <td>${auditor.name}</td>
-            <td><span style="background: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${auditor.role}</span></td>
-            <td>${auditor.standards.join(', ')}</td>
+            <td>${window.UTILS.escapeHtml(auditor.name)}</td>
+            <td><span style="background: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(auditor.role)}</span></td>
+            <td>${(auditor.standards || []).map(s => window.UTILS.escapeHtml(s)).join(', ')}</td>
             <td>
                 <button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn btn-sm view-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
@@ -120,6 +138,28 @@ function renderAuditorsEnhanced() {
                     </tbody>
                 </table>
             </div>
+            
+            ${totalItems > 0 ? `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 0.5rem;">
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Showing ${startIndex + 1} to ${Math.min(startIndex + state.auditorPagination.itemsPerPage, totalItems)} of ${totalItems} entries
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeAuditorPage(${state.auditorPagination.currentPage - 1})" ${state.auditorPagination.currentPage === 1 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-chevron-left"></i> Previous
+                    </button>
+                    <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${state.auditorPagination.currentPage} of ${totalPages}</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeAuditorPage(${state.auditorPagination.currentPage + 1})" ${state.auditorPagination.currentPage === totalPages ? 'disabled' : ''}>
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                     <select onchange="window.changeAuditorItemsPerPage(this.value)" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
+                        <option value="10" ${state.auditorPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
+                        <option value="25" ${state.auditorPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
+                         <option value="50" ${state.auditorPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
+                    </select>
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
     window.contentArea.innerHTML = html;
@@ -163,6 +203,22 @@ function renderAuditorsEnhanced() {
     };
 }
 
+window.changeAuditorPage = function (page) {
+    if (window.state.auditorPagination) {
+        window.state.auditorPagination.currentPage = page;
+        renderAuditorsEnhanced();
+    }
+};
+
+window.changeAuditorItemsPerPage = function (val) {
+    if (window.state.auditorPagination) {
+        window.state.auditorPagination.itemsPerPage = parseInt(val, 10);
+        window.state.auditorPagination.currentPage = 1; // Reset to first page
+        renderAuditorsEnhanced();
+    }
+};
+
+
 function renderAuditorDetail(auditorId) {
     const auditor = state.auditors.find(a => a.id === auditorId);
     if (!auditor) return;
@@ -181,24 +237,24 @@ function renderAuditorDetail(auditorId) {
                         <!-- Profile Photo -->
                         <div style="flex-shrink: 0;">
                             ${auditor.pictureUrl ? `
-                                <img src="${auditor.pictureUrl}" alt="${auditor.name}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-color);">
+                                <img src="${window.UTILS.escapeHtml(auditor.pictureUrl)}" alt="${window.UTILS.escapeHtml(auditor.name)}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-color);">
                             ` : `
                                 <div style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: white; font-weight: 600;">
-                                    ${auditor.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                    ${window.UTILS.escapeHtml(auditor.name).split(' ').map(n => n[0]).join('').toUpperCase()}
                                 </div>
                             `}
                         </div>
                         <!-- Info -->
                         <div>
-                            <h2 style="margin-bottom: 0.25rem;">${auditor.name}</h2>
-                            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${auditor.role}</p>
+                            <h2 style="margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(auditor.name)}</h2>
+                            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${window.UTILS.escapeHtml(auditor.role)}</p>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
-                                ${auditor.standards ? auditor.standards.map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${s}</span>`).join('') : ''}
+                                ${auditor.standards ? auditor.standards.map(s => `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${window.UTILS.escapeHtml(s)}</span>`).join('') : ''}
                             </div>
                             <div style="display: flex; gap: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
-                                ${auditor.email ? `<span><i class="fa-solid fa-envelope" style="margin-right: 0.25rem;"></i>${auditor.email}</span>` : ''}
-                                ${auditor.phone ? `<span><i class="fa-solid fa-phone" style="margin-right: 0.25rem;"></i>${auditor.phone}</span>` : ''}
-                                ${auditor.location ? `<span><i class="fa-solid fa-location-dot" style="margin-right: 0.25rem;"></i>${auditor.location}</span>` : ''}
+                                ${auditor.email ? `<span><i class="fa-solid fa-envelope" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(auditor.email)}</span>` : ''}
+                                ${auditor.phone ? `<span><i class="fa-solid fa-phone" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(auditor.phone)}</span>` : ''}
+                                ${auditor.location ? `<span><i class="fa-solid fa-location-dot" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(auditor.location)}</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -272,11 +328,11 @@ function renderAuditorTab(auditor, tabName) {
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Full Name</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.name}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(auditor.name)}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Role</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.role}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(auditor.role)}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Age</label>
@@ -292,7 +348,7 @@ function renderAuditorTab(auditor, tabName) {
                         </div>
                          <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Location</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${auditor.location || '-'}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(auditor.location || '-')}</p>
                         </div>
                     </div>
                 </div>
@@ -301,11 +357,11 @@ function renderAuditorTab(auditor, tabName) {
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Email</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-envelope" style="margin-right: 5px;"></i>${auditor.email || '-'}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-envelope" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(auditor.email || '-')}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Phone</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-phone" style="margin-right: 5px;"></i>${auditor.phone || '-'}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;"><i class="fa-solid fa-phone" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(auditor.phone || '-')}</p>
                         </div>
                     </div>
                 </div>
@@ -315,13 +371,13 @@ function renderAuditorTab(auditor, tabName) {
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Domain Expertise</label>
                             <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                                ${(auditor.domainExpertise || []).map(d => `<span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${d}</span>`).join('') || '<span style="color: var(--text-secondary);">-</span>'}
+                                ${(auditor.domainExpertise || []).map(d => `<span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(d)}</span>`).join('') || '<span style="color: var(--text-secondary);">-</span>'}
                             </div>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Industries</label>
                             <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                                ${(auditor.industries || []).map(i => `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${i}</span>`).join('') || '<span style="color: var(--text-secondary);">-</span>'}
+                                ${(auditor.industries || []).map(i => `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(i)}</span>`).join('') || '<span style="color: var(--text-secondary);">-</span>'}
                             </div>
                         </div>
                     </div>
@@ -334,16 +390,16 @@ function renderAuditorTab(auditor, tabName) {
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                             <div>
                                 <label style="color: var(--text-secondary); font-size: 0.875rem;">Highest Degree</label>
-                                <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.education.degree || '-'}</p>
+                                <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(auditor.education.degree || '-')}</p>
                             </div>
                             <div>
                                 <label style="color: var(--text-secondary); font-size: 0.875rem;">Field of Study</label>
-                                <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.education.fieldOfStudy || '-'}</p>
+                                <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(auditor.education.fieldOfStudy || '-')}</p>
                             </div>
                             ${auditor.education.specialization ? `
                             <div style="grid-column: 1 / -1;">
                                 <label style="color: var(--text-secondary); font-size: 0.875rem;">Specialization / Additional Qualifications</label>
-                                <p style="font-weight: 500; margin-top: 0.25rem;">${auditor.education.specialization}</p>
+                                <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(auditor.education.specialization)}</p>
                             </div>
                             ` : ''}
                         </div>
@@ -392,16 +448,16 @@ function renderAuditorTab(auditor, tabName) {
                 return `
                                     <div class="upcoming-audit-item" data-date="${plan.date}" data-location="${location.toLowerCase()}" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-left: 4px solid var(--primary-color);">
                                         <div>
-                                            <div style="font-weight: 500; margin-bottom: 0.25rem;">${plan.client}</div>
+                                            <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(plan.client)}</div>
                                             <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                                                <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>${plan.standard || 'ISO Standard'}
+                                                <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(plan.standard || 'ISO Standard')}
                                                 <span style="margin: 0 0.5rem;">•</span>
-                                                <i class="fa-solid fa-location-dot" style="margin-right: 0.25rem;"></i>${location}
+                                                <i class="fa-solid fa-location-dot" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(location)}
                                             </div>
                                         </div>
                                         <div style="text-align: right;">
                                             <div style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${new Date(plan.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                                            <div style="font-size: 0.8rem; color: var(--text-secondary);">${plan.type || 'Audit'} • ${plan.manDays || 0} days</div>
+                                            <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(plan.type || 'Audit')} • ${plan.manDays || 0} days</div>
                                         </div>
                                     </div>
                                 `;
@@ -528,14 +584,14 @@ function renderAuditorTab(auditor, tabName) {
                                 <tbody>
                                     ${witnessAudits.map(w => `
                                         <tr>
-                                            <td>${w.date}</td>
-                                            <td>${w.client}</td>
-                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${w.standard}</span></td>
-                                            <td>${w.witnessedBy}</td>
+                                            <td>${window.UTILS.escapeHtml(w.date)}</td>
+                                            <td>${window.UTILS.escapeHtml(w.client)}</td>
+                                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(w.standard)}</span></td>
+                                            <td>${window.UTILS.escapeHtml(w.witnessedBy)}</td>
                                             <td>
                                                 <span style="color: #fbbf24;">${'★'.repeat(w.rating || 0)}${'☆'.repeat(5 - (w.rating || 0))}</span>
                                             </td>
-                                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${w.notes || ''}">${w.notes || '-'}</td>
+                                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(w.notes || '')}">${window.UTILS.escapeHtml(w.notes || '-')}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -577,8 +633,8 @@ function renderAuditorTab(auditor, tabName) {
                                 <tbody>
                                     ${performanceReviews.map(r => `
                                         <tr>
-                                            <td>${r.date}</td>
-                                            <td>${r.type}</td>
+                                            <td>${window.UTILS.escapeHtml(r.date)}</td>
+                                            <td>${window.UTILS.escapeHtml(r.type)}</td>
                                             <td>
                                                 <span style="background: ${r.rating >= 4 ? '#d1fae5' : r.rating >= 3 ? '#fef3c7' : '#fee2e2'}; 
                                                     color: ${r.rating >= 4 ? '#065f46' : r.rating >= 3 ? '#92400e' : '#991b1b'};
@@ -586,8 +642,8 @@ function renderAuditorTab(auditor, tabName) {
                                                     ${r.rating}/5
                                                 </span>
                                             </td>
-                                            <td>${r.reviewedBy}</td>
-                                            <td><span class="status-badge status-${r.outcome?.toLowerCase() || 'pending'}">${r.outcome || 'Pending'}</span></td>
+                                            <td>${window.UTILS.escapeHtml(r.reviewedBy)}</td>
+                                            <td><span class="status-badge status-${(r.outcome || 'pending').toLowerCase()}">${window.UTILS.escapeHtml(r.outcome || 'Pending')}</span></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -605,9 +661,9 @@ function renderAuditorTab(auditor, tabName) {
             const historyRows = (auditor.auditHistory || []).length > 0
                 ? auditor.auditHistory.map(h => `
                     <tr>
-                        <td>${h.client}</td>
-                        <td>${h.date}</td>
-                        <td><span class="status-badge status-completed">${h.type}</span></td>
+                        <td>${window.UTILS.escapeHtml(h.client)}</td>
+                        <td>${window.UTILS.escapeHtml(h.date)}</td>
+                        <td><span class="status-badge status-completed">${window.UTILS.escapeHtml(h.type)}</span></td>
                     </tr>
                 `).join('')
                 : '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No audit history available yet.</td></tr>';
@@ -641,13 +697,13 @@ function renderAuditorTab(auditor, tabName) {
                                 <tbody>
                                     ${reportReviews.map(r => `
                                         <tr>
-                                            <td>${r.reviewDate}</td>
-                                            <td>${r.reportType}</td>
-                                            <td>${r.client}</td>
+                                            <td>${window.UTILS.escapeHtml(r.reviewDate)}</td>
+                                            <td>${window.UTILS.escapeHtml(r.reportType)}</td>
+                                            <td>${window.UTILS.escapeHtml(r.client)}</td>
                                             <td>${r.qualityRating}/5</td>
                                             <td>${r.completenessRating}/5</td>
                                             <td>${r.technicalRating}/5</td>
-                                            <td>${r.reviewer}</td>
+                                            <td>${window.UTILS.escapeHtml(r.reviewer)}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -2003,7 +2059,7 @@ function openEditAuditorModal(auditorId) {
                 
                 <div class="form-group">
                     <label>Full Name <span style="color: var(--danger-color);">*</span></label>
-                    <input type="text" class="form-control" id="auditor-name" value="${auditor.name}" required>
+                    <input type="text" class="form-control" id="auditor-name" value="${window.UTILS.escapeHtml(auditor.name)}" required>
                 </div>
                 <div class="form-group">
                     <label>Role</label>
@@ -2015,19 +2071,19 @@ function openEditAuditorModal(auditorId) {
                 </div>
                 <div class="form-group">
                     <label>Email</label>
-                    <input type="email" class="form-control" id="auditor-email" value="${auditor.email || ''}">
+                    <input type="email" class="form-control" id="auditor-email" value="${window.UTILS.escapeHtml(auditor.email || '')}">
                 </div>
                 <div class="form-group">
                     <label>Phone</label>
-                    <input type="text" class="form-control" id="auditor-phone" value="${auditor.phone || ''}">
+                    <input type="text" class="form-control" id="auditor-phone" value="${window.UTILS.escapeHtml(auditor.phone || '')}">
                 </div>
                 <div class="form-group">
                     <label>Location</label>
-                    <input type="text" class="form-control" id="auditor-location" value="${auditor.location || ''}">
+                    <input type="text" class="form-control" id="auditor-location" value="${window.UTILS.escapeHtml(auditor.location || '')}">
                 </div>
                 <div class="form-group">
                     <label>Profile Picture URL</label>
-                    <input type="url" class="form-control" id="auditor-picture" value="${auditor.pictureUrl || ''}" placeholder="https://...">
+                    <input type="url" class="form-control" id="auditor-picture" value="${window.UTILS.escapeHtml(auditor.pictureUrl || '')}" placeholder="https://...">
                 </div>
 
                 <!-- Qualifications -->
@@ -2085,7 +2141,7 @@ function openEditAuditorModal(auditorId) {
                 </div>
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label>Languages (comma-separated)</label>
-                    <input type="text" class="form-control" id="auditor-languages" value="${(auditor.languages || []).join(', ')}" placeholder="English, Spanish, French">
+                    <input type="text" class="form-control" id="auditor-languages" value="${(auditor.languages || []).map(l => window.UTILS.escapeHtml(l)).join(', ')}" placeholder="English, Spanish, French">
                 </div>
             </div>
         </form>

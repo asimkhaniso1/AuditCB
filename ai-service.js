@@ -4,36 +4,18 @@
 
 const AI_SERVICE = {
 
-    // Check if LOCAL API key is configured
-    isConfigured: () => {
-        return window.state && window.state.settings && window.state.settings.geminiApiKey;
-    },
-
     // Main function to generate agenda
     generateAuditAgenda: async (planContext) => {
         const prompt = AI_SERVICE.buildPrompt(planContext);
 
         try {
-            let apiResponseText;
-
-            if (AI_SERVICE.isConfigured()) {
-                // Option A: Use Local Key from Settings
-                const apiKey = window.state.settings.geminiApiKey;
-                apiResponseText = await AI_SERVICE.callDirectAPI(apiKey, prompt);
-            } else {
-                // Option B: Try Vercel Serverless Proxy (Env Var)
-                console.log("No local API key found. Attempting to use server proxy...");
-                apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
-            }
-
+            // ALWAYS use the server-side proxy for security
+            // Client-side API keys are no longer supported
+            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
             return AI_SERVICE.parseAgendaResponse(apiResponseText);
 
         } catch (error) {
             console.error("AI Generation Error:", error);
-            // Enhance error message for user
-            if (error.message.includes('GEMINI_API_KEY')) {
-                throw new Error("API Key missing. Please configure it in Settings OR add GEMINI_API_KEY to Vercel Environment Variables.");
-            }
             throw error;
         }
     },
@@ -73,46 +55,26 @@ Example:
 `;
     },
 
-    // Option A: Call Gemini API directly (Client-side)
-    callDirectAPI: async (apiKey, prompt) => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-        const payload = {
-            contents: [{
-                parts: [{ text: prompt }]
-            }]
-        };
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || 'Gemini API request failed');
-        }
-
-        const data = await response.json();
-        return AI_SERVICE.extractTextFromResponse(data);
-    },
-
-    // Option B: Call Vercel Serverless Function
+    // Call Vercel Serverless Function
     callProxyAPI: async (prompt) => {
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
+        try {
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
 
-        const data = await response.json();
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'AI Service Unavailable (Server Proxy)');
+            }
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Server Proxy failed');
+            const data = await response.json();
+            return AI_SERVICE.extractTextFromResponse(data);
+        } catch (error) {
+            console.error('Proxy API Error:', error);
+            throw new Error('Failed to connect to AI Service. Please contact administrator.');
         }
-
-        return AI_SERVICE.extractTextFromResponse(data);
     },
 
     // Helper: Extract text from Gemini JSON response

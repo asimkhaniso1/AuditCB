@@ -11,7 +11,7 @@ function renderSettings() {
                     <button class="tab-btn" onclick="switchSettingsTab('users', this)">User Management</button>
                     <button class="tab-btn" onclick="switchSettingsTab('notifications', this)">Notifications</button>
                     <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Management</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('api', this)">API Configuration</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Management</button>
                 </div>
 
                 <div id="settings-content">
@@ -43,8 +43,8 @@ function switchSettingsTab(tabName, btnElement) {
         case 'data':
             container.innerHTML = getDataManagementHTML();
             break;
-        case 'api':
-            container.innerHTML = getAPISettingsHTML();
+        case 'data':
+            container.innerHTML = getDataManagementHTML();
             break;
     }
 }
@@ -321,58 +321,6 @@ window.switchSettingsTab = switchSettingsTab;
 window.openAddUserModal = openAddUserModal;
 window.backupData = backupData;
 window.restoreData = restoreData;
-window.saveAPISettings = saveAPISettings;
+window.backupData = backupData;
+window.restoreData = restoreData;
 
-function getAPISettingsHTML() {
-    const currentKey = (window.state.settings && window.state.settings.geminiApiKey) || '';
-
-    return `
-        <div class="fade-in">
-            <h3 style="margin-bottom: 1rem;">API Configuration</h3>
-            <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem; max-width: 600px;">
-                <div style="display: flex; align-items: start; gap: 1rem; margin-bottom: 1.5rem;">
-                    <div style="width: 48px; height: 48px; background: #e0f2fe; color: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    </div>
-                    <div>
-                        <h4 style="margin: 0 0 0.5rem 0;">Google Gemini AI Integration</h4>
-                        <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">
-                            Configure your Gemini API key to enable AI-powered features like automatic Audit Agenda generation.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Gemini API Key</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="password" id="gemini-api-key" class="form-control" value="${currentKey}" placeholder="AIzaSy..." style="flex: 1;">
-                        <button class="btn btn-outline-secondary" onclick="toggleVis('gemini-api-key')">
-                            <i class="fa-solid fa-eye"></i>
-                        </button>
-                    </div>
-                    <small style="color: var(--text-secondary);">
-                        Don't have a key? <a href="https://aistudio.google.com/app/apikey" target="_blank">Get one from Google AI Studio</a>.
-                    </small>
-                </div>
-
-                <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 1rem;">
-                    <button class="btn btn-primary" onclick="window.saveAPISettings()">Save Configuration</button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function saveAPISettings() {
-    const key = document.getElementById('gemini-api-key').value.trim();
-    if (!window.state.settings) window.state.settings = {};
-
-    window.state.settings.geminiApiKey = key;
-    window.saveData();
-    window.showNotification('API Settings saved successfully', 'success');
-}
-
-window.toggleVis = function (id) {
-    const x = document.getElementById(id);
-    if (x.type === "password") { x.type = "text"; } else { x.type = "password"; }
-};

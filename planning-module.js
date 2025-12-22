@@ -17,21 +17,21 @@ function renderAuditPlanningEnhanced() {
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
-                <a href="javascript:void(0)" onclick="window.viewAuditPlan(${plan.id})" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${plan.client}</a>
-                <div style="font-size: 0.75rem; color: var(--text-secondary);">${plan.standard || 'ISO 9001:2015'}</div>
+                <a href="javascript:void(0)" onclick="window.viewAuditPlan(${plan.id})" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(plan.client)}</a>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(plan.standard) || 'ISO 9001:2015'}</div>
             </td>
-            <td>${plan.type || 'Surveillance'}</td>
-            <td>${plan.date}</td>
+            <td>${window.UTILS.escapeHtml(plan.type) || 'Surveillance'}</td>
+            <td>${window.UTILS.escapeHtml(plan.date)}</td>
             <td>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(auditor => `
                         <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
-                            <i class="fa-solid fa-user" style="font-size: 0.7rem; color: var(--text-secondary); margin-right: 4px;"></i>${auditor}
+                            <i class="fa-solid fa-user" style="font-size: 0.7rem; color: var(--text-secondary); margin-right: 4px;"></i>${window.UTILS.escapeHtml(auditor)}
                         </span>
                     `).join('')}
                 </div>
             </td>
-            <td><span class="status-badge status-${plan.status.toLowerCase()}">${plan.status}</span></td>
+            <td><span class="status-badge status-${(plan.status || 'draft').toLowerCase()}">${window.UTILS.escapeHtml(plan.status)}</span></td>
             <td>
                 <button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
                     <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
@@ -1400,10 +1400,10 @@ function addAgendaRow(data = {}) {
     const auditorOptions = uniqueAuditors.map(a => `<option value="${a}" ${data.auditor === a ? 'selected' : ''}>${a}</option>`).join('');
 
     row.innerHTML = `
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.day || 'Day 1'}" placeholder="Day"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.time || ''}" placeholder="Time"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.item || ''}" placeholder="Activity/Clause"></td>
-        <td><input type="text" class="form-control" style="padding: 4px;" value="${data.dept || ''}" placeholder="Dept"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.day || 'Day 1')}" placeholder="Day"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.time || '')}" placeholder="Time"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.item || '')}" placeholder="Activity/Clause"></td>
+        <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.dept || '')}" placeholder="Dept"></td>
         <td>
             <select class="form-control" style="padding: 4px;">
                 <option value="All" ${data.auditor === 'All' ? 'selected' : ''}>All Team</option>
@@ -1555,19 +1555,19 @@ window.printAuditPlanDetails = function (planId) {
 
             <table class="meta-table">
                 <tr>
-                    <td><span class="meta-label">Client</span>${plan.client}</td>
-                    <td><span class="meta-label">Audit Standard</span>${plan.standard}</td>
+                    <td><span class="meta-label">Client</span>${window.UTILS.escapeHtml(plan.client)}</td>
+                    <td><span class="meta-label">Audit Standard</span>${window.UTILS.escapeHtml(plan.standard)}</td>
                 </tr>
                 <tr>
-                    <td><span class="meta-label">Planned Date</span>${plan.date}</td>
-                    <td><span class="meta-label">Audit Type</span>${plan.type}</td>
+                    <td><span class="meta-label">Planned Date</span>${window.UTILS.escapeHtml(plan.date)}</td>
+                    <td><span class="meta-label">Audit Type</span>${window.UTILS.escapeHtml(plan.type)}</td>
                 </tr>
                  <tr>
-                    <td><span class="meta-label">Lead Auditor</span>${leadAuditor}</td>
-                    <td><span class="meta-label">Audit Team</span>${otherMembers.join(', ') || 'None'}</td>
+                    <td><span class="meta-label">Lead Auditor</span>${window.UTILS.escapeHtml(leadAuditor)}</td>
+                    <td><span class="meta-label">Audit Team</span>${window.UTILS.escapeHtml(otherMembers.join(', ') || 'None')}</td>
                 </tr>
                  <tr>
-                    <td><span class="meta-label">Total Man-Days</span>${plan.manDays} days (${plan.onsiteDays} onsite)</td>
+                    <td><span class="meta-label">Total Man-Days</span>${window.UTILS.escapeHtml(plan.manDays)} days (${window.UTILS.escapeHtml(plan.onsiteDays)} onsite)</td>
                     <td><span class="meta-label">Risk Level</span>Medium (Standard)</td>
                 </tr>
             </table>
@@ -1597,7 +1597,7 @@ window.printAuditPlanDetails = function (planId) {
 
         return `
                         <tr>
-                            <td>${site.name} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
+                            <td>${window.UTILS.escapeHtml(site.name)} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
                             <td>${site.address || '-'}</td>
                             <td style="text-align: right;">${site.employees}</td>
                             <td style="text-align: right;">${auditorAssigned}</td>

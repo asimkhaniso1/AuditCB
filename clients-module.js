@@ -7,22 +7,40 @@ function renderClientsEnhanced() {
     const searchTerm = state.clientSearchTerm || '';
     const filterStatus = state.clientFilterStatus || 'All';
 
+
+    // Pagination State
+    if (!state.clientPagination) {
+        state.clientPagination = { currentPage: 1, itemsPerPage: 10 };
+    }
+
     let filteredClients = state.clients.filter(client => {
         const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
         return matchesSearch && matchesStatus;
     });
 
-    const rows = filteredClients.map(client => `
+    const totalItems = filteredClients.length;
+    const totalPages = Math.ceil(totalItems / state.clientPagination.itemsPerPage);
+
+    // Ensure currentPage is valid
+    if (state.clientPagination.currentPage > totalPages && totalPages > 0) {
+        state.clientPagination.currentPage = totalPages;
+    }
+    if (state.clientPagination.currentPage < 1) state.clientPagination.currentPage = 1;
+
+    const startIndex = (state.clientPagination.currentPage - 1) * state.clientPagination.itemsPerPage;
+    const paginatedClients = filteredClients.slice(startIndex, startIndex + state.clientPagination.itemsPerPage);
+
+    const rows = paginatedClients.map(client => `
         <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;">
-            <td>${client.name}</td>
+            <td>${window.UTILS.escapeHtml(client.name)}</td>
             <td>
                 ${(client.standard || '').split(',').map(s =>
-        `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.75em;">${s.trim()}</span>`
+        `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.75em;">${window.UTILS.escapeHtml(s.trim())}</span>`
     ).join('')}
             </td>
-            <td><span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span></td>
-            <td>${client.nextAudit}</td>
+            <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
+            <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
             <td>
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
@@ -120,6 +138,28 @@ function renderClientsEnhanced() {
                     </tbody>
                 </table>
             </div>
+            
+            ${totalItems > 0 ? `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 0.5rem;">
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Showing ${startIndex + 1} to ${Math.min(startIndex + state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${state.clientPagination.currentPage - 1})" ${state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-chevron-left"></i> Previous
+                    </button>
+                    <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${state.clientPagination.currentPage} of ${totalPages}</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${state.clientPagination.currentPage + 1})" ${state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <select onchange="window.changeClientItemsPerPage(this.value)" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
+                        <option value="10" ${state.clientPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
+                        <option value="25" ${state.clientPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
+                        <option value="50" ${state.clientPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
+                    </select>
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
 
@@ -164,6 +204,21 @@ function renderClientsEnhanced() {
     };
 }
 
+window.changeClientPage = function (page) {
+    if (window.state.clientPagination) {
+        window.state.clientPagination.currentPage = page;
+        renderClientsEnhanced();
+    }
+};
+
+window.changeClientItemsPerPage = function (val) {
+    if (window.state.clientPagination) {
+        window.state.clientPagination.itemsPerPage = parseInt(val, 10);
+        window.state.clientPagination.currentPage = 1; // Reset to first page
+        renderClientsEnhanced();
+    }
+};
+
 function renderClientDetail(clientId) {
     const client = state.clients.find(c => c.id === clientId);
     if (!client) return;
@@ -185,11 +240,11 @@ function renderClientDetail(clientId) {
             <div class="card" style="margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <div>
-                    <h2 style="margin: 0;">${client.name}</h2>
-                    <p style="color: var(--text-secondary); margin: 0.25rem 0;">${client.industry || 'N/A'} • ${client.standard || 'N/A'}</p>
+                    <h2 style="margin: 0;">${window.UTILS.escapeHtml(client.name)}</h2>
+                    <p style="color: var(--text-secondary); margin: 0.25rem 0;">${window.UTILS.escapeHtml(client.industry || 'N/A')} • ${window.UTILS.escapeHtml(client.standard || 'N/A')}</p>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient('${client.name}')">
+                    <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient(${client.id})">
                         <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
                     </button>
                     <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
@@ -198,7 +253,7 @@ function renderClientDetail(clientId) {
                     <button class="btn btn-secondary" onclick="window.renderClientsEnhanced()">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </button>
-                    <span class="status-badge status-${client.status.toLowerCase()}">${client.status}</span>
+                    <span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span>
                 </div>
                 </div>
             </div>
@@ -279,23 +334,23 @@ function renderClientTab(client, tabName) {
                         <!-- Basic Info -->
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Company Name</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.name}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(client.name)}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Website</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">
-                                ${client.website ? `<a href="${client.website}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-globe" style="margin-right: 5px;"></i>${client.website}</a>` : '-'}
+                                ${client.website ? `<a href="${window.UTILS.escapeHtml(client.website)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-globe" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(client.website)}</a>` : '-'}
                             </p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Standard</label>
-                            <p style="font-weight: 500; margin-top: 0.25rem;">${client.standard}</p>
+                            <p style="font-weight: 500; margin-top: 0.25rem;">${window.UTILS.escapeHtml(client.standard)}</p>
                         </div>
                         <div>
                             <label style="color: var(--text-secondary); font-size: 0.875rem;">Industry</label>
                             <p style="font-weight: 500; margin-top: 0.25rem;">
                                 <span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">
-                                    <i class="fa-solid fa-industry" style="margin-right: 5px;"></i>${client.industry || 'Not Specified'}
+                                    <i class="fa-solid fa-industry" style="margin-right: 5px;"></i>${window.UTILS.escapeHtml(client.industry || 'Not Specified')}
                                 </span>
                             </p>
                         </div>
@@ -346,9 +401,9 @@ function renderClientTab(client, tabName) {
                                 <tbody>
                                     ${client.sites.map((s, index) => `
                                         <tr>
-                                            <td style="font-weight: 500;">${s.name}</td>
-                                            <td>${s.address || '-'}</td>
-                                            <td>${s.city || '-'}, ${s.country || ''}</td>
+                                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(s.name)}</td>
+                                            <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
+                                            <td>${window.UTILS.escapeHtml(s.city || '-')}, ${window.UTILS.escapeHtml(s.country || '')}</td>
                                             <td>
                                                 ${s.employees ? `<span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;"><i class="fa-solid fa-users" style="margin-right: 4px;"></i>${s.employees}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
                                             </td>
@@ -356,7 +411,7 @@ function renderClientTab(client, tabName) {
                                                 ${s.shift ? `<span style="background: ${s.shift === 'Yes' ? '#fef3c7' : '#f1f5f9'}; color: ${s.shift === 'Yes' ? '#d97706' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${s.shift === 'Yes' ? 'Multi-Shift' : 'General'}</span>` : '<span style="color: var(--text-secondary);">-</span>'}
                                             </td>
                                             <td>
-                                                ${s.geotag ? `<a href="https://maps.google.com/?q=${s.geotag}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${s.geotag}</a>` : '-'}
+                                                ${s.geotag ? `<a href="https://maps.google.com/?q=${window.UTILS.escapeHtml(s.geotag)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(s.geotag)}</a>` : '-'}
                                             </td>
                                             <td>
                                                 <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
@@ -391,8 +446,8 @@ function renderClientTab(client, tabName) {
                                             ${a.name.split(' ').map(n => n[0]).join('')}
                                         </div>
                                         <div>
-                                            <p style="font-weight: 500; margin: 0;">${a.name}</p>
-                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${a.role} • ${a.experience || 0} years exp</p>
+                                            <p style="font-weight: 500; margin: 0;">${window.UTILS.escapeHtml(a.name)}</p>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${window.UTILS.escapeHtml(a.role)} • ${a.experience || 0} years exp</p>
                                         </div>
                                     </div>
                                     <div style="display: flex; gap: 0.5rem;">
@@ -438,7 +493,7 @@ function renderClientTab(client, tabName) {
                     
                     ${profile ? `
                         <div style="background: #f8fafc; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); line-height: 1.8;">
-                            <div style="white-space: pre-wrap; color: var(--text-primary);">${profile}</div>
+                            <div style="white-space: pre-wrap; color: var(--text-primary);">${window.UTILS.escapeHtml(profile)}</div>
                         </div>
                     ` : `
                         <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
@@ -494,10 +549,10 @@ function renderClientTab(client, tabName) {
                                 <tbody>
                                     ${client.contacts.map((c, index) => `
                                         <tr>
-                                            <td style="font-weight: 500;">${c.name}</td>
-                                            <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.designation || '-'}</span></td>
-                                            <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${c.phone || '-'}</td>
-                                            <td><a href="mailto:${c.email}" style="color: var(--primary-color); text-decoration: none;">${c.email || '-'}</a></td>
+                                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
+                                            <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.designation || '-')}</span></td>
+                                            <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${window.UTILS.escapeHtml(c.phone || '-')}</td>
+                                            <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                             <td>
                                                 <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
                                                     <i class="fa-solid fa-pen"></i>
@@ -545,8 +600,8 @@ function renderClientTab(client, tabName) {
                                 <tbody>
                                     ${departments.map((dept, index) => `
                                         <tr>
-                                            <td style="font-weight: 500;">${dept.name}</td>
-                                            <td>${dept.head || '-'}</td>
+                                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(dept.name)}</td>
+                                            <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                             <td>
                                                 <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
                                                     <i class="fa-solid fa-pen"></i>
@@ -740,13 +795,13 @@ function renderClientTab(client, tabName) {
                                         <tr>
                                             <td>
                                                 <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
-                                                ${doc.name}
+                                                ${window.UTILS.escapeHtml(doc.name)}
                                             </td>
-                                            <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${doc.category || 'General'}</span></td>
-                                            <td>${doc.date}</td>
+                                            <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.category || 'General')}</span></td>
+                                            <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                             <td>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${doc.name} (Simulated)')"><i class="fa-solid fa-download"></i></button>
-                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${doc.id}')"><i class="fa-solid fa-trash"></i></button>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
+                                                <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
                                             </td>
                                         </tr>
                                     `).join('')}
@@ -1744,9 +1799,15 @@ window.deleteContact = function (clientId, contactIndex) {
 };
 
 // Helper function to initiate audit planning from client detail page
-window.initiateAuditPlanFromClient = function (clientName) {
+// Helper function to initiate audit planning from client detail page
+window.initiateAuditPlanFromClient = function (clientId) {
     // Navigate to Audit Planning module
     window.renderModule('planning');
+
+    const client = window.state.clients.find(c => c.id === clientId);
+    const clientName = client ? client.name : '';
+
+    if (!clientName) return;
 
     // Wait for the module to load, then open the create plan modal with client pre-selected
     setTimeout(() => {

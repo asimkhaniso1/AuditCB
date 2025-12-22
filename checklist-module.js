@@ -46,7 +46,7 @@ function renderChecklistLibrary() {
                     <input type="text" id="checklist-search" placeholder="Search..." value="${checklistSearchTerm}" style="max-width: 180px; margin-bottom: 0;">
                     <select id="checklist-filter-standard" style="max-width: 150px; margin-bottom: 0;">
                         <option value="all">All Standards</option>
-                        ${standards.map(s => `<option value="${s}" ${checklistFilterStandard === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        ${standards.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklistFilterStandard === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
                     </select>
                     <select id="checklist-filter-type" style="max-width: 120px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterType === 'all' ? 'selected' : ''}>All Types</option>
@@ -55,11 +55,11 @@ function renderChecklistLibrary() {
                     </select>
                     <select id="checklist-filter-audittype" style="max-width: 160px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterAuditType === 'all' ? 'selected' : ''}>All Audit Types</option>
-                        ${auditTypes.map(t => `<option value="${t}" ${checklistFilterAuditType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                        ${auditTypes.map(t => `<option value="${window.UTILS.escapeHtml(t)}" ${checklistFilterAuditType === t ? 'selected' : ''}>${window.UTILS.escapeHtml(t)}</option>`).join('')}
                     </select>
                     <select id="checklist-filter-scope" style="max-width: 140px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterScope === 'all' ? 'selected' : ''}>All Scopes</option>
-                        ${auditScopes.map(s => `<option value="${s}" ${checklistFilterScope === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklistFilterScope === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
                     </select>
                 </div>
                 <button id="btn-new-checklist" class="btn btn-primary">
@@ -120,10 +120,10 @@ function renderChecklistLibrary() {
                             <tbody>
                                 ${globalChecklists.map(c => `
                                     <tr>
-                                        <td style="font-weight: 500;">${c.name}</td>
-                                        <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.standard}</span></td>
+                                        <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
+                                        <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
                                         <td>${c.clauses ? c.clauses.length + ' clauses' : (c.items?.length || 0) + ' items'}</td>
-                                        <td>${c.updatedAt || c.createdAt}</td>
+                                        <td>${window.UTILS.escapeHtml(c.updatedAt || c.createdAt)}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                 <i class="fa-solid fa-eye"></i>
@@ -174,10 +174,10 @@ function renderChecklistLibrary() {
                             <tbody>
                                 ${customChecklists.map(c => `
                                     <tr>
-                                        <td style="font-weight: 500;">${c.name}</td>
-                                        <td><span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${c.standard}</span></td>
+                                        <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
+                                        <td><span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
                                         <td>${c.clauses ? c.clauses.length + ' clauses' : (c.items?.length || 0) + ' items'}</td>
-                                        <td>${c.createdBy || 'Unknown'}</td>
+                                        <td>${window.UTILS.escapeHtml(c.createdBy || 'Unknown')}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                 <i class="fa-solid fa-eye"></i>
@@ -358,10 +358,10 @@ function setupCSVUpload() {
                         const newRow = document.createElement('tr');
                         newRow.className = 'checklist-item-row';
                         newRow.innerHTML = `
-                            <td><input type="text" class="form-control item-main-clause" value="${mainClause}" style="margin: 0;"></td>
-                            <td><input type="text" class="form-control item-main-title" value="${mainTitle}" style="margin: 0;"></td>
-                            <td><input type="text" class="form-control item-clause" value="${clause}" style="margin: 0;"></td>
-                            <td><input type="text" class="form-control item-requirement" value="${requirement}" style="margin: 0;"></td>
+                            <td><input type="text" class="form-control item-main-clause" value="${window.UTILS.escapeHtml(mainClause)}" style="margin: 0;"></td>
+                            <td><input type="text" class="form-control item-main-title" value="${window.UTILS.escapeHtml(mainTitle)}" style="margin: 0;"></td>
+                            <td><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(clause)}" style="margin: 0;"></td>
+                            <td><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(requirement)}" style="margin: 0;"></td>
                             <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
                         `;
                         tbody.appendChild(newRow);
@@ -407,7 +407,7 @@ function openAddChecklistModal() {
                 <div class="form-group">
                     <label>Standard</label>
                     <select class="form-control" id="checklist-standard">
-                        ${standards.map(s => `<option value="${s}">${s}</option>`).join('')}
+                        ${standards.map(s => `<option value="${window.UTILS.escapeHtml(s)}">${window.UTILS.escapeHtml(s)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
@@ -421,14 +421,14 @@ function openAddChecklistModal() {
                     <label>Audit Type</label>
                     <select class="form-control" id="checklist-audit-type">
                         <option value="">-- Select --</option>
-                        ${auditTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
+                        ${auditTypes.map(t => `<option value="${window.UTILS.escapeHtml(t)}">${window.UTILS.escapeHtml(t)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Audit Scope</label>
                     <select class="form-control" id="checklist-audit-scope">
                         <option value="">-- Select --</option>
-                        ${auditScopes.map(s => `<option value="${s}">${s}</option>`).join('')}
+                        ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}">${window.UTILS.escapeHtml(s)}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -640,7 +640,7 @@ function openEditChecklistModal(id) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label>Checklist Name <span style="color: var(--danger-color);">*</span></label>
-                    <input type="text" class="form-control" id="checklist-name" value="${checklist.name}" required>
+                    <input type="text" class="form-control" id="checklist-name" value="${window.UTILS.escapeHtml(checklist.name)}" required>
                 </div>
                 <div class="form-group">
                     <label>Standard</label>
@@ -715,8 +715,8 @@ function openEditChecklistModal(id) {
 
             return flatItems.map(item => `
                                     <tr class="checklist-item-row">
-                                        <td><input type="text" class="form-control item-clause" value="${item.clause || ''}" style="margin: 0; width: 100%; min-width: 80px;"></td>
-                                        <td><input type="text" class="form-control item-requirement" value="${item.requirement || ''}" style="margin: 0;"></td>
+                                        <td><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(item.clause || '')}" style="margin: 0; width: 100%; min-width: 80px;"></td>
+                                        <td><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(item.requirement || '')}" style="margin: 0;"></td>
                                         <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
                                 `).join('');

@@ -157,10 +157,13 @@ function openCreateReportModal() {
     modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
 
     // Helpers exposed for HTML interaction
-    window.selectAuditPlan = (id, date, client) => {
+    window.selectAuditPlan = (id) => {
+        const plan = state.auditPlans.find(p => p.id == id);
+        if (!plan) return;
+
         document.getElementById('report-plan').value = id;
-        document.getElementById('report-date').value = date;
-        document.getElementById('plan-display').textContent = `PLN-${id}: ${client}`;
+        document.getElementById('report-date').value = plan.date;
+        document.getElementById('plan-display').textContent = `PLN-${id}: ${plan.client}`;
         document.querySelectorAll('.select-plan-btn').forEach(b => {
             b.className = 'btn btn-sm btn-outline-primary select-plan-btn';
             b.textContent = 'Select';
@@ -183,12 +186,12 @@ function openCreateReportModal() {
         return plans.map(p => `
             <tr style="border-bottom: 1px solid #e2e8f0;">
                 <td style="padding: 8px; font-weight: 600;">PLN-${p.id}</td>
-                <td style="padding: 8px;">${p.client}</td>
-                <td style="padding: 8px;">${p.standard}</td>
-                <td style="padding: 8px;">${p.date}</td>
+                <td style="padding: 8px;">${window.UTILS.escapeHtml(p.client)}</td>
+                <td style="padding: 8px;">${window.UTILS.escapeHtml(p.standard)}</td>
+                <td style="padding: 8px;">${window.UTILS.escapeHtml(p.date)}</td>
                 <td style="padding: 8px; text-align: center;">
                     <button class="btn btn-sm btn-outline-primary select-plan-btn" 
-                        onclick="window.selectAuditPlan('${p.id}', '${p.date}', '${p.client.replace(/'/g, "\\'")}')">
+                        onclick="window.selectAuditPlan('${p.id}')">
                         Select
                     </button>
                 </td>
@@ -296,7 +299,7 @@ function openEditReportModal(reportId) {
         <form id="report-form">
             <div class="form-group">
                 <label>Client</label>
-                <input type="text" class="form-control" value="${report.client}" disabled>
+                <input type="text" class="form-control" value="${window.UTILS.escapeHtml(report.client)}" disabled>
             </div>
             <div class="form-group">
                 <label>Audit Date</label>
@@ -503,9 +506,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                          <div style="display: grid; grid-template-columns: 80px 1fr 180px; gap: 1rem; align-items: start;">
                             <div style="font-weight: bold; color: var(--primary-color);">${item.clause || 'N/A'}</div>
                             <div>
-                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${item.requirement}</div>
+                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(item.requirement)}</div>
                                 <div style="position: relative;">
-                                    <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${saved.comment || ''}" style="margin-bottom: 0; padding-right: 35px;">
+                                    <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.comment || '')}" style="margin-bottom: 0; padding-right: 35px;">
                                     <button type="button" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
                                         <i class="fa-solid fa-microphone"></i>
                                     </button>
@@ -794,8 +797,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <tr>
                                         <td>NCR-${String(idx + 1).padStart(3, '0')}</td>
                                         <td><span style="background: ${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'var(--danger-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'Major' : 'Minor'}</span></td>
-                                        <td>${ncr.clause || '-'}</td>
-                                        <td>${ncr.description || '-'}</td>
+                                        <td>${window.UTILS.escapeHtml(ncr.clause || '-')}</td>
+                                        <td>${window.UTILS.escapeHtml(ncr.description || '-')}</td>
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
                                         <td><button class="btn btn-sm" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button></td>
                                     </tr>

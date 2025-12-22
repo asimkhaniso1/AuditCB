@@ -120,12 +120,12 @@ function renderCertificationModule() {
                             <tbody>
                                 ${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).map(cert => `
                                     <tr>
-                                        <td><strong>${cert.id}</strong></td>
-                                        <td>${cert.client}</td>
-                                        <td><span class="badge bg-blue">${cert.standard}</span></td>
-                                        <td>${cert.issueDate}</td>
-                                        <td>${cert.expiryDate}</td>
-                                        <td><span class="badge bg-green">${cert.status}</span></td>
+                                        <td><strong>${window.UTILS.escapeHtml(cert.id)}</strong></td>
+                                        <td>${window.UTILS.escapeHtml(cert.client)}</td>
+                                        <td><span class="badge bg-blue">${window.UTILS.escapeHtml(cert.standard)}</span></td>
+                                        <td>${window.UTILS.escapeHtml(cert.issueDate)}</td>
+                                        <td>${window.UTILS.escapeHtml(cert.expiryDate)}</td>
+                                        <td><span class="badge bg-green">${window.UTILS.escapeHtml(cert.status)}</span></td>
                                         <td  style="text-align: right;">
                                             <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View/Print"><i class="fa-solid fa-eye"></i></button>
                                             <button class="btn btn-sm btn-icon" onclick="openCertActionModal('${cert.id}')" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
@@ -156,10 +156,10 @@ function renderCertificationModule() {
                             <tbody>
                                 ${pendingDecisions.map(r => `
                                     <tr>
-                                        <td>REP-${r.id}</td>
-                                        <td>${r.client}</td>
-                                        <td>${r.date}</td>
-                                        <td><span style="color: var(--success-color); font-weight: 600;">${r.recommendation}</span></td>
+                                        <td>REP-${window.UTILS.escapeHtml(String(r.id))}</td>
+                                        <td>${window.UTILS.escapeHtml(r.client)}</td>
+                                        <td>${window.UTILS.escapeHtml(r.date)}</td>
+                                        <td><span style="color: var(--success-color); font-weight: 600;">${window.UTILS.escapeHtml(r.recommendation)}</span></td>
                                         <td>
                                             <button class="btn btn-primary btn-sm" onclick="openIssueCertificateModal('${r.id}')">
                                                 <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Issue Certificate
@@ -191,11 +191,11 @@ function renderCertificationModule() {
                             <tbody>
                                 ${certs.filter(c => c.status !== window.CONSTANTS.CERT_STATUS.VALID).map(cert => `
                                     <tr>
-                                        <td><strong>${cert.id}</strong></td>
-                                        <td>${cert.client}</td>
-                                        <td><span class="badge bg-blue">${cert.standard}</span></td>
-                                        <td><span class="badge" style="background: ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? 'orange' : 'red'}; color: white;">${cert.status}</span></td>
-                                        <td>${cert.statusReason || 'N/A'}</td>
+                                        <td><strong>${window.UTILS.escapeHtml(cert.id)}</strong></td>
+                                        <td>${window.UTILS.escapeHtml(cert.client)}</td>
+                                        <td><span class="badge bg-blue">${window.UTILS.escapeHtml(cert.standard)}</span></td>
+                                        <td><span class="badge" style="background: ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? 'orange' : 'red'}; color: white;">${window.UTILS.escapeHtml(cert.status)}</span></td>
+                                        <td>${window.UTILS.escapeHtml(cert.statusReason || 'N/A')}</td>
                                         <td style="text-align: right;">
                                             <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View History"><i class="fa-solid fa-history"></i></button>
                                             ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? `<button class="btn btn-sm btn-success" onclick="restoreCertificate('${cert.id}')" title="Restore"><i class="fa-solid fa-undo"></i> Restore</button>` : ''}
@@ -260,7 +260,7 @@ window.openIssueCertificateModal = function (reportId) {
                 <label>Client Organization</label>
                 <select class="form-control" id="cert-client" ${prefillClient ? 'disabled' : ''}>
                     <option value="">-- Select Client --</option>
-                    ${state.clients.map(c => `<option value="${c.name}" ${c.name === prefillClient ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${c.name === prefillClient ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -281,9 +281,9 @@ window.openIssueCertificateModal = function (reportId) {
                     <input type="date" class="form-control" id="cert-expiry-date" value="${new Date(new Date().setFullYear(new Date().getFullYear() + 3)).toISOString().split('T')[0]}" required>
                 </div>
             </div>
-             <div class="form-group">
+            <div class="form-group">
                 <label>Certification Scope (Critical)</label>
-                <textarea class="form-control" id="cert-scope" rows="4" placeholder="Enter the precise scope of certification...">${prefillScope}</textarea>
+                <textarea class="form-control" id="cert-scope" rows="4" placeholder="Enter the precise scope of certification...">${window.UTILS.escapeHtml(prefillScope)}</textarea>
             </div>
             
             <!-- ISO 17021-1 Decision Fields -->
@@ -453,12 +453,12 @@ window.viewCertificate = function (certId) {
                     
                     <div class="cert-body">
                         <div class="cert-presented">This is to certify that the Management System of:</div>
-                        <div class="cert-client">${cert.client}</div>
+                        <div class="cert-client">${window.UTILS.escapeHtml(cert.client)}</div>
                         
                         <div class="cert-text">has been assessed and found to constitute with the requirements of:</div>
-                        <div class="cert-standard">${cert.standard}</div>
+                        <div class="cert-standard">${window.UTILS.escapeHtml(cert.standard)}</div>
                         
-                        <div class="cert-scope"><strong>Scope of Certification:</strong><br>${cert.scope}</div>
+                        <div class="cert-scope"><strong>Scope of Certification:</strong><br>${window.UTILS.escapeHtml(cert.scope)}</div>
                     </div>
                     
                     <div class="cert-footer">
@@ -473,9 +473,9 @@ window.viewCertificate = function (certId) {
                         </div>
                         
                         <div style="text-align: center;">
-                            <div><strong>Date of Issue:</strong> ${cert.issueDate}</div>
-                            <div><strong>Valid Util:</strong> ${cert.expiryDate}</div>
-                            <div><strong>Certificate No:</strong> ${cert.id}</div>
+                            <div><strong>Date of Issue:</strong> ${window.UTILS.escapeHtml(cert.issueDate)}</div>
+                            <div><strong>Valid Util:</strong> ${window.UTILS.escapeHtml(cert.expiryDate)}</div>
+                            <div><strong>Certificate No:</strong> ${window.UTILS.escapeHtml(cert.id)}</div>
                         </div>
                     </div>
                 </div>
@@ -563,13 +563,13 @@ window.printCertificateRegister = function () {
                 <tbody>
                     ${certs.map(c => `
                         <tr>
-                            <td>${c.id}</td>
-                            <td>${c.client}</td>
-                            <td>${c.standard}</td>
-                            <td class="status-${c.status.toLowerCase()}">${c.status}</td>
-                            <td>${c.issueDate}</td>
-                            <td>${c.expiryDate}</td>
-                            <td>${c.scope}</td>
+                            <td>${window.UTILS.escapeHtml(c.id)}</td>
+                            <td>${window.UTILS.escapeHtml(c.client)}</td>
+                            <td>${window.UTILS.escapeHtml(c.standard)}</td>
+                            <td class="status-${(c.status || '').toLowerCase()}">${window.UTILS.escapeHtml(c.status)}</td>
+                            <td>${window.UTILS.escapeHtml(c.issueDate)}</td>
+                            <td>${window.UTILS.escapeHtml(c.expiryDate)}</td>
+                            <td>${window.UTILS.escapeHtml(c.scope)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
