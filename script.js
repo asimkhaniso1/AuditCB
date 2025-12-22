@@ -1273,6 +1273,13 @@ async function renderModule(moduleName) {
                     renderPlaceholder(moduleName);
                 }
                 break;
+            case 'ncr-capa':
+                if (typeof renderNCRCAPAModule === 'function') {
+                    renderNCRCAPAModule();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
             case 'management-review':
                 if (typeof renderManagementReviewModule === 'function') {
                     renderManagementReviewModule();

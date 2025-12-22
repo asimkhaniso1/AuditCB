@@ -149,6 +149,9 @@ function renderClientSidebarMenu(clientId) {
         <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
             <i class="fa-solid fa-triangle-exclamation"></i> Findings
         </li>
+        <li onclick="window.renderClientModule(${clientId}, 'ncr-capa', this)">
+            <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
+        </li>
         <li onclick="window.renderClientModule(${clientId}, 'certs', this)">
             <i class="fa-solid fa-certificate"></i> Certificates
         </li>
@@ -250,6 +253,14 @@ window.renderClientModule = function (clientId, moduleName, clickedElement) {
             break;
         case 'findings':
             contentArea.innerHTML = renderClientFindings(client);
+            break;
+        case 'ncr-capa':
+            // We can pass the client ID to the module if needed, or rely on window.state.activeClientId
+            if (typeof renderNCRCAPAModule === 'function') {
+                renderNCRCAPAModule(client.id);
+            } else {
+                contentArea.innerHTML = 'Module not loaded';
+            }
             break;
         case 'certs':
             contentArea.innerHTML = renderClientCertificates(client);

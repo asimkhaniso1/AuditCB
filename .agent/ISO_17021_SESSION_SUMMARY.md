@@ -199,3 +199,50 @@ Final = max(Adjusted, 25% of total sites)
 **Session Complete!** 🎉
 
 Three major ISO 17021-1 compliance features implemented in one session.
+
+### 4. NCR & CAPA Module (Clause 9.9 & 9.5) - 100% Complete
+
+**Purpose:** Comprehensive management of Non-Conformities and Corrective Actions for both Clients and Internal CB Operations.
+
+**Features:**
+- **Dual-Level Support:** Client-level NCRs and Internal CB NCRs (accessible via Client Workspace).
+- **Register:** Filterable list of all NCRs.
+- **CAPA Tracker:** dedicated view for tracking open corrective actions.
+- **Verification:** Workflow for verifying effectiveness of implemented CAPAs.
+- **Analytics:** Dashboard showing effectiveness rates, open vs closed, and severity distribution.
+- **Context-Aware:** Automatically scopes data to the active client workspace.
+
+**Status:** Fully Implemented and Integrated into Client Workspace sidebar.
+
+### 5. CB Policies & Criteria (Clause 8.6 & 9.6) - 100% Complete
+
+**Purpose:** Configuration of critical CB policies.
+
+**Features:**
+- NCR Classification Criteria (Major/Minor/Observation)
+- Certification Decision Rules
+- CAPA Timeline configurations
+- Audit Frequency rules
+
+**Location:** Settings Module -> CB Policies tab.
+
+---
+
+## 📁 Files Modified (Update)
+
+| File | Changes | Purpose |
+|------|---------|---------|
+| `ncr-capa-module.js` | New File | Full NCR-CAPA implementation |
+| `settings-module.js` | +200 lines | Added CB Policies tab |
+| `client-workspace.js` | +20 lines | Added NCR sidebar link and routing |
+| `index.html` | +1 line | Added script tag |
+| `script.js` | +5 lines | Added global routing case |
+
+---
+
+## 🎯 Revised Next Priority Items
+
+1. **Management Review Module** (Clause 8.5)
+2. **Certification Module Enhancements** (Link Blocking logic to NCRs)
+3. **Internal Audit Scheduling** (Complementing the NCR module)
+
