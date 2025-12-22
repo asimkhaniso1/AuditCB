@@ -3,22 +3,15 @@
 // Client-centric navigation and workspace rendering
 // ============================================
 
-let globalSidebarContent = '';
+
 
 // Initialize client sidebar on page load
 document.addEventListener('DOMContentLoaded', function () {
-    // Capture global sidebar content before any changes
-    const navList = document.querySelector('.main-nav ul');
-    if (navList) {
-        globalSidebarContent = navList.innerHTML;
-    }
-
     // Reduced timeout for faster loading
     setTimeout(() => {
-        console.log('Initializing client sidebar...', window.state?.clients);
         populateClientSidebar();
         setupClientSearch();
-    }, 100); // Reduced from 1000ms to 100ms for faster page load
+    }, 100);
 });
 
 // Populate the right sidebar with client list
@@ -46,7 +39,7 @@ function populateClientSidebar() {
         const status = client.status || 'Active';
 
         return `
-            <div class="client-list-item ${isActive ? 'active' : ''}" data-client-id="${client.id}" onclick="window.selectClient(${client.id})">
+            <div class="client-list-item ${isActive ? 'active' : ''}" data-client-id="${client.id}" onclick="window.location.hash = 'client/${client.id}/overview'">
                 <div class="client-avatar">${initials}</div>
                 <div class="client-info">
                     <div class="client-name">${client.name}</div>
@@ -92,9 +85,6 @@ window.selectClient = function (clientId) {
 
     // SWITCH LEFT SIDEBAR TO CLIENT MENU
     renderClientSidebarMenu(clientId);
-
-    // Initial Render: Overview
-    renderClientModule(clientId, 'overview');
 };
 
 // Render Client-Specific Layout in Left Sidebar
@@ -121,52 +111,52 @@ function renderClientSidebarMenu(clientId) {
 
     // Client Menu Items
     navList.innerHTML = `
-        <li style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);" onclick="window.backToDashboard()">
+        <li style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);" onclick="window.location.hash = 'dashboard'">
             <i class="fa-solid fa-arrow-left" style="color: var(--text-secondary);"></i> <span style="font-weight: 500;">Back to Global</span>
         </li>
         
-        <li class="active" onclick="window.renderClientModule(${clientId}, 'overview', this)">
+        <li class="active" onclick="window.location.hash = 'client/${clientId}/overview'">
             <i class="fa-solid fa-house"></i> Overview
         </li>
-        <li onclick="window.renderClientModule(${clientId}, 'cycle', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/cycle'">
             <i class="fa-solid fa-timeline"></i> Audit Cycle
         </li>
 
         <!-- Audit Operations -->
         <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Audit Operations</li>
-        <li onclick="window.renderClientModule(${clientId}, 'plans', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/plans'">
             <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
-        <li onclick="window.renderClientModule(${clientId}, 'execution', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/execution'">
             <i class="fa-solid fa-tasks"></i> Execution
         </li>
-        <li onclick="window.renderClientModule(${clientId}, 'reporting', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/reporting'">
             <i class="fa-solid fa-file-pen"></i> Reporting
         </li>
 
         <!-- Outcomes -->
         <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Outcomes</li>
-        <li onclick="window.renderClientModule(${clientId}, 'findings', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/findings'">
             <i class="fa-solid fa-triangle-exclamation"></i> Findings
         </li>
-        <li onclick="window.renderClientModule(${clientId}, 'ncr-capa', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
             <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
         </li>
-        <li onclick="window.renderClientModule(${clientId}, 'certs', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/certs'">
             <i class="fa-solid fa-certificate"></i> Certificates
         </li>
 
         <!-- Records & Compliance -->
         <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Governance</li>
-        <li onclick="window.renderClientModule(${clientId}, 'compliance', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/compliance'">
             <i class="fa-solid fa-shield-halved"></i> Compliance
         </li>
-        <li onclick="window.renderClientModule(${clientId}, 'docs', this)">
+        <li onclick="window.location.hash = 'client/${clientId}/docs'">
             <i class="fa-solid fa-folder-open"></i> Documents
         </li>
         
         <!-- Settings -->
-        <li style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;" onclick="window.renderClientModule(${clientId}, 'settings', this)">
+        <li style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;" onclick="window.location.hash = 'client/${clientId}/settings'">
             <i class="fa-solid fa-cog"></i> Settings
         </li>
     `;
@@ -175,6 +165,7 @@ function renderClientSidebarMenu(clientId) {
 // Back to Global Dashboard
 window.backToDashboard = function () {
     window.state.activeClientId = null;
+    window.state.ncrContextClientId = null;
 
     // Clear right sidebar selection
     document.querySelectorAll('.client-list-item').forEach(item => item.classList.remove('active'));
@@ -198,23 +189,9 @@ window.backToDashboard = function () {
 
     // RESTORE GLOBAL SIDEBAR MENU
     const navList = document.querySelector('.main-nav ul');
-    if (navList && globalSidebarContent) {
-        navList.innerHTML = globalSidebarContent;
-
-        // Re-attach global event listeners?
-        // The original listeners in script.js used event delegation or direct onclicks.
-        // Assuming original HTML had onclick="renderModule(...)" or script.js attaches them.
-        // If script.js attached them via addEventListener to specific elements, we might lose them.
-        // BUT, looking at index.html (implied), menu items usually have onclick or are handled by delegation.
-        // Let's assume standard behavior. If listeners are lost, we might need a refresh logic.
-        // Ideally, check if original items had onclick attributes.
+    if (navList && window.globalSidebarHTML) {
+        navList.innerHTML = window.globalSidebarHTML;
     }
-
-    // Default to Dashboard
-    window.renderModule('dashboard');
-
-    // Highlight Dashboard link
-    document.querySelector('.main-nav li[data-module="dashboard"]')?.classList.add('active');
 };
 
 // ============================================
@@ -222,15 +199,16 @@ window.backToDashboard = function () {
 // ============================================
 
 // Main function to render client modules
-window.renderClientModule = function (clientId, moduleName, clickedElement) {
+window.renderClientModule = function (clientId, moduleName) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     // Update Sidebar Active Class
-    if (clickedElement) {
-        document.querySelectorAll('.main-nav li').forEach(li => li.classList.remove('active'));
-        clickedElement.classList.add('active');
-    }
+    const sidebarItems = document.querySelectorAll('.main-nav li');
+    sidebarItems.forEach(li => {
+        const isMatch = li.getAttribute('onclick')?.includes(`'${moduleName}'`);
+        li.classList.toggle('active', !!isMatch);
+    });
 
     // Update Page Title
     document.getElementById('page-title').textContent = `${client.name} - ${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}`;

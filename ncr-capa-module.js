@@ -615,7 +615,7 @@ function updateNCRAnalytics() {
 }
 
 window.openNewNCRModal = function () {
-    const contextClientId = window.state.ncrContextClientId;
+    const contextClientId = window.state.ncrContextClientId || window.state.activeClientId;
 
     document.getElementById('modal-title').textContent = 'Create New NCR';
     document.getElementById('modal-body').innerHTML = `

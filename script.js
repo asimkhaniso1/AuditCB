@@ -1114,7 +1114,9 @@ function deleteRecord(collection, id) {
 // DOM Elements
 const contentArea = document.getElementById('content-area');
 const pageTitle = document.getElementById('page-title');
-const navItems = document.querySelectorAll('.main-nav li');
+// Capture global sidebar content early to ensure it can be restored
+const navListElement = document.querySelector('.main-nav ul');
+const globalSidebarHTML = navListElement ? navListElement.innerHTML : '';
 
 // Export important items to window for modules to access
 window.state = state;
@@ -1124,22 +1126,61 @@ window.showNotification = showNotification;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.renderModule = renderModule;
+window.globalSidebarHTML = globalSidebarHTML;
 
-// Navigation Handler
-navItems.forEach(item => {
-    item.addEventListener('click', () => {
-        // Update Active State
-        navItems.forEach(nav => nav.classList.remove('active'));
-        item.classList.add('active');
-
-        // Update Module
+// Navigation Handler (using delegation at document level for maximum robustness)
+document.addEventListener('click', (e) => {
+    const item = e.target.closest('li[data-module]');
+    if (item) {
         const moduleName = item.getAttribute('data-module');
-        state.currentModule = moduleName;
-
-        // Render Content
-        renderModule(moduleName);
-    });
+        window.location.hash = moduleName;
+    }
 });
+
+// Hash-based Routing
+function handleRouteChange() {
+    const hash = window.location.hash.substring(1); // Remove #
+
+    // Check if we are leaving a client workspace
+    if (!hash.startsWith('client/') && window.state && window.state.activeClientId) {
+        if (typeof window.backToDashboard === 'function') {
+            window.backToDashboard();
+        }
+    }
+
+    if (!hash || hash === 'dashboard') {
+        renderModule('dashboard', false);
+        updateActiveNavItem('dashboard');
+    } else if (hash.startsWith('client/')) {
+        const parts = hash.split('/');
+        const clientId = parseInt(parts[1]);
+        const subModule = parts[2] || 'overview';
+        if (typeof window.selectClient === 'function') {
+            // If already in client workspace, just switch tab
+            if (window.state.activeClientId === clientId) {
+                window.renderClientModule(clientId, subModule);
+            } else {
+                window.selectClient(clientId);
+                window.renderClientModule(clientId, subModule);
+            }
+        } else {
+            // Fallback if client-workspace script not loaded
+            renderModule('clients', false);
+        }
+    } else {
+        renderModule(hash, false);
+        updateActiveNavItem(hash);
+    }
+}
+
+function updateActiveNavItem(moduleName) {
+    const currentNavItems = document.querySelectorAll('.main-nav li');
+    currentNavItems.forEach(nav => {
+        nav.classList.toggle('active', nav.getAttribute('data-module') === moduleName);
+    });
+}
+
+window.addEventListener('hashchange', handleRouteChange);
 
 // Module Loader
 const loadedModules = new Set();
@@ -1174,7 +1215,14 @@ function loadScript(src) {
 }
 
 // Render Functions
-async function renderModule(moduleName) {
+async function renderModule(moduleName, syncHash = true) {
+    // If we want to sync the hash and it's different, update it and return
+    // handleRouteChange will then call renderModule(moduleName, false)
+    if (syncHash && window.location.hash !== '#' + moduleName) {
+        window.location.hash = moduleName;
+        return;
+    }
+
     // Update Title
     const titleMap = {
         'dashboard': 'Dashboard',
@@ -1559,19 +1607,22 @@ if (mobileOverlay) {
     mobileOverlay.addEventListener('click', closeMobileMenu);
 }
 
-// Close mobile menu when navigation item is clicked
-navItems.forEach(item => {
-    item.addEventListener('click', closeMobileMenu);
+// Close mobile menu when navigation item is clicked (Delegation at document level)
+document.addEventListener('click', (e) => {
+    if (e.target.closest('li[role="button"]')) {
+        closeMobileMenu();
+    }
 });
 
-// Keyboard Navigation Support
-navItems.forEach(item => {
-    item.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+// Keyboard Navigation Support (Delegation at document level)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        const item = e.target.closest('li[role="button"]');
+        if (item) {
             e.preventDefault();
             item.click();
         }
-    });
+    }
 });
 
 // ESC key to close mobile menu and modals
@@ -1643,8 +1694,12 @@ window.switchUserRole = function (role) {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     renderRoleSwitcher();
-    // Default to dashboard or restore state if implemented
-    renderModule('dashboard');
+    // Use hash for initial route or default to dashboard
+    if (window.location.hash) {
+        handleRouteChange();
+    } else {
+        window.location.hash = 'dashboard';
+    }
 });
 
 // Client Sidebar Toggle

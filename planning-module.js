@@ -207,9 +207,9 @@ function openCreatePlanModal() {
                     <!-- Client Selection -->
                     <div class="form-group">
                         <label>Client <span style="color: var(--danger-color);">*</span></label>
-                        <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)">
+                        <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)" ${window.state.activeClientId ? 'disabled' : ''}>
                             <option value="">-- Select Client --</option>
-                            ${state.clients.map(c => `<option value="${c.name}">${c.name} (${c.industry || 'N/A'})</option>`).join('')}
+                            ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name} (${c.industry || 'N/A'})</option>`).join('')}
                         </select>
                     </div>
 
@@ -373,6 +373,14 @@ function openCreatePlanModal() {
     modalCancel.onclick = () => window.closeModal();
 
     currentPlanStep = 1;
+
+    // Auto-trigger client details if pre-selected
+    if (window.state.activeClientId) {
+        const client = state.clients.find(c => c.id === window.state.activeClientId);
+        if (client) {
+            updateClientDetails(client.name);
+        }
+    }
 }
 
 function editAuditPlan(id) {

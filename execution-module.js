@@ -199,14 +199,15 @@ function openCreateReportModal() {
         `).join('');
     };
 
-    const uniqueClients = [...new Set(allOpenPlans.map(p => p.client))].sort();
+    const activeClient = window.state.activeClientId ? state.clients.find(c => c.id === window.state.activeClientId) : null;
+    const initialClientName = activeClient ? activeClient.name : '';
 
     modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filter by Company:</label>
-            <select class="form-control" onchange="window.filterAuditPlansStart(this.value)" style="margin-bottom: 1rem; border-color: var(--primary-color);">
+            <select class="form-control" id="start-audit-client-filter" onchange="window.filterAuditPlansStart(this.value)" style="margin-bottom: 1rem; border-color: var(--primary-color);" ${activeClient ? 'disabled' : ''}>
                 <option value="">-- All Companies with Open Plans --</option>
-                ${uniqueClients.map(c => `<option value="${c}">${c}</option>`).join('')}
+                ${uniqueClients.map(c => `<option value="${c}" ${c === initialClientName ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
 
             <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
@@ -249,6 +250,11 @@ function openCreateReportModal() {
         </div>
     `;
     window.openModal();
+
+    // Auto-filter if in client context
+    if (initialClientName) {
+        window.filterAuditPlansStart(initialClientName);
+    }
 
     // Update button text to 'Start Audit'
     document.getElementById('modal-save').textContent = 'Start Audit';

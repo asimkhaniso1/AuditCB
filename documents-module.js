@@ -246,9 +246,9 @@ function openUploadModal() {
             </div>
             <div class="form-group">
                 <label>Related Client</label>
-                <select class="form-control" id="doc-client">
+                <select class="form-control" id="doc-client" ${window.state.activeClientId ? 'disabled' : ''}>
                     <option value="">-- Select Client --</option>
-                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
