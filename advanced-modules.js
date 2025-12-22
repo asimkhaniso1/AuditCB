@@ -2288,22 +2288,38 @@ window.openAddQualificationModal = function (auditorId) {
     const auditor = window.state.auditors.find(a => a.id === auditorId);
     if (!auditor) return;
 
-    document.getElementById('modal-title').textContent = 'Add Qualification';
+    document.getElementById('modal-title').textContent = 'Add Qualification / Academic Degree';
     document.getElementById('modal-body').innerHTML = `
         <form id="qual-form">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label>Standard <span style="color: red;">*</span></label>
-                    <select id="qual-standard" class="form-control">
-                        <option value="ISO 9001:2015">ISO 9001:2015</option>
-                        <option value="ISO 14001:2015">ISO 14001:2015</option>
-                        <option value="ISO 45001:2018">ISO 45001:2018</option>
-                        <option value="ISO 27001:2022">ISO 27001:2022</option>
-                        <option value="ISO 22000:2018">ISO 22000:2018</option>
-                        <option value="ISO 50001:2018">ISO 50001:2018</option>
-                        <option value="ISO 13485:2016">ISO 13485:2016</option>
-                        <option value="IATF 16949:2016">IATF 16949:2016</option>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Qualification Type <span style="color: red;">*</span></label>
+                    <select id="qual-type" class="form-control">
+                        <option value="iso">ISO/Industry Standard</option>
+                        <option value="academic">Academic Degree</option>
+                        <option value="professional">Professional Certification</option>
                     </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Standard / Degree <span style="color: red;">*</span></label>
+                    <input list="qual-standards" id="qual-standard" class="form-control" placeholder="Type or select..." required>
+                    <datalist id="qual-standards">
+                        <option value="ISO 9001:2015">
+                        <option value="ISO 14001:2015">
+                        <option value="ISO 45001:2018">
+                        <option value="ISO 27001:2022">
+                        <option value="ISO 22000:2018">
+                        <option value="ISO 50001:2018">
+                        <option value="ISO 13485:2016">
+                        <option value="IATF 16949:2016">
+                        <option value="Bachelor of Engineering">
+                        <option value="Bachelor of Science">
+                        <option value="Master of Engineering">
+                        <option value="Master of Business Administration (MBA)">
+                        <option value="PhD">
+                        <option value="CQE (Certified Quality Engineer)">
+                        <option value="PMP (Project Management Professional)">
+                    </datalist>
                 </div>
                 <div class="form-group">
                     <label>Qualification Level</label>
@@ -2312,6 +2328,10 @@ window.openAddQualificationModal = function (auditorId) {
                         <option value="Auditor">Auditor</option>
                         <option value="Provisional Auditor">Provisional Auditor</option>
                         <option value="Technical Expert">Technical Expert</option>
+                        <option value="Bachelor">Bachelor's Degree</option>
+                        <option value="Master">Master's Degree</option>
+                        <option value="Doctorate">Doctorate</option>
+                        <option value="Certified">Certified Professional</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -2319,28 +2339,35 @@ window.openAddQualificationModal = function (auditorId) {
                     <input type="text" id="qual-cert-number" class="form-control" placeholder="e.g. IRCA/12345/2024">
                 </div>
                 <div class="form-group">
-                    <label>Issuing Body</label>
-                    <select id="qual-issuing-body" class="form-control">
-                        <option value="IRCA">IRCA</option>
-                        <option value="Exemplar Global">Exemplar Global</option>
-                        <option value="PECB">PECB</option>
-                        <option value="CQI">CQI</option>
-                        <option value="Internal">Internal (CB Approved)</option>
-                    </select>
+                    <label>Issuing Body / University</label>
+                    <input list="issuing-bodies" id="qual-issuing-body" class="form-control" placeholder="Type or select...">
+                    <datalist id="issuing-bodies">
+                        <option value="IRCA">
+                        <option value="Exemplar Global">
+                        <option value="PECB">
+                        <option value="CQI">
+                        <option value="Internal (CB Approved)">
+                        <option value="PMI">
+                        <option value="ASQ">
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label>Field of Study</label>
+                    <input type="text" id="qual-field" class="form-control" placeholder="e.g. Mechanical Engineering, Quality Management">
                 </div>
                 <div class="form-group">
                     <label>Issue Date</label>
                     <input type="date" id="qual-issue-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
                 </div>
                 <div class="form-group">
-                    <label>Expiry Date</label>
+                    <label>Expiry Date <small>(leave blank if no expiry)</small></label>
                     <input type="date" id="qual-expiry-date" class="form-control" value="${new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
                 </div>
             </div>
             <div style="padding: 0.75rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
                 <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
                     <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                    Qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
+                    ISO qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
                 </p>
             </div>
         </form>
@@ -2360,12 +2387,14 @@ window.openAddQualificationModal = function (auditorId) {
         }
 
         auditor.qualifications.push({
+            type: document.getElementById('qual-type').value,
             standard: standard,
             level: document.getElementById('qual-level').value,
             certNumber: document.getElementById('qual-cert-number').value || `CERT-${Date.now()}`,
             issuingBody: document.getElementById('qual-issuing-body').value,
+            fieldOfStudy: document.getElementById('qual-field').value,
             issueDate: document.getElementById('qual-issue-date').value,
-            expiryDate: document.getElementById('qual-expiry-date').value
+            expiryDate: document.getElementById('qual-expiry-date').value || null
         });
 
         // Also add to standards array if not present
@@ -2378,7 +2407,7 @@ window.openAddQualificationModal = function (auditorId) {
         window.showNotification('Qualification added successfully', 'success');
         renderAuditorDetail(auditorId);
         setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="competence"]')?.click();
+            document.querySelector('.tab-btn[data-tab="qualifications"]')?.click();
         }, 100);
     };
 
