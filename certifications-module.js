@@ -99,6 +99,7 @@ function renderCertificationModule() {
                 <button class="tab-btn active" onclick="switchCertTab(this, 'active-certs')">Active Certificates (${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).length})</button>
                 <button class="tab-btn" onclick="switchCertTab(this, 'pending-certs')">Pending Decisions (${pendingDecisions.length})</button>
                 <button class="tab-btn" onclick="switchCertTab(this, 'suspended-certs')">Suspended/Withdrawn</button>
+                <button class="tab-btn" onclick="switchCertTab(this, 'public-directory')"><i class="fa-solid fa-globe" style="margin-right: 0.5rem;"></i>Public Directory</button>
             </div>
 
             <!-- Tab Content: Active Certificates -->
@@ -217,6 +218,11 @@ window.switchCertTab = function (btn, tabId) {
 
     btn.classList.add('active');
     document.getElementById(tabId).style.display = 'block';
+
+    // Initialize Public Directory when tab is opened
+    if (tabId === 'public-directory') {
+        setTimeout(() => window.updatePublicDirectory(), 100);
+    }
 };
 
 window.openIssueCertificateModal = function (reportId) {
@@ -586,4 +592,142 @@ window.toggleCertAnalytics = function () {
     if (window.state.showCertAnalytics === undefined) window.state.showCertAnalytics = true;
     window.state.showCertAnalytics = !window.state.showCertAnalytics;
     renderCertificationModule();
+};
+
+// ============================================
+// PUBLIC DIRECTORY (ISO 17021 Clause 9.3)
+// ============================================
+
+window.updatePublicDirectory = function () {
+    const certs = window.state.certifications || [];
+    const showCertId = document.getElementById('show-cert-id')?.checked;
+    const showClient = document.getElementById('show-client')?.checked;
+    const showStandard = document.getElementById('show-standard')?.checked;
+    const showScope = document.getElementById('show-scope')?.checked;
+    const showIssueDate = document.getElementById('show-issue-date')?.checked;
+    const showExpiryDate = document.getElementById('show-expiry-date')?.checked;
+    const showActiveOnly = document.getElementById('show-active-only')?.checked;
+
+    // Filter certificates
+    const filteredCerts = showActiveOnly
+        ? certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID)
+        : certs;
+
+    // Build table HTML
+    let tableHTML = '<table><thead><tr>';
+    if (showCertId) tableHTML += '<th>Certificate ID</th>';
+    if (showClient) tableHTML += '<th>Client Organization</th>';
+    if (showStandard) tableHTML += '<th>Standard</th>';
+    if (showScope) tableHTML += '<th>Scope</th>';
+    if (showIssueDate) tableHTML += '<th>Issue Date</th>';
+    if (showExpiryDate) tableHTML += '<th>Expiry Date</th>';
+    tableHTML += '</tr></thead><tbody>';
+
+    filteredCerts.forEach(cert => {
+        tableHTML += '<tr>';
+        if (showCertId) tableHTML += `<td><strong>${window.UTILS.escapeHtml(cert.id)}</strong></td>`;
+        if (showClient) tableHTML += `<td>${window.UTILS.escapeHtml(cert.client)}</td>`;
+        if (showStandard) tableHTML += `<td><span class="badge bg-blue">${window.UTILS.escapeHtml(cert.standard)}</span></td>`;
+        if (showScope) tableHTML += `<td style="max-width: 300px;">${window.UTILS.escapeHtml((cert.scope || '').substring(0, 100))}${cert.scope && cert.scope.length > 100 ? '...' : ''}</td>`;
+        if (showIssueDate) tableHTML += `<td>${window.UTILS.escapeHtml(cert.issueDate)}</td>`;
+        if (showExpiryDate) tableHTML += `<td>${window.UTILS.escapeHtml(cert.expiryDate)}</td>`;
+        tableHTML += '</tr>';
+    });
+
+    tableHTML += '</tbody></table>';
+
+    const container = document.getElementById('public-directory-table');
+    if (container) {
+        container.innerHTML = tableHTML;
+    }
+};
+
+window.exportPublicDirectory = function () {
+    const certs = window.state.certifications || [];
+    const showActiveOnly = document.getElementById('show-active-only')?.checked;
+
+    const filteredCerts = showActiveOnly
+        ? certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID)
+        : certs;
+
+    // Build CSV
+    let csv = 'Certificate ID,Client Organization,Standard,Scope,Issue Date,Expiry Date,Status\n';
+    filteredCerts.forEach(cert => {
+        const row = [
+            cert.id,
+            cert.client,
+            cert.standard,
+            `"${(cert.scope || '').replace(/"/g, '""')}"`, // Escape quotes in scope
+            cert.issueDate,
+            cert.expiryDate,
+            cert.status
+        ].join(',');
+        csv += row + '\n';
+    });
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `certified-clients-directory-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    window.showNotification('Directory exported successfully', 'success');
+};
+
+window.generateEmbedCode = function () {
+    const certs = window.state.certifications || [];
+    const showActiveOnly = document.getElementById('show-active-only')?.checked;
+
+    const filteredCerts = showActiveOnly
+        ? certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID)
+        : certs;
+
+    // Generate HTML embed code
+    let embedHTML = `<!-- Certified Clients Directory - Generated ${new Date().toLocaleDateString()} -->
+<div style="font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto;">
+    <h2 style="color: #0284c7; margin-bottom: 1rem;">
+        <span style="margin-right: 0.5rem;">🌐</span>Certified Clients Directory
+    </h2>
+    <table style="width: 100%; border-collapse: collapse; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <thead>
+            <tr style="background: #f1f5f9;">
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Certificate ID</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Organization</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Standard</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Valid Until</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    filteredCerts.forEach((cert, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+        embedHTML += `
+            <tr style="background: ${bgColor};">
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.id}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.client}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.standard}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.expiryDate}</td>
+            </tr>`;
+    });
+
+    embedHTML += `
+        </tbody>
+    </table>
+    <p style="color: #64748b; font-size: 0.875rem; margin-top: 1rem;">
+        Last updated: ${new Date().toLocaleDateString()} | Total certified clients: ${filteredCerts.length}
+    </p>
+</div>`;
+
+    // Show in modal
+    document.getElementById('modal-title').textContent = 'Embed Code - Public Directory';
+    document.getElementById('modal-body').innerHTML = `
+        <p style="margin-bottom: 1rem; color: var(--text-secondary);">Copy the HTML code below and paste it into your website:</p>
+        <textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 0.85rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 4px;">${embedHTML}</textarea>
+        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(\`${embedHTML.replace(/`/g, '\\`')}\`); window.showNotification('Copied to clipboard!', 'success');" style="margin-top: 1rem;">
+            <i class="fa-solid fa-copy" style="margin-right: 0.5rem;"></i>Copy to Clipboard
+        </button>
+    `;
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
 };
