@@ -219,14 +219,17 @@ function renderAuditorDetail(auditorId) {
             </div>
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
-                <button class="tab-btn active" data-tab="info">Information</button>
-                <button class="tab-btn" data-tab="upcoming">Upcoming Audits</button>
-                <button class="tab-btn" data-tab="competence">Competence</button>
-                <button class="tab-btn" data-tab="training">Training</button>
-                <button class="tab-btn" data-tab="documents">Documents</button>
-                <button class="tab-btn" data-tab="history">Audit History</button>
-                <button class="tab-btn" data-tab="evaluations" style="background: #eff6ff; color: #1d4ed8;">
-                    <i class="fa-solid fa-chart-line" style="margin-right: 0.25rem;"></i>Evaluations
+                <button class="tab-btn active" data-tab="profile">
+                    <i class="fa-solid fa-user" style="margin-right: 0.25rem;"></i>Profile
+                </button>
+                <button class="tab-btn" data-tab="qualifications">
+                    <i class="fa-solid fa-graduation-cap" style="margin-right: 0.25rem;"></i>Qualifications & Training
+                </button>
+                <button class="tab-btn" data-tab="activity">
+                    <i class="fa-solid fa-calendar-check" style="margin-right: 0.25rem;"></i>Audit Activity
+                </button>
+                <button class="tab-btn" data-tab="documents">
+                    <i class="fa-solid fa-folder-open" style="margin-right: 0.25rem;"></i>Documents
                 </button>
             </div>
 
@@ -249,14 +252,14 @@ function renderAuditorDetail(auditorId) {
         openEditAuditorModal(auditor.id);
     });
 
-    renderAuditorTab(auditor, 'info');
+    renderAuditorTab(auditor, 'profile');
 }
 
 function renderAuditorTab(auditor, tabName) {
     const tabContent = document.getElementById('tab-content');
 
     switch (tabName) {
-        case 'info':
+        case 'profile':
             tabContent.innerHTML = `
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;">Personal Information</h3>
@@ -342,7 +345,7 @@ function renderAuditorTab(auditor, tabName) {
                 </div>
             `;
             break;
-        case 'upcoming':
+        case 'activity':
             // Get upcoming audits for this auditor
             const today = new Date().toISOString().split('T')[0];
             const upcomingPlans = state.auditPlans.filter(p => {
@@ -426,7 +429,7 @@ function renderAuditorTab(auditor, tabName) {
                 locationFilter?.addEventListener('input', applyFilters);
             }, 100);
             break;
-        case 'competence':
+        case 'qualifications':
             // Get qualifications or generate from standards
             const qualifications = auditor.qualifications || auditor.standards.map(std => ({
                 standard: std,
@@ -530,17 +533,20 @@ function renderAuditorTab(auditor, tabName) {
                         <strong>ISO 17021-1 Clause 7.2:</strong> Auditor competence must be maintained and monitored. Qualifications require renewal before expiry.
                     </p>
                 </div>
-            `;
-            break;
-        case 'training':
-            tabContent.innerHTML = `
-                <div class="card">
-                    <h3 style="margin-bottom: 1rem;">Training Records</h3>
+
+                <!-- Training Records -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;"><i class="fa-solid fa-book-open" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Training Records</h3>
+                        <button class="btn btn-sm btn-primary" onclick="window.openAddTrainingModal(${auditor.id})">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Training
+                        </button>
+                    </div>
                     ${(auditor.trainings && auditor.trainings.length > 0) ? `
                         <div class="table-container">
                             <table>
                                 <thead>
-                                    <tr><th>Course</th><th>Provider</th><th>Date</th><th>Certificate</th></tr>
+                                    <tr><th>Course</th><th>Provider</th><th>Date</th><th>CPD Hours</th><th>Certificate</th></tr>
                                 </thead>
                                 <tbody>
                                     ${auditor.trainings.map(t => `
@@ -548,6 +554,7 @@ function renderAuditorTab(auditor, tabName) {
                                             <td>${t.course}</td>
                                             <td>${t.provider}</td>
                                             <td>${t.date}</td>
+                                            <td><span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${t.cpdHours || 0} hrs</span></td>
                                             <td>${t.certificate ? '<i class="fa-solid fa-file-pdf" style="color: var(--danger-color);"></i> View' : '-'}</td>
                                         </tr>
                                     `).join('')}
@@ -555,12 +562,10 @@ function renderAuditorTab(auditor, tabName) {
                             </table>
                         </div>
                     ` : '<p style="color: var(--text-secondary);">No training records available.</p>'}
-                    <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openAddTrainingModal(${auditor.id})">
-                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Training
-                    </button>
                 </div>
             `;
             break;
+
         case 'documents':
             tabContent.innerHTML = `
                 <div class="card">
