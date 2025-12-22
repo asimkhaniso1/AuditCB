@@ -174,6 +174,7 @@ newComplaint.subject = cleanData.subject;
 - [x] `planning-module.js` - Audit planning (MEDIUM) ✅ **COMPLETED**
 - [x] `execution-module.js` - Findings/observations (HIGH) ✅ **COMPLETED**
 - [x] `reporting-module.js` - Report generation (MEDIUM) ✅ **COMPLETED**
+- [x] `certifications-module.js` - Certificate Issuance (BONUS) ✅ **COMPLETED**
 
 ### How to Apply:
 

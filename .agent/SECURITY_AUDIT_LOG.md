@@ -28,6 +28,9 @@ The following functions have been refactored to include input validation (via `V
 - [x] `submitForReview` - Sanitized executive summary, conclusions, strengths, improvements.
 - [x] `saveReportDraft` - Sanitized all free-text draft fields.
 
+### 7. Certifications Module (`certifications-module.js`)
+- [x] `openIssueCertificateModal` - Validated Scope, Justification, Dates. Sanitized inputs.
+
 ## Utilities Created
 - `validation.js`: Core validation engine.
 - `sanitization.js`: DOMPurify wrapper.

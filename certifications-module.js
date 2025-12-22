@@ -325,34 +325,62 @@ window.openIssueCertificateModal = function (reportId) {
     window.openModal();
 
     modalSave.onclick = () => {
-        const clientIdx = document.getElementById('cert-client').selectedIndex;
-        const clientName = document.getElementById('cert-client').options[clientIdx].text; // Handle disabled select
-        const standard = document.getElementById('cert-standard').value;
-        const issueDate = document.getElementById('cert-issue-date').value;
-        const expiryDate = document.getElementById('cert-expiry-date').value;
-        const scope = document.getElementById('cert-scope').value;
+        // 1. Define Fields
+        const fieldIds = {
+            client: 'cert-client',
+            issueDate: 'cert-issue-date',
+            expiryDate: 'cert-expiry-date',
+            scope: 'cert-scope',
+            justification: 'cert-justification',
+            independent: 'cert-independent'
+        };
 
-        // ISO 17021-1 Decision Fields
-        const justification = document.getElementById('cert-justification').value;
-        const reviewer = document.getElementById('cert-reviewer').value;
-        const independent = document.getElementById('cert-independent').value;
+        // 2. Define Rules
+        const rules = {
+            client: [{ rule: 'required', fieldName: 'Client' }],
+            issueDate: [{ rule: 'required', fieldName: 'Issue Date' }],
+            expiryDate: [{ rule: 'required', fieldName: 'Expiry Date' }],
+            scope: [
+                { rule: 'required', fieldName: 'Scope' },
+                { rule: 'length', min: 10, max: 1000, fieldName: 'Scope' },
+                { rule: 'noHtmlTags' }
+            ],
+            justification: [
+                { rule: 'required', fieldName: 'Justification' },
+                { rule: 'noHtmlTags' }
+            ]
+        };
+
+        // 3. Validate
+        const result = Validator.validateFormElements(fieldIds, rules);
+        // Custom Checkboxes
         const ncVerified = document.getElementById('cert-nc-verified').checked;
         const scopeVerified = document.getElementById('cert-scope-verified').checked;
 
-        if (!scope) {
-            alert('Scope is mandatory!');
-            return;
-        }
-
-        if (!justification) {
-            alert('Decision justification is mandatory per ISO 17021-1!');
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
             return;
         }
 
         if (!ncVerified || !scopeVerified) {
-            alert('Please confirm NC closure and scope verification before issuing certificate!');
+            window.showNotification('Please confirm NC closure and scope verification!', 'error');
             return;
         }
+
+        Validator.clearErrors(fieldIds);
+
+        // 4. Sanitize & Collect
+        const clientIdx = document.getElementById('cert-client').selectedIndex;
+        const clientName = document.getElementById('cert-client').options[clientIdx].text;
+        const standard = document.getElementById('cert-standard').value;
+        const issueDate = document.getElementById('cert-issue-date').value;
+        const expiryDate = document.getElementById('cert-expiry-date').value;
+
+        const scope = Sanitizer.sanitizeText(document.getElementById('cert-scope').value);
+        const justification = Sanitizer.sanitizeText(document.getElementById('cert-justification').value);
+        const reviewer = document.getElementById('cert-reviewer').value; // Readonly, safe
+        const independent = document.getElementById('cert-independent').value;
 
         const newCert = {
             id: document.getElementById('cert-id').value,
@@ -380,6 +408,7 @@ window.openIssueCertificateModal = function (reportId) {
         renderCertificationModule();
         // Also pop up the certificate immediately
         window.viewCertificate(newCert.id);
+        window.showNotification('Certificate issued successfully', 'success');
     };
 };
 
