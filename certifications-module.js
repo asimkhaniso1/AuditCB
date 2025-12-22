@@ -692,16 +692,26 @@ window.updatePublicDirectory = function () {
     if (showCertId) tableHTML += '<th>Certificate ID</th>';
     if (showClient) tableHTML += '<th>Client Organization</th>';
     if (showStandard) tableHTML += '<th>Standard</th>';
+    tableHTML += '<th>Location</th>'; // Always show location as per ISO requirement (implied)
     if (showScope) tableHTML += '<th>Scope</th>';
     if (showIssueDate) tableHTML += '<th>Issue Date</th>';
     if (showExpiryDate) tableHTML += '<th>Expiry Date</th>';
     tableHTML += '</tr></thead><tbody>';
 
     filteredCerts.forEach(cert => {
+        // Find client location
+        const clientObj = clients.find(c => c.name === cert.client);
+        let location = 'Unknown';
+        if (clientObj && clientObj.sites && clientObj.sites.length > 0) {
+            const site = clientObj.sites[0];
+            location = [site.city, site.country].filter(Boolean).join(', ');
+        }
+
         tableHTML += '<tr>';
         if (showCertId) tableHTML += `<td><strong>${window.UTILS.escapeHtml(cert.id)}</strong></td>`;
         if (showClient) tableHTML += `<td>${window.UTILS.escapeHtml(cert.client)}</td>`;
         if (showStandard) tableHTML += `<td><span class="badge bg-blue">${window.UTILS.escapeHtml(cert.standard)}</span></td>`;
+        tableHTML += `<td>${window.UTILS.escapeHtml(location)}</td>`;
         if (showScope) tableHTML += `<td style="max-width: 300px;">${window.UTILS.escapeHtml((cert.scope || '').substring(0, 100))}${cert.scope && cert.scope.length > 100 ? '...' : ''}</td>`;
         if (showIssueDate) tableHTML += `<td>${window.UTILS.escapeHtml(cert.issueDate)}</td>`;
         if (showExpiryDate) tableHTML += `<td>${window.UTILS.escapeHtml(cert.expiryDate)}</td>`;
@@ -731,12 +741,22 @@ window.exportPublicDirectory = function () {
     }
 
     // Build CSV
-    let csv = 'Certificate ID,Client Organization,Standard,Scope,Issue Date,Expiry Date,Status\n';
+    let csv = 'Certificate ID,Client Organization,Standard,Location,Scope,Issue Date,Expiry Date,Status\n';
     filteredCerts.forEach(cert => {
+        // Find client location
+        const clientObj = clients.find(c => c.name === cert.client);
+        let location = 'Unknown';
+        if (clientObj && clientObj.sites && clientObj.sites.length > 0) {
+            const site = clientObj.sites[0];
+            location = [site.city, site.country].filter(Boolean).join(', '); // Sanitize CSV if needed, but simple join is usually safe for city/country
+            if (location.includes(',')) location = `"${location}"`;
+        }
+
         const row = [
             cert.id,
             cert.client,
             cert.standard,
+            location,
             `"${(cert.scope || '').replace(/"/g, '""')}"`, // Escape quotes in scope
             cert.issueDate,
             cert.expiryDate,
@@ -781,18 +801,28 @@ window.generateEmbedCode = function () {
                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Certificate ID</th>
                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Organization</th>
                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Standard</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Location</th>
                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1;">Valid Until</th>
             </tr>
         </thead>
         <tbody>`;
 
     filteredCerts.forEach((cert, index) => {
+        // Find client location
+        const clientObj = clients.find(c => c.name === cert.client);
+        let location = 'Unknown';
+        if (clientObj && clientObj.sites && clientObj.sites.length > 0) {
+            const site = clientObj.sites[0];
+            location = [site.city, site.country].filter(Boolean).join(', ');
+        }
+
         const bgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
         embedHTML += `
             <tr style="background: ${bgColor};">
                 <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.id}</td>
                 <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.client}</td>
                 <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.standard}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${location}</td>
                 <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${cert.expiryDate}</td>
             </tr>`;
     });

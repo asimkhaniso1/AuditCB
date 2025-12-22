@@ -40,7 +40,6 @@ Implemented comprehensive role-based access control (RBAC) for the Client Manage
     *   **Edit Plan**: Restricted to 'Certification Manager' and 'Admin'.
 
 ## Next Steps
-*   **Public Directory**: Task 3 remains 'Testing' status.
-*   **Reporting**: Check permissions for final audit report approval.
+*   **Public Directory**: Verified and Enhanced. Added "Geographical Location" (City/Country) to Table, CSV, and Embed code (ISO 17021 requirement).
 *   **Backend Validation**: Future backend integration required.
 *   **Testing**: Verify roles across all secured modules.
