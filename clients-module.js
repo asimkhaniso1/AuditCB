@@ -179,7 +179,7 @@ function renderClientsEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Event listeners
-    document.getElementById('btn-new-client')?.addEventListener('click', openNewClientModal);
+    document.getElementById('btn-new-client')?.addEventListener('click', openAddClientModal);
 
     document.getElementById('client-import-file')?.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
