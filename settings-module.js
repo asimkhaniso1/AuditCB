@@ -116,6 +116,8 @@ function switchSettingsTab(tabName, btnElement) {
 
 function getCBProfileHTML() {
     const settings = window.state.cbSettings;
+    const sites = settings.cbSites || [{ name: 'Head Office', address: settings.cbAddress, city: '', country: '', phone: settings.cbPhone }];
+
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
@@ -137,22 +139,69 @@ function getCBProfileHTML() {
                         <input type="email" class="form-control" id="cb-email" value="${window.UTILS.escapeHtml(settings.cbEmail)}" required>
                     </div>
                     <div class="form-group">
-                        <label>Phone</label>
-                        <input type="tel" class="form-control" id="cb-phone" value="${window.UTILS.escapeHtml(settings.cbPhone)}">
-                    </div>
-                    <div class="form-group">
                         <label>Website</label>
                         <input type="url" class="form-control" id="cb-website" value="${window.UTILS.escapeHtml(settings.cbWebsite)}">
                     </div>
-                    <div class="form-group">
-                        <label>Logo URL</label>
-                        <input type="text" class="form-control" id="cb-logo" value="${window.UTILS.escapeHtml(settings.logoUrl || '')}" placeholder="https://...">
+                </div>
+                
+                <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Logo</h4>
+                <div style="display: flex; gap: 1.5rem; align-items: start;">
+                    <div style="flex: 1;">
+                        <div class="form-group">
+                            <label>Logo URL</label>
+                            <input type="text" class="form-control" id="cb-logo" value="${window.UTILS.escapeHtml(settings.logoUrl || '')}" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label>Or Upload Logo</label>
+                            <input type="file" class="form-control" id="logo-upload" accept="image/*" onchange="handleLogoUpload(this)">
+                            <small style="color: var(--text-secondary);">Max 2MB, PNG/JPG/SVG</small>
+                        </div>
+                    </div>
+                    <div style="width: 150px; height: 150px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                        ${settings.logoUrl ? `<img src="${settings.logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;">` : '<i class="fa-solid fa-image" style="font-size: 3rem; color: var(--text-secondary);"></i>'}
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Address</label>
-                    <textarea class="form-control" id="cb-address" rows="2">${window.UTILS.escapeHtml(settings.cbAddress)}</textarea>
+                
+                <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Office Locations</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Office Name</th>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>Country</th>
+                                <th>Phone</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cb-sites-tbody">
+                            ${sites.map((site, idx) => `
+                                <tr>
+                                    <td>${window.UTILS.escapeHtml(site.name)}</td>
+                                    <td>${window.UTILS.escapeHtml(site.address)}</td>
+                                    <td>${window.UTILS.escapeHtml(site.city || '')}</td>
+                                    <td>${window.UTILS.escapeHtml(site.country || '')}</td>
+                                    <td>${window.UTILS.escapeHtml(site.phone || '')}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-icon" onclick="editCBSite(${idx})" title="Edit">
+                                            <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                                        </button>
+                                        ${sites.length > 1 ? `
+                                            <button type="button" class="btn btn-sm btn-icon" onclick="deleteCBSite(${idx})" title="Delete">
+                                                <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                            </button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
+                <button type="button" class="btn btn-secondary" onclick="addCBSite()" style="margin-top: 0.5rem;">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
+                    Add Office Location
+                </button>
                 
                 <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Brand Colors</h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 500px;">
@@ -720,6 +769,151 @@ function restoreData(input) {
     reader.readAsText(file);
     input.value = '';
 }
+
+// ============================================
+// CB PROFILE HELPER FUNCTIONS
+// ============================================
+
+window.handleLogoUpload = function (input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+        window.showNotification('Logo file too large. Max 2MB', 'error');
+        input.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        window.state.cbSettings.logoUrl = e.target.result;
+        document.getElementById('cb-logo').value = 'Data URL (uploaded)';
+        window.saveData();
+        switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
+        window.showNotification('Logo uploaded successfully', 'success');
+    };
+    reader.readAsDataURL(file);
+};
+
+window.addCBSite = function () {
+    document.getElementById('modal-title').textContent = 'Add Office Location';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="cb-site-form">
+            <div class="form-group">
+                <label>Office Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="site-name" placeholder="e.g., Regional Office" required>
+            </div>
+            <div class="form-group">
+                <label>Address <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="site-address" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" class="form-control" id="site-city">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" class="form-control" id="site-country">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" class="form-control" id="site-phone">
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const name = document.getElementById('site-name').value.trim();
+        const address = document.getElementById('site-address').value.trim();
+
+        if (!name || !address) {
+            window.showNotification('Please fill required fields', 'error');
+            return;
+        }
+
+        if (!window.state.cbSettings.cbSites) {
+            window.state.cbSettings.cbSites = [];
+        }
+
+        window.state.cbSettings.cbSites.push({
+            name: window.Sanitizer.sanitizeText(name),
+            address: window.Sanitizer.sanitizeText(address),
+            city: window.Sanitizer.sanitizeText(document.getElementById('site-city').value.trim()),
+            country: window.Sanitizer.sanitizeText(document.getElementById('site-country').value.trim()),
+            phone: window.Sanitizer.sanitizeText(document.getElementById('site-phone').value.trim())
+        });
+
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
+        window.showNotification('Office location added', 'success');
+    };
+
+    window.openModal();
+};
+
+window.editCBSite = function (idx) {
+    const sites = window.state.cbSettings.cbSites || [];
+    const site = sites[idx];
+
+    document.getElementById('modal-title').textContent = 'Edit Office Location';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="cb-site-form">
+            <div class="form-group">
+                <label>Office Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="site-name" value="${window.UTILS.escapeHtml(site.name)}" required>
+            </div>
+            <div class="form-group">
+                <label>Address <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="site-address" value="${window.UTILS.escapeHtml(site.address)}" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" class="form-control" id="site-city" value="${window.UTILS.escapeHtml(site.city || '')}">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" class="form-control" id="site-country" value="${window.UTILS.escapeHtml(site.country || '')}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" class="form-control" id="site-phone" value="${window.UTILS.escapeHtml(site.phone || '')}">
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        sites[idx] = {
+            name: window.Sanitizer.sanitizeText(document.getElementById('site-name').value.trim()),
+            address: window.Sanitizer.sanitizeText(document.getElementById('site-address').value.trim()),
+            city: window.Sanitizer.sanitizeText(document.getElementById('site-city').value.trim()),
+            country: window.Sanitizer.sanitizeText(document.getElementById('site-country').value.trim()),
+            phone: window.Sanitizer.sanitizeText(document.getElementById('site-phone').value.trim())
+        };
+
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
+        window.showNotification('Office location updated', 'success');
+    };
+
+    window.openModal();
+};
+
+window.deleteCBSite = function (idx) {
+    if (confirm('Delete this office location?')) {
+        window.state.cbSettings.cbSites.splice(idx, 1);
+        window.saveData();
+        switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
+        window.showNotification('Office location deleted', 'success');
+    }
+};
 
 // ============================================
 // SAVE FUNCTIONS WITH SANITIZATION
