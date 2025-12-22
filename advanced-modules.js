@@ -2411,3 +2411,165 @@ window.openAddQualificationModal = function (auditorId) {
 
     window.openModal();
 };
+
+// ============================================
+// ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
+// ============================================
+
+// Add Witness Audit Record
+window.addWitnessAudit = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Record Witness Audit';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="witness-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Date of Witness Audit</label>
+                    <input type="date" id="witness-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="form-group">
+                    <label>Client Name</label>
+                    <input type="text" id="witness-client" class="form-control" placeholder="Enter client name" required>
+                </div>
+                <div class="form-group">
+                    <label>Standard Audited</label>
+                    <select id="witness-standard" class="form-control">
+                        <option value="ISO 9001:2015">ISO 9001:2015</option>
+                        <option value="ISO 14001:2015">ISO 14001:2015</option>
+                        <option value="ISO 45001:2018">ISO 45001:2018</option>
+                        <option value="ISO 27001:2022">ISO 27001:2022</option>
+                        <option value="ISO 22000:2018">ISO 22000:2018</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Witnessed By</label>
+                    <input type="text" id="witness-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Overall Rating</label>
+                    <select id="witness-rating" class="form-control">
+                        <option value="5">5 - Excellent</option>
+                        <option value="4" selected>4 - Good</option>
+                        <option value="3">3 - Satisfactory</option>
+                        <option value="2">2 - Needs Improvement</option>
+                        <option value="1">1 - Unsatisfactory</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Observations/Notes</label>
+                    <textarea id="witness-notes" class="form-control" rows="4" placeholder="Enter observations, strengths, areas for improvement..."></textarea>
+                </div>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        const client = document.getElementById('witness-client').value;
+        if (!client) {
+            window.showNotification('Please enter the client name', 'error');
+            return;
+        }
+
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
+
+        auditor.evaluations.witnessAudits.unshift({
+            date: document.getElementById('witness-date').value,
+            client: client,
+            standard: document.getElementById('witness-standard').value,
+            witnessedBy: document.getElementById('witness-by').value,
+            rating: parseInt(document.getElementById('witness-rating').value),
+            notes: document.getElementById('witness-notes').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Witness audit recorded', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
+
+// Add Performance Review
+window.addPerformanceReview = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Performance Review';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="review-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Review Date</label>
+                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="form-group">
+                    <label>Review Type</label>
+                    <select id="review-type" class="form-control">
+                        <option value="Annual Review">Annual Review</option>
+                        <option value="Quarterly Review">Quarterly Review</option>
+                        <option value="Post-Audit Review">Post-Audit Review</option>
+                        <option value="Competence Assessment">Competence Assessment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Overall Rating (1-5)</label>
+                    <select id="review-rating" class="form-control">
+                        <option value="5">5 - Excellent</option>
+                        <option value="4" selected>4 - Good</option>
+                        <option value="3">3 - Satisfactory</option>
+                        <option value="2">2 - Needs Improvement</option>
+                        <option value="1">1 - Unsatisfactory</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reviewed By</label>
+                    <input type="text" id="review-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Outcome/Decision</label>
+                    <select id="review-outcome" class="form-control">
+                        <option value="Approved">Approved - Continue</option>
+                        <option value="Approved with Conditions">Approved with Conditions</option>
+                        <option value="Retraining Required">Retraining Required</option>
+                        <option value="Pending">Pending Further Review</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Comments/Notes</label>
+                    <textarea id="review-notes" class="form-control" rows="4" placeholder="Enter review comments, strengths, development areas..."></textarea>
+                </div>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
+
+        auditor.evaluations.performanceReviews.unshift({
+            date: document.getElementById('review-date').value,
+            type: document.getElementById('review-type').value,
+            rating: parseInt(document.getElementById('review-rating').value),
+            reviewedBy: document.getElementById('review-by').value,
+            outcome: document.getElementById('review-outcome').value,
+            notes: document.getElementById('review-notes').value
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Performance review added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+        }, 100);
+    };
+
+    window.openModal();
+};
