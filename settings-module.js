@@ -1,21 +1,91 @@
 // ============================================
-// SETTINGS & USER MANAGEMENT MODULE
+// SETTINGS MODULE - CB CONFIGURATION
 // ============================================
+
+// Initialize CB settings if not present
+if (!window.state.cbSettings) {
+    window.state.cbSettings = {
+        // CB Profile & Branding
+        cbName: 'AuditCB360 Certification Body',
+        cbAddress: '123 Quality Street, ISO City, 9001',
+        cbPhone: '+1-555-AUDIT',
+        cbEmail: 'info@auditcb360.com',
+        cbWebsite: 'https://auditcb360.com',
+        cbTagline: 'Committed to Excellence in Certification',
+        logoUrl: '',
+        primaryColor: '#0284c7',
+        secondaryColor: '#7c3aed',
+
+        // Accreditation
+        accreditationBody: 'ANAB',
+        accreditationNumber: 'AB-2024-001',
+        accreditationExpiry: '2026-12-31',
+        standardsOffered: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022'],
+        geographicScope: ['United States', 'Canada', 'Mexico'],
+        iafMlaStatus: true,
+
+        // Quality Policy
+        qualityPolicy: 'We are committed to providing impartial, competent, and consistent certification services that meet the requirements of ISO 17021-1 and exceed our clients\' expectations.',
+        qualityObjectives: [
+            { objective: 'Client Satisfaction', target: '95%', actual: '97%' },
+            { objective: 'Audit On-Time Rate', target: '98%', actual: '99%' },
+            { objective: 'NCR Closure Within 90 Days', target: '100%', actual: '95%' }
+        ],
+        msScope: 'Certification services for management systems across all accredited standards and geographic regions',
+        policyLastReviewed: '2024-01-15',
+        policyApprovedBy: 'CEO',
+
+        // System Defaults
+        certificateNumberFormat: 'CB-{YEAR}-{SEQ}',
+        dateFormat: 'YYYY-MM-DD',
+        defaultStage1Duration: 1,
+        defaultStage2Duration: 2,
+        manDayCalculationMode: 'ISO 17021',
+        notificationLeadTime: 14,
+        sessionTimeout: 30,
+        currency: 'USD'
+    };
+}
+
+// Initialize organization structure
+if (!window.state.orgStructure) {
+    window.state.orgStructure = [
+        { id: 1, title: 'Chief Executive Officer', department: 'Executive', reportsTo: null },
+        { id: 2, title: 'Quality Manager', department: 'Quality', reportsTo: 'CEO' },
+        { id: 3, title: 'Certification Manager', department: 'Operations', reportsTo: 'CEO' },
+        { id: 4, title: 'Lead Auditor', department: 'Operations', reportsTo: 'Certification Manager' },
+        { id: 5, title: 'Auditor', department: 'Operations', reportsTo: 'Lead Auditor' }
+    ];
+}
+
+// Initialize role permissions
+if (!window.state.rolePermissions) {
+    window.state.rolePermissions = {
+        'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
+        'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
+        'Lead Auditor': { dashboard: 'view', clients: 'view', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+        'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+        'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }
+    };
+}
 
 function renderSettings() {
     const html = `
         <div class="fade-in">
             <div class="card" style="margin-bottom: 2rem;">
-                <div class="tab-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                    <button class="tab-btn active" onclick="switchSettingsTab('general', this)">General Settings</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('users', this)">User Management</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('notifications', this)">Notifications</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Management</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Management</button>
+                <div class="tab-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; overflow-x: auto; white-space: nowrap;">
+                    <button class="tab-btn active" onclick="switchSettingsTab('profile', this)">CB Profile</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('accreditation', this)">Accreditation</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('organization', this)">Organization</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('permissions', this)">Permissions</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Backup</button>
                 </div>
 
                 <div id="settings-content">
-                    ${getGeneralSettingsHTML()}
+                    ${getCBProfileHTML()}
                 </div>
             </div>
         </div>
@@ -24,109 +94,220 @@ function renderSettings() {
 }
 
 function switchSettingsTab(tabName, btnElement) {
-    // Update active tab
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     btnElement.classList.add('active');
 
-    // Update content
     const container = document.getElementById('settings-content');
     switch (tabName) {
-        case 'general':
-            container.innerHTML = getGeneralSettingsHTML();
-            break;
-        case 'users':
-            container.innerHTML = getUserManagementHTML();
-            break;
-        case 'notifications':
-            container.innerHTML = getNotificationSettingsHTML();
-            break;
-        case 'data':
-            container.innerHTML = getDataManagementHTML();
-            break;
-        case 'data':
-            container.innerHTML = getDataManagementHTML();
-            break;
+        case 'profile': container.innerHTML = getCBProfileHTML(); break;
+        case 'accreditation': container.innerHTML = getAccreditationHTML(); break;
+        case 'organization': container.innerHTML = getOrganizationHTML(); break;
+        case 'permissions': container.innerHTML = getPermissionsHTML(); break;
+        case 'retention': container.innerHTML = getRetentionHTML(); break;
+        case 'policy': container.innerHTML = getQualityPolicyHTML(); break;
+        case 'defaults': container.innerHTML = getDefaultsHTML(); break;
+        case 'data': container.innerHTML = getDataManagementHTML(); break;
     }
 }
 
-function getGeneralSettingsHTML() {
+// ============================================
+// TAB 1: CB PROFILE & BRANDING
+// ============================================
+
+function getCBProfileHTML() {
+    const settings = window.state.cbSettings;
     return `
         <div class="fade-in">
-            <h3 style="margin-bottom: 1.5rem;">Company Information</h3>
-            <form onsubmit="event.preventDefault(); showNotification('Settings saved successfully');">
-                <div class="form-group">
-                    <label>Company Name</label>
-                    <input type="text" class="form-control" value="AuditCB360 Certification Body" style="max-width: 400px;">
-                </div>
-                <div class="form-group">
-                    <label>Contact Email</label>
-                    <input type="email" class="form-control" value="admin@auditcb360.com" style="max-width: 400px;">
-                </div>
-                <div class="form-group">
-                    <label>Logo URL</label>
-                    <input type="text" class="form-control" value="/assets/logo.png" style="max-width: 400px;">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>
+                CB Profile & Branding
+            </h3>
+            <form id="profile-form" onsubmit="event.preventDefault(); saveCBProfile();">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="form-group">
+                        <label>Certification Body Name <span style="color: var(--danger-color);">*</span></label>
+                        <input type="text" class="form-control" id="cb-name" value="${window.UTILS.escapeHtml(settings.cbName)}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tagline</label>
+                        <input type="text" class="form-control" id="cb-tagline" value="${window.UTILS.escapeHtml(settings.cbTagline)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Email <span style="color: var(--danger-color);">*</span></label>
+                        <input type="email" class="form-control" id="cb-email" value="${window.UTILS.escapeHtml(settings.cbEmail)}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" class="form-control" id="cb-phone" value="${window.UTILS.escapeHtml(settings.cbPhone)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Website</label>
+                        <input type="url" class="form-control" id="cb-website" value="${window.UTILS.escapeHtml(settings.cbWebsite)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Logo URL</label>
+                        <input type="text" class="form-control" id="cb-logo" value="${window.UTILS.escapeHtml(settings.logoUrl || '')}" placeholder="https://...">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Address</label>
-                    <textarea class="form-control" rows="3" style="max-width: 400px;">123 Quality Street, ISO City, 9001</textarea>
+                    <textarea class="form-control" id="cb-address" rows="2">${window.UTILS.escapeHtml(settings.cbAddress)}</textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
+                
+                <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Brand Colors</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 500px;">
+                    <div class="form-group">
+                        <label>Primary Color</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="color" id="primary-color" value="${settings.primaryColor}" style="width: 60px; height: 40px; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <input type="text" class="form-control" value="${settings.primaryColor}" readonly style="flex: 1;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Color</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="color" id="secondary-color" value="${settings.secondaryColor}" style="width: 60px; height: 40px; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <input type="text" class="form-control" value="${settings.secondaryColor}" readonly style="flex: 1;">
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem;">
+                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
+                    Save Profile
+                </button>
             </form>
         </div>
     `;
 }
 
-function getUserManagementHTML() {
-    // Mock Users Data
-    const users = [
-        { id: 1, name: 'Admin User', email: 'admin@auditcb360.com', role: 'Administrator', status: 'Active' },
-        { id: 2, name: 'John Doe', email: 'john.doe@auditcb360.com', role: 'Lead Auditor', status: 'Active' },
-        { id: 3, name: 'Jane Smith', email: 'jane.smith@auditcb360.com', role: 'Auditor', status: 'Active' },
-        { id: 4, name: 'Client Viewer', email: 'view@acmecorp.com', role: 'Client', status: 'Inactive' }
-    ];
+window.saveCBProfile = function () {
+    const settings = window.state.cbSettings;
+    settings.cbName = document.getElementById('cb-name').value;
+    settings.cbTagline = document.getElementById('cb-tagline').value;
+    settings.cbEmail = document.getElementById('cb-email').value;
+    settings.cbPhone = document.getElementById('cb-phone').value;
+    settings.cbWebsite = document.getElementById('cb-website').value;
+    settings.cbAddress = document.getElementById('cb-address').value;
+    settings.logoUrl = document.getElementById('cb-logo').value;
+    settings.primaryColor = document.getElementById('primary-color').value;
+    settings.secondaryColor = document.getElementById('secondary-color').value;
 
-    const rows = users.map(user => `
-        <tr>
-            <td>
-                <div style="display: flex; align-items: center; gap: 0.8rem;">
-                    <div style="width: 32px; height: 32px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-user" style="color: #64748b; font-size: 0.8rem;"></i>
+    window.saveData();
+    window.showNotification('CB Profile saved successfully', 'success');
+};
+
+// ============================================
+// TAB 2: ACCREDITATION & SCOPE
+// ============================================
+
+function getAccreditationHTML() {
+    const settings = window.state.cbSettings;
+    return `
+        <div class="fade-in">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i>
+                Accreditation & Scope
+            </h3>
+            <form id="accreditation-form" onsubmit="event.preventDefault(); saveAccreditation();">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="form-group">
+                        <label>Accreditation Body</label>
+                        <input type="text" class="form-control" id="ab-name" value="${window.UTILS.escapeHtml(settings.accreditationBody)}">
                     </div>
-                    <div>
-                        <div style="font-weight: 500;">${user.name}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${user.email}</div>
+                    <div class="form-group">
+                        <label>Accreditation Number</label>
+                        <input type="text" class="form-control" id="ab-number" value="${window.UTILS.escapeHtml(settings.accreditationNumber)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Accreditation Expiry</label>
+                        <input type="date" class="form-control" id="ab-expiry" value="${settings.accreditationExpiry}">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="iaf-mla" ${settings.iafMlaStatus ? 'checked' : ''} style="width: 18px; height: 18px;">
+                            <span>IAF MLA Signatory</span>
+                        </label>
                     </div>
                 </div>
-            </td>
-            <td>${getRoleBadge(user.role)}</td>
-            <td><span class="status-badge status-${user.status.toLowerCase()}">${user.status}</span></td>
-            <td>
-                <button class="btn btn-sm" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button>
-                <button class="btn btn-sm" style="color: var(--danger-color);"><i class="fa-solid fa-trash"></i></button>
-            </td>
-        </tr>
-    `).join('');
+                
+                <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Standards Offered</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
+                    ${['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018'].map(std => `
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" class="standard-checkbox" value="${std}" ${settings.standardsOffered.includes(std) ? 'checked' : ''}>
+                            <span>${std}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem;">
+                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
+                    Save Accreditation
+                </button>
+            </form>
+        </div>
+    `;
+}
 
+window.saveAccreditation = function () {
+    const settings = window.state.cbSettings;
+    settings.accreditationBody = document.getElementById('ab-name').value;
+    settings.accreditationNumber = document.getElementById('ab-number').value;
+    settings.accreditationExpiry = document.getElementById('ab-expiry').value;
+    settings.iafMlaStatus = document.getElementById('iaf-mla').checked;
+
+    settings.standardsOffered = Array.from(document.querySelectorAll('.standard-checkbox:checked')).map(cb => cb.value);
+
+    window.saveData();
+    window.showNotification('Accreditation settings saved', 'success');
+};
+
+// ============================================
+// TAB 3: ORGANIZATION STRUCTURE
+// ============================================
+
+function getOrganizationHTML() {
+    const orgStructure = window.state.orgStructure || [];
     return `
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h3>Users</h3>
-                <button class="btn btn-primary" onclick="openAddUserModal()">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add User
+                <h3 style="color: var(--primary-color);">
+                    <i class="fa-solid fa-sitemap" style="margin-right: 0.5rem;"></i>
+                    Organization Structure
+                </h3>
+                <button class="btn btn-primary" onclick="addDesignation()">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
+                    Add Designation
                 </button>
             </div>
+            
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>User</th>
-                            <th>Role</th>
-                            <th>Status</th>
+                            <th>Title</th>
+                            <th>Department</th>
+                            <th>Reports To</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows}
+                        ${orgStructure.map(pos => `
+                            <tr>
+                                <td><strong>${window.UTILS.escapeHtml(pos.title)}</strong></td>
+                                <td>${window.UTILS.escapeHtml(pos.department)}</td>
+                                <td>${pos.reportsTo ? window.UTILS.escapeHtml(pos.reportsTo) : '<em>Top Level</em>'}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-icon" onclick="editDesignation(${pos.id})" title="Edit">
+                                        <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="deleteDesignation(${pos.id})" title="Delete">
+                                        <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
                     </tbody>
                 </table>
             </div>
@@ -134,131 +315,366 @@ function getUserManagementHTML() {
     `;
 }
 
-function getNotificationSettingsHTML() {
+window.addDesignation = function () {
+    document.getElementById('modal-title').textContent = 'Add Designation';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="designation-form">
+            <div class="form-group">
+                <label>Title <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="designation-title" required>
+            </div>
+            <div class="form-group">
+                <label>Department</label>
+                <input type="text" class="form-control" id="designation-dept">
+            </div>
+            <div class="form-group">
+                <label>Reports To</label>
+                <input type="text" class="form-control" id="designation-reports">
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const title = document.getElementById('designation-title').value.trim();
+        if (!title) return;
+
+        window.state.orgStructure.push({
+            id: Date.now(),
+            title: title,
+            department: document.getElementById('designation-dept').value.trim(),
+            reportsTo: document.getElementById('designation-reports').value.trim() || null
+        });
+
+        window.saveData();
+        window.closeModal();
+        switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
+        window.showNotification('Designation added', 'success');
+    };
+
+    window.openModal();
+};
+
+window.deleteDesignation = function (id) {
+    if (confirm('Delete this designation?')) {
+        window.state.orgStructure = window.state.orgStructure.filter(p => p.id !== id);
+        window.saveData();
+        switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
+        window.showNotification('Designation deleted', 'success');
+    }
+};
+
+// ============================================
+// TAB 4: ROLE PERMISSIONS
+// ============================================
+
+function getPermissionsHTML() {
+    const permissions = window.state.rolePermissions;
+    const modules = ['dashboard', 'clients', 'auditors', 'audits', 'certs', 'reports', 'settings'];
+    const roles = Object.keys(permissions);
+
     return `
         <div class="fade-in">
-            <h3 style="margin-bottom: 1.5rem;">Email Notifications</h3>
-            <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 500px;">
-                <label class="checkbox-container" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" checked>
-                    <span>Notify when an Audit Plan is created</span>
-                </label>
-                <label class="checkbox-container" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" checked>
-                    <span>Notify when NCRs are closed</span>
-                </label>
-                <label class="checkbox-container" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox">
-                    <span>Weekly Digest Report</span>
-                </label>
-                <div style="margin-top: 1rem;">
-                    <button class="btn btn-primary" onclick="showNotification('Preferences updated')">Save Preferences</button>
-                </div>
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-shield-halved" style="margin-right: 0.5rem;"></i>
+                User Role Permissions
+            </h3>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            ${modules.map(m => `<th style="text-transform: capitalize;">${m}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${roles.map(role => `
+                            <tr>
+                                <td><strong>${role}</strong></td>
+                                ${modules.map(module => {
+        const perm = permissions[role][module];
+        const color = perm === 'full' ? 'green' : perm === 'view' || perm === 'assigned' || perm === 'own' ? 'orange' : 'gray';
+        return `<td><span class="badge" style="background: ${color}; color: white;">${perm}</span></td>`;
+    }).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">
+                <small style="color: #065f46;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    <strong>Permission Levels:</strong> full = all actions, view = read-only, assigned = own assigned items, own = own data only, none = no access
+                </small>
             </div>
         </div>
     `;
 }
 
-function getRoleBadge(role) {
-    let color = '#64748b';
-    let bg = '#f1f5f9';
+// ============================================
+// TAB 5: RECORD RETENTION (Moved from separate module)
+// ============================================
 
-    switch (role) {
-        case 'Administrator':
-            color = '#7c3aed';
-            bg = '#ede9fe';
-            break;
-        case 'Lead Auditor':
-            color = '#059669';
-            bg = '#d1fae5';
-            break;
-        case 'Auditor':
-            color = '#0284c7';
-            bg = '#e0f2fe';
-            break;
-    }
+function getRetentionHTML() {
+    const retentionPolicies = window.state.retentionPolicies || [
+        { type: 'Audit Reports', period: '6 years', basis: 'ISO 17021-1' },
+        { type: 'Certificates', period: '10 years', basis: 'Accreditation Requirements' },
+        { type: 'NCR Evidence', period: '6 years', basis: 'ISO 17021-1' },
+        { type: 'Training Records', period: '10 years', basis: 'HR Policy' },
+        { type: 'Impartiality Records', period: '5 years', basis: 'ISO 17021-1' },
+        { type: 'Management Review Minutes', period: '5 years', basis: 'ISO 17021-1' }
+    ];
 
-    return `<span style="background: ${bg}; color: ${color}; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${role}</span>`;
-}
-
-function openAddUserModal() {
-    const modalBody = document.getElementById('modal-body');
-    const modalTitle = document.getElementById('modal-title');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Add New User';
-    modalBody.innerHTML = `
-        <form id="add-user-form">
-            <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" class="form-control" placeholder="e.g. Sarah Connor">
+    return `
+        <div class="fade-in">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-archive" style="margin-right: 0.5rem;"></i>
+                Record Retention Policy
+            </h3>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Record Type</th>
+                            <th>Retention Period</th>
+                            <th>Legal Basis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${retentionPolicies.map(policy => `
+                            <tr>
+                                <td><strong>${window.UTILS.escapeHtml(policy.type)}</strong></td>
+                                <td><span class="badge bg-blue">${window.UTILS.escapeHtml(policy.period)}</span></td>
+                                <td>${window.UTILS.escapeHtml(policy.basis)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" class="form-control" placeholder="e.g. sarah@example.com">
+            
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #eff6ff; border-left: 4px solid #0284c7; border-radius: 4px;">
+                <small style="color: #0369a1;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    ISO 17021-1 Clause 8.4 requires retention of records for at least one certification cycle (typically 3 years) or as required by law.
+                </small>
             </div>
-            <div class="form-group">
-                <label>Role</label>
-                <select class="form-control">
-                    <option value="Auditor">Auditor</option>
-                    <option value="Lead Auditor">Lead Auditor</option>
-                    <option value="Administrator">Administrator</option>
-                    <option value="Client">Client User</option>
-                </select>
-            </div>
-        </form>
+        </div>
     `;
-
-    modalSave.onclick = () => {
-        showNotification('User invitation sent successfully');
-        closeModal();
-    };
-
-    openModal();
 }
+
+// ============================================
+// TAB 6: QUALITY POLICY & OBJECTIVES
+// ============================================
+
+function getQualityPolicyHTML() {
+    const settings = window.state.cbSettings;
+    return `
+        <div class="fade-in">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>
+                Quality Policy & Objectives (ISO 17021 Clause 8.1)
+            </h3>
+            
+            <form id="policy-form" onsubmit="event.preventDefault(); saveQualityPolicy();">
+                <div class="form-group">
+                    <label>Quality Policy Statement</label>
+                    <textarea class="form-control" id="quality-policy" rows="4">${window.UTILS.escapeHtml(settings.qualityPolicy)}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Scope of Management System</label>
+                    <textarea class="form-control" id="ms-scope" rows="2">${window.UTILS.escapeHtml(settings.msScope)}</textarea>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="form-group">
+                        <label>Last Reviewed</label>
+                        <input type="date" class="form-control" id="policy-reviewed" value="${settings.policyLastReviewed}">
+                    </div>
+                    <div class="form-group">
+                        <label>Approved By</label>
+                        <input type="text" class="form-control" id="policy-approved" value="${window.UTILS.escapeHtml(settings.policyApprovedBy)}">
+                    </div>
+                </div>
+                
+                <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Quality Objectives</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Objective</th>
+                                <th>Target</th>
+                                <th>Actual</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${settings.qualityObjectives.map((obj, idx) => `
+                                <tr>
+                                    <td>${window.UTILS.escapeHtml(obj.objective)}</td>
+                                    <td><span class="badge bg-orange">${window.UTILS.escapeHtml(obj.target)}</span></td>
+                                    <td><span class="badge bg-green">${window.UTILS.escapeHtml(obj.actual)}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem;">
+                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
+                    Save Policy
+                </button>
+            </form>
+        </div>
+    `;
+}
+
+window.saveQualityPolicy = function () {
+    const settings = window.state.cbSettings;
+    settings.qualityPolicy = document.getElementById('quality-policy').value;
+    settings.msScope = document.getElementById('ms-scope').value;
+    settings.policyLastReviewed = document.getElementById('policy-reviewed').value;
+    settings.policyApprovedBy = document.getElementById('policy-approved').value;
+
+    window.saveData();
+    window.showNotification('Quality Policy saved', 'success');
+};
+
+// ============================================
+// TAB 7: SYSTEM DEFAULTS
+// ============================================
+
+function getDefaultsHTML() {
+    const settings = window.state.cbSettings;
+    return `
+        <div class="fade-in">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-sliders" style="margin-right: 0.5rem;"></i>
+                System Defaults
+            </h3>
+            
+            <form id="defaults-form" onsubmit="event.preventDefault(); saveDefaults();">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="form-group">
+                        <label>Certificate Number Format</label>
+                        <input type="text" class="form-control" id="cert-format" value="${window.UTILS.escapeHtml(settings.certificateNumberFormat)}">
+                        <small style="color: var(--text-secondary);">Use {YEAR}, {SEQ}, {STANDARD}</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Date Format</label>
+                        <select class="form-control" id="date-format">
+                            <option value="YYYY-MM-DD" ${settings.dateFormat === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
+                            <option value="DD/MM/YYYY" ${settings.dateFormat === 'DD/MM/YYYY' ? 'selected' : ''}>DD/MM/YYYY</option>
+                            <option value="MM/DD/YYYY" ${settings.dateFormat === 'MM/DD/YYYY' ? 'selected' : ''}>MM/DD/YYYY</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Default Stage 1 Duration (days)</label>
+                        <input type="number" class="form-control" id="stage1-duration" value="${settings.defaultStage1Duration}" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Default Stage 2 Duration (days)</label>
+                        <input type="number" class="form-control" id="stage2-duration" value="${settings.defaultStage2Duration}" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Notification Lead Time (days)</label>
+                        <input type="number" class="form-control" id="notification-lead" value="${settings.notificationLeadTime}" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Session Timeout (minutes)</label>
+                        <input type="number" class="form-control" id="session-timeout" value="${settings.sessionTimeout}" min="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select class="form-control" id="currency">
+                            <option value="USD" ${settings.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
+                            <option value="EUR" ${settings.currency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+                            <option value="GBP" ${settings.currency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Man-Day Calculation</label>
+                        <select class="form-control" id="manday-mode">
+                            <option value="ISO 17021" ${settings.manDayCalculationMode === 'ISO 17021' ? 'selected' : ''}>ISO 17021</option>
+                            <option value="Custom" ${settings.manDayCalculationMode === 'Custom' ? 'selected' : ''}>Custom</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem;">
+                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
+                    Save Defaults
+                </button>
+            </form>
+        </div>
+    `;
+}
+
+window.saveDefaults = function () {
+    const settings = window.state.cbSettings;
+    settings.certificateNumberFormat = document.getElementById('cert-format').value;
+    settings.dateFormat = document.getElementById('date-format').value;
+    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration').value);
+    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration').value);
+    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead').value);
+    settings.sessionTimeout = parseInt(document.getElementById('session-timeout').value);
+    settings.currency = document.getElementById('currency').value;
+    settings.manDayCalculationMode = document.getElementById('manday-mode').value;
+
+    window.saveData();
+    window.showNotification('System defaults saved', 'success');
+};
+
+// ============================================
+// TAB 8: DATA BACKUP & MANAGEMENT
+// ============================================
 
 function getDataManagementHTML() {
     return `
         <div class="fade-in">
-            <h3 style="margin-bottom: 1.5rem;">Data Backup & Restore</h3>
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-database" style="margin-right: 0.5rem;"></i>
+                Data Backup & Management
+            </h3>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                <!-- Backup Section -->
                 <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem;">
                     <h4 style="margin-bottom: 1rem; color: var(--primary-color);">
                         <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i> Backup Data
                     </h4>
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-                        Download a complete backup of your application data (Clients, Auditors, Plans, etc.) as a JSON file.
+                        Download a complete backup of your application data as JSON.
                     </p>
                     <button class="btn btn-primary" onclick="backupData()">
+                        <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>
                         Download Backup
                     </button>
                 </div>
 
-                <!-- Restore Section -->
                 <div class="card" style="border: 1px solid var(--border-color); padding: 1.5rem;">
                     <h4 style="margin-bottom: 1rem; color: var(--danger-color);">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i> Restore Data
                     </h4>
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-                        Upload a previously saved backup file to restore your data. 
-                        <strong style="color: var(--danger-color);">Warning: This will replace all current data.</strong>
+                        Upload a backup file to restore data. 
+                        <strong style="color: var(--danger-color);">Warning: Replaces all current data.</strong>
                     </p>
                     <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreData(this)">
                     <button class="btn btn-secondary" onclick="document.getElementById('restore-file').click()">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>
                         Select Backup File
                     </button>
                 </div>
             </div>
 
-            <div style="margin-top: 2rem; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 4px solid var(--primary-color);">
+            <div style="margin-top: 2rem; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid var(--primary-color);">
                 <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">
                     <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i> Data Privacy
                 </h4>
-                <p style="font-size: 0.85rem; color: var(--text-secondary);">
-                    All data is currently stored locally in your browser (LocalStorage). 
-                    Clearing your browser cache will delete this data unless you have a backup.
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+                    All data is stored locally in your browser (LocalStorage). Clearing browser cache will delete this data unless backed up.
                 </p>
             </div>
         </div>
@@ -267,19 +683,16 @@ function getDataManagementHTML() {
 
 function backupData() {
     try {
-        const dataStr = JSON.stringify(state, null, 2);
+        const dataStr = JSON.stringify(window.state, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-
         const exportFileDefaultName = `auditcb360_backup_${new Date().toISOString().slice(0, 10)}.json`;
-
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', exportFileDefaultName);
         linkElement.click();
-
-        showNotification('Backup downloaded successfully', 'success');
+        window.showNotification('Backup downloaded successfully', 'success');
     } catch (error) {
-        showNotification('Failed to create backup', 'error');
+        window.showNotification('Failed to create backup', 'error');
     }
 }
 
@@ -291,36 +704,25 @@ function restoreData(input) {
     reader.onload = function (e) {
         try {
             const data = JSON.parse(e.target.result);
-
-            // Basic validation
             if (!data.clients || !data.auditors) {
                 throw new Error('Invalid backup file format');
             }
-
-            // Confirm before restoring
             if (confirm('Are you sure you want to restore this data? Current data will be lost.')) {
-                // Update state
-                Object.assign(state, data);
-                saveData(); // Save to localStorage
-
-                showNotification('Data restored successfully. Reloading...', 'success');
+                Object.assign(window.state, data);
+                window.saveData();
+                window.showNotification('Data restored successfully. Reloading...', 'success');
                 setTimeout(() => location.reload(), 1500);
             }
         } catch (error) {
-            showNotification('Failed to restore data: Invalid file', 'error');
+            window.showNotification('Failed to restore data: Invalid file', 'error');
         }
     };
     reader.readAsText(file);
-    // Reset input
     input.value = '';
 }
 
 // Export functions
 window.renderSettings = renderSettings;
 window.switchSettingsTab = switchSettingsTab;
-window.openAddUserModal = openAddUserModal;
 window.backupData = backupData;
 window.restoreData = restoreData;
-window.backupData = backupData;
-window.restoreData = restoreData;
-
