@@ -600,6 +600,7 @@ window.toggleCertAnalytics = function () {
 
 window.updatePublicDirectory = function () {
     const certs = window.state.certifications || [];
+    const clients = window.state.clients || [];
     const showCertId = document.getElementById('show-cert-id')?.checked;
     const showClient = document.getElementById('show-client')?.checked;
     const showStandard = document.getElementById('show-standard')?.checked;
@@ -608,10 +609,14 @@ window.updatePublicDirectory = function () {
     const showExpiryDate = document.getElementById('show-expiry-date')?.checked;
     const showActiveOnly = document.getElementById('show-active-only')?.checked;
 
-    // Filter certificates
-    const filteredCerts = showActiveOnly
-        ? certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID)
-        : certs;
+    // Get internal client names to exclude
+    const internalClientNames = clients.filter(c => c.type === 'internal').map(c => c.name);
+
+    // Filter certificates - exclude internal clients and optionally filter by status
+    let filteredCerts = certs.filter(c => !internalClientNames.includes(c.client));
+    if (showActiveOnly) {
+        filteredCerts = filteredCerts.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID);
+    }
 
     // Build table HTML
     let tableHTML = '<table><thead><tr>';
@@ -644,11 +649,17 @@ window.updatePublicDirectory = function () {
 
 window.exportPublicDirectory = function () {
     const certs = window.state.certifications || [];
+    const clients = window.state.clients || [];
     const showActiveOnly = document.getElementById('show-active-only')?.checked;
 
-    const filteredCerts = showActiveOnly
-        ? certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID)
-        : certs;
+    // Get internal client names to exclude
+    const internalClientNames = clients.filter(c => c.type === 'internal').map(c => c.name);
+
+    // Filter out internal clients
+    let filteredCerts = certs.filter(c => !internalClientNames.includes(c.client));
+    if (showActiveOnly) {
+        filteredCerts = filteredCerts.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID);
+    }
 
     // Build CSV
     let csv = 'Certificate ID,Client Organization,Standard,Scope,Issue Date,Expiry Date,Status\n';
@@ -677,11 +688,17 @@ window.exportPublicDirectory = function () {
 
 window.generateEmbedCode = function () {
     const certs = window.state.certifications || [];
+    const clients = window.state.clients || [];
     const showActiveOnly = document.getElementById('show-active-only')?.checked;
 
-    const filteredCerts = showActiveOnly
-        ? certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID)
-        : certs;
+    // Get internal client names to exclude
+    const internalClientNames = clients.filter(c => c.type === 'internal').map(c => c.name);
+
+    // Filter out internal clients
+    let filteredCerts = certs.filter(c => !internalClientNames.includes(c.client));
+    if (showActiveOnly) {
+        filteredCerts = filteredCerts.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID);
+    }
 
     // Generate HTML embed code
     let embedHTML = `<!-- Certified Clients Directory - Generated ${new Date().toLocaleDateString()} -->

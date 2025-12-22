@@ -19,6 +19,7 @@ const state = {
             name: 'Tech Solutions Ltd',
             standard: 'ISO 9001:2015',
             status: 'Active',
+            type: 'external', // external = regular client, internal = CB self-audit
             nextAudit: '2024-03-15',
             website: 'https://techsolutions.com',
             contacts: [
@@ -38,6 +39,7 @@ const state = {
             name: 'Global Manufacturing',
             standard: 'ISO 14001:2015',
             status: 'Active',
+            type: 'external',
             nextAudit: '2024-04-20',
             website: 'https://globalmfg.com',
             contacts: [
@@ -56,6 +58,7 @@ const state = {
             name: 'SecureData Corp',
             standard: 'ISO 27001:2022',
             status: 'Suspended',
+            type: 'external',
             nextAudit: '2024-05-10',
             website: 'https://securedata.com',
             contacts: [
@@ -69,6 +72,33 @@ const state = {
             employees: 50,
             shifts: 'No',
             industry: 'Financial Services'
+        },
+        {
+            id: 999,
+            name: 'AuditCB360 - Internal Operations',
+            standard: 'ISO 17021-1:2015',
+            status: 'Active',
+            type: 'internal', // Internal client for CB self-audits (ISO 17021 Clause 8.6)
+            nextAudit: '2024-06-15',
+            website: '',
+            contacts: [
+                { name: 'Quality Manager', designation: 'Quality Manager', phone: '', email: 'quality@auditcb360.com' }
+            ],
+            sites: [
+                { name: 'Head Office', address: 'CB Headquarters', city: '', country: '', geotag: '', employees: 10, shift: 'No' }
+            ],
+            employees: 10,
+            shifts: 'No',
+            industry: 'Certification Body',
+            internalAuditScopes: [
+                'Certification Decision Process (7.6)',
+                'Auditor Competence Management (6.1)',
+                'Impartiality Management (5.2)',
+                'Appeals & Complaints (9.10, 9.11)',
+                'Document Control (8.3)',
+                'Record Retention (8.4)',
+                'Management Review (8.5)'
+            ]
         }
     ],
     auditors: [
