@@ -758,9 +758,14 @@ function getClientGoodsServicesHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Products and services offered by the organization</p>
             </div>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-            <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">
-                <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Item
-            </button>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices(${client.id})">
+                    <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                </button>
+            </div>
             ` : ''}
         </div>
         ${items.length > 0 ? `
@@ -813,9 +818,14 @@ function getClientKeyProcessesHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Core business processes for audit planning</p>
             </div>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-            <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">
-                <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Process
-            </button>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses(${client.id})">
+                    <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                </button>
+            </div>
             ` : ''}
         </div>
         ${processes.length > 0 ? `
@@ -931,7 +941,7 @@ function getClientAuditsHTML(client) {
     const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
 
     return `
-    < div class="card" style = "margin-bottom: 1.5rem;" >
+    <div class="card" style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-bar" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Summary</h3>
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
                 <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
@@ -955,9 +965,9 @@ function getClientAuditsHTML(client) {
                     <div style="font-size: 0.8rem; color: #64748b;">Open NCRs</div>
                 </div>
             </div>
-        </div >
+        </div>
         
-        < !--Audit History Timeline-- >
+        <!-- Audit History Timeline -->
         <div class="card" style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Audit History</h3>
             ${clientPlans.length > 0 ? `
@@ -1046,7 +1056,7 @@ function getClientAuditsHTML(client) {
 function getClientDocumentsHTML(client) {
     const docs = client.documents || [];
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Documents</h3>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
@@ -1096,7 +1106,7 @@ function getClientDocumentsHTML(client) {
                     ` : ''}
                 </div>
             `}
-        </div >
+        </div>
     `;
 }
 
@@ -1118,7 +1128,7 @@ function getClientComplianceHTML(client) {
     };
 
     return `
-    < div class="card" style = "margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};" >
+    <div class="card" style="margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};">
             <h3 style="margin: 0 0 1rem 0;">
                 <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                 Application Status
@@ -1134,7 +1144,7 @@ function getClientComplianceHTML(client) {
                     </span>
                 `).join('')}
             </div>
-        </div >
+        </div>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <!-- Contract Card -->
@@ -2460,7 +2470,89 @@ window.editGoodsService = function (clientId, index) {
 window.deleteGoodsService = function (clientId, index) {
     if (!confirm('Delete this item?')) return;
     const client = window.state.clients.find(c => c.id === clientId);
-    if (client && client.goodsServices) { client.goodsServices.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 2); window.showNotification('Goods/Service deleted'); }
+    if (client && client.goodsServices) { client.goodsServices.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 6); window.showNotification('Goods/Service deleted'); }
+};
+
+// Bulk Upload Goods/Services
+window.bulkUploadGoodsServices = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Upload Goods & Services',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-info-circle"></i> Paste goods/services list in CSV format (one per line):
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
+                Name, Category, Description<br>
+                Steel Components, Goods, High-grade steel parts<br>
+                Consulting Services, Services, ISO implementation support<br>
+                Machined Parts, Goods, Precision CNC components
+            </p>
+        </div>
+        <form id="bulk-goods-form">
+            <div class="form-group">
+                <label>Goods/Services List (CSV Format)</label>
+                <textarea id="goods-bulk-data" rows="10" placeholder="Steel Components, Goods, High-grade steel parts
+Consulting Services, Services, ISO implementation support
+Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+                    <input type="checkbox" id="goods-replace" style="width: auto;">
+                    Replace existing items (otherwise, append to existing list)
+                </label>
+            </div>
+        </form>
+        `,
+        () => {
+            const bulkData = document.getElementById('goods-bulk-data').value.trim();
+            const replace = document.getElementById('goods-replace').checked;
+
+            if (!bulkData) {
+                window.showNotification('Please enter goods/services data', 'error');
+                return;
+            }
+
+            const lines = bulkData.split('\n').filter(line => line.trim());
+            const newItems = [];
+            let errors = 0;
+
+            lines.forEach((line, index) => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 1 && parts[0]) {
+                    newItems.push({
+                        name: parts[0],
+                        category: parts[1] || 'Goods',
+                        description: parts[2] || ''
+                    });
+                } else {
+                    errors++;
+                }
+            });
+
+            if (newItems.length === 0) {
+                window.showNotification('No valid items found in the data', 'error');
+                return;
+            }
+
+            if (replace) {
+                client.goodsServices = newItems;
+            } else {
+                if (!client.goodsServices) client.goodsServices = [];
+                client.goodsServices.push(...newItems);
+            }
+
+            window.saveData();
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 6);
+
+            const message = `${newItems.length} item(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+            window.showNotification(message);
+        }
+    );
 };
 
 // ============================================
@@ -2505,7 +2597,90 @@ window.editKeyProcess = function (clientId, index) {
 window.deleteKeyProcess = function (clientId, index) {
     if (!confirm('Delete this process?')) return;
     const client = window.state.clients.find(c => c.id === clientId);
-    if (client && client.keyProcesses) { client.keyProcesses.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 3); window.showNotification('Process deleted'); }
+    if (client && client.keyProcesses) { client.keyProcesses.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 7); window.showNotification('Process deleted'); }
+};
+
+// Bulk Upload Key Processes
+window.bulkUploadKeyProcesses = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Upload Key Processes',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-info-circle"></i> Paste process list in CSV format (one per line):
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
+                Process Name, Category, Owner<br>
+                Production Planning, Core, John Doe<br>
+                Quality Control, Core, Jane Smith<br>
+                Maintenance, Support, Bob Johnson
+            </p>
+        </div>
+        <form id="bulk-process-form">
+            <div class="form-group">
+                <label>Process List (CSV Format)</label>
+                <textarea id="process-bulk-data" rows="10" placeholder="Production Planning, Core, John Doe
+Quality Control, Core, Jane Smith
+Maintenance, Support, Bob Johnson
+HR Management, Support," style="font-family: monospace;"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+                    <input type="checkbox" id="process-replace" style="width: auto;">
+                    Replace existing processes (otherwise, append to existing list)
+                </label>
+            </div>
+        </form>
+        `,
+        () => {
+            const bulkData = document.getElementById('process-bulk-data').value.trim();
+            const replace = document.getElementById('process-replace').checked;
+
+            if (!bulkData) {
+                window.showNotification('Please enter process data', 'error');
+                return;
+            }
+
+            const lines = bulkData.split('\n').filter(line => line.trim());
+            const newProcesses = [];
+            let errors = 0;
+
+            lines.forEach((line, index) => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 1 && parts[0]) {
+                    newProcesses.push({
+                        name: parts[0],
+                        category: parts[1] || 'Support',
+                        owner: parts[2] || ''
+                    });
+                } else {
+                    errors++;
+                }
+            });
+
+            if (newProcesses.length === 0) {
+                window.showNotification('No valid processes found in the data', 'error');
+                return;
+            }
+
+            if (replace) {
+                client.keyProcesses = newProcesses;
+            } else {
+                if (!client.keyProcesses) client.keyProcesses = [];
+                client.keyProcesses.push(...newProcesses);
+            }
+
+            window.saveData();
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 7);
+
+            const message = `${newProcesses.length} process(es) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+            window.showNotification(message);
+        }
+    );
 };
 
 // ============================================
