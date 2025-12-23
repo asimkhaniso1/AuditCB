@@ -690,7 +690,7 @@ function getClientDepartmentsHTML(client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                     <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
@@ -716,7 +716,7 @@ function getClientDepartmentsHTML(client) {
                                     <td style="font-weight: 500;">${window.UTILS.escapeHtml(dept.name)}</td>
                                     <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                     <td>
-                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
@@ -735,7 +735,7 @@ function getClientDepartmentsHTML(client) {
                     <i class="fa-solid fa-sitemap" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                         <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment(${client.id})">Add Manually</button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
                         ` : ''}
@@ -816,7 +816,7 @@ function getClientKeyProcessesHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem; color: #06b6d4;"></i>Key Processes</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Core business processes for audit planning</p>
             </div>
-            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -845,7 +845,7 @@ function getClientKeyProcessesHTML(client) {
                                 <td><span class="badge" style="background: ${proc.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${proc.category === 'Core' ? '#065f46' : '#0369a1'};">${window.UTILS.escapeHtml(proc.category || 'Support')}</span></td>
                                 <td>${window.UTILS.escapeHtml(proc.owner || '-')}</td>
                                 <td>
-                                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                                     <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-pen"></i></button>
                                     <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
@@ -3671,47 +3671,58 @@ window.downloadImportTemplate = function () {
     // 1. Define Sheets Data (Headers + Sample)
     const clientsData = [
         ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date"],
-        ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01"]
+        ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01"],
+        ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15"]
     ];
 
     const certsData = [
         ["Client Name", "Standard", "Scope", "Status", "Certificate No", "Applicable Sites", "Initial Date", "Current Issue", "Expiry Date", "Revision No"],
-        ["Sample Corp", "ISO 9001:2015", "Design and Manuf. of Widgets", "Active", "CERT-001", "Head Office", "2020-01-01", "2023-01-01", "2026-01-01", "01"]
+        ["Sample Corp", "ISO 9001:2015", "Design and Manuf. of Widgets", "Active", "CERT-001", "Head Office", "2020-01-01", "2023-01-01", "2026-01-01", "01"],
+        ["Tech Solutions Inc", "ISO 27001:2022", "Information Security Management System", "Active", "CERT-002", "HQ", "2021-05-10", "2024-05-10", "2027-05-09", "00"]
     ];
 
     const sitesData = [
-        ["Client Name", "Site Name", "Address", "City", "Country", "Employees", "Shift Work"],
-        ["Sample Corp", "Head Office", "123 Main St", "New York", "USA", "80", "No"],
-        ["Sample Corp", "Factory", "456 Ind Park", "Chicago", "USA", "20", "Yes"]
+        ["Client Name", "Site Name", "Address", "City", "Country", "Employees", "Shift Work", "Standards"],
+        ["Sample Corp", "Head Office", "123 Main St", "New York", "USA", "80", "No", "ISO 9001:2015"],
+        ["Sample Corp", "Factory", "456 Ind Park", "Chicago", "USA", "20", "Yes", "ISO 9001:2015"],
+        ["Tech Solutions Inc", "HQ", "789 Tech Blvd", "San Francisco", "USA", "50", "No", "ISO 27001:2022"]
     ];
 
     const contactsData = [
         ["Client Name", "Full Name", "Designation", "Department", "Email", "Phone", "Role"],
         ["Sample Corp", "John Doe", "Quality Manager", "Quality", "john@sample.com", "555-0100", "Mgmt Rep"],
-        ["Sample Corp", "Jane Smith", "Director", "Management", "jane@sample.com", "555-0101", "Director"]
+        ["Sample Corp", "Jane Smith", "Director", "Management", "jane@sample.com", "555-0101", "Director"],
+        ["Tech Solutions Inc", "Alice Tech", "CTO", "Engineering", "alice@techsol.com", "555-9999", "Security Lead"]
     ];
 
     const deptsData = [
         ["Client Name", "Department Name", "Risk Level"],
         ["Sample Corp", "HR", "Low"],
-        ["Sample Corp", "Production", "High"]
+        ["Sample Corp", "Production", "High"],
+        ["Tech Solutions Inc", "Development", "High"],
+        ["Tech Solutions Inc", "Support", "Medium"]
     ];
 
     const desigData = [
         ["Client Name", "Designation"],
         ["Sample Corp", "Manager"],
-        ["Sample Corp", "Supervisor"]
+        ["Sample Corp", "Supervisor"],
+        ["Tech Solutions Inc", "Developer"],
+        ["Tech Solutions Inc", "Analyst"]
     ];
 
     const goodsData = [
         ["Client Name", "Name", "Category", "Description"],
-        ["Sample Corp", "Widget A", "Product", "Main product line"]
+        ["Sample Corp", "Widget A", "Product", "Main product line"],
+        ["Tech Solutions Inc", "Cloud Hosting", "Service", "Managed hosting services"]
     ];
 
     const processData = [
         ["Client Name", "Process Name", "Category", "Owner"],
         ["Sample Corp", "Procurement", "Support", "Purchasing Manager"],
-        ["Sample Corp", "Sales", "Core", "Sales Director"]
+        ["Sample Corp", "Sales", "Core", "Sales Director"],
+        ["Tech Solutions Inc", "Software Dev", "Core", "VP Engineering"],
+        ["Tech Solutions Inc", "Incident Mgmt", "Core", "Ops Manager"]
     ];
 
     // 2. Create Workbook
