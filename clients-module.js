@@ -482,6 +482,7 @@ function getClientSitesHTML(client) {
                         <thead>
                             <tr>
                                 <th>Site Name</th>
+                                <th>Standards</th>
                                 <th>Address</th>
                                 <th>City</th>
                                 <th>Employees</th>
@@ -494,6 +495,7 @@ function getClientSitesHTML(client) {
                             ${client.sites.map((s, index) => `
                                 <tr>
                                     <td style="font-weight: 500;">${window.UTILS.escapeHtml(s.name)}</td>
+                                    <td><span style="font-size: 0.85rem; color: var(--primary-color); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">${window.UTILS.escapeHtml(s.standards || 'Inherited')}</span></td>
                                     <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
                                     <td>${window.UTILS.escapeHtml(s.city || '-')}, ${window.UTILS.escapeHtml(s.country || '')}</td>
                                     <td>
@@ -1484,7 +1486,8 @@ function openAddClientModal() {
             address: cleanData.address,
             city: cleanData.city,
             country: cleanData.country,
-            geotag: cleanData.geotag
+            geotag: cleanData.geotag,
+            standards: standard // Inherit from client
         }];
 
         const newClient = {
@@ -1777,6 +1780,15 @@ function addSite(clientId) {
             
             <div style="border-top: 1px solid var(--border-color); margin: 1rem 0; padding-top: 1rem;">
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>Optional: Site-specific details for man-day calculation</p>
+                <div class="form-group">
+                    <label>Applicable Standards</label>
+                    <select class="form-control" id="site-standards" multiple style="height: 100px;">
+                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+        `<option value="${std}" ${(client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
+    ).join('')}
+                    </select>
+                    <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple (Defaults to client standards)</small>
+                </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>Employees at this Site <span style="font-weight: normal; color: var(--text-secondary);">(optional)</span></label>
@@ -1818,7 +1830,8 @@ function addSite(clientId) {
 
         if (name) {
             if (!client.sites) client.sites = [];
-            client.sites.push({ name, address, city, country, geotag, employees, shift });
+            const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
+            client.sites.push({ name, address, city, country, geotag, employees, shift, standards });
             window.saveData();
             window.closeModal();
             renderClientDetail(clientId);
@@ -1975,6 +1988,15 @@ window.editSite = function (clientId, siteIndex) {
             </div>
             
             <div style="border-top: 1px solid var(--border-color); margin: 1rem 0; padding-top: 1rem;">
+                <div class="form-group">
+                    <label>Applicable Standards</label>
+                    <select class="form-control" id="site-standards" multiple style="height: 100px;">
+                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+        `<option value="${std}" ${(site.standards || client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
+    ).join('')}
+                    </select>
+                    <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
+                </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>Employees</label>
@@ -2015,7 +2037,8 @@ window.editSite = function (clientId, siteIndex) {
         const shift = document.getElementById('site-shift').value || null;
 
         if (name) {
-            client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift };
+            const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
+            client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift, standards };
             window.saveData();
             window.closeModal();
             renderClientDetail(clientId);
@@ -3396,70 +3419,204 @@ window.setSetupWizardStep = function (clientId, step) {
 
 function getClientCertificatesHTML(client) {
     const certs = client.certificates || [];
+    const allStandards = new Set();
+
+    // Collect all standards from client global and sites
+    if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+    if (client.sites) {
+        client.sites.forEach(site => {
+            if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+        });
+    }
+
+    if (certs.length === 0 && allStandards.size > 0) {
+        return `
+            <div class="fade-in" style="text-align: center; padding: 3rem;">
+                <i class="fa-solid fa-certificate" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
+                <h3>Initialize Certification Records</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                    Detected standards: ${Array.from(allStandards).join(', ')}.<br>
+                    Click below to generate certificate records for these standards to manage scopes and revisions.
+                </p>
+                <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards(${client.id})">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Records
+                </button>
+            </div>
+        `;
+    }
 
     return `
         <div class="fade-in">
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">
-                <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
-            </h3>
-            
-            ${certs.length === 0 ? `
-                <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;">
-                    <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                    <p style="color: var(--text-secondary);">No certification scopes defined for this client.</p>
-                </div>
-            ` : `
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Standard / Cert No</th>
-                            <th style="width: 30%;">Scope of Certification</th>
-                            <th>Applicable Sites</th>
-                            <th>Dates (Cycle)</th>
-                            <th>Revision</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${certs.map(cert => `
-                        <tr>
-                            <td>
-                                <strong>${window.UTILS.escapeHtml(cert.standard)}</strong><br>
-                                <span style="font-size:0.85rem; color:#666;">${window.UTILS.escapeHtml(cert.certificateNo || 'N/A')}</span>
-                            </td>
-                            <td>
-                                <div style="max-height: 80px; overflow-y: auto; font-size: 0.9rem;">
-                                    ${window.UTILS.escapeHtml(cert.scope || 'N/A')}
-                                </div>
-                            </td>
-                            <td>
-                                ${cert.applicableSites ?
-            cert.applicableSites.split(',').map(s => `<span class="badge" style="background:#f3f4f6; border:1px solid #d1d5db; color:#374151; margin:2px;">${window.UTILS.escapeHtml(s.trim())}</span>`).join('')
-            : '<span class="badge" style="background:#d1fae5; color:#065f46;">All Sites</span>'}
-                            </td>
-                             <td>
-                                <div style="font-size: 0.85rem;">
-                                    <div><strong>Initial:</strong> ${cert.initialDate || '-'}</div>
-                                    <div><strong>Issue:</strong> ${cert.currentIssue || '-'}</div>
-                                    <div><strong>Expiry:</strong> ${cert.expiryDate || '-'}</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge" style="background:#e0edff; color:#1d4ed8;">Rev ${window.UTILS.escapeHtml(cert.revision || '00')}</span>
-                            </td>
-                             <td>
-                                <span class="status-badge status-${(cert.status || 'Active').toLowerCase()}">${window.UTILS.escapeHtml(cert.status)}</span>
-                            </td>
-                        </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
+                    <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
+                </h3>
+                <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards(${client.id})">
+                    <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Refresh from Sites
+                </button>
             </div>
-            `}
+            
+            ${certs.map((cert, index) => {
+        // Find sites relevant to this standard
+        const relevantSites = (client.sites || []).filter(s =>
+            (s.standards && s.standards.includes(cert.standard)) ||
+            (!s.standards && client.standard && client.standard.includes(cert.standard)) // Fallback if site has no standards defined but client does
+        );
+
+        return `
+                <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--primary-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                        <div>
+                            <span class="badge" style="background: var(--primary-color); color: white; font-size: 0.9rem; margin-bottom: 0.5rem;">${cert.standard}</span>
+                            <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
+                                Cert #: <input type="text" value="${cert.certificateNo || ''}" 
+                                    style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;"
+                                    onchange="window.updateCertField(${client.id}, ${index}, 'certificateNo', this.value)">
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;">
+                                <i class="fa-solid fa-history"></i> Revision History
+                             </button>
+                             <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                Current Rev: <strong>${cert.revision || '00'}</strong>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Scope -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem;">Global / Main Scope Text (Fallback)</label>
+                        <textarea class="form-control" rows="2" 
+                            onchange="window.updateCertField(${client.id}, ${index}, 'scope', this.value)"
+                            placeholder="Enter the main scope statement...">${cert.scope || ''}</textarea>
+                    </div>
+
+                    <!-- Site Specific Scopes -->
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
+                        <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--primary-color);">
+                            <i class="fa-solid fa-location-dot"></i> Site-Specific Scopes (Annex)
+                        </h4>
+                        ${relevantSites.length > 0 ? `
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="text-align: left; border-bottom: 2px solid #e2e8f0;">
+                                    <th style="padding: 0.5rem; width: 25%;">Site</th>
+                                    <th style="padding: 0.5rem;">Scope of Activity (For this Standard)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${relevantSites.map(site => {
+            const siteScope = (cert.siteScopes && cert.siteScopes[site.name])
+                ? cert.siteScopes[site.name]
+                : (cert.scope || ''); // Default to global scope if empty
+            return `
+                                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
+                                            <strong>${site.name}</strong><br>
+                                            <span style="font-size: 0.8rem; color: #64748b;">${site.city}, ${site.country}</span>
+                                        </td>
+                                        <td style="padding: 0.75rem 0.5rem;">
+                                            <textarea class="form-control" rows="2" 
+                                                style="font-size: 0.9rem;"
+                                                onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)"
+                                                placeholder="Define specific scope for this site...">${siteScope}</textarea>
+                                        </td>
+                                    </tr>
+                                    `;
+        }).join('')}
+                            </tbody>
+                        </table>
+                        ` : '<p style="font-style: italic; color: #94a3b8;">No sites linked to this standard.</p>'}
+                    </div>
+
+                    <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                         <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <label style="font-size: 0.8rem;">Initial Date</label>
+                                <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'initialDate', this.value)">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem;">Current Issue</label>
+                                <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'currentIssue', this.value)">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem;">Expiry Date</label>
+                                <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'expiryDate', this.value)">
+                            </div>
+                         </div>
+                         <div style="display: flex; align-items: flex-end;">
+                            <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">
+                                <i class="fa-solid fa-save"></i> Save Changes
+                            </button>
+                         </div>
+                    </div>
+                </div>
+                `;
+    }).join('')}
         </div>
     `;
 }
+
+window.generateCertificatesFromStandards = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const allStandards = new Set();
+    if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+    if (client.sites) {
+        client.sites.forEach(site => {
+            if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+        });
+    }
+
+    if (!client.certificates) client.certificates = [];
+
+    allStandards.forEach(std => {
+        if (!client.certificates.find(c => c.standard === std)) {
+            client.certificates.push({
+                standard: std,
+                certificateNo: '',
+                status: 'Active',
+                revision: '00',
+                scope: client.scope || '', // Default global scope
+                siteScopes: {}
+            });
+        }
+    });
+
+    window.saveData();
+    renderClientDetail(clientId);
+    // Switch to scopes tab
+    setTimeout(() => {
+        document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
+    }, 100);
+    window.showNotification('Certificate records generated');
+};
+
+window.updateCertField = function (clientId, certIndex, field, value) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (client && client.certificates && client.certificates[certIndex]) {
+        client.certificates[certIndex][field] = value;
+        // Autosave turned off to allow bulk edits, but for single inputs we might want to save?
+        // Let's rely on the explicit "Save" button for major changes, but keep local state updated.
+    }
+};
+
+window.updateSiteScope = function (clientId, certIndex, siteName, value) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (client && client.certificates && client.certificates[certIndex]) {
+        if (!client.certificates[certIndex].siteScopes) {
+            client.certificates[certIndex].siteScopes = {};
+        }
+        client.certificates[certIndex].siteScopes[siteName] = value;
+    }
+};
+
+window.saveCertificateDetails = function (clientId) {
+    window.saveData();
+    window.showNotification('Certificate details and scopes saved successfully', 'success');
+};
 
 // Sub-Tab Switching for Org Setup
 window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
