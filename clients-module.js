@@ -556,9 +556,13 @@ function getClientProfileHTML(client) {
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                        <label class="btn btn-sm btn-outline-primary" style="cursor: pointer; margin: 0;">
+                            <i class="fa-solid fa-file-pdf" style="margin-right: 0.25rem;"></i> Upload PDF
+                            <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc(${client.id}, this.files[0])">
+                        </label>
                         ${client.website ? `
                             <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
-                                <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate from Website
+                                <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate
                             </button>
                         ` : ''}
                         <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">
@@ -567,6 +571,22 @@ function getClientProfileHTML(client) {
                     ` : ''}
             </div>
         </div>
+        
+        <!-- Uploaded Document Info -->
+        ${client.profileDocument ? `
+            <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #f0fdf4; border-radius: var(--radius-md); border: 1px solid #86efac; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <i class="fa-solid fa-file-pdf" style="color: #16a34a; margin-right: 0.5rem;"></i>
+                    <span style="font-size: 0.9rem; color: #166534;"><strong>Source Document:</strong> ${window.UTILS.escapeHtml(client.profileDocument.name)}</span>
+                    <span style="font-size: 0.8rem; color: #22c55e; margin-left: 0.5rem;">(Uploaded ${new Date(client.profileDocument.uploadedAt).toLocaleDateString()})</span>
+                </div>
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" onclick="window.removeProfileDocument(${client.id})" title="Remove document">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+                ` : ''}
+            </div>
+        ` : ''}
             
             ${profile ? `
                 <div style="background: #f8fafc; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); line-height: 1.8;">
@@ -577,14 +597,16 @@ function getClientProfileHTML(client) {
                     <i class="fa-solid fa-file-lines" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No company profile generated yet.</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                        ${client.website ?
-            'Click "AI Generate from Website" to automatically create a company profile summary.' :
-            'Add a website URL in the client information to enable AI generation, or edit manually.'}
+                        Upload a company profile PDF/manual, use AI generation from website, or write manually.
                     </p>
-                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
                         ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                            <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
+                                <i class="fa-solid fa-upload"></i> Upload Document
+                                <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc(${client.id}, this.files[0])">
+                            </label>
                             ${client.website ? `
-                                <button class="btn btn-primary btn-sm" onclick="window.generateCompanyProfile(${client.id})">
+                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
                                     <i class="fa-solid fa-sparkles"></i> AI Generate
                                 </button>
                             ` : ''}
@@ -2625,6 +2647,97 @@ window.bulkUploadDepartments = bulkUploadDepartments;
 // Export profile functions
 window.generateCompanyProfile = generateCompanyProfile;
 window.editCompanyProfile = editCompanyProfile;
+
+// Upload Company Profile Document
+window.uploadCompanyProfileDoc = async function (clientId, file) {
+    if (!file) return;
+
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|txt)$/i)) {
+        window.showNotification('Please upload a PDF, Word document, or text file', 'error');
+        return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        window.showNotification('File size must be less than 10MB', 'error');
+        return;
+    }
+
+    window.showNotification('Processing document...', 'info');
+
+    try {
+        // Read file content
+        const reader = new FileReader();
+        reader.onload = async function (e) {
+            const fileContent = e.target.result;
+
+            // Store document metadata
+            client.profileDocument = {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                uploadedAt: new Date().toISOString()
+            };
+
+            // For text files, extract content directly
+            if (file.type === 'text/plain') {
+                client.profileDocumentText = fileContent;
+            } else {
+                // For PDF/DOC, store base64 and note that text extraction may be limited
+                client.profileDocumentBase64 = fileContent.split(',')[1]; // Remove data URL prefix
+                client.profileDocumentText = `[Content from uploaded document: ${file.name}]\n\nNote: For best results, please use the "Edit Manually" option to paste the key information from your company profile document, or use "AI Generate" if you have a website configured.`;
+            }
+
+            window.saveData();
+
+            // Refresh the view
+            if (window.setSetupWizardStep) {
+                window.setSetupWizardStep(clientId, 1);
+            } else {
+                renderClientDetail(clientId);
+            }
+
+            window.showNotification(`Document "${file.name}" uploaded successfully! You can now use AI Generate to create a profile summary.`, 'success');
+        };
+
+        if (file.type === 'text/plain') {
+            reader.readAsText(file);
+        } else {
+            reader.readAsDataURL(file);
+        }
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        window.showNotification('Error uploading document. Please try again.', 'error');
+    }
+};
+
+// Remove Profile Document
+window.removeProfileDocument = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    if (confirm('Are you sure you want to remove the uploaded document?')) {
+        delete client.profileDocument;
+        delete client.profileDocumentText;
+        delete client.profileDocumentBase64;
+
+        window.saveData();
+
+        // Refresh the view
+        if (window.setSetupWizardStep) {
+            window.setSetupWizardStep(clientId, 1);
+        } else {
+            renderClientDetail(clientId);
+        }
+
+        window.showNotification('Document removed', 'success');
+    }
+};
 
 // ============================================
 // ISO 17021-1 CLIENT COMPLIANCE FUNCTIONS
