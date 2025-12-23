@@ -1277,6 +1277,11 @@ function addAgendaRow(data = {}) {
     tbody.appendChild(row);
 }
 
+// Delete a row from the agenda table
+function deleteAgendaRow(btn) {
+    btn.closest('tr').remove();
+}
+
 // Note: saveAuditPlan is defined later in the file (around line 1600) with proper validation and sanitization
 
 // Export functions
