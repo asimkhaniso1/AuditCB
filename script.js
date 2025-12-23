@@ -1667,21 +1667,25 @@ async function lazyLoadModal(modulePath, functionName) {
 }
 
 // Initial Render
-// Role Switcher for Demo
+// Role Switcher for Demo - positioned at bottom of left sidebar
 function renderRoleSwitcher() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
     const switcher = document.createElement('div');
-    switcher.style.position = 'fixed';
-    switcher.style.top = '10px';
-    switcher.style.right = '200px'; // Left of Profile
-    switcher.style.zIndex = '10000';
+    switcher.id = 'role-switcher-container';
+    switcher.style.cssText = 'padding: 1rem; border-top: 1px solid var(--border-color); margin-top: auto;';
     switcher.innerHTML = `
-        <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.8rem; background: #fff;">
-            <option value="Auditor" ${state.currentUser.role === 'Auditor' ? 'selected' : ''}>Role: Auditor</option>
-            <option value="Lead Auditor" ${state.currentUser.role === 'Lead Auditor' ? 'selected' : ''}>Role: Lead Auditor</option>
-            <option value="Certification Manager" ${state.currentUser.role === 'Certification Manager' ? 'selected' : ''}>Role: Cert Manager</option>
+        <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">
+            <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Demo Role
+        </label>
+        <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--card-bg); color: var(--text-color); cursor: pointer;">
+            <option value="Auditor" ${state.currentUser.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+            <option value="Lead Auditor" ${state.currentUser.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
+            <option value="Certification Manager" ${state.currentUser.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>
         </select>
     `;
-    document.body.appendChild(switcher);
+    sidebar.appendChild(switcher);
 }
 
 window.switchUserRole = function (role) {
