@@ -320,9 +320,6 @@ function renderClientDetail(clientId, options = {}) {
                 </button>
                 <button class="tab-btn" data-tab="audits">Audits</button>
                 <button class="tab-btn" data-tab="documents">Documents</button>
-                <button class="tab-btn" data-tab="compliance" style="background: #eff6ff; color: #1d4ed8;">
-                    <i class="fa-solid fa-shield-halved" style="margin-right: 0.25rem;"></i>Compliance
-                </button>
             </div>
 
             <div id="tab-content"></div>
@@ -2334,7 +2331,7 @@ function bulkUploadDepartments(clientId) {
     window.openModal(
         'Bulk Upload Departments',
         `
-    < div style = "margin-bottom: 1rem;" >
+        <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste department list in CSV format (one per line):
             </p>
@@ -2400,8 +2397,8 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
 
             window.saveData();
             window.closeModal();
-            renderClientDetail(clientId);
-            renderClientTab(client, 'departments');
+            window.setSetupWizardStep(clientId, 3);
+
 
             const message = `${newDepartments.length} department(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
             window.showNotification(message);
