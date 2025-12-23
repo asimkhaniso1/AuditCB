@@ -203,7 +203,8 @@ function renderClientsEnhanced() {
         el.addEventListener('click', (e) => {
             if (!e.target.closest('.edit-client')) {
                 const clientId = parseInt(el.getAttribute('data-client-id'));
-                renderClientDetail(clientId);
+                // Navigate directly to Client Workspace (no intermediate page)
+                window.location.hash = `client/${clientId}`;
             }
         });
     });
