@@ -317,15 +317,7 @@ function publishReport(reportId) {
     setTimeout(() => window.generateAuditReport(reportId), 500);
 }
 
-// Revert to Draft status
-function revertToDraft(reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
-    if (!report) return;
-    report.status = window.CONSTANTS.STATUS.DRAFT;
-    window.saveData();
-    window.renderExecutionDetail(reportId);
-    window.showNotification('Report reverted to Draft');
-}
+// Note: revertToDraft is already defined above as window.revertToDraft
 
 // Save report draft
 window.saveReportDraft = function (reportId) {
@@ -830,135 +822,9 @@ window.publishReport = publishReport;
 window.revertToDraft = revertToDraft;
 
 // ============================================
-// NEW: Reporting Dashboard (Top-Level View)
+// NOTE: The main renderReportingModule function with full Reporting Process Flow
+// visualization is defined below (around line 960). The duplicate here was removed.
 // ============================================
-
-function renderReportingModule() {
-    const h = window.UTILS.escapeHtml; // Sanitization alias
-    const reports = window.state.auditReports || [];
-
-    // Helper for status color
-    const getStatusColor = (status) => {
-        const S = window.CONSTANTS.STATUS;
-        if (status === S.FINALIZED || status === S.PUBLISHED) return 'var(--success-color)'; // Green
-        if (status === S.IN_REVIEW) return 'var(--warning-color)'; // Orange
-        if (status === S.DRAFT) return 'var(--info-color)'; // Blue
-        if (status === S.IN_PROGRESS) return '#64748b'; // Grey
-        return '#94a3b8';
-    };
-
-    const html = `
-        <div class="fade-in">
-             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <div>
-                    <h2 style="margin: 0;">Audit Reporting Dashboard</h2>
-                    <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">Manage, review, and publish audit reports.</p>
-                </div>
-            </div>
-
-            <!-- Summary Metric Cards -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-file-lines"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Reports</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.length}</div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-glasses"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Pending Review</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.filter(r => r.status === window.CONSTANTS.STATUS.IN_REVIEW).length}</div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f5f3ff; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-check-double"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Approved</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.filter(r => r.status === 'Approved').length}</div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0fdf4; color: #15803d; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-file-contract"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Finalized</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${reports.filter(r => r.status === window.CONSTANTS.STATUS.FINALIZED || r.status === window.CONSTANTS.STATUS.PUBLISHED).length}</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Workflow Help Cards -->
-            <div style="margin-bottom: 2rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe;">
-                    <div style="font-weight: 600; color: #1d4ed8; margin-bottom: 0.5rem;"><i class="fa-solid fa-pen-ruler"></i> Draft</div>
-                    <div style="font-size: 0.85rem;">Auditors consolidate findings and draft the initial report content.</div>
-                </div>
-                 <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px solid #fed7aa;">
-                    <div style="font-weight: 600; color: #c2410c; margin-bottom: 0.5rem;"><i class="fa-solid fa-glasses"></i> Review (Manual)</div>
-                    <div style="font-size: 0.85rem;">Lead Auditor performs <strong>manual classification</strong> of findings and validates technical content.</div>
-                </div>
-                <div style="background: #f5f3ff; padding: 1rem; border-radius: 8px; border: 1px solid #ddd6fe;">
-                    <div style="font-weight: 600; color: #7c3aed; margin-bottom: 0.5rem;"><i class="fa-solid fa-check-double"></i> Approved</div>
-                    <div style="font-size: 0.85rem;">Cert Manager validates report against historical context and approves for final issuance.</div>
-                </div>
-                 <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0;">
-                    <div style="font-weight: 600; color: #15803d; margin-bottom: 0.5rem;"><i class="fa-solid fa-file-contract"></i> Finalized</div>
-                    <div style="font-size: 0.85rem;">Report is published, locked, and ready for the formal Certification Decision.</div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Client</th>
-                                <th>Audit Date</th>
-                                <th>Report Status</th>
-                                <th>Findings (Total)</th>
-                                <th>Last Action</th>
-                                <th style="text-align: right;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${reports.length > 0 ? reports.map(r => `
-                                <tr>
-                                    <td><strong>${h(r.client)}</strong></td>
-                                    <td>${h(r.date)}</td>
-                                    <td><span class="badge" style="background: ${getStatusColor(r.status)}">${h(r.status)}</span></td>
-                                    <td>
-                                        <span style="font-weight: 600;">${(r.ncrs || []).length}</span> 
-                                        <span style="font-size: 0.8rem; color: #64748b;">(${(r.ncrs || []).filter(n => n.type === 'major').length} Major)</span>
-                                    </td>
-                                    <td style="font-size: 0.85rem; color: #64748b;">${r.finalizedAt ? 'Finalized on ' + new Date(r.finalizedAt).toLocaleDateString() : 'Drafting'}</td>
-                                    <td style="text-align: right;">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${r.id})">
-                                            <i class="fa-solid fa-file-pen" style="margin-right: 0.5rem;"></i> Manage Report
-                                        </button>
-                                    </td>
-                                </tr>
-                            `).join('') : '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">No audit reports found. Start an audit in "Audit Execution" first.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-        </div>
-    `;
-    window.contentArea.innerHTML = html;
-}
 
 // Wrapper to open detail view from the list
 window.openReportingDetail = function (reportId) {

@@ -644,67 +644,7 @@ function autoCalculateDays() {
     }
 }
 
-function saveAuditPlan() {
-    const client = document.getElementById('plan-client').value;
-    const date = document.getElementById('plan-date').value;
-    const lead = document.getElementById('plan-lead-auditor').value;
-    const type = document.getElementById('plan-type').value;
-    const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
-    const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
-    const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
-
-    // ISO 17021-1 Fields
-    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
-    const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
-    const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
-    const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
-
-    // Get selected sites
-    const selectedSites = [];
-    document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
-        selectedSites.push({
-            name: cb.dataset.name,
-            geotag: cb.dataset.geotag || null
-        });
-    });
-
-    // Get multiple selected team members
-    const teamSelect = document.getElementById('plan-team');
-    const team = Array.from(teamSelect.selectedOptions).map(option => option.value);
-    if (lead) team.unshift(lead);
-
-    if (client && date && lead) {
-        const newPlan = {
-            id: Date.now(),
-            client: client,
-            date: date,
-            type: type,
-            standard: standard,
-            team: team,
-            selectedSites: selectedSites,
-            manDays: manDays,
-            onsiteDays: onsiteDays,
-            status: 'Draft',
-            // ISO 17021-1 Compliance Fields
-            auditType: auditType,
-            auditMethod: auditMethod,
-            impartialityAssessment: {
-                risk: impartialityRisk,
-                notes: impartialityNotes,
-                assessedBy: state.currentUser?.name || 'System',
-                assessedDate: new Date().toISOString().split('T')[0]
-            }
-        };
-
-        state.auditPlans.push(newPlan);
-        window.saveData();
-        window.closeModal();
-        renderAuditPlanningEnhanced();
-        window.showNotification('Audit Plan created successfully');
-    } else {
-        window.showNotification('Please fill in all required fields (Client, Date, Lead Auditor)', 'error');
-    }
-}
+// Note: The definitive saveAuditPlan function is defined below (around line 1660) with proper validation and sanitization
 
 function viewAuditPlan(id) {
     if (!window.state) {
@@ -965,130 +905,7 @@ function viewAuditPlan(id) {
 }
 
 
-window.printAuditPlanDetails = function (planId) {
-    const plan = state.auditPlans.find(p => p.id == planId);
-    if (!plan) return;
-
-    const client = state.clients.find(c => c.name === plan.client);
-
-    // Calculate breakdowns
-    let totalEmployees = 0;
-    const siteDetails = (plan.selectedSites || []).map(s => {
-        // Find site object in client data to get employees
-        const siteData = (client?.sites || []).find(cs => cs.name === s.name);
-        const emps = siteData?.employees || 0;
-        totalEmployees += emps;
-        return { ...s, employees: emps, address: siteData?.address || '' };
-    });
-
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
-
-    let content = `
-        <html>
-        <head>
-            <title>Audit Plan - ${plan.client}</title>
-            <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; padding: 40px; }
-                .header { border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
-                .logo { font-size: 24px; font-weight: bold; color: #0f172a; }
-                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                .meta-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; width: 50%; vertical-align: top; }
-                .meta-label { font-weight: bold; color: #64748b; font-size: 0.9em; display: block; margin-bottom: 4px; }
-                .section-title { background: #f1f5f9; padding: 10px 15px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0f172a; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em; }
-                th { background: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
-                td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
-                .footer { margin-top: 50px; font-size: 0.8em; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div>
-                    <div class="logo">AUDIT PLAN</div>
-                    <div>Ref: P-${plan.id}</div>
-                </div>
-                <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
-            </div>
-
-            <table class="meta-table">
-                <tr>
-                    <td><span class="meta-label">Client</span>${plan.client}</td>
-                    <td><span class="meta-label">Audit Standard</span>${plan.standard}</td>
-                </tr>
-                <tr>
-                    <td><span class="meta-label">Planned Date</span>${plan.date}</td>
-                    <td><span class="meta-label">Audit Type</span>${plan.type}</td>
-                </tr>
-                 <tr>
-                    <td><span class="meta-label">Lead Auditor</span>${(plan.team || [])[0] || '-'}</td>
-                    <td><span class="meta-label">Audit Team</span>${(plan.team || []).slice(1).join(', ') || 'None'}</td>
-                </tr>
-                 <tr>
-                    <td><span class="meta-label">Total Man-Days</span>${plan.manDays} days (${plan.onsiteDays} onsite)</td>
-                    <td><span class="meta-label">Risk Level</span>Medium (Standard)</td>
-                </tr>
-            </table>
-
-            <div class="section-title">AUDIT SCOPE & MAN-DAYS DISTRIBUTION</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Site Name</th>
-                        <th>Address</th>
-                        <th style="text-align: right;">Employees</th>
-                        <th style="text-align: right;">Allocated Man-Days</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${siteDetails.map(site => {
-        // Calculate proportional man-days
-        // If total employees is 0 (missing data), split evenly
-        let allocatedDays = 0;
-        if (totalEmployees > 0) {
-            allocatedDays = (site.employees / totalEmployees) * plan.manDays;
-        } else {
-            allocatedDays = plan.manDays / siteDetails.length;
-        }
-        return `
-                        <tr>
-                            <td>${site.name} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
-                            <td>${site.address || '-'}</td>
-                            <td style="text-align: right;">${site.employees}</td>
-                            <td style="text-align: right; font-weight: bold;">${allocatedDays.toFixed(2)}</td>
-                        </tr>
-                        `;
-    }).join('')}
-                    <tr style="background: #f8fafc; font-weight: bold;">
-                        <td colspan="2">TOTAL</td>
-                        <td style="text-align: right;">${totalEmployees}</td>
-                        <td style="text-align: right;">${plan.manDays.toFixed(2)}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="section-title">AUDIT OBJECTIVES</div>
-            <ul style="margin-top: 0; padding-left: 20px; color: #333;">
-                <li>Determine conformity of the management system with audit criteria.</li>
-                <li>Evaluate the ability of the management system to ensure likely compliance with statutory, regulatory and contractual requirements.</li>
-                <li>Evaluate the effectiveness of the management system in meeting its specified objectives.</li>
-                <li>Identify areas for potential improvement.</li>
-            </ul>
-
-            <div class="footer">
-                Generated by AuditCB • ${new Date().toLocaleString()} • Page 1 of 1
-            </div>
-
-            <script>
-                window.onload = function() { window.print(); }
-            </script>
-        </body>
-        </html>
-    `;
-
-    const printWin = window.open('', '', 'width=900,height=800');
-    printWin.document.write(content);
-    printWin.document.close();
-};
+// Note: The definitive printAuditPlanDetails function (with team name resolution) is defined below around line 1295
 
 window.printAuditChecklist = function (planId) {
     try {
@@ -1125,7 +942,7 @@ window.printAuditChecklist = function (planId) {
         if (report && report.checklistProgress) {
             report.checklistProgress.forEach(p => {
                 // Normalized key: ID-Idx (String)
-                progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
+                progressMap[`${p.checklistId} -${p.itemIdx} `] = p;
             });
         }
 
@@ -1460,74 +1277,7 @@ function addAgendaRow(data = {}) {
     tbody.appendChild(row);
 }
 
-function saveAuditPlan() {
-    const clientName = document.getElementById('plan-client').value;
-    if (!clientName) return;
-
-    // Collect Step 1 Data
-    const date = document.getElementById('plan-date').value;
-    const type = document.getElementById('plan-type').value;
-    const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
-    const leadAuditor = document.getElementById('plan-lead-auditor').value;
-    const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
-    const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
-    const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
-
-    const selectedSites = [];
-    document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
-        selectedSites.push({
-            name: cb.dataset.name,
-            geotag: cb.dataset.geotag || null
-        });
-    });
-
-    // Collect Agenda (Step 2)
-    const agenda = [];
-    document.querySelectorAll('#agenda-tbody tr').forEach(row => {
-        const inputs = row.querySelectorAll('input, select');
-        agenda.push({
-            day: inputs[0].value,
-            time: inputs[1].value,
-            item: inputs[2].value,
-            dept: inputs[3].value,
-            auditor: inputs[4].value
-        });
-    });
-
-    // Construct Plan Object
-    const planData = {
-        client: clientName,
-        date: date,
-        type: type,
-        standard: standard,
-        auditors: [], // We use team names mainly
-        team: [leadAuditor, ...team].filter(Boolean),
-        manDays: manDays,
-        onsiteDays: onsiteDays,
-        selectedSites: selectedSites,
-        agenda: agenda,
-        status: 'Scheduled'
-    };
-
-    if (window.editingPlanId) {
-        const index = state.auditPlans.findIndex(p => p.id === window.editingPlanId);
-        if (index !== -1) {
-            state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
-            window.showNotification('Audit Plan updated successfully');
-        }
-    } else {
-        planData.id = Date.now();
-        planData.progress = 0;
-        state.auditPlans.push(planData);
-        window.showNotification('Audit Plan created successfully');
-    }
-
-    window.saveData();
-    window.closeModal();
-    renderAuditPlanningEnhanced();
-    if (window.renderDashboardEnhanced) renderDashboardEnhanced();
-    window.editingPlanId = null;
-}
+// Note: saveAuditPlan is defined later in the file (around line 1600) with proper validation and sanitization
 
 // Export functions
 window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
@@ -1713,139 +1463,8 @@ function togglePlanningAnalytics() {
     renderAuditPlanningEnhanced();
 }
 
-// --- Agenda & Wizard Logic ---
-
-function goToStep2() {
-    const form = document.getElementById('plan-form');
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-    }
-
-    document.getElementById('step-1-content').style.display = 'none';
-    document.getElementById('step-2-content').style.display = 'block';
-
-    document.getElementById('step-indicator-1').style.color = 'var(--text-secondary)';
-    document.getElementById('step-indicator-1').style.fontWeight = 'normal';
-    document.getElementById('step-indicator-2').style.color = 'var(--primary-color)';
-    document.getElementById('step-indicator-2').style.fontWeight = 'bold';
-
-    // Icon update
-    document.querySelector('#step-indicator-1').innerHTML = '1. Plan Details <i class="fa-solid fa-check-circle" style="color:var(--success-color)"></i>';
-
-    const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
-
-    modalSave.textContent = 'Save Audit Plan';
-    modalSave.onclick = () => saveAuditPlan();
-
-    modalCancel.textContent = 'Back';
-    modalCancel.onclick = () => goToStep1();
-
-    const tbody = document.getElementById('agenda-tbody');
-    if (tbody.children.length === 0) {
-        // Auto-populate default rows
-        addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
-        addAgendaRow({ day: 'Day 1', time: '09:30 - 10:30', item: 'Site Tour', dept: 'All', auditor: 'All' });
-        addAgendaRow({ day: 'Day 1', time: '16:00 - 17:00', item: 'Closing Meeting', dept: 'Top Management', auditor: 'All' });
-    }
-
-    currentPlanStep = 2;
-}
-
-function goToStep1() {
-    document.getElementById('step-1-content').style.display = 'block';
-    document.getElementById('step-2-content').style.display = 'none';
-
-    document.getElementById('step-indicator-1').style.color = 'var(--primary-color)';
-    document.getElementById('step-indicator-1').style.fontWeight = 'bold';
-    document.querySelector('#step-indicator-1').innerHTML = '1. Plan Details'; // Reset
-
-    document.getElementById('step-indicator-2').style.color = 'var(--text-secondary)';
-    document.getElementById('step-indicator-2').style.fontWeight = 'normal';
-
-    const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
-
-    modalSave.textContent = 'Next: Agenda ->';
-    modalSave.onclick = () => goToStep2();
-
-    modalCancel.textContent = 'Cancel';
-    modalCancel.onclick = () => window.closeModal();
-
-    currentPlanStep = 1;
-}
-
-function goToStep2() {
-    // Validate Step 1
-    const client = document.getElementById('plan-client').value;
-    const date = document.getElementById('plan-date').value;
-
-    if (!client || !date) {
-        window.showNotification('Please fill in all required fields (Client, Date)', 'error');
-        return;
-    }
-
-    document.getElementById('step-1-content').style.display = 'none';
-    document.getElementById('step-2-content').style.display = 'block';
-
-    document.getElementById('step-indicator-1').style.color = 'var(--text-secondary)';
-    document.getElementById('step-indicator-1').style.fontWeight = 'normal';
-    document.querySelector('#step-indicator-1').innerHTML = '<i class="fa-solid fa-check-circle" style="color: var(--success-color);"></i> 1. Plan Details';
-
-    document.getElementById('step-indicator-2').style.color = 'var(--primary-color)';
-    document.getElementById('step-indicator-2').style.fontWeight = 'bold';
-
-    const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
-
-    modalSave.textContent = 'Save Plan';
-    modalSave.onclick = () => saveAuditPlan();
-
-    modalCancel.textContent = 'Back';
-    modalCancel.onclick = () => goToStep1();
-
-    const tbody = document.getElementById('agenda-tbody');
-    if (tbody.children.length === 0) {
-        // Auto-populate default rows
-        addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
-        addAgendaRow({ day: 'Day 1', time: '09:30 - 10:30', item: 'Site Tour', dept: 'All', auditor: 'All' });
-        addAgendaRow({ day: 'Day 1', time: '16:00 - 17:00', item: 'Closing Meeting', dept: 'Top Management', auditor: 'All' });
-    }
-
-    currentPlanStep = 2;
-}
-
-function addAgendaRow(data = null) {
-    const tbody = document.getElementById('agenda-tbody');
-    const tr = document.createElement('tr');
-
-    // Default values
-    const day = data?.day || 'Day 1';
-    const time = data?.time || '';
-    const item = data?.item || '';
-    const dept = data?.dept || '';
-    const auditor = data?.auditor || '';
-
-    tr.innerHTML = `
-        <td><input type="text" class="form-control" value="${day}" placeholder="Day 1" style="font-size: 0.85rem;"></td>
-        <td><input type="text" class="form-control" value="${time}" placeholder="09:00 - 10:00" style="font-size: 0.85rem;"></td>
-        <td><input type="text" class="form-control" value="${item}" placeholder="Activity" style="font-size: 0.85rem;"></td>
-        <td><input type="text" class="form-control" value="${dept}" placeholder="Dept." style="font-size: 0.85rem;"></td>
-        <td><input type="text" class="form-control" value="${auditor}" placeholder="Auditor" style="font-size: 0.85rem;"></td>
-        <td style="text-align: center;">
-            <button type="button" class="btn btn-sm btn-icon" onclick="deleteAgendaRow(this)" style="color: var(--danger-color);">
-                <i class="fa-solid fa-trash"></i>
-            </button>
-        </td>
-    `;
-    tbody.appendChild(tr);
-}
-
-function deleteAgendaRow(btn) {
-    btn.closest('tr').remove();
-}
-
+// Note: goToStep2, goToStep1, addAgendaRow, deleteAgendaRow are defined earlier in the file (around lines 1369-1461)
+// The saveAuditPlan function below is the definitive version with proper validation and sanitization
 
 function saveAuditPlan() {
     // 1. Define Fields
@@ -1931,6 +1550,12 @@ function saveAuditPlan() {
         });
     }
 
+    // 5.5. Collect ISO 17021-1 Fields (optional fields)
+    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
+    const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
+    const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
+    const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
+
     // 6. Construct Plan Object
     const planData = {
         client: clientName,
@@ -1943,7 +1568,16 @@ function saveAuditPlan() {
         onsiteDays: onsiteDays,
         selectedSites: selectedSites,
         agenda: agenda,
-        status: 'Scheduled'
+        status: 'Scheduled',
+        // ISO 17021-1 Compliance Fields
+        auditType: auditType,
+        auditMethod: auditMethod,
+        impartialityAssessment: {
+            risk: impartialityRisk,
+            notes: impartialityNotes,
+            assessedBy: window.state.currentUser?.name || 'System',
+            assessedDate: new Date().toISOString().split('T')[0]
+        }
     };
 
     if (window.editingPlanId) {
