@@ -1227,8 +1227,8 @@ function openAddClientModal() {
 
     modalTitle.textContent = 'Add New Client';
     modalBody.innerHTML = `
-    < form id = "client-form" style = "display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;" >
-            < !--Basic Info-- >
+        <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <!-- Basic Info -->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
             
             <div class="form-group">
