@@ -4231,9 +4231,13 @@ function updateClientWorkspaceHeader(clientId) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
-    const logoContainer = document.getElementById('client-workspace-logo');
-    if (logoContainer && client.logoUrl) {
-        logoContainer.innerHTML = `<img src="${client.logoUrl}" style="height: 36px; max-width: 100px; object-fit: contain;">`;
+    const logoContainer = document.getElementById('cb-logo-display');
+    if (logoContainer) {
+        if (client.logoUrl) {
+            logoContainer.innerHTML = `<img src="${client.logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${client.name}">`;
+        } else {
+            logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${client.name.length > 20 ? client.name.substring(0, 20) + '...' : client.name}</h1>`;
+        }
     }
 }
 window.updateClientWorkspaceHeader = updateClientWorkspaceHeader;

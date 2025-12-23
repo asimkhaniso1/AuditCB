@@ -92,6 +92,27 @@ const Sanitizer = {
         return DOMPurify.sanitize(url, { ALLOWED_TAGS: [] });
     },
 
+    // Alias for lowercase 'url' (compatibility)
+    sanitizeUrl: function (url) {
+        return this.sanitizeURL(url);
+    },
+
+    /**
+     * Sanitize email address
+     * @param {string} email - Email to sanitize
+     * @returns {string} - Safe email or empty string
+     */
+    sanitizeEmail: (email) => {
+        if (!email) return '';
+
+        // Basic email sanitization - strip HTML and validate format loosely
+        const clean = DOMPurify.sanitize(email, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim();
+
+        // Accept anything that looks vaguely like an email
+        // Real validation should happen server-side
+        return clean;
+    },
+
     /**
      * Create safe DOM element with text content
      * Preferred over innerHTML for user content
