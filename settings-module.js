@@ -382,22 +382,45 @@ window.saveAccreditation = function () {
 };
 
 window.addStandardToMasterlist = function () {
-    const std = prompt("Enter the new Standard Name (e.g., ISO 13485:2016):");
-    if (std && std.trim()) {
+    document.getElementById('modal-title').textContent = 'Add New Standard';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="add-standard-form">
+            <div class="form-group">
+                <label>Standard Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="new-standard-name" placeholder="e.g., ISO 13485:2016" required>
+            </div>
+            <div class="alert alert-info" style="margin-top: 1rem; padding: 0.75rem; background: #e0f2fe; color: #0284c7; border-radius: 4px; border: 1px solid #bae6fd;">
+                <i class="fa-solid fa-info-circle"></i> This will add the standard to the masterlist. You can then select it as "Offered" in the accreditation settings.
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const std = document.getElementById('new-standard-name').value;
+
+        if (!std || !std.trim()) {
+            window.showNotification('Please enter a standard name', 'error');
+            return;
+        }
+
         const settings = window.state.cbSettings;
         if (!settings.availableStandards) {
             settings.availableStandards = ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018'];
         }
+
         const cleanStd = std.trim();
         if (!settings.availableStandards.includes(cleanStd)) {
             settings.availableStandards.push(cleanStd);
             window.saveData();
+            window.closeModal();
             switchSettingsTab('accreditation', document.querySelectorAll('.tab-btn')[3]);
             window.showNotification('Standard added to masterlist', 'success');
         } else {
             window.showNotification('Standard already exists', 'warning');
         }
-    }
+    };
+
+    window.openModal();
 };
 
 window.deleteStandardFromMasterlist = function (std) {

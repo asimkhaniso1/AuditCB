@@ -129,6 +129,7 @@ function renderCertificationModule() {
                                         <td><span class="badge bg-green">${window.UTILS.escapeHtml(cert.status)}</span></td>
                                         <td  style="text-align: right;">
                                             <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View/Print"><i class="fa-solid fa-eye"></i></button>
+                                            <button class="btn btn-sm btn-icon" onclick="editCertificate('${cert.id}')" title="Edit Details"><i class="fa-solid fa-pen"></i></button>
                                             <button class="btn btn-sm btn-icon" onclick="openCertActionModal('${cert.id}')" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
                                         </td>
                                     </tr>
@@ -599,6 +600,80 @@ window.restoreCertificate = function (certId) {
         window.saveData();
         renderCertificationModule();
     }
+};
+
+window.editCertificate = function (certId) {
+    const cert = state.certifications.find(c => c.id === certId);
+    if (!cert) return;
+
+    document.getElementById('modal-title').textContent = 'Edit Certificate Details';
+    document.getElementById('modal-body').innerHTML = `
+        <div style="background: #eff6ff; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid #bfdbfe;">
+             <strong>Certificate:</strong> ${window.UTILS.escapeHtml(cert.id)}<br>
+             <strong>Client:</strong> ${window.UTILS.escapeHtml(cert.client)}
+        </div>
+        <form id="cert-edit-form">
+            <div class="form-group">
+                <label>Standard</label>
+                <select class="form-control" id="edit-cert-standard">
+                     ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018"].map(std =>
+        `<option value="${std}" ${cert.standard === std ? 'selected' : ''}>${std}</option>`
+    ).join('')}
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Issue Date</label>
+                    <input type="date" class="form-control" id="edit-cert-issue" value="${cert.issueDate}">
+                </div>
+                <div class="form-group">
+                    <label>Expiry Date</label>
+                    <input type="date" class="form-control" id="edit-cert-expiry" value="${cert.expiryDate}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Certification Scope</label>
+                <textarea class="form-control" id="edit-cert-scope" rows="4">${window.UTILS.escapeHtml(cert.scope)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Reason for Modification <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="edit-cert-reason" placeholder="e.g., Scope expansion, Typo correction" required>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const standard = document.getElementById('edit-cert-standard').value;
+        const issueDate = document.getElementById('edit-cert-issue').value;
+        const expiryDate = document.getElementById('edit-cert-expiry').value;
+        const scope = document.getElementById('edit-cert-scope').value.trim();
+        const reason = document.getElementById('edit-cert-reason').value.trim();
+
+        if (!reason || !scope) {
+            window.showNotification('Scope and Reason are required', 'error');
+            return;
+        }
+
+        cert.standard = standard;
+        cert.issueDate = issueDate;
+        cert.expiryDate = expiryDate;
+        cert.scope = scope;
+
+        cert.history.push({
+            date: new Date().toISOString().split('T')[0],
+            action: 'Certificate Maintained/Edited',
+            user: window.state.currentUser?.name || 'Admin',
+            reason: reason,
+            changes: `Updated scope/details`
+        });
+
+        window.saveData();
+        window.closeModal();
+        renderCertificationModule();
+        window.showNotification('Certificate details updated', 'success');
+    };
+
+    window.openModal();
 };
 
 window.printCertificateRegister = function () {
