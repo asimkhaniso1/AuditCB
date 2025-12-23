@@ -258,7 +258,7 @@ body {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
-    overflow: hidden;
+    overflow-x: auto;
 }
 
 table {
@@ -1454,6 +1454,7 @@ textarea:focus:invalid {
         right: 0;
     }
 }
+
 /* Sidebar Toggle Button */
 .sidebar-toggle-btn {
     background: none;

@@ -703,8 +703,14 @@ window.openNewNCRModal = function () {
                 </select>
             </div>
             <div class="form-group">
-                <label>Description <span style="color: var(--danger-color);">*</span></label>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label>Description <span style="color: var(--danger-color);">*</span></label>
+                    <button type="button" class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" onclick="window.generateNewNCRFinding()">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>AI Generate
+                    </button>
+                </div>
                 <textarea class="form-control" id="ncr-description" rows="3" required></textarea>
+                <small style="color: var(--text-secondary);">AI will generate professional finding based on standard/clause</small>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
@@ -918,8 +924,14 @@ window.editNCR = function (ncrId) {
             </div>
             
             <div class="form-group">
-                <label>Description <span style="color: var(--danger-color);">*</span></label>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label>Description <span style="color: var(--danger-color);">*</span></label>
+                    <button type="button" class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" onclick="window.generateNCRFinding(${ncrId})">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>AI Generate
+                    </button>
+                </div>
                 <textarea class="form-control" id="edit-ncr-description" rows="3" required>${window.UTILS.escapeHtml(ncr.description)}</textarea>
+                <small style="color: var(--text-secondary);">AI will reference uploaded standards from Knowledge Base</small>
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -1086,6 +1098,151 @@ window.verifyCAPA = function (ncrId) {
     };
 
     window.openModal();
+};
+
+// ============================================
+// AI GENERATE NCR FINDING
+// ============================================
+window.generateNCRFinding = async function (ncrId) {
+    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    if (!ncr) return;
+
+    const standard = document.getElementById('edit-ncr-standard')?.value || ncr.standard;
+    const clause = document.getElementById('edit-ncr-clause')?.value || ncr.clause;
+    const severity = document.getElementById('edit-ncr-severity')?.value || ncr.severity;
+    const currentDesc = document.getElementById('edit-ncr-description')?.value || '';
+
+    // Check if Knowledge Base has standards
+    const kb = window.state.knowledgeBase || { standards: [] };
+    const hasStandards = kb.standards.length > 0;
+
+    // Show loading state
+    const descField = document.getElementById('edit-ncr-description');
+    const originalValue = descField.value;
+    descField.value = 'Generating finding with AI...';
+    descField.disabled = true;
+
+    try {
+        // Build prompt
+        const prompt = `You are an ISO certification auditor. Generate a professional NCR (Non-Conformance Report) finding description.
+
+Standard: ${standard}
+Clause: ${clause}
+Severity: ${severity}
+${currentDesc ? `Auditor's Notes: ${currentDesc}` : ''}
+
+Requirements:
+1. Start with what was observed (objective evidence)
+2. Reference the specific clause requirement that was not met
+3. Be factual, not opinion-based
+4. Use professional audit language
+5. Keep it concise (2-3 sentences max)
+
+Generate only the finding description, no headers or labels.`;
+
+        // Call Gemini API via proxy
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                context: hasStandards ? `Knowledge Base contains: ${kb.standards.map(s => s.name).join(', ')}` : ''
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('API request failed');
+        }
+
+        const data = await response.json();
+        const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        if (generatedText) {
+            descField.value = generatedText.trim();
+            window.showNotification('Finding generated - please review and edit as needed', 'success');
+        } else {
+            throw new Error('No response from AI');
+        }
+    } catch (error) {
+        console.error('AI Generation Error:', error);
+        descField.value = originalValue;
+
+        // Fallback: Generate template locally
+        const fallbackText = `During the audit of ${standard}, Clause ${clause}, it was observed that [DESCRIBE OBJECTIVE EVIDENCE]. This does not conform to the requirement of Clause ${clause} which requires [STATE THE REQUIREMENT]. This has been classified as a ${severity} non-conformance.`;
+
+        descField.value = fallbackText;
+        window.showNotification('AI unavailable - template provided. Please complete the finding.', 'warning');
+    } finally {
+        descField.disabled = false;
+        descField.focus();
+    }
+};
+
+// AI Generate for NEW NCR (uses form fields instead of existing NCR)
+window.generateNewNCRFinding = async function () {
+    const standard = document.getElementById('ncr-standard')?.value || '';
+    const clause = document.getElementById('ncr-clause')?.value || '';
+    const severity = document.getElementById('ncr-severity')?.value || 'Minor';
+    const currentDesc = document.getElementById('ncr-description')?.value || '';
+
+    if (!standard || !clause) {
+        window.showNotification('Please enter Standard and Clause first', 'warning');
+        return;
+    }
+
+    const kb = window.state.knowledgeBase || { standards: [] };
+    const hasStandards = kb.standards.length > 0;
+
+    const descField = document.getElementById('ncr-description');
+    const originalValue = descField.value;
+    descField.value = 'Generating finding with AI...';
+    descField.disabled = true;
+
+    try {
+        const prompt = `You are an ISO certification auditor. Generate a professional NCR (Non-Conformance Report) finding description.
+
+Standard: ${standard}
+Clause: ${clause}
+Severity: ${severity}
+${currentDesc ? `Auditor's Notes: ${currentDesc}` : ''}
+
+Requirements:
+1. Start with what was observed (objective evidence)
+2. Reference the specific clause requirement that was not met
+3. Be factual, not opinion-based
+4. Use professional audit language
+5. Keep it concise (2-3 sentences max)
+
+Generate only the finding description, no headers or labels.`;
+
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                context: hasStandards ? `Knowledge Base contains: ${kb.standards.map(s => s.name).join(', ')}` : ''
+            })
+        });
+
+        if (!response.ok) throw new Error('API request failed');
+
+        const data = await response.json();
+        const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        if (generatedText) {
+            descField.value = generatedText.trim();
+            window.showNotification('Finding generated - please review and edit', 'success');
+        } else {
+            throw new Error('No response');
+        }
+    } catch (error) {
+        console.error('AI Error:', error);
+        descField.value = `During the audit of ${standard}, Clause ${clause}, it was observed that [DESCRIBE OBJECTIVE EVIDENCE]. This does not conform to Clause ${clause} which requires [STATE THE REQUIREMENT]. Classified as ${severity}.`;
+        window.showNotification('AI unavailable - template provided', 'warning');
+    } finally {
+        descField.disabled = false;
+        descField.focus();
+    }
 };
 
 // Export main render function

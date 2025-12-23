@@ -136,6 +136,7 @@ function renderSettings() {
                     <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
                     <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
                     <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Backup</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('knowledgebase', this)"><i class="fa-solid fa-brain" style="margin-right: 0.25rem;"></i>Knowledge Base</button>
                 </div>
 
                 <div id="settings-content">
@@ -162,6 +163,7 @@ function switchSettingsTab(tabName, btnElement) {
         case 'defaults': container.innerHTML = getDefaultsHTML(); break;
         case 'data': container.innerHTML = getDataManagementHTML(); break;
         case 'cbpolicies': container.innerHTML = getCBPoliciesHTML(); break;
+        case 'knowledgebase': container.innerHTML = getKnowledgeBaseHTML(); break;
     }
 }
 
@@ -1662,3 +1664,242 @@ window.renderSettings = renderSettings;
 window.switchSettingsTab = switchSettingsTab;
 window.backupData = backupData;
 window.restoreData = restoreData;
+
+// ============================================
+// KNOWLEDGE BASE MODULE
+// ============================================
+
+// Initialize Knowledge Base state
+if (!window.state.knowledgeBase) {
+    window.state.knowledgeBase = {
+        standards: [],  // { id, name, fileName, uploadDate, status }
+        sops: [],
+        policies: []
+    };
+}
+
+function getKnowledgeBaseHTML() {
+    const kb = window.state.knowledgeBase;
+
+    return `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; color: var(--primary-color);">
+                    <i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>
+                    Knowledge Base
+                </h3>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-lightbulb" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>AI-Powered Standards Reference</strong>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">
+                            Upload ISO Standards, SOPs, and Policies. AI will reference them when generating NCR findings and audit reports.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Standards Section -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; color: #0369a1;">
+                        <i class="fa-solid fa-book" style="margin-right: 0.5rem;"></i>
+                        ISO Standards
+                    </h4>
+                    <button class="btn btn-primary btn-sm" onclick="window.uploadKnowledgeDoc('standard')">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload Standard
+                    </button>
+                </div>
+                
+                ${kb.standards.length > 0 ? `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>File</th>
+                                    <th>Uploaded</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${kb.standards.map(doc => `
+                                    <tr>
+                                        <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
+                                        <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName)}</td>
+                                        <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
+                                        <td>
+                                            <span class="badge" style="background: ${doc.status === 'ready' ? '#10b981' : '#f59e0b'}; color: white;">
+                                                ${doc.status === 'ready' ? 'Ready' : 'Processing'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('standard', ${doc.id})" title="Delete">
+                                                <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
+                        <i class="fa-solid fa-book" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+                        <p style="margin: 0;">No ISO standards uploaded. Click "Upload Standard" to add.</p>
+                    </div>
+                `}
+            </div>
+            
+            <!-- SOPs Section -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; color: #059669;">
+                        <i class="fa-solid fa-file-lines" style="margin-right: 0.5rem;"></i>
+                        Standard Operating Procedures
+                    </h4>
+                    <button class="btn btn-secondary btn-sm" onclick="window.uploadKnowledgeDoc('sop')">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload SOP
+                    </button>
+                </div>
+                
+                ${kb.sops.length > 0 ? `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+                        ${kb.sops.map(doc => `
+                            <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${window.UTILS.escapeHtml(doc.name)}</strong>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.uploadDate)}</div>
+                                </div>
+                                <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('sop', ${doc.id})">
+                                    <i class="fa-solid fa-times" style="color: var(--danger-color);"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
+                        <p style="margin: 0;">No SOPs uploaded yet.</p>
+                    </div>
+                `}
+            </div>
+            
+            <!-- Policies Section -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; color: #7c3aed;">
+                        <i class="fa-solid fa-shield" style="margin-right: 0.5rem;"></i>
+                        CB Policies
+                    </h4>
+                    <button class="btn btn-secondary btn-sm" onclick="window.uploadKnowledgeDoc('policy')">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload Policy
+                    </button>
+                </div>
+                
+                ${kb.policies.length > 0 ? `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+                        ${kb.policies.map(doc => `
+                            <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${window.UTILS.escapeHtml(doc.name)}</strong>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.uploadDate)}</div>
+                                </div>
+                                <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('policy', ${doc.id})">
+                                    <i class="fa-solid fa-times" style="color: var(--danger-color);"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
+                        <p style="margin: 0;">No policies uploaded yet.</p>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+}
+
+// Upload Knowledge Document Modal
+window.uploadKnowledgeDoc = function (type) {
+    const typeLabel = type === 'standard' ? 'ISO Standard' : type === 'sop' ? 'SOP' : 'Policy';
+
+    document.getElementById('modal-title').textContent = `Upload ${typeLabel}`;
+    document.getElementById('modal-body').innerHTML = `
+        <form id="upload-kb-form">
+            <div class="form-group">
+                <label>Document Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="kb-doc-name" placeholder="e.g., ISO 9001:2015" required>
+            </div>
+            <div class="form-group">
+                <label>Select PDF File <span style="color: var(--danger-color);">*</span></label>
+                <input type="file" class="form-control" id="kb-doc-file" accept=".pdf,.docx,.doc" required>
+                <small style="color: var(--text-secondary);">Supported: PDF, DOCX (Max 10MB)</small>
+            </div>
+            <div style="background: #e0f2fe; padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+                <i class="fa-solid fa-info-circle" style="color: #0284c7; margin-right: 0.5rem;"></i>
+                <span style="color: #0284c7; font-size: 0.9rem;">
+                    Document will be processed and indexed for AI reference. This may take a few seconds.
+                </span>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const name = document.getElementById('kb-doc-name').value.trim();
+        const fileInput = document.getElementById('kb-doc-file');
+
+        if (!name || !fileInput.files[0]) {
+            window.showNotification('Please fill all required fields', 'error');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const kb = window.state.knowledgeBase;
+        const collection = type === 'standard' ? kb.standards : type === 'sop' ? kb.sops : kb.policies;
+
+        // Create document entry
+        const newDoc = {
+            id: Date.now(),
+            name: name,
+            fileName: file.name,
+            uploadDate: new Date().toISOString().split('T')[0],
+            status: 'ready', // In production, this would be 'processing' until Gemini caches
+            fileSize: file.size
+        };
+
+        collection.push(newDoc);
+        window.saveData();
+        window.closeModal();
+
+        // Re-render the tab
+        switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        window.showNotification(`${typeLabel} uploaded successfully`, 'success');
+    };
+
+    window.openModal();
+};
+
+// Delete Knowledge Document
+window.deleteKnowledgeDoc = function (type, id) {
+    if (!confirm('Are you sure you want to delete this document from the Knowledge Base?')) return;
+
+    const kb = window.state.knowledgeBase;
+
+    if (type === 'standard') {
+        kb.standards = kb.standards.filter(d => d.id !== id);
+    } else if (type === 'sop') {
+        kb.sops = kb.sops.filter(d => d.id !== id);
+    } else {
+        kb.policies = kb.policies.filter(d => d.id !== id);
+    }
+
+    window.saveData();
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    window.showNotification('Document removed from Knowledge Base', 'success');
+};
+
