@@ -478,3 +478,76 @@ window.openAddMeetingModal = function () {
 
     window.openModal();
 };
+
+window.editCommitteeMember = function (id) {
+    const member = window.state.impartialityCommittee.members.find(m => m.id === id);
+    if (!member) return;
+
+    document.getElementById('modal-title').textContent = 'Edit Committee Member';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="member-form">
+            <div class="form-group">
+                <label>Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="member-name" value="${window.UTILS.escapeHtml(member.name)}" required>
+            </div>
+            <div class="form-group">
+                <label>Organization <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="member-org" value="${window.UTILS.escapeHtml(member.organization)}" required>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select class="form-control" id="member-role">
+                    <option value="Chairperson" ${member.role === 'Chairperson' ? 'selected' : ''}>Chairperson</option>
+                    <option value="Member" ${member.role === 'Member' ? 'selected' : ''}>Member</option>
+                    <option value="Observer" ${member.role === 'Observer' ? 'selected' : ''}>Observer</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Expertise</label>
+                <input type="text" class="form-control" id="member-expertise" value="${window.UTILS.escapeHtml(member.expertise || '')}" placeholder="e.g., Quality Management">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Appointed Date</label>
+                    <input type="date" class="form-control" id="member-appointed" value="${member.appointedDate}">
+                </div>
+                <div class="form-group">
+                    <label>Term End Date</label>
+                    <input type="date" class="form-control" id="member-term-end" value="${member.termEnd || ''}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select class="form-control" id="member-status">
+                    <option value="Active" ${member.status === 'Active' ? 'selected' : ''}>Active</option>
+                    <option value="Inactive" ${member.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const name = document.getElementById('member-name').value.trim();
+        const org = document.getElementById('member-org').value.trim();
+
+        if (!name || !org) {
+            window.showNotification('Please fill in required fields', 'error');
+            return;
+        }
+
+        member.name = name;
+        member.organization = org;
+        member.role = document.getElementById('member-role').value;
+        member.expertise = document.getElementById('member-expertise').value;
+        member.appointedDate = document.getElementById('member-appointed').value;
+        member.termEnd = document.getElementById('member-term-end').value;
+        member.status = document.getElementById('member-status').value;
+
+        window.saveData();
+        window.closeModal();
+        renderImpartialityModule();
+        window.showNotification('Committee member updated successfully', 'success');
+    };
+
+    window.openModal();
+};
