@@ -633,9 +633,14 @@ function getClientContactsHTML(client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Contact
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts(${client.id})">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                    </button>
+                </div>
                 ` : ''}
         </div>
             ${(client.contacts && client.contacts.length > 0) ? `
@@ -863,9 +868,14 @@ function getClientDesignationsHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Job titles and roles within the organization</p>
             </div>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-            <button class="btn btn-sm btn-secondary" onclick="window.addDesignation(${client.id})">
-                <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Designation
-            </button>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addDesignation(${client.id})">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations(${client.id})">
+                    <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                </button>
+            </div>
             ` : ''}
         </div>
         ${designations.length > 0 ? `
@@ -2096,6 +2106,88 @@ window.deleteContact = function (clientId, contactIndex) {
     }
 };
 
+// Bulk Upload Contacts/Personnel
+window.bulkUploadContacts = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Upload Personnel',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-info-circle"></i> Paste contact list in CSV format (one per line):
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
+                Name, Designation, Email, Phone<br>
+                John Doe, QA Manager, john@company.com, +1234567890<br>
+                Jane Smith, HR Director, jane@company.com, +0987654321
+            </p>
+        </div>
+        <form id="bulk-contacts-form">
+            <div class="form-group">
+                <label>Contact List (CSV Format)</label>
+                <textarea id="contacts-bulk-data" rows="10" placeholder="John Doe, QA Manager, john@company.com, +1234567890
+Jane Smith, HR Director, jane@company.com, +0987654321
+Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+                    <input type="checkbox" id="contacts-replace" style="width: auto;">
+                    Replace existing contacts (otherwise, append to existing list)
+                </label>
+            </div>
+        </form>
+        `,
+        () => {
+            const bulkData = document.getElementById('contacts-bulk-data').value.trim();
+            const replace = document.getElementById('contacts-replace').checked;
+
+            if (!bulkData) {
+                window.showNotification('Please enter contact data', 'error');
+                return;
+            }
+
+            const lines = bulkData.split('\n').filter(line => line.trim());
+            const newContacts = [];
+            let errors = 0;
+
+            lines.forEach((line, index) => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 1 && parts[0]) {
+                    newContacts.push({
+                        name: parts[0],
+                        designation: parts[1] || '',
+                        email: parts[2] || '',
+                        phone: parts[3] || ''
+                    });
+                } else {
+                    errors++;
+                }
+            });
+
+            if (newContacts.length === 0) {
+                window.showNotification('No valid contacts found in the data', 'error');
+                return;
+            }
+
+            if (replace) {
+                client.contacts = newContacts;
+            } else {
+                if (!client.contacts) client.contacts = [];
+                client.contacts.push(...newContacts);
+            }
+
+            window.saveData();
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 5);
+
+            const message = `${newContacts.length} contact(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+            window.showNotification(message);
+        }
+    );
+};
+
 // Helper function to initiate audit planning from client detail page
 // Helper function to initiate audit planning from client detail page
 window.initiateAuditPlanFromClient = function (clientId) {
@@ -2441,7 +2533,90 @@ window.addDesignation = function (clientId) {
 window.deleteDesignation = function (clientId, index) {
     if (!confirm('Delete this designation?')) return;
     const client = window.state.clients.find(c => c.id === clientId);
-    if (client && client.designations) { client.designations.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 6); window.showNotification('Designation deleted'); }
+    if (client && client.designations) { client.designations.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 4); window.showNotification('Designation deleted'); }
+};
+
+// Bulk Upload Designations
+window.bulkUploadDesignations = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Upload Designations',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-info-circle"></i> Paste designation list in CSV format (one per line):
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
+                Designation Title, Department<br>
+                QA Manager, Quality Assurance<br>
+                Production Head, Production<br>
+                HR Officer, Human Resources
+            </p>
+        </div>
+        <form id="bulk-designation-form">
+            <div class="form-group">
+                <label>Designation List (CSV Format)</label>
+                <textarea id="designation-bulk-data" rows="10" placeholder="QA Manager, Quality Assurance
+Production Head, Production
+HR Officer, Human Resources
+CEO,
+CFO," style="font-family: monospace;"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+                    <input type="checkbox" id="designation-replace" style="width: auto;">
+                    Replace existing designations (otherwise, append to existing list)
+                </label>
+            </div>
+        </form>
+        `,
+        () => {
+            const bulkData = document.getElementById('designation-bulk-data').value.trim();
+            const replace = document.getElementById('designation-replace').checked;
+
+            if (!bulkData) {
+                window.showNotification('Please enter designation data', 'error');
+                return;
+            }
+
+            const lines = bulkData.split('\n').filter(line => line.trim());
+            const newDesignations = [];
+            let errors = 0;
+
+            lines.forEach((line, index) => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 1 && parts[0]) {
+                    newDesignations.push({
+                        title: parts[0],
+                        department: parts[1] || ''
+                    });
+                } else {
+                    errors++;
+                }
+            });
+
+            if (newDesignations.length === 0) {
+                window.showNotification('No valid designations found in the data', 'error');
+                return;
+            }
+
+            if (replace) {
+                client.designations = newDesignations;
+            } else {
+                if (!client.designations) client.designations = [];
+                client.designations.push(...newDesignations);
+            }
+
+            window.saveData();
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 4);
+
+            const message = `${newDesignations.length} designation(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+            window.showNotification(message);
+        }
+    );
 };
 
 // Company Profile Functions
