@@ -288,19 +288,35 @@ function getCBProfileHTML() {
 }
 
 window.saveCBProfile = function () {
-    const settings = window.state.cbSettings;
-    settings.cbName = document.getElementById('cb-name').value;
-    settings.cbTagline = document.getElementById('cb-tagline').value;
-    settings.cbEmail = document.getElementById('cb-email').value;
-    settings.cbPhone = document.getElementById('cb-phone').value;
-    settings.cbWebsite = document.getElementById('cb-website').value;
-    settings.cbAddress = document.getElementById('cb-address').value;
-    settings.logoUrl = document.getElementById('cb-logo').value;
-    settings.primaryColor = document.getElementById('primary-color').value;
-    settings.secondaryColor = document.getElementById('secondary-color').value;
+    try {
+        const settings = window.state.cbSettings;
 
-    window.saveData();
-    window.showNotification('CB Profile saved successfully', 'success');
+        // Only access elements that exist in the form
+        const cbName = document.getElementById('cb-name');
+        const cbTagline = document.getElementById('cb-tagline');
+        const cbEmail = document.getElementById('cb-email');
+        const cbWebsite = document.getElementById('cb-website');
+        const cbLogo = document.getElementById('cb-logo');
+        const primaryColor = document.getElementById('primary-color');
+        const secondaryColor = document.getElementById('secondary-color');
+
+        if (cbName) settings.cbName = cbName.value;
+        if (cbTagline) settings.cbTagline = cbTagline.value;
+        if (cbEmail) settings.cbEmail = cbEmail.value;
+        if (cbWebsite) settings.cbWebsite = cbWebsite.value;
+        if (cbLogo) settings.logoUrl = cbLogo.value;
+        if (primaryColor) settings.primaryColor = primaryColor.value;
+        if (secondaryColor) settings.secondaryColor = secondaryColor.value;
+
+        window.saveData();
+        window.showNotification('CB Profile saved successfully', 'success');
+
+        // Update sidebar header logo
+        if (window.updateCBLogoDisplay) window.updateCBLogoDisplay();
+    } catch (error) {
+        console.error('Error saving CB Profile:', error);
+        window.showNotification('An unexpected error occurred. Please refresh the page.', 'error');
+    }
 };
 
 // ============================================
@@ -1318,21 +1334,8 @@ window.deleteCBSite = function (idx) {
 // SAVE FUNCTIONS WITH SANITIZATION
 // ============================================
 
-window.saveCBProfile = function () {
-    const settings = window.state.cbSettings;
-    settings.cbName = window.Sanitizer.sanitizeText(document.getElementById('cb-name').value);
-    settings.cbTagline = window.Sanitizer.sanitizeText(document.getElementById('cb-tagline').value);
-    settings.cbEmail = window.Sanitizer.sanitizeEmail(document.getElementById('cb-email').value);
-    settings.cbPhone = window.Sanitizer.sanitizeText(document.getElementById('cb-phone').value);
-    settings.cbWebsite = window.Sanitizer.sanitizeUrl(document.getElementById('cb-website').value);
-    settings.cbAddress = window.Sanitizer.sanitizeText(document.getElementById('cb-address').value);
-    settings.logoUrl = window.Sanitizer.sanitizeUrl(document.getElementById('cb-logo').value);
-    settings.primaryColor = window.Sanitizer.sanitizeText(document.getElementById('primary-color').value);
-    settings.secondaryColor = window.Sanitizer.sanitizeText(document.getElementById('secondary-color').value);
-
-    window.saveData();
-    window.showNotification('CB Profile saved successfully', 'success');
-};
+// Note: saveCBProfile is defined earlier in the file (around line 290)
+// Removed duplicate definition that was overriding the fixed version
 
 window.saveAccreditation = function () {
     const settings = window.state.cbSettings;
