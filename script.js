@@ -1713,3 +1713,21 @@ if (sidebarToggleBtn) {
         sidebarToggleBtn.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
     });
 }
+
+// Side Bar Group Toggle
+window.toggleNavGroup = function (header) {
+    const content = header.nextElementSibling;
+    const arrow = header.querySelector('.group-arrow');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        content.classList.remove('collapsed');
+        arrow.classList.remove('fa-chevron-down');
+        arrow.classList.add('fa-chevron-up');
+    } else {
+        content.style.display = 'none';
+        content.classList.add('collapsed');
+        arrow.classList.remove('fa-chevron-up');
+        arrow.classList.add('fa-chevron-down');
+    }
+};

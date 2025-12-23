@@ -61,12 +61,22 @@
                     <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
                             class="fa-solid fa-list-check"></i> Checklists</li>
 
-                    <li data-module="appeals-complaints" role="button" tabindex="0" aria-label="Appeals & Complaints"><i
-                            class="fa-solid fa-balance-scale"></i> Appeals</li>
-                    <li data-module="impartiality" role="button" tabindex="0" aria-label="Impartiality Committee"><i
-                            class="fa-solid fa-shield-halved"></i> Impartiality</li>
-                    <li data-module="management-review" role="button" tabindex="0" aria-label="Management Review"><i
-                            class="fa-solid fa-clipboard-check"></i> Mgmt Review</li>
+                    <!-- Governance Group -->
+                    <li class="nav-group-header" onclick="toggleNavGroup(this)" role="button" tabindex="0"
+                        aria-label="Toggle Governance Menu" style="justify-content: space-between;">
+                        <span><i class="fa-solid fa-scale-balanced"></i> Governance</span>
+                        <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
+                    </li>
+                    <div class="nav-group-content collapsed"
+                        style="overflow: hidden; padding-left: 0.5rem; display: none;">
+                        <li data-module="appeals-complaints" role="button" tabindex="0"
+                            aria-label="Appeals & Complaints"><i class="fa-solid fa-gavel"></i> Appeals</li>
+                        <li data-module="impartiality" role="button" tabindex="0" aria-label="Impartiality Committee"><i
+                                class="fa-solid fa-shield-halved"></i> Impartiality</li>
+                        <li data-module="management-review" role="button" tabindex="0" aria-label="Management Review"><i
+                                class="fa-solid fa-clipboard-check"></i> Mgmt Review</li>
+                    </div>
+
                     <li data-module="settings" role="button" tabindex="0" aria-label="Settings"
                         style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"><i
                             class="fa-solid fa-cog"></i> Settings</li>
