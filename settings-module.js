@@ -476,41 +476,96 @@ function getPermissionsHTML() {
     const modules = ['dashboard', 'clients', 'auditors', 'audits', 'certs', 'reports', 'settings'];
     const roles = Object.keys(permissions);
 
+    const config = {
+        'full': { color: '#059669', icon: 'fa-check-circle', label: 'Full Access' },
+        'partial': { color: '#0ea5e9', icon: 'fa-circle-half-stroke', label: 'Partial / Limited Edit' },
+        'view': { color: '#f59e0b', icon: 'fa-eye', label: 'View Only' },
+        'assigned': { color: '#0284c7', icon: 'fa-clipboard-user', label: 'Assigned Only' },
+        'own': { color: '#8b5cf6', icon: 'fa-user', label: 'Own Data' },
+        'none': { color: '#64748b', icon: 'fa-ban', label: 'No Access' }
+    };
+
     return `
         <div class="fade-in">
+            <style>
+                .perm-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                    color: white;
+                    cursor: pointer;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    min-width: 95px;
+                    justify-content: left;
+                    user-select: none;
+                    border: 1px solid rgba(255,255,255,0.1);
+                }
+                .perm-badge:hover {
+                    transform: translateY(-2px);
+                    filter: brightness(1.1);
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+                }
+                .perm-badge:active {
+                    transform: translateY(0);
+                    filter: brightness(0.95);
+                }
+                .perm-cell {
+                    text-align: center;
+                    padding: 8px 12px !important;
+                    vertical-align: middle;
+                }
+                .role-row {
+                    transition: background-color 0.2s;
+                }
+                .role-row:hover {
+                    background-color: #f8fafc;
+                }
+                .legend-item {
+                    display: flex; 
+                    align-items: center; 
+                    gap: 8px; 
+                    font-size: 0.85rem; 
+                    color: #475569; 
+                    background: white; 
+                    padding: 6px 10px; 
+                    border-radius: 8px; 
+                    border: 1px solid #e2e8f0;
+                }
+            </style>
+
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-                <i class="fa-solid fa-shield-halved" style="margin-right: 0.5rem;"></i>
+                <i class="fa-solid fa-user-shield" style="margin-right: 0.5rem;"></i>
                 User Role Permissions
             </h3>
             
-            <div class="table-container">
-                <table>
+            <div class="table-container" style="overflow: visible; background: transparent; border: none; box-shadow: none;">
+                <table style="border-collapse: separate; border-spacing: 0 6px; width: 100%;">
                     <thead>
                         <tr>
-                            <th>Role</th>
-                            ${modules.map(m => `<th style="text-transform: capitalize;">${m}</th>`).join('')}
+                            <th style="background: transparent; border: none; font-size: 0.95rem; color: var(--text-secondary); font-weight: 600; padding: 0 12px 8px;">Role</th>
+                            ${modules.map(m => `<th style="text-transform: capitalize; text-align: center; background: transparent; border: none; font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; padding: 0 12px 8px;">${m}</th>`).join('')}
                         </tr>
                     </thead>
                     <tbody>
                         ${roles.map(role => `
-                            <tr>
-                                <td><strong>${role}</strong></td>
-                                ${modules.map(module => {
+                            <tr class="role-row" style="background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-radius: 12px;">
+                                <td style="font-weight: 600; color: #334155; border-radius: 8px 0 0 8px; padding: 12px 16px; border: 1px solid #f1f5f9; border-right: none;">${role}</td>
+                                ${modules.map((module, idx) => {
         const perm = permissions[role][module];
-        const colors = {
-            'full': '#059669',
-            'view': '#f59e0b',
-            'assigned': '#0284c7',
-            'own': '#8b5cf6',
-            'none': '#6b7280',
-            'partial': '#0ea5e9'
-        };
-        return `<td>
-                                        <span class="badge" 
+        const style = config[perm] || config['none'];
+        const isLast = idx === modules.length - 1;
+        return `<td class="perm-cell" style="border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; ${isLast ? 'border-right: 1px solid #f1f5f9; border-radius: 0 8px 8px 0;' : ''}">
+                                        <span class="perm-badge" 
                                             onclick="cyclePermission('${role}', '${module}')" 
-                                            style="background: ${colors[perm] || '#6b7280'}; color: white; cursor: pointer; user-select: none;"
-                                            title="Click to change">
-                                            ${perm}
+                                            style="background: ${style.color};"
+                                            title="Current: ${style.label}\nClick to cycle permission">
+                                            <i class="fa-solid ${style.icon}" style="width: 16px; text-align: center;"></i>
+                                            ${perm.charAt(0).toUpperCase() + perm.slice(1)}
                                         </span>
                                     </td>`;
     }).join('')}
@@ -520,15 +575,26 @@ function getPermissionsHTML() {
                 </table>
             </div>
             
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-                <small style="color: #065f46;">
-                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                    <strong>Permission Levels:</strong> full = all actions, partial = limited edit, view = read-only, assigned = own assigned items, own = own data only, none = no access
-                    <br><strong>Click badges to change permissions</strong>
-                </small>
-                <button class="btn btn-sm btn-outline-danger" onclick="resetPermissions()">
-                    <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Reset to Defaults
-                </button>
+            <div style="margin-top: 2rem; background: #f8fafc; padding: 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; font-size: 0.95rem; color: #475569; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-circle-info" style="color: var(--primary-color);"></i>
+                        Permission Levels Legend
+                    </h4>
+                    <button class="btn btn-sm btn-outline-danger" onclick="resetPermissions()">
+                        <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Reset Defaults
+                    </button>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                    ${Object.entries(config).map(([key, value]) => `
+                        <div class="legend-item">
+                            <span style="width: 20px; height: 20px; border-radius: 50%; background: ${value.color}; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.65rem;">
+                                <i class="fa-solid ${value.icon}"></i>
+                            </span>
+                            <span><strong style="text-transform: capitalize;">${key}:</strong> ${value.label}</span>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
         </div>
     `;
