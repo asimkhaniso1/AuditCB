@@ -86,6 +86,33 @@ if (!window.state.ncrs) {
             verifiedDate: '2024-02-18',
             effectiveness: 'Effective',
             evidence: ['Updated HR checklist v3.0', 'Competence records']
+        },
+        {
+            id: 4,
+            level: 'client',
+            clientId: 1,
+            clientName: 'Tech Solutions Ltd',
+            auditId: 1,
+            source: 'Stage 2 Audit',
+            standard: 'ISO 9001:2015',
+            clause: '9.2',
+            severity: 'Major',
+            description: 'Internal audit program not effectively implemented. Audit schedule for 2024 not available.',
+            raisedBy: 'John Smith',
+            raisedDate: '2024-03-20',
+            dueDate: '2024-04-20',
+            status: 'Open',
+            correction: '2024 Audit Schedule drafted immediately',
+            correctionDate: '2024-03-22',
+            rootCause: '',
+            correctiveAction: '',
+            capaResponsible: 'Quality Manager',
+            capaImplementedDate: null,
+            verificationMethod: '',
+            verifiedBy: null,
+            verifiedDate: null,
+            effectiveness: 'Pending',
+            evidence: []
         }
     ];
 }
@@ -334,14 +361,25 @@ function getCAPATrackerHTML() {
     if (window.state.ncrContextClientId) {
         ncrs = ncrs.filter(n => n.clientId === window.state.ncrContextClientId);
     }
-    ncrs = ncrs.filter(n => n.status !== 'Closed');
+    const showClosed = window.state.showClosedCAPAs || false;
+    if (!showClosed) {
+        ncrs = ncrs.filter(n => n.status !== 'Closed');
+    }
 
     return `
         <div class="fade-in">
-            <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-                <i class="fa-solid fa-tasks" style="margin-right: 0.5rem;"></i>
-                CAPA Tracker - Active Items
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
+                    <i class="fa-solid fa-tasks" style="margin-right: 0.5rem;"></i>
+                    CAPA Tracker
+                </h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="font-size: 0.9rem; user-select: none; cursor: pointer;">
+                        <input type="checkbox" onchange="window.state.showClosedCAPAs = this.checked; renderNCRCAPAModule(window.state.ncrContextClientId);" ${showClosed ? 'checked' : ''}>
+                        Show Closed Items
+                    </label>
+                </div>
+            </div>
 
             <div class="table-container">
                 <table>
@@ -858,12 +896,16 @@ window.updateCAPAProgress = function (ncrId) {
     document.getElementById('modal-body').innerHTML = `
         <form id="capa-form">
             <div class="form-group">
-                <label>Root Cause Analysis</label>
-                <textarea class="form-control" id="capa-root-cause" rows="3">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+                <label>Correction (Immediate Action)</label>
+                <textarea class="form-control" id="capa-correction" rows="2" placeholder="Action taken to fix the immediate problem">${window.UTILS.escapeHtml(ncr.correction || '')}</textarea>
             </div>
             <div class="form-group">
-                <label>Corrective Action</label>
-                <textarea class="form-control" id="capa-action" rows="3">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
+                <label>Root Cause Analysis</label>
+                <textarea class="form-control" id="capa-root-cause" rows="3" placeholder="Why did this occur?">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Corrective Action (Long-term Solution)</label>
+                <textarea class="form-control" id="capa-action" rows="3" placeholder="Action taken to prevent recurrence">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
             </div>
             <div class="form-group">
                 <label>Responsible Person</label>
@@ -886,6 +928,7 @@ window.updateCAPAProgress = function (ncrId) {
 
     document.getElementById('modal-save').style.display = '';
     document.getElementById('modal-save').onclick = () => {
+        ncr.correction = window.Sanitizer.sanitizeText(document.getElementById('capa-correction').value);
         ncr.rootCause = window.Sanitizer.sanitizeText(document.getElementById('capa-root-cause').value);
         ncr.correctiveAction = window.Sanitizer.sanitizeText(document.getElementById('capa-action').value);
         ncr.capaResponsible = window.Sanitizer.sanitizeText(document.getElementById('capa-responsible').value);

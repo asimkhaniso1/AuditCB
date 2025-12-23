@@ -2,7 +2,7 @@
 // AUDITCB360 - MAIN APPLICATION SCRIPT
 // ============================================
 
-const DATA_VERSION = '1.2'; // Increment to force state reset
+const DATA_VERSION = '1.3'; // Increment to force state reset
 
 // Application State
 const state = {
