@@ -1288,15 +1288,7 @@ function openAddClientModal() {
                 <label>Company Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="client-name" required>
             </div>
-            <div class="form-group">
-                <label>Standard</label>
-                <select class="form-control" id="client-standard">
-                    <option>ISO 9001:2015</option>
-                    <option>ISO 14001:2015</option>
-                    <option>ISO 45001:2018</option>
-                    <option>ISO 27001:2022</option>
-                </select>
-            </div>
+
             <div class="form-group">
                 <label>Industry</label>
                 <select class="form-control" id="client-industry">
