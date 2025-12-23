@@ -112,7 +112,7 @@ function renderChecklistLibrary() {
                                 <tr>
                                     <th>Checklist Name</th>
                                     <th>Standard</th>
-                                    <th>Items</th>
+                                    <th>Total Questions</th>
                                     <th>Last Updated</th>
                                     <th>Actions</th>
                                 </tr>
@@ -122,7 +122,7 @@ function renderChecklistLibrary() {
                                     <tr>
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
-                                        <td>${c.clauses ? c.clauses.length + ' clauses' : (c.items?.length || 0) + ' items'}</td>
+                                        <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses?.length || 0), 0) : (c.items?.length || 0)}</td>
                                         <td>${window.UTILS.escapeHtml(c.updatedAt || c.createdAt)}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
@@ -166,7 +166,7 @@ function renderChecklistLibrary() {
                                 <tr>
                                     <th>Checklist Name</th>
                                     <th>Standard</th>
-                                    <th>Items</th>
+                                    <th>Total Questions</th>
                                     <th>Created By</th>
                                     <th>Actions</th>
                                 </tr>
@@ -176,7 +176,7 @@ function renderChecklistLibrary() {
                                     <tr>
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
-                                        <td>${c.clauses ? c.clauses.length + ' clauses' : (c.items?.length || 0) + ' items'}</td>
+                                        <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses?.length || 0), 0) : (c.items?.length || 0)}</td>
                                         <td>${window.UTILS.escapeHtml(c.createdBy || 'Unknown')}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
