@@ -375,8 +375,8 @@ function getClientInfoHTML(client) {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Company Information</h3>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-outline-primary" onclick="window.downloadImportTemplate()">
-                    <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import Client
+                <button class="btn btn-sm btn-outline-primary" onclick="window.openImportAccountSetupModal(${client.id})">
+                    <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Bulk Import Setup
                 </button>
                 ` : ''}
             </div>
@@ -3788,6 +3788,249 @@ window.importClientsFromExcel = function (file) {
 
         } catch (err) {
             console.error(err);
+            window.showNotification('Import Failed: ' + err.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+// ============================================
+// ACCOUNT SETUP BULK IMPORT (MASTER UPLOAD)
+// ============================================
+
+window.openImportAccountSetupModal = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Import Account Setup',
+        `
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Upload a single Excel file containing multiple sheets to populate Sites, Departments, Designations, Personnel, Goods/Services, and Key Processes.
+            </p>
+            
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 2rem;">
+                <!-- Step 1: Download Template -->
+                <div class="card" style="flex: 1; padding: 1.5rem; text-align: center; border: 1px dashed var(--primary-color);">
+                    <i class="fa-solid fa-file-excel" style="font-size: 2rem; color: #10b981; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 0.5rem;">Step 1: Get Template</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Download valid Excel structure</p>
+                    <button class="btn btn-outline-primary btn-sm" onclick="window.downloadAccountSetupTemplate('${window.UTILS.escapeHtml(client.name)}')">
+                        <i class="fa-solid fa-download"></i> Download Template
+                    </button>
+                </div>
+
+                <!-- Step 2: Upload Data -->
+                <div class="card" style="flex: 1; padding: 1.5rem; text-align: center; border: 1px dashed var(--primary-color);">
+                    <i class="fa-solid fa-upload" style="font-size: 2rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 0.5rem;">Step 2: Upload File</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Select filled Excel file</p>
+                    <label class="btn btn-primary btn-sm">
+                        <input type="file" accept=".xlsx, .xls" style="display: none;" onchange="window.processAccountSetupImport(${clientId}, this)">
+                        <i class="fa-solid fa-folder-open"></i> Select File
+                    </label>
+                </div>
+            </div>
+
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; text-align: left; font-size: 0.9rem;">
+                <strong>Included Sheets:</strong>
+                <ul style="margin: 0.5rem 0 0 1.5rem; color: var(--text-secondary);">
+                    <li>Sites</li>
+                    <li>Departments</li>
+                    <li>Designations</li>
+                    <li>Personnel</li>
+                    <li>GoodsServices</li>
+                    <li>KeyProcesses</li>
+                </ul>
+            </div>
+        </div>
+        `
+    );
+    // Hide default Save button
+    document.getElementById('modal-save').style.display = 'none';
+};
+
+window.downloadAccountSetupTemplate = function (clientName) {
+    const wb = XLSX.utils.book_new();
+
+    // 1. Sites Sheet
+    const sitesData = [
+        ["Site Name", "Address", "City", "Country", "Employees", "Shift (Yes/No)", "Standards"],
+        ["Head Office", "123 Main St", "New York", "USA", "50", "No", "ISO 9001:2015"],
+        ["Factory 1", "456 Industrial Rd", "Chicago", "USA", "200", "Yes", "ISO 9001:2015, ISO 14001:2015"]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sitesData), "Sites");
+
+    // 2. Departments Sheet
+    const deptsData = [
+        ["Department Name", "Risk Level"],
+        ["HR", "Low"],
+        ["Production", "High"],
+        ["Quality", "Medium"]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(deptsData), "Departments");
+
+    // 3. Designations Sheet
+    const desigData = [
+        ["Designation"],
+        ["Manager"],
+        ["Supervisor"],
+        ["Operator"]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(desigData), "Designations");
+
+    // 4. Personnel Sheet
+    const personnelData = [
+        ["Name", "Designation", "Email", "Phone", "Role"],
+        ["John Doe", "Manager", "john@example.com", "555-0101", "Management Rep"],
+        ["Jane Smith", "Supervisor", "jane@example.com", "555-0102", "Audit Contact"]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(personnelData), "Personnel");
+
+    // 5. Goods/Services Sheet
+    const goodsData = [
+        ["Name", "Category", "Description"],
+        ["Widget A", "Product", "Main product line"],
+        ["Consulting", "Service", "Technical consultancy"]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(goodsData), "GoodsServices");
+
+    // 6. Key Processes Sheet
+    const processData = [
+        ["Process Name", "Category", "Owner"],
+        ["Procurement", "Support", "Purchasing Manager"],
+        ["Manufacturing", "Core", "Production Manager"],
+        ["Sales", "Core", "Sales Director"]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(processData), "KeyProcesses");
+
+    const fileName = `${clientName.replace(/[^a-z0-9]/gi, '_')}_Setup_Template.xlsx`;
+    XLSX.writeFile(wb, fileName);
+};
+
+window.processAccountSetupImport = function (clientId, input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    window.closeModal(); // Close modal immediately to show notification
+    window.showNotification(`Reading ${file.name}...`, 'info');
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const client = window.state.clients.find(c => c.id === clientId);
+
+            if (!client) throw new Error("Client not found");
+
+            let log = { sites: 0, depts: 0, desig: 0, people: 0, goods: 0, procs: 0 };
+
+            // Helper to clean string
+            const clean = (val) => val ? String(val).trim() : '';
+
+            // 1. Process Sites
+            if (workbook.Sheets['Sites']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Sites']);
+                if (!client.sites) client.sites = [];
+                rows.forEach(r => {
+                    client.sites.push({
+                        name: clean(r['Site Name']),
+                        address: clean(r['Address']),
+                        city: clean(r['City']),
+                        country: clean(r['Country']),
+                        employees: parseInt(r['Employees']) || 0,
+                        shift: clean(r['Shift (Yes/No)']),
+                        standards: clean(r['Standards'])
+                    });
+                });
+                log.sites = rows.length;
+            }
+
+            // 2. Process Departments
+            if (workbook.Sheets['Departments']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Departments']);
+                if (!client.departments) client.departments = [];
+                rows.forEach(r => {
+                    const name = clean(r['Department Name']);
+                    if (name && !client.departments.some(d => d.name === name)) {
+                        client.departments.push({
+                            name: name,
+                            risk: clean(r['Risk Level']) || 'Medium',
+                            head: '' // Not in template
+                        });
+                    }
+                });
+                log.depts = rows.length;
+            }
+
+            // 3. Process Designations
+            if (workbook.Sheets['Designations']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Designations']);
+                if (!client.designations) client.designations = [];
+                rows.forEach(r => {
+                    const desig = clean(r['Designation']);
+                    if (desig && !client.designations.includes(desig)) {
+                        client.designations.push(desig);
+                    }
+                });
+                log.desig = rows.length;
+            }
+
+            // 4. Process Personnel
+            if (workbook.Sheets['Personnel']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Personnel']);
+                if (!client.contacts) client.contacts = [];
+                rows.forEach(r => {
+                    client.contacts.push({
+                        name: clean(r['Name']),
+                        designation: clean(r['Designation']),
+                        email: clean(r['Email']),
+                        phone: clean(r['Phone']),
+                        role: clean(r['Role'])
+                    });
+                });
+                log.people = rows.length;
+            }
+
+            // 5. Process Goods/Services
+            if (workbook.Sheets['GoodsServices']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['GoodsServices']);
+                if (!client.goodsServices) client.goodsServices = [];
+                rows.forEach(r => {
+                    client.goodsServices.push({
+                        name: clean(r['Name']),
+                        category: clean(r['Category']) || 'Product',
+                        description: clean(r['Description'])
+                    });
+                });
+                log.goods = rows.length;
+            }
+
+            // 6. Process Key Processes
+            if (workbook.Sheets['KeyProcesses']) {
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['KeyProcesses']);
+                if (!client.keyProcesses) client.keyProcesses = [];
+                rows.forEach(r => {
+                    client.keyProcesses.push({
+                        name: clean(r['Process Name']),
+                        category: clean(r['Category']) || 'Core',
+                        owner: clean(r['Owner'])
+                    });
+                });
+                log.procs = rows.length;
+            }
+
+            window.saveData();
+            renderClientDetail(clientId);
+            window.showNotification(
+                `Import Complete: ${log.sites} Sites, ${log.depts} Depts, ${log.desig} Roles, ${log.people} Staff, ${log.goods} Goods, ${log.procs} Processes`,
+                'success'
+            );
+
+        } catch (err) {
+            console.error('Import Error:', err);
             window.showNotification('Import Failed: ' + err.message, 'error');
         }
     };
