@@ -1483,7 +1483,7 @@ function openEditClientModal(clientId) {
 
     modalTitle.textContent = 'Edit Client';
     modalBody.innerHTML = `
-    < form id = "client-form" style = "max-height: 70vh; overflow-y: auto;" >
+        <form id="client-form" style="max-height: 70vh; overflow-y: auto;">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <!-- Basic Info -->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Information</div>
@@ -1658,7 +1658,7 @@ function addContactPerson(clientId) {
 
     modalTitle.textContent = 'Add Contact Person';
     modalBody.innerHTML = `
-    < form id = "contact-form" >
+        <form id="contact-form">
             <div class="form-group">
                 <label>Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="contact-name" required>
@@ -1710,7 +1710,7 @@ function addSite(clientId) {
 
     modalTitle.textContent = 'Add Site Location';
     modalBody.innerHTML = `
-    < form id = "site-form" >
+        <form id="site-form">
             <div class="form-group">
                 <label>Site Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="site-name" placeholder="e.g. Main Plant" required>
@@ -1795,7 +1795,7 @@ window.openUploadDocumentModal = function (clientId) {
 
     modalTitle.textContent = 'Upload Document';
     modalBody.innerHTML = `
-    < form id = "upload-form" >
+        <form id="upload-form">
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="doc-name" required placeholder="e.g. ISO 9001 Certificate">
@@ -1909,7 +1909,7 @@ window.editSite = function (clientId, siteIndex) {
 
     modalTitle.textContent = 'Edit Site Location';
     modalBody.innerHTML = `
-    < form id = "site-form" >
+        <form id="site-form">
             <div class="form-group">
                 <label>Site Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="site-name" value="${site.name}" required>
@@ -2007,7 +2007,7 @@ window.editContact = function (clientId, contactIndex) {
 
     modalTitle.textContent = 'Edit Contact Person';
     modalBody.innerHTML = `
-    < form id = "contact-form" >
+        <form id="contact-form">
             <div class="form-group">
                 <label>Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="contact-name" value="${contact.name}" required>
@@ -2098,7 +2098,7 @@ function addDepartment(clientId) {
     window.openModal(
         'Add Department',
         `
-    < form id = "dept-form" >
+        <form id="dept-form">
             <div class="form-group">
                 <label>Department Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" id="dept-name" placeholder="e.g., Quality Assurance" required>
@@ -2142,7 +2142,7 @@ function editDepartment(clientId, deptIndex) {
     window.openModal(
         'Edit Department',
         `
-    < form id = "dept-form" >
+        <form id="dept-form">
             <div class="form-group">
                 <label>Department Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" id="dept-name" value="${dept.name}" required>
