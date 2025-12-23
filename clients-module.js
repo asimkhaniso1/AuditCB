@@ -375,7 +375,14 @@ function getClientInfoHTML(client) {
 
     return `
         <div class="card">
-            <h3 style="margin-bottom: 1rem;">Company Information</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Company Information</h3>
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-outline-primary" onclick="window.downloadImportTemplate()">
+                    <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import Client
+                </button>
+                ` : ''}
+            </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
                 <!-- Basic Info -->
                 <div>
@@ -2940,11 +2947,8 @@ function getClientCertificatesHTML(client) {
 
     return `
         <div class="fade-in">
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                <span><i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History</span>
-                <button class="btn btn-sm btn-outline-primary" onclick="window.downloadImportTemplate()">
-                    <i class="fa-solid fa-download"></i> Template
-                </button>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">
+                <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
             </h3>
             
             ${certs.length === 0 ? `
