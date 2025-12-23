@@ -126,38 +126,53 @@ function renderClientSidebarMenu(clientId) {
             <i class="fa-solid fa-timeline"></i> Audit Cycle
         </li>
 
-        <!-- Audit Operations -->
-        <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Audit Operations</li>
-        <li onclick="window.location.hash = 'client/${clientId}/plans'">
-            <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
+        <!-- Group: Audit Operations -->
+        <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
+            <span style="font-size: 0.9em; font-weight: 600;"><i class="fa-solid fa-clipboard-list"></i> Audit Ops</span>
+            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/execution'">
-            <i class="fa-solid fa-tasks"></i> Execution
-        </li>
-        <li onclick="window.location.hash = 'client/${clientId}/reporting'">
-            <i class="fa-solid fa-file-pen"></i> Reporting
-        </li>
+        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
+            <li onclick="window.location.hash = 'client/${clientId}/plans'">
+                <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
+            </li>
+            <li onclick="window.location.hash = 'client/${clientId}/execution'">
+                <i class="fa-solid fa-tasks"></i> Execution
+            </li>
+            <li onclick="window.location.hash = 'client/${clientId}/reporting'">
+                <i class="fa-solid fa-file-pen"></i> Reporting
+            </li>
+        </div>
 
-        <!-- Outcomes -->
-        <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Outcomes</li>
-        <li onclick="window.location.hash = 'client/${clientId}/findings'">
-            <i class="fa-solid fa-triangle-exclamation"></i> Findings
+        <!-- Group: Outcomes -->
+        <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
+             <span style="font-size: 0.9em; font-weight: 600;"><i class="fa-solid fa-check-double"></i> Outcomes</span>
+            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
-            <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
-        </li>
-        <li onclick="window.location.hash = 'client/${clientId}/certs'">
-            <i class="fa-solid fa-certificate"></i> Certificates
-        </li>
+        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
+            <li onclick="window.location.hash = 'client/${clientId}/findings'">
+                <i class="fa-solid fa-triangle-exclamation"></i> Findings
+            </li>
+            <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
+                <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
+            </li>
+            <li onclick="window.location.hash = 'client/${clientId}/certs'">
+                <i class="fa-solid fa-certificate"></i> Certificates
+            </li>
+        </div>
 
-        <!-- Records & Compliance -->
-        <li style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 1rem 0 0.5rem 0.5rem; font-weight: 600; padding-left: 0.5rem; pointer-events: none;">Governance</li>
-        <li onclick="window.location.hash = 'client/${clientId}/compliance'">
-            <i class="fa-solid fa-shield-halved"></i> Compliance
+        <!-- Group: Records & Compliance -->
+        <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
+             <span style="font-size: 0.9em; font-weight: 600;"><i class="fa-solid fa-box-archive"></i> Records</span>
+            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/docs'">
-            <i class="fa-solid fa-folder-open"></i> Documents
-        </li>
+        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
+            <li onclick="window.location.hash = 'client/${clientId}/compliance'">
+                <i class="fa-solid fa-shield-halved"></i> Compliance
+            </li>
+            <li onclick="window.location.hash = 'client/${clientId}/docs'">
+                <i class="fa-solid fa-folder-open"></i> Documents
+            </li>
+        </div>
     `;
 }
 
