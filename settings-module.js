@@ -22,6 +22,7 @@ if (!window.state.cbSettings) {
         accreditationExpiry: '2026-12-31',
         standardsOffered: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022'],
         geographicScope: ['United States', 'Canada', 'Mexico'],
+        availableStandards: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018', 'ISO 13485:2016'],
         iafMlaStatus: true,
 
         // Quality Policy
@@ -334,15 +335,29 @@ function getAccreditationHTML() {
                     </div>
                 </div>
                 
-                <h4 style="margin: 2rem 0 1rem; color: #0369a1;">Standards Offered</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
-                    ${['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018'].map(std => `
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" class="standard-checkbox" value="${std}" ${settings.standardsOffered.includes(std) ? 'checked' : ''}>
-                            <span>${std}</span>
-                        </label>
+                <h4 style="margin: 2rem 0 1rem; color: #0369a1; display: flex; align-items: center; justify-content: space-between;">
+                    Standards Masterlist
+                    <button class="btn btn-sm btn-secondary" onclick="addStandardToMasterlist()" title="Add new standard to masterlist">
+                        <i class="fa-solid fa-plus"></i> Add New
+                    </button>
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem;">
+                    ${(settings.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018']).map(std => `
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; flex: 1;">
+                                <input type="checkbox" class="standard-checkbox" value="${std}" ${settings.standardsOffered.includes(std) ? 'checked' : ''}>
+                                <span style="font-size: 0.9rem;">${std}</span>
+                            </label>
+                            <button type="button" class="btn btn-sm btn-icon" onclick="deleteStandardFromMasterlist('${std}')" title="Remove from Masterlist" style="color: #cbd5e1; padding: 0;">
+                                <i class="fa-solid fa-times hover-danger"></i>
+                            </button>
+                        </div>
                     `).join('')}
                 </div>
+                
+                <style>
+                    .hover-danger:hover { color: var(--danger-color) !important; }
+                </style>
                 
                 <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem;">
                     <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
@@ -364,6 +379,37 @@ window.saveAccreditation = function () {
 
     window.saveData();
     window.showNotification('Accreditation settings saved', 'success');
+};
+
+window.addStandardToMasterlist = function () {
+    const std = prompt("Enter the new Standard Name (e.g., ISO 13485:2016):");
+    if (std && std.trim()) {
+        const settings = window.state.cbSettings;
+        if (!settings.availableStandards) {
+            settings.availableStandards = ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018'];
+        }
+        const cleanStd = std.trim();
+        if (!settings.availableStandards.includes(cleanStd)) {
+            settings.availableStandards.push(cleanStd);
+            window.saveData();
+            switchSettingsTab('accreditation', document.querySelectorAll('.tab-btn')[3]);
+            window.showNotification('Standard added to masterlist', 'success');
+        } else {
+            window.showNotification('Standard already exists', 'warning');
+        }
+    }
+};
+
+window.deleteStandardFromMasterlist = function (std) {
+    if (confirm(`Are you sure you want to remove ${std} from the masterlist?`)) {
+        const settings = window.state.cbSettings;
+        settings.availableStandards = settings.availableStandards.filter(s => s !== std);
+        settings.standardsOffered = settings.standardsOffered.filter(s => s !== std);
+
+        window.saveData();
+        switchSettingsTab('accreditation', document.querySelectorAll('.tab-btn')[3]);
+        window.showNotification('Standard removed', 'success');
+    }
 };
 
 // ============================================
