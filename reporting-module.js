@@ -334,8 +334,8 @@ window.saveReportDraft = function (reportId) {
     window.showNotification('Report draft saved to local storage', 'success');
 };
 
-// AI-powered draft generation
-window.generateAIConclusion = function (reportId) {
+// AI-powered draft generation (enhanced with Gemini API)
+window.generateAIConclusion = async function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
@@ -346,39 +346,133 @@ window.generateAIConclusion = function (reportId) {
     const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
     const plan = state.auditPlans.find(p => p.client === report.client) || {};
 
-    setTimeout(() => {
-        const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${plan.standard || 'the standard'}. The primary objective was to verify compliance and effectiveness of the management system.
+    // Check Knowledge Base
+    const kb = window.state.knowledgeBase || { standards: [] };
+    const hasStandards = kb.standards.length > 0;
 
-During the audit, a total of ${ncrCount} non - conformities were identified(${majorCount} Major, ${minorCount} Minor).The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
+    // Build NCR descriptions for context
+    const ncrDescriptions = (report.ncrs || []).map((n, i) =>
+        `Finding ${i + 1} (${n.type}): Clause ${n.clause} - ${n.description}`
+    ).join('\n');
 
-        Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance.Key processes are generally well - defined, though specific lapses were noted in operational controls as detailed in the findings.`;
+    const prompt = `You are an ISO certification auditor writing an audit report for a Certification Body.
 
-        const strengths = `- Strong commitment from top management towards quality objectives.
+Client: ${report.client}
+Standard: ${plan.standard || 'ISO Management System'}
+Audit Date: ${report.date}
+Total Non-Conformities: ${ncrCount} (${majorCount} Major, ${minorCount} Minor)
+
+Findings:
+${ncrDescriptions || 'No non-conformities identified.'}
+
+Generate the following sections for the audit report:
+1. EXECUTIVE SUMMARY (2-3 paragraphs covering scope, methodology, and overall findings)
+2. KEY STRENGTHS (bullet points, 4-5 items)
+3. AREAS FOR IMPROVEMENT (bullet points, 3-4 items based on findings)
+4. CONCLUSION (1-2 paragraphs with certification recommendation)
+
+Format each section with its header on a new line. Use professional certification body language.`;
+
+    try {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                context: hasStandards ? `Knowledge Base contains: ${kb.standards.map(s => s.name).join(', ')}` : ''
+            })
+        });
+
+        if (!response.ok) throw new Error('API request failed');
+
+        const data = await response.json();
+        const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        if (generatedText) {
+            // Parse sections from AI response
+            const sections = parseAIReportSections(generatedText);
+
+            if (document.getElementById('exec-summary'))
+                document.getElementById('exec-summary').value = sections.execSummary;
+            if (document.getElementById('strengths'))
+                document.getElementById('strengths').value = sections.strengths;
+            if (document.getElementById('improvements'))
+                document.getElementById('improvements').value = sections.improvements;
+            if (document.getElementById('conclusion'))
+                document.getElementById('conclusion').value = sections.conclusion;
+
+            if (document.getElementById('recommendation')) {
+                if (majorCount > 0) document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL;
+                else document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.RECOMMEND;
+            }
+
+            window.showNotification('AI Draft generated successfully!', 'success');
+            return;
+        }
+    } catch (error) {
+        console.error('AI Generation Error:', error);
+    }
+
+    // Fallback: Template-based generation
+    generateTemplateDraft(report, plan, ncrCount, majorCount, minorCount);
+};
+
+// Parse AI response into report sections
+function parseAIReportSections(text) {
+    const sections = {
+        execSummary: '',
+        strengths: '',
+        improvements: '',
+        conclusion: ''
+    };
+
+    // Try to split by headers
+    const execMatch = text.match(/EXECUTIVE SUMMARY[:\s]*([\s\S]*?)(?=KEY STRENGTHS|STRENGTHS|$)/i);
+    const strengthsMatch = text.match(/(?:KEY )?STRENGTHS[:\s]*([\s\S]*?)(?=AREAS FOR IMPROVEMENT|IMPROVEMENTS|$)/i);
+    const improvementsMatch = text.match(/(?:AREAS FOR )?IMPROVEMENTS?[:\s]*([\s\S]*?)(?=CONCLUSION|$)/i);
+    const conclusionMatch = text.match(/CONCLUSION[:\s]*([\s\S]*?)$/i);
+
+    sections.execSummary = execMatch ? execMatch[1].trim() : text.substring(0, 500);
+    sections.strengths = strengthsMatch ? strengthsMatch[1].trim() : '';
+    sections.improvements = improvementsMatch ? improvementsMatch[1].trim() : '';
+    sections.conclusion = conclusionMatch ? conclusionMatch[1].trim() : '';
+
+    return sections;
+}
+
+// Fallback template generation
+function generateTemplateDraft(report, plan, ncrCount, majorCount, minorCount) {
+    const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${plan.standard || 'the standard'}. The primary objective was to verify compliance and effectiveness of the management system.
+
+During the audit, a total of ${ncrCount} non-conformities were identified (${majorCount} Major, ${minorCount} Minor). The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
+
+Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance. Key processes are generally well-defined, though specific lapses were noted in operational controls as detailed in the findings.`;
+
+    const strengths = `- Strong commitment from top management towards quality objectives.
 - Documentation structure is comprehensive and easily accessible.
 - Employee awareness regarding policy and objectives is commendable.
-- Infrastructure and resources are well - maintained.`;
+- Infrastructure and resources are well-maintained.`;
 
-        const improvements = `- Need to strengthen the internal audit mechanism to capture process deviations earlier.
+    const improvements = `- Need to strengthen the internal audit mechanism to capture process deviations earlier.
 - Document control for external origin documents needs review.
 - Training records for temporary staff could be better organized.`;
 
-        const conclusion = ncrCount === 0
-            ? `Based on the audit results, the management system is found to be properly maintained and compliant with ${plan.standard}. No non - conformities were raised.It is recommended to continue certification.`
-            : `The management system is generally effective, with the exception of the identified non - conformities.The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days.Subject to the acceptance of the corrective actions, certification is recommended.`;
+    const conclusion = ncrCount === 0
+        ? `Based on the audit results, the management system is found to be properly maintained and compliant with ${plan.standard}. No non-conformities were raised. It is recommended to continue certification.`
+        : `The management system is generally effective, with the exception of the identified non-conformities. The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days. Subject to the acceptance of the corrective actions, certification is recommended.`;
 
-        if (document.getElementById('exec-summary')) document.getElementById('exec-summary').value = execSummary;
-        if (document.getElementById('strengths')) document.getElementById('strengths').value = strengths;
-        if (document.getElementById('improvements')) document.getElementById('improvements').value = improvements;
-        if (document.getElementById('conclusion')) document.getElementById('conclusion').value = conclusion;
+    if (document.getElementById('exec-summary')) document.getElementById('exec-summary').value = execSummary;
+    if (document.getElementById('strengths')) document.getElementById('strengths').value = strengths;
+    if (document.getElementById('improvements')) document.getElementById('improvements').value = improvements;
+    if (document.getElementById('conclusion')) document.getElementById('conclusion').value = conclusion;
 
-        if (document.getElementById('recommendation')) {
-            if (majorCount > 0) document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL;
-            else document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.RECOMMEND;
-        }
+    if (document.getElementById('recommendation')) {
+        if (majorCount > 0) document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL;
+        else document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.RECOMMEND;
+    }
 
-        window.showNotification('AI Draft generated successfully!', 'success');
-    }, 1500);
-};
+    window.showNotification('AI Draft generated (using template)!', 'success');
+}
 
 // Generate Printable PDF Report
 // Generate Printable PDF Report
