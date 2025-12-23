@@ -63,7 +63,7 @@ if (!window.state.rolePermissions) {
     window.state.rolePermissions = {
         'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
         'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
-        'Lead Auditor': { dashboard: 'view', clients: 'view', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+        'Lead Auditor': { dashboard: 'view', clients: 'partial', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
         'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
         'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }
     };
@@ -502,7 +502,8 @@ function getPermissionsHTML() {
             'view': '#f59e0b',
             'assigned': '#0284c7',
             'own': '#8b5cf6',
-            'none': '#6b7280'
+            'none': '#6b7280',
+            'partial': '#0ea5e9'
         };
         return `<td>
                                         <span class="badge" 
@@ -522,7 +523,7 @@ function getPermissionsHTML() {
             <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">
                 <small style="color: #065f46;">
                     <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                    <strong>Permission Levels:</strong> full = all actions, view = read-only, assigned = own assigned items, own = own data only, none = no access
+                    <strong>Permission Levels:</strong> full = all actions, partial = limited edit, view = read-only, assigned = own assigned items, own = own data only, none = no access
                     <br><strong>Click badges to change permissions</strong>
                 </small>
             </div>

@@ -631,7 +631,7 @@ function getClientContactsHTML(client) {
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
-            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -662,7 +662,7 @@ function getClientContactsHTML(client) {
                                     <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${window.UTILS.escapeHtml(c.phone || '-')}</td>
                                     <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                     <td>
-                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
@@ -756,7 +756,7 @@ function getClientGoodsServicesHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-boxes-stacked" style="margin-right: 0.5rem; color: #f59e0b;"></i>Goods & Services</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Products and services offered by the organization</p>
             </div>
-            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -785,7 +785,7 @@ function getClientGoodsServicesHTML(client) {
                                 <td><span class="badge" style="background: #fef3c7; color: #d97706;">${window.UTILS.escapeHtml(item.category || 'General')}</span></td>
                                 <td style="font-size: 0.9rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.description || '-')}</td>
                                 <td>
-                                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                                     <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editGoodsService(${client.id}, ${index})"><i class="fa-solid fa-pen"></i></button>
                                     <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
@@ -876,7 +876,7 @@ function getClientDesignationsHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-id-badge" style="margin-right: 0.5rem; color: #84cc16;"></i>Designations</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Job titles and roles within the organization</p>
             </div>
-            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-secondary" onclick="window.addDesignation(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -894,7 +894,7 @@ function getClientDesignationsHTML(client) {
                         <i class="fa-solid fa-user-tie" style="color: #16a34a;"></i>
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
-                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
