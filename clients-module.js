@@ -245,8 +245,9 @@ function renderClientDetail(clientId, options = {}) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
-    // Options: showAccountSetup (default: true for backward compatibility)
+    // Options: showAccountSetup (default: true), showAnalytics (default: true)
     const showAccountSetup = options.showAccountSetup !== false;
+    const showAnalytics = options.showAnalytics !== false;
 
     // Calculate performance metrics
     const totalAudits = window.state.auditPlans.filter(p => p.client === client.name).length;
@@ -285,6 +286,7 @@ function renderClientDetail(clientId, options = {}) {
                 </div>
             </div>
 
+            ${showAnalytics ? `
             <!-- Performance Analytics Cards -->
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.25rem; text-align: center;">
@@ -304,6 +306,7 @@ function renderClientDetail(clientId, options = {}) {
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0;">${pendingAudits}</p>
                 </div>
             </div>
+            ` : ''}
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Summary</button>

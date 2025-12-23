@@ -275,7 +275,7 @@ window.renderClientModule = function (clientId, moduleName) {
         case 'settings':
             // Settings shows Account Setup wizard
             if (typeof renderClientDetail === 'function') {
-                renderClientDetail(client.id, { showAccountSetup: true });
+                renderClientDetail(client.id, { showAccountSetup: true, showAnalytics: false });
                 // Try to switch to 'client_org' tab if it exists (for managers), otherwise stay on defaults
                 setTimeout(() => {
                     const orgTab = document.querySelector('.tab-btn[data-tab="client_org"]');
