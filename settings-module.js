@@ -1188,6 +1188,8 @@ window.handleLogoUpload = function (input) {
         window.saveData();
         switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
         window.showNotification('Logo uploaded successfully', 'success');
+        // Update sidebar header logo
+        if (window.updateCBLogoDisplay) window.updateCBLogoDisplay();
     };
     reader.readAsDataURL(file);
 };

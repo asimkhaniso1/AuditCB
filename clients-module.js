@@ -1325,6 +1325,19 @@ function openAddClientModal() {
                 <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
             </div>
 
+            <!-- Company Logo -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
+            <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label>Upload Logo</label>
+                    <input type="file" class="form-control" id="client-logo-upload" accept="image/*" onchange="window.previewClientLogo(this)">
+                    <small style="color: var(--text-secondary);">Max 1MB, PNG/JPG (displayed in workspace header)</small>
+                </div>
+                <div id="client-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                    <i class="fa-solid fa-image" style="font-size: 1.5rem; color: var(--text-secondary);"></i>
+                </div>
+            </div>
+
             <!--Primary Contact-- >
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
 
@@ -1501,7 +1514,8 @@ function openAddClientModal() {
             contacts: contacts,
             sites: sites,
             employees: parseInt(cleanData.employees) || 0,
-            shifts: document.getElementById('client-shifts').value // select value
+            shifts: document.getElementById('client-shifts').value, // select value
+            logoUrl: window._tempClientLogo || '' // Client company logo
         };
 
         // 6. Save
@@ -1571,6 +1585,19 @@ function openEditClientModal(clientId) {
             <div class="form-group">
                 <label>Next Audit Date</label>
                 <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit || ''}">
+            </div>
+
+            <!-- Company Logo -->
+            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
+            <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label>Upload New Logo</label>
+                    <input type="file" class="form-control" id="edit-client-logo-upload" accept="image/*" onchange="window.handleClientLogoUpload(this, ${client.id})">
+                    <small style="color: var(--text-secondary);">Max 1MB, PNG/JPG</small>
+                </div>
+                <div id="edit-client-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                    ${client.logoUrl ? `<img src="${client.logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">` : '<i class="fa-solid fa-image" style="font-size: 1.5rem; color: var(--text-secondary);"></i>'}
+                </div>
             </div>
 
             <!-- Operational -->
@@ -4147,3 +4174,66 @@ if (typeof openNewClientModal !== 'undefined') window.openNewClientModal = openN
 if (typeof openEditClientModal !== 'undefined') window.openEditClientModal = openEditClientModal;
 if (typeof initiateAuditPlanFromClient !== 'undefined') window.initiateAuditPlanFromClient = initiateAuditPlanFromClient;
 if (typeof renderClientDetail !== 'undefined') window.renderClientDetail = renderClientDetail;
+
+// Client Logo Upload Functions
+window._tempClientLogo = '';
+
+window.previewClientLogo = function (input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+        window.showNotification('Logo too large. Max 1MB', 'error');
+        input.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        window._tempClientLogo = e.target.result;
+        const preview = document.getElementById('client-logo-preview');
+        if (preview) {
+            preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
+        }
+    };
+    reader.readAsDataURL(file);
+};
+
+window.handleClientLogoUpload = function (input, clientId) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+        window.showNotification('Logo too large. Max 1MB', 'error');
+        input.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const client = window.state.clients.find(c => c.id === clientId);
+        if (client) {
+            client.logoUrl = e.target.result;
+            window.saveData();
+            const preview = document.getElementById('edit-client-logo-preview');
+            if (preview) {
+                preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
+            }
+            window.showNotification('Logo uploaded', 'success');
+            // Update header if in client workspace
+            updateClientWorkspaceHeader(clientId);
+        }
+    };
+    reader.readAsDataURL(file);
+};
+
+function updateClientWorkspaceHeader(clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const logoContainer = document.getElementById('client-workspace-logo');
+    if (logoContainer && client.logoUrl) {
+        logoContainer.innerHTML = `<img src="${client.logoUrl}" style="height: 36px; max-width: 100px; object-fit: contain;">`;
+    }
+}
+window.updateClientWorkspaceHeader = updateClientWorkspaceHeader;

@@ -1694,6 +1694,7 @@ window.switchUserRole = function (role) {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     renderRoleSwitcher();
+    updateCBLogoDisplay(); // Update CB logo in sidebar
     // Use hash for initial route or default to dashboard
     if (window.location.hash) {
         handleRouteChange();
@@ -1701,6 +1702,20 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.hash = 'dashboard';
     }
 });
+
+// Update CB Logo in Sidebar Header
+function updateCBLogoDisplay() {
+    const logoContainer = document.getElementById('cb-logo-display');
+    if (!logoContainer) return;
+
+    const logoUrl = state.cbSettings?.logoUrl;
+    if (logoUrl && logoUrl.startsWith('data:')) {
+        logoContainer.innerHTML = `<img src="${logoUrl}" style="height: 32px; max-width: 40px; object-fit: contain;">`;
+    } else {
+        logoContainer.innerHTML = '<i class="fa-solid fa-certificate"></i>';
+    }
+}
+window.updateCBLogoDisplay = updateCBLogoDisplay;
 
 // Client Sidebar Toggle
 const sidebarToggleBtn = document.getElementById('sidebar-toggle');

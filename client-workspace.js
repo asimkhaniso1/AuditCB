@@ -96,6 +96,8 @@ function renderClientSidebarMenu(clientId) {
     const navList = document.querySelector('.main-nav ul');
     if (!navList) return;
 
+    const client = window.state.clients.find(c => c.id === clientId);
+
     // Force left sidebar to be visible
     const sidebar = document.getElementById('sidebar');
     if (sidebar) {
@@ -105,6 +107,17 @@ function renderClientSidebarMenu(clientId) {
         sidebar.style.width = 'var(--sidebar-width)';
         sidebar.style.opacity = '1';
         sidebar.style.pointerEvents = 'auto';
+    }
+
+    // Update sidebar header to show client logo
+    const logoContainer = document.getElementById('cb-logo-display');
+    if (logoContainer && client) {
+        if (client.logoUrl) {
+            logoContainer.innerHTML = `<img src="${client.logoUrl}" style="height: 32px; max-width: 40px; object-fit: contain;">`;
+        } else {
+            const initials = client.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            logoContainer.innerHTML = `<div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">${initials}</div>`;
+        }
     }
 
     // Hide right client sidebar when in client workspace
@@ -210,6 +223,9 @@ window.backToDashboard = function () {
     if (navList && window.globalSidebarHTML) {
         navList.innerHTML = window.globalSidebarHTML;
     }
+
+    // Restore CB logo in sidebar header
+    if (window.updateCBLogoDisplay) window.updateCBLogoDisplay();
 };
 
 // ============================================
