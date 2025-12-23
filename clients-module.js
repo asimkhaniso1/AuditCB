@@ -3672,9 +3672,32 @@ window.downloadImportTemplate = function () {
     ];
 
     const contactsData = [
-        ["Client Name", "Full Name", "Designation", "Department", "Email", "Phone"],
-        ["Sample Corp", "John Doe", "Quality Manager", "Quality", "john@sample.com", "555-0100"],
-        ["Sample Corp", "Jane Smith", "Director", "Management", "jane@sample.com", "555-0101"]
+        ["Client Name", "Full Name", "Designation", "Department", "Email", "Phone", "Role"],
+        ["Sample Corp", "John Doe", "Quality Manager", "Quality", "john@sample.com", "555-0100", "Mgmt Rep"],
+        ["Sample Corp", "Jane Smith", "Director", "Management", "jane@sample.com", "555-0101", "Director"]
+    ];
+
+    const deptsData = [
+        ["Client Name", "Department Name", "Risk Level"],
+        ["Sample Corp", "HR", "Low"],
+        ["Sample Corp", "Production", "High"]
+    ];
+
+    const desigData = [
+        ["Client Name", "Designation"],
+        ["Sample Corp", "Manager"],
+        ["Sample Corp", "Supervisor"]
+    ];
+
+    const goodsData = [
+        ["Client Name", "Name", "Category", "Description"],
+        ["Sample Corp", "Widget A", "Product", "Main product line"]
+    ];
+
+    const processData = [
+        ["Client Name", "Process Name", "Category", "Owner"],
+        ["Sample Corp", "Procurement", "Support", "Purchasing Manager"],
+        ["Sample Corp", "Sales", "Core", "Sales Director"]
     ];
 
     // 2. Create Workbook
@@ -3683,14 +3706,22 @@ window.downloadImportTemplate = function () {
     const wsCerts = XLSX.utils.aoa_to_sheet(certsData);
     const wsSites = XLSX.utils.aoa_to_sheet(sitesData);
     const wsContacts = XLSX.utils.aoa_to_sheet(contactsData);
+    const wsDepts = XLSX.utils.aoa_to_sheet(deptsData);
+    const wsDesig = XLSX.utils.aoa_to_sheet(desigData);
+    const wsGoods = XLSX.utils.aoa_to_sheet(goodsData);
+    const wsProcs = XLSX.utils.aoa_to_sheet(processData);
 
     XLSX.utils.book_append_sheet(wb, wsClients, "Clients");
     XLSX.utils.book_append_sheet(wb, wsCerts, "Certificates");
     XLSX.utils.book_append_sheet(wb, wsSites, "Sites");
     XLSX.utils.book_append_sheet(wb, wsContacts, "Contacts");
+    XLSX.utils.book_append_sheet(wb, wsDepts, "Departments");
+    XLSX.utils.book_append_sheet(wb, wsDesig, "Designations");
+    XLSX.utils.book_append_sheet(wb, wsGoods, "GoodsServices");
+    XLSX.utils.book_append_sheet(wb, wsProcs, "KeyProcesses");
 
     // 3. Download
-    XLSX.writeFile(wb, 'AuditCB_Client_Import_Template.xlsx');
+    XLSX.writeFile(wb, 'AuditCB_Global_Import_Template.xlsx');
 };
 
 // Update Import Logic for 'Applicable Sites'
@@ -3709,6 +3740,10 @@ window.importClientsFromExcel = function (file) {
             const certsRaw = workbook.Sheets['Certificates'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Certificates']) : [];
             const sitesRaw = workbook.Sheets['Sites'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Sites']) : [];
             const contactsRaw = workbook.Sheets['Contacts'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Contacts']) : [];
+            const deptsRaw = workbook.Sheets['Departments'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Departments']) : [];
+            const desigRaw = workbook.Sheets['Designations'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Designations']) : [];
+            const goodsRaw = workbook.Sheets['GoodsServices'] ? XLSX.utils.sheet_to_json(workbook.Sheets['GoodsServices']) : [];
+            const procsRaw = workbook.Sheets['KeyProcesses'] ? XLSX.utils.sheet_to_json(workbook.Sheets['KeyProcesses']) : [];
 
             let importedCount = 0;
             let updatedCount = 0;
@@ -3727,7 +3762,11 @@ window.importClientsFromExcel = function (file) {
                         name: window.Sanitizer.sanitizeText(name),
                         certificates: [],
                         sites: [],
-                        contacts: []
+                        contacts: [],
+                        departments: [],
+                        designations: [],
+                        goodsServices: [],
+                        keyProcesses: []
                     };
                     window.window.state.clients.push(client);
                     importedCount++;
@@ -3739,6 +3778,9 @@ window.importClientsFromExcel = function (file) {
                 client.employees = parseInt(row['Employee Count']) || 0;
                 client.website = window.Sanitizer.sanitizeText(row['Website'] || '');
                 client.nextAudit = row['Next Audit Date'] || '';
+
+                // Helper
+                const clean = (val) => val ? String(val).trim() : '';
 
                 // Process Linked Certificates
                 const clientCerts = certsRaw.filter(c => c['Client Name'] === name);
@@ -3768,7 +3810,8 @@ window.importClientsFromExcel = function (file) {
                     city: window.Sanitizer.sanitizeText(s['City']),
                     country: window.Sanitizer.sanitizeText(s['Country']),
                     employees: parseInt(s['Employees']) || 0,
-                    shift: window.Sanitizer.sanitizeText(s['Shift Work'] || 'No')
+                    shift: window.Sanitizer.sanitizeText(s['Shift Work'] || 'No'),
+                    standards: window.Sanitizer.sanitizeText(s['Standards'] || '')
                 }));
 
                 // Process Linked Contacts
@@ -3778,7 +3821,36 @@ window.importClientsFromExcel = function (file) {
                     designation: window.Sanitizer.sanitizeText(c['Designation']),
                     department: window.Sanitizer.sanitizeText(c['Department'] || ''),
                     email: window.Sanitizer.sanitizeText(c['Email']),
-                    phone: window.Sanitizer.sanitizeText(c['Phone'] || '')
+                    phone: window.Sanitizer.sanitizeText(c['Phone'] || ''),
+                    role: window.Sanitizer.sanitizeText(c['Role'] || '')
+                }));
+
+                // Process Departments
+                const clientDepts = deptsRaw.filter(d => d['Client Name'] === name);
+                client.departments = clientDepts.map(d => ({
+                    name: clean(d['Department Name']),
+                    risk: clean(d['Risk Level']) || 'Medium',
+                    head: ''
+                }));
+
+                // Process Designations
+                const clientDesig = desigRaw.filter(d => d['Client Name'] === name);
+                client.designations = clientDesig.map(d => clean(d['Designation']));
+
+                // Process Goods/Services
+                const clientGoods = goodsRaw.filter(g => g['Client Name'] === name);
+                client.goodsServices = clientGoods.map(g => ({
+                    name: clean(g['Name']),
+                    category: clean(g['Category']),
+                    description: clean(g['Description'])
+                }));
+
+                // Process Key Processes
+                const clientProcs = procsRaw.filter(p => p['Client Name'] === name);
+                client.keyProcesses = clientProcs.map(p => ({
+                    name: clean(p['Process Name']),
+                    category: clean(p['Category']),
+                    owner: clean(p['Owner'])
                 }));
             });
 
