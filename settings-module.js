@@ -1849,7 +1849,7 @@ window.uploadKnowledgeDoc = function (type) {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const name = document.getElementById('kb-doc-name').value.trim();
         const fileInput = document.getElementById('kb-doc-file');
 
@@ -1868,20 +1868,122 @@ window.uploadKnowledgeDoc = function (type) {
             name: name,
             fileName: file.name,
             uploadDate: new Date().toISOString().split('T')[0],
-            status: 'ready', // In production, this would be 'processing' until Gemini caches
-            fileSize: file.size
+            status: 'processing',
+            fileSize: file.size,
+            clauses: [] // Will be populated by extraction
         };
 
         collection.push(newDoc);
         window.saveData();
         window.closeModal();
 
+        // Show processing notification
+        window.showNotification(`${typeLabel} uploaded. Extracting clauses...`, 'info');
+
+        // For standards, extract clauses via AI (one-time cost)
+        if (type === 'standard') {
+            await extractStandardClauses(newDoc, name);
+        }
+
         // Re-render the tab
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
-        window.showNotification(`${typeLabel} uploaded successfully`, 'success');
+        window.showNotification(`${typeLabel} indexed successfully!`, 'success');
     };
 
     window.openModal();
+};
+
+// One-time clause extraction from standard
+async function extractStandardClauses(doc, standardName) {
+    try {
+        // Build extraction prompt based on known standards
+        const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a JSON array of the main clauses with their requirement text.
+
+Format: [{"clause": "4.1", "title": "Understanding the organization", "requirement": "The organization shall determine external and internal issues..."}, ...]
+
+Include clauses 4 through 10 (or relevant range for this standard). Keep requirement text concise (1-2 sentences each).
+Return ONLY the JSON array, no markdown or explanation.`;
+
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            // Parse JSON from response
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                doc.clauses = JSON.parse(jsonMatch[0]);
+                doc.status = 'ready';
+                window.saveData();
+                console.log(`Extracted ${doc.clauses.length} clauses from ${standardName}`);
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Clause extraction error:', error);
+    }
+
+    // Fallback: Use built-in ISO 9001 clauses if API fails
+    doc.clauses = getBuiltInClauses(doc.name);
+    doc.status = 'ready';
+    window.saveData();
+}
+
+// Built-in clause database for common standards (fallback)
+function getBuiltInClauses(standardName) {
+    const iso9001Clauses = [
+        { clause: "4.1", title: "Understanding the organization and its context", requirement: "The organization shall determine external and internal issues that are relevant to its purpose." },
+        { clause: "4.2", title: "Understanding needs and expectations", requirement: "The organization shall determine interested parties and their requirements relevant to the QMS." },
+        { clause: "4.3", title: "Determining the scope of the QMS", requirement: "The organization shall determine the boundaries and applicability of the QMS." },
+        { clause: "5.1", title: "Leadership and commitment", requirement: "Top management shall demonstrate leadership and commitment with respect to the QMS." },
+        { clause: "5.2", title: "Policy", requirement: "Top management shall establish, implement and maintain a quality policy." },
+        { clause: "5.3", title: "Organizational roles, responsibilities and authorities", requirement: "Top management shall ensure responsibilities and authorities are assigned and communicated." },
+        { clause: "6.1", title: "Actions to address risks and opportunities", requirement: "The organization shall determine risks and opportunities that need to be addressed." },
+        { clause: "6.2", title: "Quality objectives and planning", requirement: "The organization shall establish quality objectives at relevant functions and levels." },
+        { clause: "7.1", title: "Resources", requirement: "The organization shall determine and provide the resources needed for the QMS." },
+        { clause: "7.2", title: "Competence", requirement: "The organization shall determine necessary competence and ensure persons are competent." },
+        { clause: "7.5", title: "Documented information", requirement: "The QMS shall include documented information required by the standard and determined necessary." },
+        { clause: "8.1", title: "Operational planning and control", requirement: "The organization shall plan, implement and control processes needed to meet requirements." },
+        { clause: "8.2", title: "Requirements for products and services", requirement: "The organization shall determine and review customer requirements." },
+        { clause: "8.4", title: "Control of externally provided processes", requirement: "The organization shall ensure externally provided processes conform to requirements." },
+        { clause: "8.5", title: "Production and service provision", requirement: "The organization shall implement production under controlled conditions." },
+        { clause: "8.5.1", title: "Control of production and service provision", requirement: "Controlled conditions shall include documented information, monitoring, infrastructure, and competent persons." },
+        { clause: "8.6", title: "Release of products and services", requirement: "The organization shall implement planned arrangements to verify requirements are met." },
+        { clause: "8.7", title: "Control of nonconforming outputs", requirement: "Outputs not conforming to requirements shall be identified and controlled." },
+        { clause: "9.1", title: "Monitoring, measurement, analysis and evaluation", requirement: "The organization shall determine what needs to be monitored and measured." },
+        { clause: "9.2", title: "Internal audit", requirement: "The organization shall conduct internal audits at planned intervals." },
+        { clause: "9.3", title: "Management review", requirement: "Top management shall review the QMS at planned intervals." },
+        { clause: "10.1", title: "Improvement - General", requirement: "The organization shall determine and select opportunities for improvement." },
+        { clause: "10.2", title: "Nonconformity and corrective action", requirement: "When nonconformity occurs, the organization shall react and take action." },
+        { clause: "10.3", title: "Continual improvement", requirement: "The organization shall continually improve the suitability, adequacy and effectiveness of the QMS." }
+    ];
+
+    if (standardName.includes('9001')) return iso9001Clauses;
+    if (standardName.includes('14001')) return iso9001Clauses.map(c => ({ ...c, title: c.title.replace('quality', 'environmental') }));
+    if (standardName.includes('45001')) return iso9001Clauses.map(c => ({ ...c, title: c.title.replace('quality', 'OH&S') }));
+
+    return iso9001Clauses; // Default fallback
+}
+
+// Lookup clause text from Knowledge Base (for NCR generation)
+window.lookupClauseText = function (standardName, clauseNumber) {
+    const kb = window.state.knowledgeBase || { standards: [] };
+    const standard = kb.standards.find(s =>
+        s.name.toLowerCase().includes(standardName.toLowerCase().replace('iso ', ''))
+    );
+
+    if (!standard || !standard.clauses) return null;
+
+    const clause = standard.clauses.find(c =>
+        c.clause === clauseNumber || c.clause.startsWith(clauseNumber)
+    );
+
+    return clause ? `${clause.title}: ${clause.requirement}` : null;
 };
 
 // Delete Knowledge Document

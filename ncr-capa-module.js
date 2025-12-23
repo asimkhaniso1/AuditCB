@@ -1112,9 +1112,8 @@ window.generateNCRFinding = async function (ncrId) {
     const severity = document.getElementById('edit-ncr-severity')?.value || ncr.severity;
     const currentDesc = document.getElementById('edit-ncr-description')?.value || '';
 
-    // Check if Knowledge Base has standards
-    const kb = window.state.knowledgeBase || { standards: [] };
-    const hasStandards = kb.standards.length > 0;
+    // Lookup clause text from local Knowledge Base (no API cost)
+    const clauseText = window.lookupClauseText ? window.lookupClauseText(standard, clause) : null;
 
     // Show loading state
     const descField = document.getElementById('edit-ncr-description');
@@ -1123,16 +1122,17 @@ window.generateNCRFinding = async function (ncrId) {
     descField.disabled = true;
 
     try {
-        // Build prompt
+        // Build prompt with local clause context
         const prompt = `You are an ISO certification auditor. Generate a professional NCR (Non-Conformance Report) finding description.
 
 Standard: ${standard}
 Clause: ${clause}
+${clauseText ? `Clause Requirement: "${clauseText}"` : ''}
 Severity: ${severity}
 ${currentDesc ? `Auditor's Notes: ${currentDesc}` : ''}
 
 Requirements:
-1. Start with what was observed (objective evidence)
+1. Start with what was observed (objective evidence placeholder)
 2. Reference the specific clause requirement that was not met
 3. Be factual, not opinion-based
 4. Use professional audit language
@@ -1144,10 +1144,7 @@ Generate only the finding description, no headers or labels.`;
         const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                context: hasStandards ? `Knowledge Base contains: ${kb.standards.map(s => s.name).join(', ')}` : ''
-            })
+            body: JSON.stringify({ prompt })
         });
 
         if (!response.ok) {
@@ -1167,11 +1164,12 @@ Generate only the finding description, no headers or labels.`;
         console.error('AI Generation Error:', error);
         descField.value = originalValue;
 
-        // Fallback: Generate template locally
-        const fallbackText = `During the audit of ${standard}, Clause ${clause}, it was observed that [DESCRIBE OBJECTIVE EVIDENCE]. This does not conform to the requirement of Clause ${clause} which requires [STATE THE REQUIREMENT]. This has been classified as a ${severity} non-conformance.`;
+        // Fallback: Generate template with local clause text
+        const requirementText = clauseText || '[STATE THE REQUIREMENT]';
+        const fallbackText = `During the audit of ${standard}, Clause ${clause}, it was observed that [DESCRIBE OBJECTIVE EVIDENCE]. This does not conform to Clause ${clause} which requires: "${requirementText}". This has been classified as a ${severity} non-conformance.`;
 
         descField.value = fallbackText;
-        window.showNotification('AI unavailable - template provided. Please complete the finding.', 'warning');
+        window.showNotification(clauseText ? 'Using local clause reference' : 'Template provided - please complete', 'warning');
     } finally {
         descField.disabled = false;
         descField.focus();
@@ -1190,8 +1188,8 @@ window.generateNewNCRFinding = async function () {
         return;
     }
 
-    const kb = window.state.knowledgeBase || { standards: [] };
-    const hasStandards = kb.standards.length > 0;
+    // Lookup clause text from local Knowledge Base (no API cost)
+    const clauseText = window.lookupClauseText ? window.lookupClauseText(standard, clause) : null;
 
     const descField = document.getElementById('ncr-description');
     const originalValue = descField.value;
@@ -1203,11 +1201,12 @@ window.generateNewNCRFinding = async function () {
 
 Standard: ${standard}
 Clause: ${clause}
+${clauseText ? `Clause Requirement: "${clauseText}"` : ''}
 Severity: ${severity}
 ${currentDesc ? `Auditor's Notes: ${currentDesc}` : ''}
 
 Requirements:
-1. Start with what was observed (objective evidence)
+1. Start with what was observed (objective evidence placeholder)
 2. Reference the specific clause requirement that was not met
 3. Be factual, not opinion-based
 4. Use professional audit language
@@ -1218,10 +1217,7 @@ Generate only the finding description, no headers or labels.`;
         const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                context: hasStandards ? `Knowledge Base contains: ${kb.standards.map(s => s.name).join(', ')}` : ''
-            })
+            body: JSON.stringify({ prompt })
         });
 
         if (!response.ok) throw new Error('API request failed');
@@ -1237,8 +1233,10 @@ Generate only the finding description, no headers or labels.`;
         }
     } catch (error) {
         console.error('AI Error:', error);
-        descField.value = `During the audit of ${standard}, Clause ${clause}, it was observed that [DESCRIBE OBJECTIVE EVIDENCE]. This does not conform to Clause ${clause} which requires [STATE THE REQUIREMENT]. Classified as ${severity}.`;
-        window.showNotification('AI unavailable - template provided', 'warning');
+        // Fallback with local clause text
+        const requirementText = clauseText || '[STATE THE REQUIREMENT]';
+        descField.value = `During the audit of ${standard}, Clause ${clause}, it was observed that [DESCRIBE OBJECTIVE EVIDENCE]. This does not conform to Clause ${clause} which requires: "${requirementText}". Classified as ${severity}.`;
+        window.showNotification(clauseText ? 'Using local clause reference' : 'Template provided', 'warning');
     } finally {
         descField.disabled = false;
         descField.focus();
