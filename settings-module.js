@@ -520,16 +520,34 @@ function getPermissionsHTML() {
                 </table>
             </div>
             
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                 <small style="color: #065f46;">
                     <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
                     <strong>Permission Levels:</strong> full = all actions, partial = limited edit, view = read-only, assigned = own assigned items, own = own data only, none = no access
                     <br><strong>Click badges to change permissions</strong>
                 </small>
+                <button class="btn btn-sm btn-outline-danger" onclick="resetPermissions()">
+                    <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Reset to Defaults
+                </button>
             </div>
         </div>
     `;
 }
+
+window.resetPermissions = function () {
+    if (!confirm('Are you sure you want to reset all role permissions to their system defaults? This cannot be undone.')) return;
+
+    window.state.rolePermissions = {
+        'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
+        'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
+        'Lead Auditor': { dashboard: 'view', clients: 'partial', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+        'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+        'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }
+    };
+    window.saveData();
+    switchSettingsTab('permissions', document.querySelectorAll('.tab-btn')[3]);
+    window.showNotification('Role permissions reset to defaults', 'success');
+};
 
 // ============================================
 // TAB 5: RECORD RETENTION (Moved from separate module)
@@ -1221,7 +1239,7 @@ window.saveDefaults = function () {
 // ============================================
 
 window.cyclePermission = function (role, module) {
-    const permissionLevels = ['none', 'view', 'assigned', 'own', 'full'];
+    const permissionLevels = ['none', 'view', 'assigned', 'own', 'partial', 'full'];
     const currentPerm = window.state.rolePermissions[role][module];
     const currentIndex = permissionLevels.indexOf(currentPerm);
     const nextIndex = (currentIndex + 1) % permissionLevels.length;
