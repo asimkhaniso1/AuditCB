@@ -109,14 +109,14 @@ function renderClientSidebarMenu(clientId) {
         sidebar.style.pointerEvents = 'auto';
     }
 
-    // Update sidebar header to show client logo
+    // Update sidebar header to show client logo (replaces CB branding)
     const logoContainer = document.getElementById('cb-logo-display');
     if (logoContainer && client) {
         if (client.logoUrl) {
-            logoContainer.innerHTML = `<img src="${client.logoUrl}" style="height: 32px; max-width: 40px; object-fit: contain;">`;
+            logoContainer.innerHTML = `<img src="${client.logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${client.name}">`;
         } else {
-            const initials = client.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-            logoContainer.innerHTML = `<div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">${initials}</div>`;
+            // Show client name as text
+            logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${client.name.length > 20 ? client.name.substring(0, 20) + '...' : client.name}</h1>`;
         }
     }
 

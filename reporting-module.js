@@ -567,6 +567,12 @@ window.generateAuditReport = function (reportId) {
         const leadAuditor = state.auditors.find(a => plan.auditors?.includes(a.id));
         const auditTeam = (plan.auditors || []).map(id => state.auditors.find(a => a.id === id)).filter(a => a);
 
+        // Get logos for PDF header
+        const cbSettings = state.cbSettings || {};
+        const cbLogo = cbSettings.logoUrl || '';
+        const cbName = cbSettings.cbName || 'AuditCB360';
+        const clientLogo = client.logoUrl || '';
+
         const printWindow = window.open('', '_blank');
 
         if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
@@ -644,7 +650,15 @@ window.generateAuditReport = function (reportId) {
                 </div>
 
                 <div class="cover-page">
-                    <div class="logo"><i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> AuditCB360</div>
+                    <!-- Dual Logo Header: CB Logo (left) and Client Logo (right) -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2rem;">
+                        <div style="text-align: left;">
+                            ${cbLogo ? `<img src="${cbLogo}" style="max-height: 60px; max-width: 200px; object-fit: contain;" alt="${h(cbName)}">` : `<div style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;"><i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> ${h(cbName)}</div>`}
+                        </div>
+                        <div style="text-align: right;">
+                            ${clientLogo ? `<img src="${clientLogo}" style="max-height: 60px; max-width: 200px; object-fit: contain;" alt="${h(report.client)}">` : ''}
+                        </div>
+                    </div>
                     <div class="report-title">Audit Certification Report</div>
                     <div class="report-meta">
                         <p style="text-align: center; font-weight: 500; font-size: 1.3rem;">${h(report.client)}</p>

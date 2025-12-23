@@ -1709,10 +1709,14 @@ function updateCBLogoDisplay() {
     if (!logoContainer) return;
 
     const logoUrl = state.cbSettings?.logoUrl;
+    const cbName = state.cbSettings?.cbName || 'AuditCB360';
+
     if (logoUrl && logoUrl.startsWith('data:')) {
-        logoContainer.innerHTML = `<img src="${logoUrl}" style="height: 32px; max-width: 40px; object-fit: contain;">`;
+        // Replace entire header with just the logo
+        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${cbName}">`;
     } else {
-        logoContainer.innerHTML = '<i class="fa-solid fa-certificate"></i>';
+        // Default: icon + text
+        logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${cbName}</h1>`;
     }
 }
 window.updateCBLogoDisplay = updateCBLogoDisplay;
