@@ -376,3 +376,105 @@ window.openAddThreatModal = function () {
 
     window.openModal();
 };
+
+window.openAddMeetingModal = function () {
+    const activeMembers = window.state.impartialityCommittee.members.filter(m => m.status === 'Active');
+    const openThreats = window.state.impartialityCommittee.threats;
+
+    document.getElementById('modal-title').textContent = 'Record Impartiality Committee Meeting';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="meeting-form">
+            <div class="form-group">
+                <label>Meeting Date <span style="color: var(--danger-color);">*</span></label>
+                <input type="date" class="form-control" id="meeting-date" value="${new Date().toISOString().split('T')[0]}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Attendees</label>
+                <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px;">
+                    ${activeMembers.map(m => `
+                        <div style="margin-bottom: 0.25rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" class="meeting-attendee" value="${m.id}">
+                                <span>${window.UTILS.escapeHtml(m.name)} <small style="color: grey;">(${m.role})</small></span>
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Threats Reviewed</label>
+                <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px;">
+                    ${openThreats.length > 0 ? openThreats.map(t => `
+                        <div style="margin-bottom: 0.25rem;">
+                            <label style="display: flex; align-items: start; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" class="meeting-threat" value="${t.id}">
+                                <span style="font-size: 0.9rem;">
+                                    <strong>${window.UTILS.escapeHtml(t.type)}</strong>: ${window.UTILS.escapeHtml(t.description.substring(0, 50))}...
+                                    <br><small style="color: grey;">Status: ${t.status}</small>
+                                </span>
+                            </label>
+                        </div>
+                    `).join('') : '<span style="color: var(--text-secondary);">No threats logged.</span>'}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Decisions & Outcomes <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="meeting-decisions" rows="3" placeholder="Enter key decisions made..." required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Next Meeting Date</label>
+                <input type="date" class="form-control" id="meeting-next">
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        const date = document.getElementById('meeting-date').value;
+        const decisionsRaw = document.getElementById('meeting-decisions').value.trim();
+
+        if (!date || !decisionsRaw) {
+            window.showNotification('Please fill in required fields', 'error');
+            return;
+        }
+
+        const attendees = Array.from(document.querySelectorAll('.meeting-attendee:checked')).map(cb => parseInt(cb.value));
+        const threatsReviewedIds = Array.from(document.querySelectorAll('.meeting-threat:checked')).map(cb => parseInt(cb.value));
+
+        const threatsReviewed = window.state.impartialityCommittee.threats
+            .filter(t => threatsReviewedIds.includes(t.id))
+            .map(t => ({
+                threat: t.type + ' - ' + t.description,
+                client: t.client,
+                safeguard: t.safeguard,
+                decision: 'Reviewed'
+            }));
+
+        // Mark threats as reviewed
+        window.state.impartialityCommittee.threats.forEach(t => {
+            if (threatsReviewedIds.includes(t.id)) {
+                t.reviewedByCommittee = true;
+            }
+        });
+
+        const newMeeting = {
+            id: Date.now(),
+            date: date,
+            attendees: attendees,
+            threatsReviewed: threatsReviewed,
+            decisions: decisionsRaw.split('\n').filter(d => d.trim() !== ''),
+            nextMeetingDate: document.getElementById('meeting-next').value
+        };
+
+        window.state.impartialityCommittee.meetings.push(newMeeting);
+        window.saveData();
+        window.closeModal();
+        renderImpartialityModule();
+        window.showNotification('Meeting recorded successfully', 'success');
+    };
+
+    window.openModal();
+};
