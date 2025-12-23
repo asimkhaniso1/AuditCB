@@ -127,13 +127,13 @@ function renderSettings() {
             <div class="card" style="margin-bottom: 2rem;">
                 <div class="tab-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; overflow-x: auto; white-space: nowrap;">
                     <button class="tab-btn active" onclick="switchSettingsTab('profile', this)">CB Profile</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('accreditation', this)">Accreditation</button>
                     <button class="tab-btn" onclick="switchSettingsTab('organization', this)">Organization</button>
                     <button class="tab-btn" onclick="switchSettingsTab('permissions', this)">Permissions</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('accreditation', this)">Accreditation</button>
                     <button class="tab-btn" onclick="switchSettingsTab('cbpolicies', this)">CB Policies</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
                     <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Backup</button>
                 </div>
 
