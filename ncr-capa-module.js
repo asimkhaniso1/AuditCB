@@ -884,8 +884,83 @@ window.viewNCRDetails = function (ncrId) {
 };
 
 window.editNCR = function (ncrId) {
-    // Implementation similar to viewNCRDetails but with editable fields
-    window.showNotification('Edit NCR functionality - to be implemented', 'info');
+    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    if (!ncr) return;
+
+    document.getElementById('modal-title').textContent = `Edit NCR-${String(ncrId).padStart(3, '0')}`;
+    document.getElementById('modal-body').innerHTML = `
+        <form id="edit-ncr-form">
+            <div class="card" style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                    <strong>Client:</strong> ${window.UTILS.escapeHtml(ncr.clientName)} <br>
+                    <strong>Source:</strong> ${window.UTILS.escapeHtml(ncr.source)}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Standard <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" class="form-control" id="edit-ncr-standard" value="${window.UTILS.escapeHtml(ncr.standard)}" required>
+                </div>
+                <div class="form-group">
+                    <label>Clause <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" class="form-control" id="edit-ncr-clause" value="${window.UTILS.escapeHtml(ncr.clause)}" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Severity <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="edit-ncr-severity" required>
+                    <option value="Major" ${ncr.severity === 'Major' ? 'selected' : ''}>Major</option>
+                    <option value="Minor" ${ncr.severity === 'Minor' ? 'selected' : ''}>Minor</option>
+                    <option value="Observation" ${ncr.severity === 'Observation' ? 'selected' : ''}>Observation/OFI</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Description <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="edit-ncr-description" rows="3" required>${window.UTILS.escapeHtml(ncr.description)}</textarea>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Raised By</label>
+                    <input type="text" class="form-control" id="edit-ncr-raised-by" value="${window.UTILS.escapeHtml(ncr.raisedBy)}">
+                </div>
+                <div class="form-group">
+                    <label>Due Date <span style="color: var(--danger-color);">*</span></label>
+                    <input type="date" class="form-control" id="edit-ncr-due-date" value="${ncr.dueDate}" required>
+                </div>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const standard = document.getElementById('edit-ncr-standard').value;
+        const clause = document.getElementById('edit-ncr-clause').value;
+        const description = document.getElementById('edit-ncr-description').value;
+
+        if (!standard || !clause || !description) {
+            window.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
+        // Update NCR object
+        ncr.standard = window.Sanitizer.sanitizeText(standard);
+        ncr.clause = window.Sanitizer.sanitizeText(clause);
+        ncr.severity = document.getElementById('edit-ncr-severity').value;
+        ncr.description = window.Sanitizer.sanitizeText(description);
+        ncr.raisedBy = window.Sanitizer.sanitizeText(document.getElementById('edit-ncr-raised-by').value);
+        ncr.dueDate = document.getElementById('edit-ncr-due-date').value;
+
+        window.saveData();
+        window.closeModal();
+        renderNCRCAPAModule(window.state.ncrContextClientId);
+        window.showNotification('NCR updated successfully', 'success');
+    };
+
+    window.openModal();
 };
 
 window.updateCAPAProgress = function (ncrId) {
