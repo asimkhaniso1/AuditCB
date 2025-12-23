@@ -2831,12 +2831,12 @@ function getClientOrgSetupHTML(client) {
 
     const steps = [
         { id: 1, title: 'Org Context', icon: 'fa-building', color: '#6366f1' },
-        { id: 2, title: 'Goods/Services', icon: 'fa-boxes-stacked', color: '#f59e0b' },
-        { id: 3, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' },
-        { id: 4, title: 'Sites', icon: 'fa-map-location-dot', color: '#ec4899' },
-        { id: 5, title: 'Departments', icon: 'fa-sitemap', color: '#8b5cf6' },
-        { id: 6, title: 'Designations', icon: 'fa-id-badge', color: '#84cc16' },
-        { id: 7, title: 'Personnel', icon: 'fa-address-book', color: '#10b981' }
+        { id: 2, title: 'Sites', icon: 'fa-map-location-dot', color: '#ec4899' },
+        { id: 3, title: 'Departments', icon: 'fa-sitemap', color: '#8b5cf6' },
+        { id: 4, title: 'Designations', icon: 'fa-id-badge', color: '#84cc16' },
+        { id: 5, title: 'Personnel', icon: 'fa-address-book', color: '#10b981' },
+        { id: 6, title: 'Goods/Services', icon: 'fa-boxes-stacked', color: '#f59e0b' },
+        { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' }
     ];
 
     const progressWidth = ((currentStep - 1) / (steps.length - 1)) * 100;
@@ -2913,12 +2913,12 @@ function getClientOrgSetupHTML(client) {
 getClientOrgSetupHTML.renderWizardStep = function (client, step) {
     switch (step) {
         case 1: return getClientProfileHTML(client);
-        case 2: return getClientGoodsServicesHTML(client);
-        case 3: return getClientKeyProcessesHTML(client);
-        case 4: return getClientSitesHTML(client);
-        case 5: return getClientDepartmentsHTML(client);
-        case 6: return getClientDesignationsHTML(client);
-        case 7: return getClientContactsHTML(client);
+        case 2: return getClientSitesHTML(client);
+        case 3: return getClientDepartmentsHTML(client);
+        case 4: return getClientDesignationsHTML(client);
+        case 5: return getClientContactsHTML(client);
+        case 6: return getClientGoodsServicesHTML(client);
+        case 7: return getClientKeyProcessesHTML(client);
         default: return getClientProfileHTML(client);
     }
 };
