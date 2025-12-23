@@ -1956,6 +1956,7 @@ window.addSite = addSite;
 
 // Edit Site Modal
 window.editSite = function (clientId, siteIndex) {
+    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.sites || !client.sites[siteIndex]) return;
 
@@ -2051,6 +2052,7 @@ window.editSite = function (clientId, siteIndex) {
 
 // Delete Site
 window.deleteSite = function (clientId, siteIndex) {
+    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client || !client.sites) return;
 
@@ -2954,6 +2956,12 @@ function generateCompanyProfile(clientId) {
 }
 
 function editCompanyProfile(clientId) {
+    // RBAC Check
+    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+        window.showNotification('Access Denied', 'error');
+        return;
+    }
+
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
@@ -3012,6 +3020,12 @@ window.editCompanyProfile = editCompanyProfile;
 
 // Upload Company Profile Document
 window.uploadCompanyProfileDoc = async function (clientId, file) {
+    // RBAC Check
+    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+        window.showNotification('Access Denied', 'error');
+        return;
+    }
+
     if (!file) return;
 
     const client = window.state.clients.find(c => c.id === clientId);
@@ -3982,6 +3996,12 @@ window.downloadAccountSetupTemplate = function (clientName) {
 };
 
 window.processAccountSetupImport = function (clientId, input) {
+    // RBAC Check
+    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+        window.showNotification('Access Denied: Only Certification Managers or Admins can perform this action.', 'error');
+        return;
+    }
+
     const file = input.files[0];
     if (!file) return;
 
