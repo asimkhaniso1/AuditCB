@@ -79,6 +79,13 @@
             <header class="top-bar">
                 <h2 id="page-title">Dashboard</h2>
                 <div style="display: flex; align-items: center; gap: 1rem;">
+                    <!-- Client Settings Icon (visible only in Client Workspace) -->
+                    <button id="client-settings-btn" class="btn btn-icon"
+                        onclick="if(window.state.activeClientId) window.location.hash = 'client/' + window.state.activeClientId + '/settings'"
+                        style="display: none; border: none; background: transparent; color: var(--text-secondary); font-size: 1.1rem; padding: 0.5rem; cursor: pointer;"
+                        title="Client Settings">
+                        <i class="fa-solid fa-cog"></i>
+                    </button>
                     <button class="btn btn-outline-primary" onclick="window.location.hash = 'manday-calculator'"
                         style="border: none; background: transparent; color: var(--primary-color);">
                         <i class="fa-solid fa-calculator"></i> <span style="font-weight: 500;">Man-Day Calc</span>

@@ -241,9 +241,12 @@ window.changeClientItemsPerPage = function (val) {
     }
 };
 
-function renderClientDetail(clientId) {
+function renderClientDetail(clientId, options = {}) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
+
+    // Options: showAccountSetup (default: true for backward compatibility)
+    const showAccountSetup = options.showAccountSetup !== false;
 
     // Calculate performance metrics
     const totalAudits = window.state.auditPlans.filter(p => p.client === client.name).length;
@@ -304,7 +307,7 @@ function renderClientDetail(clientId) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Summary</button>
-                ${window.state.activeClientId ? `
+                ${showAccountSetup && window.state.activeClientId ? `
                 <button class="tab-btn" data-tab="client_org" style="background: #fdf4ff; color: #a21caf;">
                     <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Account Setup
                 </button>

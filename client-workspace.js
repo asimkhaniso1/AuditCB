@@ -83,6 +83,10 @@ window.selectClient = function (clientId) {
         item.classList.toggle('active', parseInt(item.dataset.clientId) === clientId);
     });
 
+    // Show client settings icon in header
+    const settingsBtn = document.getElementById('client-settings-btn');
+    if (settingsBtn) settingsBtn.style.display = 'block';
+
     // SWITCH LEFT SIDEBAR TO CLIENT MENU
     renderClientSidebarMenu(clientId);
 };
@@ -154,11 +158,6 @@ function renderClientSidebarMenu(clientId) {
         <li onclick="window.location.hash = 'client/${clientId}/docs'">
             <i class="fa-solid fa-folder-open"></i> Documents
         </li>
-        
-        <!-- Settings -->
-        <li style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;" onclick="window.location.hash = 'client/${clientId}/settings'">
-            <i class="fa-solid fa-cog"></i> Settings
-        </li>
     `;
 }
 
@@ -186,6 +185,10 @@ window.backToDashboard = function () {
     if (clientSidebar) {
         clientSidebar.classList.remove('hidden');
     }
+
+    // Hide client settings icon in header
+    const settingsBtn = document.getElementById('client-settings-btn');
+    if (settingsBtn) settingsBtn.style.display = 'none';
 
     // RESTORE GLOBAL SIDEBAR MENU
     const navList = document.querySelector('.main-nav ul');
@@ -217,10 +220,13 @@ window.renderClientModule = function (clientId, moduleName) {
 
     switch (moduleName) {
         case 'overview':
-            contentArea.innerHTML = renderClientOverview(client);
-            setTimeout(() => {
-                if (window.initClientDashboardCharts) window.initClientDashboardCharts(client.id);
-            }, 50);
+            // Use the full Client Dashboard (same as old client detail page)
+            // Hide Account Setup tab - it's accessed via Settings
+            if (typeof renderClientDetail === 'function') {
+                renderClientDetail(client.id, { showAccountSetup: false });
+            } else {
+                contentArea.innerHTML = 'Overview not available';
+            }
             break;
         case 'cycle':
             contentArea.innerHTML = renderAuditCycleTimeline(client);
@@ -267,8 +273,9 @@ window.renderClientModule = function (clientId, moduleName) {
             }
             break;
         case 'settings':
+            // Settings shows Account Setup wizard
             if (typeof renderClientDetail === 'function') {
-                renderClientDetail(client.id);
+                renderClientDetail(client.id, { showAccountSetup: true });
                 // Try to switch to 'client_org' tab if it exists (for managers), otherwise stay on defaults
                 setTimeout(() => {
                     const orgTab = document.querySelector('.tab-btn[data-tab="client_org"]');
