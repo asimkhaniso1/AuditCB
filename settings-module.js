@@ -1738,9 +1738,25 @@ function getKnowledgeBaseHTML() {
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName)}</td>
                                         <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
                                         <td>
-                                            <span class="badge" style="background: ${doc.status === 'ready' ? '#10b981' : '#f59e0b'}; color: white;">
-                                                ${doc.status === 'ready' ? 'Ready' : 'Processing'}
-                                            </span>
+                                            ${doc.status === 'ready' ? `
+                                                <span class="badge" style="background: #10b981; color: white;">
+                                                    <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Ready
+                                                </span>
+                                                ${doc.clauses && doc.clauses.length > 0 ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${doc.clauses.length} clauses indexed</div>` : ''}
+                                            ` : doc.status === 'processing' ? `
+                                                <span class="badge" style="background: #3b82f6; color: white;">
+                                                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 4px;"></i>Analyzing...
+                                                </span>
+                                            ` : `
+                                                <div>
+                                                    <span class="badge" style="background: #f59e0b; color: white;">
+                                                        <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
+                                                    </span>
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeStandard(${doc.id})">
+                                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze Now
+                                                    </button>
+                                                </div>
+                                            `}
                                         </td>
                                         <td>
                                             <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('standard', ${doc.id})" title="Delete">
@@ -1883,19 +1899,45 @@ window.uploadKnowledgeDoc = function (type) {
         window.closeModal();
 
         // Show processing notification
-        window.showNotification(`${typeLabel} uploaded. Extracting clauses...`, 'info');
+        window.showNotification(`${typeLabel} uploaded. Click "Analyze Now" to extract clauses.`, 'info');
 
-        // For standards, extract clauses via AI (one-time cost)
+        // For standards, set status to pending - user can click Analyze Now
         if (type === 'standard') {
-            await extractStandardClauses(newDoc, name);
+            newDoc.status = 'pending';
+            window.saveData();
         }
 
         // Re-render the tab
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
-        window.showNotification(`${typeLabel} indexed successfully!`, 'success');
     };
 
     window.openModal();
+};
+
+// Analyze standard function (triggered by "Analyze Now" button)
+window.analyzeStandard = async function (docId) {
+    const kb = window.state.knowledgeBase;
+    const doc = kb.standards.find(d => d.id === docId);
+    if (!doc) return;
+
+    // Update status to processing
+    doc.status = 'processing';
+    window.saveData();
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+
+    window.showNotification(`Analyzing ${doc.name}...`, 'info');
+
+    // Extract clauses
+    await extractStandardClauses(doc, doc.name);
+
+    // Re-render
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+
+    if (doc.status === 'ready') {
+        window.showNotification(`${doc.name} analysis complete! ${doc.clauses ? doc.clauses.length : 0} clauses indexed.`, 'success');
+    } else {
+        window.showNotification(`Analysis complete. Using fallback clause data.`, 'info');
+    }
 };
 
 // One-time clause extraction from standard
