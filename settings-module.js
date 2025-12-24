@@ -1957,7 +1957,11 @@ window.uploadKnowledgeDoc = function (type) {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = async () => {
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.textContent = 'Upload';
+    saveBtn.style.display = 'inline-block';
+
+    saveBtn.onclick = async () => {
         const name = document.getElementById('kb-doc-name').value.trim();
         const fileInput = document.getElementById('kb-doc-file');
 

@@ -421,6 +421,7 @@ function openImportChecklistModal() {
     });
 
     modalSave.textContent = 'Import Checklist';
+    modalSave.style.display = 'inline-block';
     modalSave.onclick = () => {
         const name = document.getElementById('import-checklist-name').value.trim();
         const standard = document.getElementById('import-checklist-standard').value;
@@ -599,6 +600,9 @@ function openAddChecklistModal() {
 
     const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
+
+    // Reset save button visibility
+    modalSave.style.display = 'inline-block';
 
     modalTitle.textContent = 'Create New Checklist';
     modalBody.innerHTML = `
@@ -837,6 +841,9 @@ function openEditChecklistModal(id) {
     const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
+
+    // Reset save button visibility
+    modalSave.style.display = 'inline-block';
 
     modalTitle.textContent = 'Edit Checklist';
     modalBody.innerHTML = `
