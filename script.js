@@ -1232,6 +1232,7 @@ async function renderModule(moduleName, syncHash = true) {
         'audit-planning': 'Audit Planning',
         'checklists': 'Checklist Library',
         'manday-calculator': 'Man-Day Calculator',
+        'multisite-sampling': 'Multi-Site Sampling Calculator',
         'audit-execution': 'Audit Execution',
         'audit-reporting': 'Audit Reporting Dashboard',
         'certification': 'Certification Decisions',
@@ -1345,6 +1346,13 @@ async function renderModule(moduleName, syncHash = true) {
             case 'manday-calculator':
                 if (typeof renderManDayCalculator === 'function') {
                     renderManDayCalculator();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
+            case 'multisite-sampling':
+                if (typeof renderMultiSiteSamplingCalculator === 'function') {
+                    renderMultiSiteSamplingCalculator();
                 } else {
                     renderPlaceholder(moduleName);
                 }

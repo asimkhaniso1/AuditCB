@@ -206,8 +206,69 @@ function renderCertificationModule() {
                                 `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">No suspended or withdrawn certificates.</td></tr>'}
                             </tbody>
                         </table>
-                    </div>
                 </div>
+             </div>
+
+             <!-- Tab Content: Public Directory (ISO 17021 Clause 9.3) -->
+             <div id="public-directory" class="cert-tab-content" style="display: none;">
+                 <div class="card">
+                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                         <div>
+                             <h3 style="margin: 0 0 0.5rem 0;"><i class="fa-solid fa-globe" style="margin-right: 0.5rem; color: #0284c7;"></i>Public Certified Clients Directory</h3>
+                             <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">ISO 17021-1 Clause 9.3 - Publicly accessible directory of certified clients</p>
+                         </div>
+                         <div style="display: flex; gap: 0.5rem;">
+                             <button class="btn btn-secondary btn-sm" onclick="window.exportPublicDirectory()">
+                                 <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>Export CSV
+                             </button>
+                             <button class="btn btn-primary btn-sm" onclick="window.generateEmbedCode()">
+                                 <i class="fa-solid fa-code" style="margin-right: 0.5rem;"></i>Generate Embed
+                             </button>
+                         </div>
+                     </div>
+             
+                     <!-- Privacy Controls -->
+                     <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                         <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--text-secondary);">
+                             <i class="fa-solid fa-shield-halved" style="margin-right: 0.5rem;"></i>Privacy Controls
+                         </h4>
+                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-cert-id" checked onchange="window.updatePublicDirectory()">
+                                 <span>Certificate ID</span>
+                             </label>
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-client" checked onchange="window.updatePublicDirectory()">
+                                 <span>Client Name</span>
+                             </label>
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-standard" checked onchange="window.updatePublicDirectory()">
+                                 <span>Standard</span>
+                             </label>
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-scope" checked onchange="window.updatePublicDirectory()">
+                                 <span>Scope</span>
+                             </label>
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-issue-date" checked onchange="window.updatePublicDirectory()">
+                                 <span>Issue Date</span>
+                             </label>
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-expiry-date" checked onchange="window.updatePublicDirectory()">
+                                 <span>Expiry Date</span>
+                             </label>
+                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                                 <input type="checkbox" id="show-active-only" checked onchange="window.updatePublicDirectory()">
+                                 <span>Active Only</span>
+                             </label>
+                         </div>
+                     </div>
+             
+                     <!-- Directory Table -->
+                     <div id="public-directory-table" class="table-container">
+                         <!-- Populated by updatePublicDirectory() -->
+                     </div>
+                 </div>
              </div>
         </div>
     `;
