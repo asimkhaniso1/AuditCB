@@ -318,8 +318,6 @@ function renderClientDetail(clientId, options = {}) {
                 <button class="tab-btn" data-tab="scopes">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>Scopes & Certs
                 </button>
-                <button class="tab-btn" data-tab="audits">Audits</button>
-                <button class="tab-btn" data-tab="documents">Documents</button>
             </div>
 
             <div id="tab-content"></div>
