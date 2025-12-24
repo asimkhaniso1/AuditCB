@@ -1812,11 +1812,32 @@ function getKnowledgeBaseHTML() {
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
                                         <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
                                         <td>
-                                            <span class="badge" style="background: #10b981; color: white;">
-                                                <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Uploaded
-                                            </span>
+                                            ${doc.status === 'ready' ? `
+                                                <span class="badge" style="background: #10b981; color: white;">
+                                                    <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Ready
+                                                </span>
+                                                ${doc.clauses && doc.clauses.length > 0 ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${doc.clauses.length} sections indexed</div>` : ''}
+                                            ` : doc.status === 'processing' ? `
+                                                <span class="badge" style="background: #3b82f6; color: white;">
+                                                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 4px;"></i>Analyzing...
+                                                </span>
+                                            ` : `
+                                                <div>
+                                                    <span class="badge" style="background: #f59e0b; color: white;">
+                                                        <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
+                                                    </span>
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeDocument('sop', '${doc.id}')">
+                                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze
+                                                    </button>
+                                                </div>
+                                            `}
                                         </td>
                                         <td>
+                                            ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
+                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                    <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
+                                                </button>
+                                            ` : ''}
                                             <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('sop', '${doc.id}')" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
@@ -1865,11 +1886,32 @@ function getKnowledgeBaseHTML() {
                                         <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
                                         <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
                                         <td>
-                                            <span class="badge" style="background: #10b981; color: white;">
-                                                <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Uploaded
-                                            </span>
+                                            ${doc.status === 'ready' ? `
+                                                <span class="badge" style="background: #10b981; color: white;">
+                                                    <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Ready
+                                                </span>
+                                                ${doc.clauses && doc.clauses.length > 0 ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${doc.clauses.length} sections indexed</div>` : ''}
+                                            ` : doc.status === 'processing' ? `
+                                                <span class="badge" style="background: #3b82f6; color: white;">
+                                                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 4px;"></i>Analyzing...
+                                                </span>
+                                            ` : `
+                                                <div>
+                                                    <span class="badge" style="background: #f59e0b; color: white;">
+                                                        <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
+                                                    </span>
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeDocument('policy', '${doc.id}')">
+                                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze
+                                                    </button>
+                                                </div>
+                                            `}
                                         </td>
                                         <td>
+                                            ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
+                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                    <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
+                                                </button>
+                                            ` : ''}
                                             <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('policy', '${doc.id}')" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
@@ -1962,8 +2004,11 @@ window.uploadKnowledgeDoc = function (type) {
 // Analyze standard function (triggered by "Analyze Now" button)
 window.analyzeStandard = async function (docId) {
     const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id === docId);
-    if (!doc) return;
+    const doc = kb.standards.find(d => d.id == docId);
+    if (!doc) {
+        window.showNotification('Standard not found', 'error');
+        return;
+    }
 
     // Update status to processing
     doc.status = 'processing';
@@ -1983,6 +2028,83 @@ window.analyzeStandard = async function (docId) {
     } else {
         window.showNotification(`Analysis complete. Using fallback clause data.`, 'info');
     }
+};
+
+// Analyze SOP or Policy document
+window.analyzeDocument = async function (type, docId) {
+    const kb = window.state.knowledgeBase;
+    const collection = type === 'sop' ? kb.sops : kb.policies;
+    const doc = collection.find(d => d.id == docId);
+    if (!doc) {
+        window.showNotification('Document not found', 'error');
+        return;
+    }
+
+    // Update status to processing
+    doc.status = 'processing';
+    window.saveData();
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+
+    window.showNotification(`Analyzing ${doc.name}...`, 'info');
+
+    try {
+        const docType = type === 'sop' ? 'Standard Operating Procedure' : 'Policy';
+        const prompt = `You are a document analyst. For the ${docType} titled "${doc.name}", generate a JSON array of key sections typically found in such a document.
+
+For SOPs, include sections like: Purpose, Scope, Responsibilities, Procedure Steps, Records, References, Revision History.
+For Policies, include sections like: Purpose, Scope, Policy Statement, Definitions, Responsibilities, Compliance, Related Documents.
+
+Format: [{"clause": "1", "title": "Purpose", "requirement": "Brief description of what this section should contain..."}, ...]
+
+Return ONLY the JSON array, no markdown or explanation.`;
+
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            // Parse JSON from response
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                doc.clauses = JSON.parse(jsonMatch[0]);
+                doc.status = 'ready';
+                window.saveData();
+                switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+                window.showNotification(`${doc.name} analysis complete! ${doc.clauses.length} sections indexed.`, 'success');
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Document analysis error:', error);
+    }
+
+    // Fallback: Use generic sections
+    const fallbackSections = type === 'sop' ? [
+        { clause: "1", title: "Purpose", requirement: "States the purpose and objectives of the SOP." },
+        { clause: "2", title: "Scope", requirement: "Defines the scope and applicability of the procedure." },
+        { clause: "3", title: "Responsibilities", requirement: "Identifies roles and responsibilities of personnel." },
+        { clause: "4", title: "Procedure", requirement: "Step-by-step instructions for carrying out the process." },
+        { clause: "5", title: "Records", requirement: "Documents and records to be maintained." },
+        { clause: "6", title: "References", requirement: "Related documents and standards referenced." }
+    ] : [
+        { clause: "1", title: "Purpose", requirement: "States why this policy exists and its objectives." },
+        { clause: "2", title: "Scope", requirement: "Defines who and what the policy applies to." },
+        { clause: "3", title: "Policy Statement", requirement: "The main policy declarations and commitments." },
+        { clause: "4", title: "Definitions", requirement: "Key terms and their meanings." },
+        { clause: "5", title: "Responsibilities", requirement: "Roles responsible for implementing the policy." },
+        { clause: "6", title: "Compliance", requirement: "Requirements for compliance and consequences of non-compliance." }
+    ];
+
+    doc.clauses = fallbackSections;
+    doc.status = 'ready';
+    window.saveData();
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    window.showNotification(`${doc.name} analyzed with standard sections.`, 'info');
 };
 
 // One-time clause extraction from standard
@@ -2325,8 +2447,22 @@ window.deleteKnowledgeDoc = function (type, id) {
 // ============================================
 window.viewKBAnalysis = function (docId) {
     const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id === docId);
-    if (!doc) return;
+
+    // Search across all collections
+    let doc = kb.standards.find(d => d.id == docId);
+    let docType = 'standard';
+    if (!doc) {
+        doc = kb.sops.find(d => d.id == docId);
+        docType = 'sop';
+    }
+    if (!doc) {
+        doc = kb.policies.find(d => d.id == docId);
+        docType = 'policy';
+    }
+    if (!doc) {
+        window.showNotification('Document not found', 'error');
+        return;
+    }
 
     const clauses = doc.clauses || [];
 
