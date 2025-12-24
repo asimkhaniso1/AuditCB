@@ -2166,7 +2166,8 @@ window.analyzeDocument = async function (type, docId) {
         { clause: "4", title: "Market Presence", requirement: "Target audience, geography, and industries served." },
         { clause: "5", title: "Certifications", requirement: "ISO certifications and other accreditations held." },
         { clause: "6", title: "Team & Expertise", requirement: "Key personnel and technical expertise." },
-        { clause: "7", title: "Contact Information", requirement: "Office locations and support channels." }
+        { clause: "7", title: "Contact Information", requirement: "Office locations and support channels." },
+        { clause: "8", title: "Case Studies & Safety Record", requirement: "Relevant past projects and safety performance statistics." }
     ];
 
     doc.clauses = fallbackSections;
