@@ -2416,11 +2416,11 @@ window.deleteKnowledgeDoc = function (type, id) {
     const kb = window.state.knowledgeBase;
 
     if (type === 'standard') {
-        kb.standards = kb.standards.filter(d => d.id !== id);
+        kb.standards = kb.standards.filter(d => d.id != id);
     } else if (type === 'sop') {
-        kb.sops = kb.sops.filter(d => d.id !== id);
+        kb.sops = kb.sops.filter(d => d.id != id);
     } else {
-        kb.policies = kb.policies.filter(d => d.id !== id);
+        kb.policies = kb.policies.filter(d => d.id != id);
     }
 
     window.saveData();
