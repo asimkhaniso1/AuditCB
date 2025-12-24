@@ -1112,8 +1112,23 @@ function openChecklistSelectionModal(planId) {
 
     const checklists = state.checklists || [];
 
-    // Improved matching: check if standard contains the plan standard or vice versa
-    const planStandards = (plan.standard || '').split(', ').map(s => s.trim().toLowerCase());
+    // Get client's standards (from client record or plan)
+    const client = state.clients.find(c => c.name === plan.client);
+    const clientStandards = client?.standards || [];
+
+    // Combine plan standard and client standards
+    let allStandards = [];
+    if (plan.standard) {
+        allStandards = allStandards.concat(plan.standard.split(', ').map(s => s.trim()));
+    }
+    if (clientStandards.length > 0) {
+        allStandards = allStandards.concat(clientStandards);
+    }
+    // Remove duplicates and convert to lowercase for matching
+    const uniqueStandards = [...new Set(allStandards)];
+    const planStandards = uniqueStandards.map(s => s.toLowerCase());
+
+    // Improved matching: check if standard contains any of the plan/client standards
     const matchingChecklists = checklists.filter(c => {
         if (!c.standard) return true; // If no standard specified, include it
         const checklistStandard = c.standard.toLowerCase();
@@ -1139,11 +1154,14 @@ function openChecklistSelectionModal(planId) {
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
 
+    // Display standards text
+    const standardsDisplay = uniqueStandards.length > 0 ? uniqueStandards.join(', ') : 'All Standards';
+
     modalTitle.textContent = 'Configure Checklists for Audit';
     modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin: 0;">
-                Select checklists to use during this audit. Showing checklists for <strong>${plan.standard || 'All Standards'}</strong>.
+                Select checklists to use during this audit. Showing checklists for <strong>${standardsDisplay}</strong>.
             </p>
         </div>
 
