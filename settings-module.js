@@ -1948,12 +1948,18 @@ window.analyzeStandard = async function (docId) {
 // One-time clause extraction from standard
 async function extractStandardClauses(doc, standardName) {
     try {
-        // Build extraction prompt based on known standards
-        const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a JSON array of the main clauses with their requirement text.
+        // Build comprehensive extraction prompt for detailed sub-clauses
+        const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
 
-Format: [{"clause": "4.1", "title": "Understanding the organization", "requirement": "The organization shall determine external and internal issues..."}, ...]
+IMPORTANT: Include ALL levels of sub-clauses, such as:
+- Main clauses: 4, 5, 6, 7, 8, 9, 10
+- First level sub-clauses: 4.1, 4.2, 4.3, 5.1, 5.2, etc.
+- Second level sub-clauses: 4.4.1, 4.4.2, 5.1.1, 5.1.2, 6.1.1, 6.2.1, 6.2.2, 7.1.1, 7.1.2, 7.1.3, 7.1.4, 7.1.5, 7.1.6, 7.5.1, 7.5.2, 7.5.3, 8.2.1, 8.2.2, 8.2.3, 8.3.1, 8.3.2, 8.3.3, 8.3.4, 8.3.5, 8.3.6, 8.4.1, 8.4.2, 8.4.3, 8.5.1, 8.5.2, 8.5.3, 8.5.4, 8.5.5, 8.5.6, 8.7.1, 8.7.2, 9.1.1, 9.1.2, 9.1.3, 9.2.1, 9.2.2, 9.3.1, 9.3.2, 9.3.3, 10.2.1, 10.2.2, etc.
+- Third level sub-clauses where applicable: 7.1.5.1, 7.1.5.2, 7.5.3.1, 7.5.3.2, 8.2.3.1, 8.2.3.2, etc.
 
-Include clauses 4 through 10 (or relevant range for this standard). Keep requirement text concise (1-2 sentences each).
+Format: [{"clause": "4.1", "title": "Understanding the organization and its context", "requirement": "The organization shall determine external and internal issues that are relevant to its purpose and strategic direction..."}, ...]
+
+Include ALL clauses from 4 through 10 with ALL their sub-clauses. Each requirement should be detailed (2-3 sentences with the key "shall" statements).
 Return ONLY the JSON array, no markdown or explanation.`;
 
         const response = await fetch('/api/gemini', {
@@ -1986,38 +1992,127 @@ Return ONLY the JSON array, no markdown or explanation.`;
     window.saveData();
 }
 
-// Built-in clause database for common standards (fallback)
+// Built-in clause database for common standards (fallback) - COMPREHENSIVE with sub-clauses
 function getBuiltInClauses(standardName) {
     const iso9001Clauses = [
-        { clause: "4.1", title: "Understanding the organization and its context", requirement: "The organization shall determine external and internal issues that are relevant to its purpose." },
-        { clause: "4.2", title: "Understanding needs and expectations", requirement: "The organization shall determine interested parties and their requirements relevant to the QMS." },
-        { clause: "4.3", title: "Determining the scope of the QMS", requirement: "The organization shall determine the boundaries and applicability of the QMS." },
-        { clause: "5.1", title: "Leadership and commitment", requirement: "Top management shall demonstrate leadership and commitment with respect to the QMS." },
+        // Clause 4 - Context of the organization
+        { clause: "4.1", title: "Understanding the organization and its context", requirement: "The organization shall determine external and internal issues that are relevant to its purpose and strategic direction and that affect its ability to achieve the intended results of its QMS." },
+        { clause: "4.2", title: "Understanding the needs and expectations of interested parties", requirement: "The organization shall determine: a) the interested parties that are relevant to the QMS; b) the requirements of these interested parties that are relevant to the QMS." },
+        { clause: "4.3", title: "Determining the scope of the quality management system", requirement: "The organization shall determine the boundaries and applicability of the QMS to establish its scope. The scope shall be available and maintained as documented information." },
+        { clause: "4.4", title: "Quality management system and its processes", requirement: "The organization shall establish, implement, maintain and continually improve a QMS, including the processes needed and their interactions." },
+        { clause: "4.4.1", title: "QMS processes - Requirements", requirement: "The organization shall determine inputs required and outputs expected, sequence and interaction, criteria and methods, resources needed, responsibilities, risks and opportunities, and evaluation methods." },
+        { clause: "4.4.2", title: "QMS processes - Documentation", requirement: "The organization shall maintain documented information to support the operation of its processes and retain documented information to have confidence that the processes are being carried out as planned." },
+
+        // Clause 5 - Leadership
+        { clause: "5.1", title: "Leadership and commitment", requirement: "Top management shall demonstrate leadership and commitment with respect to the quality management system." },
+        { clause: "5.1.1", title: "Leadership and commitment - General", requirement: "Top management shall take accountability for QMS effectiveness, ensure quality policy and objectives are established, ensure integration of QMS into business processes, promote use of process approach and risk-based thinking." },
+        { clause: "5.1.2", title: "Customer focus", requirement: "Top management shall demonstrate leadership and commitment with respect to customer focus by ensuring customer requirements are determined and met, risks and opportunities are addressed, and focus on enhancing customer satisfaction is maintained." },
         { clause: "5.2", title: "Policy", requirement: "Top management shall establish, implement and maintain a quality policy." },
-        { clause: "5.3", title: "Organizational roles, responsibilities and authorities", requirement: "Top management shall ensure responsibilities and authorities are assigned and communicated." },
-        { clause: "6.1", title: "Actions to address risks and opportunities", requirement: "The organization shall determine risks and opportunities that need to be addressed." },
-        { clause: "6.2", title: "Quality objectives and planning", requirement: "The organization shall establish quality objectives at relevant functions and levels." },
-        { clause: "7.1", title: "Resources", requirement: "The organization shall determine and provide the resources needed for the QMS." },
-        { clause: "7.2", title: "Competence", requirement: "The organization shall determine necessary competence and ensure persons are competent." },
-        { clause: "7.5", title: "Documented information", requirement: "The QMS shall include documented information required by the standard and determined necessary." },
-        { clause: "8.1", title: "Operational planning and control", requirement: "The organization shall plan, implement and control processes needed to meet requirements." },
-        { clause: "8.2", title: "Requirements for products and services", requirement: "The organization shall determine and review customer requirements." },
-        { clause: "8.4", title: "Control of externally provided processes", requirement: "The organization shall ensure externally provided processes conform to requirements." },
-        { clause: "8.5", title: "Production and service provision", requirement: "The organization shall implement production under controlled conditions." },
-        { clause: "8.5.1", title: "Control of production and service provision", requirement: "Controlled conditions shall include documented information, monitoring, infrastructure, and competent persons." },
-        { clause: "8.6", title: "Release of products and services", requirement: "The organization shall implement planned arrangements to verify requirements are met." },
-        { clause: "8.7", title: "Control of nonconforming outputs", requirement: "Outputs not conforming to requirements shall be identified and controlled." },
-        { clause: "9.1", title: "Monitoring, measurement, analysis and evaluation", requirement: "The organization shall determine what needs to be monitored and measured." },
-        { clause: "9.2", title: "Internal audit", requirement: "The organization shall conduct internal audits at planned intervals." },
-        { clause: "9.3", title: "Management review", requirement: "Top management shall review the QMS at planned intervals." },
-        { clause: "10.1", title: "Improvement - General", requirement: "The organization shall determine and select opportunities for improvement." },
-        { clause: "10.2", title: "Nonconformity and corrective action", requirement: "When nonconformity occurs, the organization shall react and take action." },
-        { clause: "10.3", title: "Continual improvement", requirement: "The organization shall continually improve the suitability, adequacy and effectiveness of the QMS." }
+        { clause: "5.2.1", title: "Establishing the quality policy", requirement: "The quality policy shall be appropriate to the purpose and context, provide a framework for setting quality objectives, include commitment to satisfy applicable requirements, and include commitment to continual improvement." },
+        { clause: "5.2.2", title: "Communicating the quality policy", requirement: "The quality policy shall be available and maintained as documented information, be communicated, understood and applied within the organization, and be available to relevant interested parties." },
+        { clause: "5.3", title: "Organizational roles, responsibilities and authorities", requirement: "Top management shall ensure that the responsibilities and authorities for relevant roles are assigned, communicated and understood within the organization." },
+
+        // Clause 6 - Planning
+        { clause: "6.1", title: "Actions to address risks and opportunities", requirement: "When planning for the QMS, the organization shall consider the issues referred to in 4.1 and the requirements referred to in 4.2 and determine the risks and opportunities that need to be addressed." },
+        { clause: "6.1.1", title: "Planning - Risks and opportunities", requirement: "The organization shall plan actions to address these risks and opportunities, considering how to integrate and implement the actions into its QMS processes and evaluate the effectiveness of these actions." },
+        { clause: "6.1.2", title: "Planning - Objectives of actions", requirement: "Actions taken to address risks and opportunities shall be proportionate to the potential impact on the conformity of products and services." },
+        { clause: "6.2", title: "Quality objectives and planning to achieve them", requirement: "The organization shall establish quality objectives at relevant functions, levels and processes needed for the QMS." },
+        { clause: "6.2.1", title: "Quality objectives - Requirements", requirement: "Quality objectives shall be consistent with the quality policy, be measurable, take into account applicable requirements, be relevant to conformity of products and services, be monitored, communicated and updated." },
+        { clause: "6.2.2", title: "Planning to achieve objectives", requirement: "When planning how to achieve quality objectives, the organization shall determine what will be done, what resources will be required, who will be responsible, when it will be completed, and how results will be evaluated." },
+        { clause: "6.3", title: "Planning of changes", requirement: "When the organization determines the need for changes to the QMS, changes shall be carried out in a planned manner considering the purpose, consequences, integrity and availability of resources." },
+
+        // Clause 7 - Support
+        { clause: "7.1", title: "Resources", requirement: "The organization shall determine and provide the resources needed for the establishment, implementation, maintenance and continual improvement of the QMS." },
+        { clause: "7.1.1", title: "General - Resources", requirement: "The organization shall consider the capabilities of and constraints on existing internal resources and what needs to be obtained from external providers." },
+        { clause: "7.1.2", title: "People", requirement: "The organization shall determine and provide the persons necessary for the effective implementation of its QMS and for the operation and control of its processes." },
+        { clause: "7.1.3", title: "Infrastructure", requirement: "The organization shall determine, provide and maintain the infrastructure necessary for the operation of its processes and to achieve conformity of products and services." },
+        { clause: "7.1.4", title: "Environment for the operation of processes", requirement: "The organization shall determine, provide and maintain the environment necessary for the operation of its processes and to achieve conformity of products and services." },
+        { clause: "7.1.5", title: "Monitoring and measuring resources", requirement: "The organization shall determine and provide the resources needed to ensure valid and reliable results when monitoring or measuring is used to verify the conformity of products and services." },
+        { clause: "7.1.5.1", title: "Monitoring and measuring resources - General", requirement: "Resources shall be suitable for the specific type of monitoring and measurement activities, and maintained to ensure continued fitness for purpose." },
+        { clause: "7.1.5.2", title: "Measurement traceability", requirement: "When measurement traceability is a requirement, measuring equipment shall be calibrated or verified at specified intervals against standards traceable to international or national measurement standards." },
+        { clause: "7.1.6", title: "Organizational knowledge", requirement: "The organization shall determine the knowledge necessary for the operation of its processes and to achieve conformity of products and services. This knowledge shall be maintained and made available." },
+        { clause: "7.2", title: "Competence", requirement: "The organization shall determine necessary competence of persons doing work under its control that affects QMS performance and effectiveness, ensure these persons are competent on the basis of appropriate education, training, or experience, take actions to acquire the necessary competence, and retain appropriate documented information." },
+        { clause: "7.3", title: "Awareness", requirement: "The organization shall ensure that persons doing work under its control are aware of the quality policy, relevant quality objectives, their contribution to the effectiveness of the QMS, and implications of not conforming with QMS requirements." },
+        { clause: "7.4", title: "Communication", requirement: "The organization shall determine the internal and external communications relevant to the QMS, including what it will communicate, when to communicate, with whom to communicate, how to communicate, and who communicates." },
+        { clause: "7.5", title: "Documented information", requirement: "The organization's QMS shall include documented information required by ISO 9001 and documented information determined necessary for the effectiveness of the QMS." },
+        { clause: "7.5.1", title: "Documented information - General", requirement: "The extent of documented information can differ due to the size of organization, type of activities, processes, products and services, complexity of processes, and competence of persons." },
+        { clause: "7.5.2", title: "Creating and updating", requirement: "When creating and updating documented information, the organization shall ensure appropriate identification and description, format, media, and review and approval for suitability and adequacy." },
+        { clause: "7.5.3", title: "Control of documented information", requirement: "Documented information shall be controlled to ensure it is available and suitable for use where and when needed, and adequately protected from loss of confidentiality, improper use, or loss of integrity." },
+        { clause: "7.5.3.1", title: "Control of documented information - Actions", requirement: "Activities shall include distribution, access, retrieval and use, storage and preservation, control of changes, retention and disposition." },
+        { clause: "7.5.3.2", title: "External origin documented information", requirement: "Documented information of external origin necessary for QMS planning and operation shall be identified and controlled." },
+
+        // Clause 8 - Operation
+        { clause: "8.1", title: "Operational planning and control", requirement: "The organization shall plan, implement and control the processes needed to meet requirements for provision of products and services and to implement the actions determined in Clause 6." },
+        { clause: "8.2", title: "Requirements for products and services", requirement: "The organization shall implement a process for communicating with customers and determining requirements for products and services." },
+        { clause: "8.2.1", title: "Customer communication", requirement: "Communication with customers shall include providing information relating to products and services, handling enquiries, contracts or orders including changes, obtaining customer feedback including complaints, and handling or controlling customer property." },
+        { clause: "8.2.2", title: "Determining the requirements for products and services", requirement: "When determining requirements for products and services to be offered, the organization shall ensure requirements are defined including applicable statutory and regulatory requirements, and it can meet the claims for products and services it offers." },
+        { clause: "8.2.3", title: "Review of requirements for products and services", requirement: "The organization shall ensure it has ability to meet requirements for products and services to be offered to customers, including requirements specified by the customer, requirements not stated by the customer but necessary for intended use, statutory and regulatory requirements, and contract or order requirements differing from those previously expressed." },
+        { clause: "8.2.3.1", title: "Review of requirements - Conduct", requirement: "The review shall be conducted before the organization commits to supplying products and services to a customer." },
+        { clause: "8.2.3.2", title: "Review of requirements - Documented information", requirement: "The organization shall retain documented information on the results of the review and any new requirements for products and services." },
+        { clause: "8.2.4", title: "Changes to requirements for products and services", requirement: "The organization shall ensure relevant documented information is amended and relevant persons are made aware of the changed requirements when requirements change." },
+        { clause: "8.3", title: "Design and development of products and services", requirement: "The organization shall establish, implement and maintain a design and development process that is appropriate to ensure the subsequent provision of products and services." },
+        { clause: "8.3.1", title: "Design and development - General", requirement: "When requirements are not already established or not defined by the customer, the organization shall establish a process for design and development." },
+        { clause: "8.3.2", title: "Design and development planning", requirement: "In determining the stages and controls for design and development, the organization shall consider the nature, duration and complexity, required process stages, required verification and validation activities, responsibilities and authorities, internal and external resource needs, control of interfaces, involvement of customers and users, requirements for subsequent provision, and level of control expected by customers and other relevant interested parties." },
+        { clause: "8.3.3", title: "Design and development inputs", requirement: "The organization shall determine the requirements essential for the specific types of products and services to be designed and developed, including functional and performance requirements, information derived from previous similar design and development activities, statutory and regulatory requirements, and standards or codes of practice the organization has committed to implement." },
+        { clause: "8.3.4", title: "Design and development controls", requirement: "The organization shall apply controls to the design and development process to ensure results to be achieved are defined, reviews are conducted as planned, verification is conducted to ensure outputs meet input requirements, and validation is conducted to ensure products and services meet requirements for specified application or intended use." },
+        { clause: "8.3.5", title: "Design and development outputs", requirement: "The organization shall ensure design and development outputs meet the input requirements, are adequate for the subsequent processes for provision of products and services, include or reference monitoring and measuring requirements and acceptance criteria, and specify characteristics essential for intended purpose and safe and proper provision." },
+        { clause: "8.3.6", title: "Design and development changes", requirement: "The organization shall identify, review and control changes made during or after the design and development of products and services to the extent necessary to ensure there is no adverse impact on conformity to requirements." },
+        { clause: "8.4", title: "Control of externally provided processes, products and services", requirement: "The organization shall ensure that externally provided processes, products and services conform to requirements." },
+        { clause: "8.4.1", title: "External provision - General", requirement: "The organization shall determine the controls to be applied to externally provided processes, products and services when products and services from external providers are intended for incorporation, are provided directly to customers, or a process or part of a process is provided by an external provider." },
+        { clause: "8.4.2", title: "Type and extent of control", requirement: "The organization shall ensure externally provided processes remain within the control of its QMS, define controls it intends to apply to an external provider and those it intends to apply to the resulting output, and take into consideration the potential impact on the organization's ability to consistently meet customer and applicable statutory and regulatory requirements." },
+        { clause: "8.4.3", title: "Information for external providers", requirement: "The organization shall communicate to external providers its requirements for the processes, products and services to be provided, approval methods, competence and qualification requirements, interactions with the organization's QMS, control and monitoring of performance, and verification or validation activities." },
+        { clause: "8.5", title: "Production and service provision", requirement: "The organization shall implement production and service provision under controlled conditions." },
+        { clause: "8.5.1", title: "Control of production and service provision", requirement: "Controlled conditions shall include: availability of documented information, availability of suitable monitoring and measuring resources, implementation of monitoring and measurement activities, use of suitable infrastructure, appointment of competent persons, validation of ability to achieve planned results for special processes, implementation of actions to prevent human error, and implementation of release, delivery and post-delivery activities." },
+        { clause: "8.5.2", title: "Identification and traceability", requirement: "The organization shall use suitable means to identify outputs when necessary to ensure conformity of products and services. The organization shall identify the status of outputs with respect to monitoring and measurement requirements. The organization shall control the unique identification of the outputs when traceability is a requirement and shall retain documented information necessary to enable traceability." },
+        { clause: "8.5.3", title: "Property belonging to customers or external providers", requirement: "The organization shall exercise care with property belonging to customers or external providers while it is under the organization's control or being used. It shall identify, verify, protect and safeguard property, and report to the owner if property is lost, damaged or otherwise found to be unsuitable for use." },
+        { clause: "8.5.4", title: "Preservation", requirement: "The organization shall preserve the outputs during production and service provision, to the extent necessary to ensure conformity to requirements. Preservation can include identification, handling, contamination control, packaging, storage, transmission or transportation, and protection." },
+        { clause: "8.5.5", title: "Post-delivery activities", requirement: "The organization shall meet requirements for post-delivery activities associated with the products and services. The organization shall consider statutory and regulatory requirements, potential undesired consequences, nature, use and intended lifetime, customer requirements, and customer feedback." },
+        { clause: "8.5.6", title: "Control of changes", requirement: "The organization shall review and control changes for production or service provision, to the extent necessary to ensure continuing conformity with requirements. The organization shall retain documented information describing the results of the review of changes, the person(s) authorizing the change, and any necessary actions arising from the review." },
+        { clause: "8.6", title: "Release of products and services", requirement: "The organization shall implement planned arrangements at appropriate stages to verify that product and service requirements have been met. Release of products and services shall not proceed until planned arrangements have been satisfactorily completed, unless otherwise approved by a relevant authority and, as applicable, by the customer. The organization shall retain documented information on the release of products and services, including evidence of conformity with acceptance criteria and traceability to the person(s) authorizing the release." },
+        { clause: "8.7", title: "Control of nonconforming outputs", requirement: "The organization shall ensure that outputs that do not conform to their requirements are identified and controlled to prevent their unintended use or delivery." },
+        { clause: "8.7.1", title: "Nonconforming outputs - Actions", requirement: "The organization shall take appropriate action based on the nature of the nonconformity and its effect on the conformity of products and services. This shall also apply to nonconforming products and services detected after delivery of products, during or after the provision of services." },
+        { clause: "8.7.2", title: "Nonconforming outputs - Documented information", requirement: "The organization shall retain documented information that describes the nonconformity, describes the actions taken, describes any concessions obtained, and identifies the authority deciding the action in respect of the nonconformity." },
+
+        // Clause 9 - Performance evaluation
+        { clause: "9.1", title: "Monitoring, measurement, analysis and evaluation", requirement: "The organization shall determine what needs to be monitored and measured, the methods for monitoring, measurement, analysis and evaluation, when to monitor and measure, when to analyse and evaluate results." },
+        { clause: "9.1.1", title: "Monitoring, measurement - General", requirement: "The organization shall evaluate the performance and the effectiveness of the QMS. The organization shall retain appropriate documented information as evidence of the results." },
+        { clause: "9.1.2", title: "Customer satisfaction", requirement: "The organization shall monitor customers' perceptions of the degree to which their needs and expectations have been fulfilled. The organization shall determine the methods for obtaining, monitoring and reviewing this information." },
+        { clause: "9.1.3", title: "Analysis and evaluation", requirement: "The organization shall analyse and evaluate appropriate data and information arising from monitoring and measurement. The results of analysis shall be used to evaluate conformity of products and services, degree of customer satisfaction, performance and effectiveness of the QMS, if planning has been implemented effectively, effectiveness of actions taken to address risks and opportunities, performance of external providers, and need for improvements to the QMS." },
+        { clause: "9.2", title: "Internal audit", requirement: "The organization shall conduct internal audits at planned intervals to provide information on whether the QMS conforms to the organization's own requirements and ISO 9001, and is effectively implemented and maintained." },
+        { clause: "9.2.1", title: "Internal audit - Requirements", requirement: "The organization shall plan, establish, implement and maintain an audit programme including the frequency, methods, responsibilities, planning requirements and reporting. The audit programme shall take into consideration the importance of the processes concerned, changes affecting the organization, and the results of previous audits." },
+        { clause: "9.2.2", title: "Internal audit - Conduct", requirement: "The organization shall define the audit criteria and scope for each audit, select auditors and conduct audits to ensure objectivity and impartiality of the audit process, ensure results are reported to relevant management, take appropriate correction and corrective actions without undue delay, and retain documented information as evidence of the implementation of the audit programme and the audit results." },
+        { clause: "9.3", title: "Management review", requirement: "Top management shall review the organization's QMS, at planned intervals, to ensure its continuing suitability, adequacy, effectiveness and alignment with the strategic direction of the organization." },
+        { clause: "9.3.1", title: "Management review - General", requirement: "The management review shall be planned and carried out taking into consideration the status of actions from previous management reviews, changes in external and internal issues, information on the performance and effectiveness of the QMS." },
+        { clause: "9.3.2", title: "Management review inputs", requirement: "The management review shall be planned and carried out taking into consideration customer satisfaction and feedback, the extent to which quality objectives have been met, process performance and conformity of products and services, nonconformities and corrective actions, monitoring and measurement results, audit results, performance of external providers, adequacy of resources, effectiveness of actions taken to address risks and opportunities, and opportunities for improvement." },
+        { clause: "9.3.3", title: "Management review outputs", requirement: "The outputs of the management review shall include decisions and actions related to opportunities for improvement, any need for changes to the QMS, and resource needs. The organization shall retain documented information as evidence of the results of management reviews." },
+
+        // Clause 10 - Improvement
+        { clause: "10.1", title: "General - Improvement", requirement: "The organization shall determine and select opportunities for improvement and implement any necessary actions to meet customer requirements and enhance customer satisfaction." },
+        { clause: "10.2", title: "Nonconformity and corrective action", requirement: "When a nonconformity occurs, including any arising from complaints, the organization shall react to the nonconformity and take action to control and correct it and deal with the consequences." },
+        { clause: "10.2.1", title: "Nonconformity and corrective action - Requirements", requirement: "The organization shall evaluate the need for action to eliminate the cause(s) of the nonconformity to prevent recurrence or occurrence elsewhere, by reviewing and analysing the nonconformity, determining the causes, determining if similar nonconformities exist or could potentially occur, implementing any action needed, reviewing the effectiveness of any corrective action taken, updating risks and opportunities determined during planning if necessary, and making changes to the QMS if necessary." },
+        { clause: "10.2.2", title: "Nonconformity and corrective action - Documented information", requirement: "The organization shall retain documented information as evidence of the nature of the nonconformities and any subsequent actions taken, and the results of any corrective action." },
+        { clause: "10.3", title: "Continual improvement", requirement: "The organization shall continually improve the suitability, adequacy and effectiveness of the quality management system. The organization shall consider the results of analysis and evaluation, and the outputs from management review, to determine if there are needs or opportunities that shall be addressed as part of continual improvement." }
     ];
 
+    // ISO 14001 Environmental Management System clauses
+    if (standardName.includes('14001')) {
+        return iso9001Clauses.map(c => ({
+            ...c,
+            title: c.title.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace('customer', 'interested party'),
+            requirement: c.requirement.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace(/customer(?!s)/gi, 'interested party')
+        }));
+    }
+
+    // ISO 45001 Occupational Health and Safety clauses
+    if (standardName.includes('45001')) {
+        return iso9001Clauses.map(c => ({
+            ...c,
+            title: c.title.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S MS').replace('customer', 'worker'),
+            requirement: c.requirement.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S management system').replace(/customer(?!s)/gi, 'worker')
+        }));
+    }
+
     if (standardName.includes('9001')) return iso9001Clauses;
-    if (standardName.includes('14001')) return iso9001Clauses.map(c => ({ ...c, title: c.title.replace('quality', 'environmental') }));
-    if (standardName.includes('45001')) return iso9001Clauses.map(c => ({ ...c, title: c.title.replace('quality', 'OH&S') }));
 
     return iso9001Clauses; // Default fallback
 }
