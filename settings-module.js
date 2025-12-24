@@ -2497,6 +2497,26 @@ window.lookupClauseText = function (standardName, clauseNumber) {
     return clause ? `${clause.title}: ${clause.requirement}` : null;
 };
 
+// Update Knowledge Base Section Content (Manual Edit)
+window.updateKBSection = function (docId, clauseId, newContent) {
+    const kb = window.state.knowledgeBase;
+    let doc = kb.standards.find(d => d.id == docId) ||
+        kb.sops.find(d => d.id == docId) ||
+        kb.policies.find(d => d.id == docId) ||
+        kb.marketing.find(d => d.id == docId);
+
+    if (doc && doc.clauses) {
+        const clause = doc.clauses.find(c => c.clause === clauseId);
+        if (clause) {
+            clause.requirement = newContent;
+            window.saveData();
+            // Optional: Notification? unique notification might be annoying on every blur.
+            // Maybe show a small toast or just save silently.
+            console.log('Section updated:', clauseId);
+        }
+    }
+};
+
 // Delete Knowledge Document
 window.deleteKnowledgeDoc = function (type, id) {
     if (!confirm('Are you sure you want to delete this document from the Knowledge Base?')) return;
@@ -2642,7 +2662,15 @@ window.viewKBAnalysis = function (docId) {
                                 <td style="padding: 0.5rem;"><span class="badge bg-blue">${window.UTILS.escapeHtml(c.clause)}</span></td>
                                 <td style="padding: 0.5rem; font-weight: 500;">${window.UTILS.escapeHtml(c.title)}</td>
                                 <td style="padding: 0.5rem; color: var(--text-secondary);">
-                                    <div>${window.UTILS.escapeHtml(c.requirement)}</div>
+                                    <div contenteditable="true" 
+                                         onblur="window.updateKBSection('${doc.id}', '${c.clause}', this.innerText)" 
+                                         title="Click to edit content"
+                                         style="padding: 4px; border: 1px dashed transparent; border-radius: 4px; transition: all 0.2s; cursor: text;" 
+                                         onfocus="this.style.borderColor='#3b82f6'; this.style.backgroundColor='#eff6ff'; this.style.color='#1e293b';"
+                                         onmouseover="this.style.borderColor='#cbd5e1';" 
+                                         onmouseout="if(document.activeElement !== this) this.style.borderColor='transparent';">
+                                        ${window.UTILS.escapeHtml(c.requirement)}
+                                    </div>
                                     ${c.subRequirements && c.subRequirements.length > 0 ? `
                                         <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; color: #374151;">
                                             ${c.subRequirements.map(sub => `
