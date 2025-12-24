@@ -349,9 +349,51 @@ window.generateAIConclusion = async function (reportId) {
 
     window.showNotification('AI Agent analyzing audit findings...', 'info');
 
-    const ncrCount = (report.ncrs || []).length;
-    const majorCount = (report.ncrs || []).filter(n => n.type === 'major').length;
-    const minorCount = (report.ncrs || []).filter(n => n.type === 'minor').length;
+    // 1. GATHER ALL FINDINGS (Manual NCRs + Checklist NCs)
+    const allFindings = [];
+
+    // A. Manual NCRs
+    (report.ncrs || []).forEach((n, i) => {
+        allFindings.push({
+            type: n.type || 'minor',
+            clause: n.clause || 'General',
+            description: n.description || 'No description'
+        });
+    });
+
+    // B. Checklist NCs (Review Stage Data)
+    (report.checklistProgress || []).filter(item => item.status === 'nc').forEach(item => {
+        let clause = 'Checklist Item';
+        // Resolve clause from checklist definition
+        if (item.checklistId) {
+            const cl = state.checklists.find(c => c.id == item.checklistId);
+            if (cl) {
+                if (cl.clauses && (String(item.itemIdx).includes('-'))) {
+                    const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
+                    const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
+                    if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
+                        clause = mainObj.subClauses[subIdxVal].clause;
+                    }
+                } else {
+                    const clItem = cl.items?.[item.itemIdx];
+                    if (clItem) clause = clItem.clause;
+                }
+            }
+        } else if (item.isCustom) {
+            const customItem = (report.customItems || [])[item.itemIdx];
+            if (customItem) clause = customItem.clause;
+        }
+
+        allFindings.push({
+            type: item.ncrType || 'minor',
+            clause: clause,
+            description: item.ncrDescription || item.comment || 'Checklist finding identified.'
+        });
+    });
+
+    const ncrCount = allFindings.length;
+    const majorCount = allFindings.filter(n => n.type === 'major').length;
+    const minorCount = allFindings.filter(n => n.type === 'minor').length;
     const plan = state.auditPlans.find(p => p.client === report.client) || {};
 
     // Check Knowledge Base
@@ -359,7 +401,7 @@ window.generateAIConclusion = async function (reportId) {
     const hasStandards = kb.standards.length > 0;
 
     // Build NCR descriptions for context
-    const ncrDescriptions = (report.ncrs || []).map((n, i) =>
+    const ncrDescriptions = allFindings.map((n, i) =>
         `Finding ${i + 1} (${n.type}): Clause ${n.clause} - ${n.description}`
     ).join('\n');
 
@@ -370,8 +412,8 @@ Standard: ${plan.standard || 'ISO Management System'}
 Audit Date: ${report.date}
 Total Non-Conformities: ${ncrCount} (${majorCount} Major, ${minorCount} Minor)
 
-Findings:
-${ncrDescriptions || 'No non-conformities identified.'}
+Findings Data:
+${ncrDescriptions || 'No non-conformities identified. System is fully compliant.'}
 
 Generate the following sections for the audit report:
 1. EXECUTIVE SUMMARY (2-3 paragraphs covering scope, methodology, and overall findings)
@@ -384,25 +426,10 @@ Format each section with its header on a new line. Use professional certificatio
     let useAI = false;
 
     try {
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                context: hasStandards ? `Knowledge Base contains: ${kb.standards.map(s => s.name).join(', ')}` : ''
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `API request failed with status ${response.status}`);
-        }
-
-        const data = await response.json();
-        const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        // Use unified AI Service
+        const generatedText = await AI_SERVICE.callProxyAPI(prompt);
 
         if (generatedText) {
-            // Parse sections from AI response
             const sections = parseAIReportSections(generatedText);
 
             if (document.getElementById('exec-summary'))
