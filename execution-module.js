@@ -647,7 +647,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                                             <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); user-select: none;">
                                                 <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
-                                                    <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" onclick="event.stopPropagation(); window.toggleSectionSelection('${sectionId}', this)" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
+                                                    <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
                                                     <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">Clause ${clause.mainClause}</span>
                                                     <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" onclick="window.toggleAccordion('${sectionId}')">${clause.title}</span>
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${clause.subClauses.length} items)</span>
@@ -773,6 +773,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
 
             `;
+
+            // Setup event delegation for section checkboxes
+            setTimeout(() => {
+                document.querySelectorAll('.section-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', function (e) {
+                        e.stopPropagation();
+                        const sectionId = this.getAttribute('data-section-id');
+                        console.log('Checkbox clicked for section:', sectionId);
+                        window.toggleSectionSelection(sectionId, this);
+                    });
+                });
+            }, 100);
+
             break;
 
         case 'ncr':
