@@ -999,24 +999,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="max-height: 500px; overflow-y: auto;">
                             ${allFindings.map((f, idx) => `
                                 <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'};">
-                                    <div style="display: grid; grid-template-columns: 1fr 150px 150px; gap: 1rem; align-items: start;">
+                                    <div style="display: grid; grid-template-columns: 1fr 150px 200px; gap: 1rem; align-items: start;">
+                                        <!-- Finding Details Column -->
                                         <div>
-                                                ${f.source} Finding #${idx + 1}
-                                                ${f.hasEvidence ? `<img src="${f.evidenceImage}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; margin-left: 0.5rem; vertical-align: middle;" title="Evidence">` : ''}
+                                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                                <span style="background: ${f.type === 'major' ? '#fef2f2' : f.type === 'minor' ? '#fffbeb' : '#f5f3ff'}; color: ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'}; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">${f.source}</span>
+                                                <span style="font-weight: 600; color: #1e293b;">Finding #${idx + 1}</span>
+                                                ${f.hasEvidence ? `<img src="${f.evidenceImage}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0;" title="Evidence attached">` : ''}
                                             </div>
                                             ${f.clause || f.requirement ? `
                                                 <div style="font-size: 0.8rem; color: var(--primary-color); margin-bottom: 0.25rem; font-weight: 600;">
                                                     ${f.clause ? `${f.clause}: ` : ''}${f.requirement || ''}
                                                 </div>
                                             ` : ''}
-                                            <div style="font-weight: 500; margin-bottom: 0.5rem;">${f.description}</div>
+                                            <div style="font-weight: 500; color: #374151; margin-bottom: 0.5rem;">${f.description}</div>
                                             ${f.designation || f.department ? `
-                                                <div style="font-size: 0.85rem; color: #64748b;">
-                                                    <i class="fa-solid fa-user"></i> ${f.designation || '-'} | 
-                                                    <i class="fa-solid fa-building"></i> ${f.department || '-'}
+                                                <div style="font-size: 0.8rem; color: #64748b;">
+                                                    <i class="fa-solid fa-user" style="width: 14px;"></i> ${f.designation || '-'} | 
+                                                    <i class="fa-solid fa-building" style="width: 14px;"></i> ${f.department || '-'}
                                                 </div>
                                             ` : ''}
                                         </div>
+                                        <!-- Severity Column -->
                                         <div>
                                             <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Severity</label>
                                             <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.85rem;">
@@ -1025,9 +1029,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 <option value="major" ${f.type === 'major' ? 'selected' : ''}>Major NC</option>
                                             </select>
                                         </div>
+                                        <!-- Remarks Column -->
                                         <div>
                                             <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Auditor Remarks</label>
-                                            <input type="text" class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Add notes..." value="${f.remarks}" style="font-size: 0.85rem;">
+                                            <input type="text" class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Add notes..." value="${f.remarks || ''}" style="font-size: 0.85rem;">
                                         </div>
                                     </div>
                                 </div>
