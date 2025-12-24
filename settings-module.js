@@ -1685,6 +1685,10 @@ if (!window.state.knowledgeBase) {
 
 function getKnowledgeBaseHTML() {
     const kb = window.state.knowledgeBase;
+    kb.standards = kb.standards || [];
+    kb.sops = kb.sops || [];
+    kb.policies = kb.policies || [];
+    kb.marketing = kb.marketing || [];
 
     return `
         <div class="fade-in">
@@ -1928,13 +1932,87 @@ function getKnowledgeBaseHTML() {
                     </div>
                 `}
             </div>
+
+            <!-- Marketing Section -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; color: #db2777;">
+                        <i class="fa-solid fa-bullhorn" style="margin-right: 0.5rem;"></i>
+                        Company Brochure & Marketing
+                    </h4>
+                    <button class="btn btn-primary btn-sm" style="background: #db2777; border-color: #db2777;" onclick="window.uploadKnowledgeDoc('marketing')">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload
+                    </button>
+                </div>
+                
+                ${kb.marketing.length > 0 ? `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>File</th>
+                                    <th>Uploaded</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${kb.marketing.map(doc => `
+                                    <tr>
+                                        <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
+                                        <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
+                                        <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
+                                        <td>
+                                            ${doc.status === 'ready' ? `
+                                                <span class="badge" style="background: #10b981; color: white;">
+                                                    <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Ready
+                                                </span>
+                                                ${doc.clauses && doc.clauses.length > 0 ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${doc.clauses.length} sections indexed</div>` : ''}
+                                            ` : doc.status === 'processing' ? `
+                                                <span class="badge" style="background: #3b82f6; color: white;">
+                                                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 4px;"></i>Analyzing...
+                                                </span>
+                                            ` : `
+                                                <div>
+                                                    <span class="badge" style="background: #f59e0b; color: white;">
+                                                        <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
+                                                    </span>
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeDocument('marketing', '${doc.id}')">
+                                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze
+                                                    </button>
+                                                </div>
+                                            `}
+                                        </td>
+                                        <td>
+                                            ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
+                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                    <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
+                                                </button>
+                                            ` : ''}
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('marketing', '${doc.id}')" title="Delete">
+                                                <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
+                        <i class="fa-solid fa-bullhorn" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+                        <p style="margin: 0;">No marketing materials uploaded. Click "Upload" to add.</p>
+                    </div>
+                `}
+            </div>
         </div>
     `;
 }
 
 // Upload Knowledge Document Modal
 window.uploadKnowledgeDoc = function (type) {
-    const typeLabel = type === 'standard' ? 'ISO Standard' : type === 'sop' ? 'SOP' : 'Policy';
+    const typeLabel = type === 'standard' ? 'ISO Standard' : type === 'sop' ? 'SOP' : type === 'policy' ? 'Policy' : 'Marketing Material';
 
     document.getElementById('modal-title').textContent = `Upload ${typeLabel}`;
     document.getElementById('modal-body').innerHTML = `
@@ -1972,7 +2050,7 @@ window.uploadKnowledgeDoc = function (type) {
 
         const file = fileInput.files[0];
         const kb = window.state.knowledgeBase;
-        const collection = type === 'standard' ? kb.standards : type === 'sop' ? kb.sops : kb.policies;
+        const collection = type === 'standard' ? kb.standards : type === 'sop' ? kb.sops : type === 'policy' ? kb.policies : kb.marketing;
 
         // Create document entry with pending status (user clicks Analyze to process)
         const newDoc = {
@@ -2049,7 +2127,7 @@ window.reanalyzeStandard = async function (docId) {
 // Analyze SOP or Policy document - uses instant template (AI optional)
 window.analyzeDocument = async function (type, docId) {
     const kb = window.state.knowledgeBase;
-    const collection = type === 'sop' ? kb.sops : kb.policies;
+    const collection = type === 'sop' ? kb.sops : type === 'policy' ? kb.policies : kb.marketing;
     const doc = collection.find(d => d.id == docId);
     if (!doc) {
         window.showNotification('Document not found', 'error');
@@ -2072,7 +2150,7 @@ window.analyzeDocument = async function (type, docId) {
         { clause: "5", title: "Records", requirement: "Documents and records to be maintained." },
         { clause: "6", title: "References", requirement: "Related documents and standards referenced." },
         { clause: "7", title: "Revision History", requirement: "Version control and change history." }
-    ] : [
+    ] : type === 'policy' ? [
         { clause: "1", title: "Purpose", requirement: "States why this policy exists and its objectives." },
         { clause: "2", title: "Scope", requirement: "Defines who and what the policy applies to." },
         { clause: "3", title: "Policy Statement", requirement: "The main policy declarations and commitments." },
@@ -2080,6 +2158,15 @@ window.analyzeDocument = async function (type, docId) {
         { clause: "5", title: "Responsibilities", requirement: "Roles responsible for implementing the policy." },
         { clause: "6", title: "Compliance", requirement: "Requirements for compliance and enforcement." },
         { clause: "7", title: "Related Documents", requirement: "Associated policies, procedures, and references." }
+    ] : [
+        // Marketing/Brochure Default Sections
+        { clause: "1", title: "Company Overview", requirement: "Mission, vision, core values, and history." },
+        { clause: "2", title: "Services & Products", requirement: "Detailed description of offerings and capabilities." },
+        { clause: "3", title: "Key Differentiators", requirement: "Unique selling points and competitive advantages." },
+        { clause: "4", title: "Market Presence", requirement: "Target audience, geography, and industries served." },
+        { clause: "5", title: "Certifications", requirement: "ISO certifications and other accreditations held." },
+        { clause: "6", title: "Team & Expertise", requirement: "Key personnel and technical expertise." },
+        { clause: "7", title: "Contact Information", requirement: "Office locations and support channels." }
     ];
 
     doc.clauses = fallbackSections;
@@ -2419,8 +2506,10 @@ window.deleteKnowledgeDoc = function (type, id) {
         kb.standards = kb.standards.filter(d => d.id != id);
     } else if (type === 'sop') {
         kb.sops = kb.sops.filter(d => d.id != id);
-    } else {
+    } else if (type === 'policy') {
         kb.policies = kb.policies.filter(d => d.id != id);
+    } else {
+        kb.marketing = kb.marketing.filter(d => d.id != id);
     }
 
     window.saveData();
@@ -2445,6 +2534,10 @@ window.viewKBAnalysis = function (docId) {
     if (!doc) {
         doc = kb.policies.find(d => d.id == docId);
         docType = 'policy';
+    }
+    if (!doc) {
+        doc = kb.marketing.find(d => d.id == docId);
+        docType = 'marketing';
     }
     if (!doc) {
         window.showNotification('Document not found', 'error');
