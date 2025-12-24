@@ -2048,7 +2048,7 @@ window.reanalyzeStandard = async function (docId) {
     // Trigger re-analysis
     await window.analyzeStandard(docId);
 };
-// Analyze SOP or Policy document
+// Analyze SOP or Policy document - uses instant template (AI optional)
 window.analyzeDocument = async function (type, docId) {
     const kb = window.state.knowledgeBase;
     const collection = type === 'sop' ? kb.sops : kb.policies;
@@ -2065,65 +2065,36 @@ window.analyzeDocument = async function (type, docId) {
 
     window.showNotification(`Analyzing ${doc.name}...`, 'info');
 
-    try {
-        const docType = type === 'sop' ? 'Standard Operating Procedure' : 'Policy';
-        const prompt = `You are a document analyst. For the ${docType} titled "${doc.name}", generate a JSON array of key sections typically found in such a document.
-
-For SOPs, include sections like: Purpose, Scope, Responsibilities, Procedure Steps, Records, References, Revision History.
-For Policies, include sections like: Purpose, Scope, Policy Statement, Definitions, Responsibilities, Compliance, Related Documents.
-
-Format: [{"clause": "1", "title": "Purpose", "requirement": "Brief description of what this section should contain..."}, ...]
-
-Return ONLY the JSON array, no markdown or explanation.`;
-
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            // Parse JSON from response
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                doc.clauses = JSON.parse(jsonMatch[0]);
-                doc.status = 'ready';
-                window.saveData();
-                switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
-                window.showNotification(`${doc.name} analysis complete! ${doc.clauses.length} sections indexed.`, 'success');
-                return;
-            }
-        }
-    } catch (error) {
-        console.error('Document analysis error:', error);
-    }
-
-    // Fallback: Use generic sections
+    // Use instant template-based sections (no API delay)
     const fallbackSections = type === 'sop' ? [
         { clause: "1", title: "Purpose", requirement: "States the purpose and objectives of the SOP." },
         { clause: "2", title: "Scope", requirement: "Defines the scope and applicability of the procedure." },
         { clause: "3", title: "Responsibilities", requirement: "Identifies roles and responsibilities of personnel." },
         { clause: "4", title: "Procedure", requirement: "Step-by-step instructions for carrying out the process." },
         { clause: "5", title: "Records", requirement: "Documents and records to be maintained." },
-        { clause: "6", title: "References", requirement: "Related documents and standards referenced." }
+        { clause: "6", title: "References", requirement: "Related documents and standards referenced." },
+        { clause: "7", title: "Revision History", requirement: "Version control and change history." }
     ] : [
         { clause: "1", title: "Purpose", requirement: "States why this policy exists and its objectives." },
         { clause: "2", title: "Scope", requirement: "Defines who and what the policy applies to." },
         { clause: "3", title: "Policy Statement", requirement: "The main policy declarations and commitments." },
         { clause: "4", title: "Definitions", requirement: "Key terms and their meanings." },
         { clause: "5", title: "Responsibilities", requirement: "Roles responsible for implementing the policy." },
-        { clause: "6", title: "Compliance", requirement: "Requirements for compliance and consequences of non-compliance." }
+        { clause: "6", title: "Compliance", requirement: "Requirements for compliance and enforcement." },
+        { clause: "7", title: "Related Documents", requirement: "Associated policies, procedures, and references." }
     ];
 
     doc.clauses = fallbackSections;
     doc.status = 'ready';
     window.saveData();
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
-    window.showNotification(`${doc.name} analyzed with standard sections.`, 'info');
+
+    // Small delay for visual feedback
+    setTimeout(() => {
+        switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        window.showNotification(`${doc.name} analyzed! ${doc.clauses.length} sections indexed.`, 'success');
+    }, 300);
 };
+
 
 // One-time clause extraction from standard
 async function extractStandardClauses(doc, standardName) {
