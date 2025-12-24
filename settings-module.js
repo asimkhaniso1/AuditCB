@@ -1970,13 +1970,13 @@ window.uploadKnowledgeDoc = function (type) {
         const kb = window.state.knowledgeBase;
         const collection = type === 'standard' ? kb.standards : type === 'sop' ? kb.sops : kb.policies;
 
-        // Create document entry
+        // Create document entry with pending status (user clicks Analyze to process)
         const newDoc = {
             id: Date.now(),
             name: name,
             fileName: file.name,
             uploadDate: new Date().toISOString().split('T')[0],
-            status: 'processing',
+            status: 'pending',  // All documents start as pending
             fileSize: file.size,
             clauses: [] // Will be populated by extraction
         };
@@ -1985,14 +1985,8 @@ window.uploadKnowledgeDoc = function (type) {
         window.saveData();
         window.closeModal();
 
-        // Show processing notification
-        window.showNotification(`${typeLabel} uploaded. Click "Analyze Now" to extract clauses.`, 'info');
-
-        // For standards, set status to pending - user can click Analyze Now
-        if (type === 'standard') {
-            newDoc.status = 'pending';
-            window.saveData();
-        }
+        // Show upload notification
+        window.showNotification(`${typeLabel} uploaded. Click "Analyze" to index sections.`, 'info');
 
         // Re-render the tab
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
