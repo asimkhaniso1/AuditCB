@@ -2048,19 +2048,34 @@ window.uploadKnowledgeDoc = function (type) {
             return;
         }
 
+        // Show processing state
+        const originalBtnText = saveBtn.textContent;
+        saveBtn.textContent = 'Processing File...';
+        saveBtn.disabled = true;
+
         const file = fileInput.files[0];
+        let extractedText = null;
+
+        // Extract text for analysis
+        try {
+            extractedText = await window.extractTextFromFile(file);
+        } catch (err) {
+            console.warn('Could not extract text:', err);
+        }
+
         const kb = window.state.knowledgeBase;
         const collection = type === 'standard' ? kb.standards : type === 'sop' ? kb.sops : type === 'policy' ? kb.policies : kb.marketing;
 
-        // Create document entry with pending status (user clicks Analyze to process)
+        // Create document entry with pending status
         const newDoc = {
             id: Date.now(),
             name: name,
             fileName: file.name,
             uploadDate: new Date().toISOString().split('T')[0],
-            status: 'pending',  // All documents start as pending
+            status: 'pending',
             fileSize: file.size,
-            clauses: [] // Will be populated by extraction
+            extractedText: extractedText, // Save content for AI
+            clauses: []
         };
 
         collection.push(newDoc);
@@ -2141,7 +2156,18 @@ window.analyzeDocument = async function (type, docId) {
 
     window.showNotification(`Analyzing ${doc.name}...`, 'info');
 
-    // Use instant template-based sections (no API delay)
+    // Try AI Analysis if text is available
+    if (doc.extractedText) {
+        try {
+            await window.analyzeCustomDocWithAI(doc, type);
+            return; // Success
+        } catch (e) {
+            console.error('AI Analysis failed, using template fallback', e);
+            window.showNotification('AI Analysis failed, using template.', 'warning');
+        }
+    }
+
+    // Use instant template-based sections (Fallback)
     const fallbackSections = type === 'sop' ? [
         { clause: "1", title: "Purpose", requirement: "States the purpose and objectives of the SOP." },
         { clause: "2", title: "Scope", requirement: "Defines the scope and applicability of the procedure." },
@@ -2514,6 +2540,64 @@ window.updateKBSection = function (docId, clauseId, newContent) {
             // Maybe show a small toast or just save silently.
             console.log('Section updated:', clauseId);
         }
+    }
+};
+
+// Helper: Extract text from file (PDF/Text)
+window.extractTextFromFile = async function (file) {
+    try {
+        if (file.type === 'application/pdf') {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            const maxPages = Math.min(pdf.numPages, 15); // Limit pages for performance
+            for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+            return fullText;
+        } else if (file.type.startsWith('text/')) {
+            return await file.text();
+        }
+    } catch (e) {
+        console.error('Text extraction failed:', e);
+    }
+    return null;
+};
+
+// Analyze Custom Document with AI
+window.analyzeCustomDocWithAI = async function (doc, type) {
+    const typeLabel = type === 'sop' ? 'Standard Operating Procedure' : type === 'policy' ? 'Policy' : 'Company Profile/Marketing';
+    const context = doc.extractedText.substring(0, 15000); // Limit context size
+
+    const prompt = `You are a QA Auditor. Analyze this ${typeLabel} text and extract key sections.
+    Return a JSON array: [{"clause": "1", "title": "Section Title", "requirement": "Summary of content..."}].
+    Extract 6-10 key sections like Purpose, Scope, Responsibilities, or Company Overview, Products, etc.
+    Keep summaries concise.
+    
+    Text:
+    ${context}
+    
+    Return ONLY JSON.`;
+
+    try {
+        const response = await AI_SERVICE.callProxyAPI(prompt);
+        let validJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+        const tabs = JSON.parse(validJson);
+
+        doc.clauses = tabs;
+        doc.status = 'ready';
+        window.saveData();
+
+        // Refresh UI
+        switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        window.showNotification(`${doc.name} analyzed with AI!`, 'success');
+        return true;
+    } catch (e) {
+        console.error('AI Parse Error', e);
+        throw e;
     }
 };
 
