@@ -521,9 +521,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                                <button type="button" class="btn-icon btn-na ${s === window.CONSTANTS.STATUS.NA ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', '${window.CONSTANTS.STATUS.NA}')" title="Not Applicable">N/A</button>
-                                <button type="button" class="btn-icon btn-ok ${s === window.CONSTANTS.STATUS.CONFORM ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', '${window.CONSTANTS.STATUS.CONFORM}')" title="Conformity"><i class="fa fa-check"></i></button>
-                                <button type="button" class="btn-icon btn-nc ${s === window.CONSTANTS.STATUS.NC ? 'active' : ''}" onclick="window.setChecklistStatus('${uniqueId}', '${window.CONSTANTS.STATUS.NC}')" title="Non-Conformity"><i class="fa fa-times"></i></button>
+                                <button type="button" class="btn-icon btn-na status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NA}" title="Not Applicable">N/A</button>
+                                <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity"><i class="fa fa-check"></i></button>
+                                <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity"><i class="fa fa-times"></i></button>
                             </div>
                          </div>
                          
@@ -2212,6 +2212,20 @@ document.addEventListener('click', function (e) {
             // Close menu
             const menu = document.getElementById('bulk-menu-' + reportId);
             if (menu) menu.classList.add('hidden');
+        }
+    }
+});
+
+// Global event delegation for status buttons (OK, NC, N/A)
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.status-btn');
+    if (btn) {
+        const uniqueId = btn.getAttribute('data-unique-id');
+        const status = btn.getAttribute('data-status');
+        console.log('Status button clicked:', status, 'for item:', uniqueId);
+
+        if (uniqueId && status) {
+            window.setChecklistStatus(uniqueId, status);
         }
     }
 });
