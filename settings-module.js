@@ -2030,6 +2030,24 @@ window.analyzeStandard = async function (docId) {
     }
 };
 
+// Re-analyze a standard (for deeper extraction)
+window.reanalyzeStandard = async function (docId) {
+    const kb = window.state.knowledgeBase;
+    const doc = kb.standards.find(d => d.id == docId);
+    if (!doc) {
+        window.showNotification('Standard not found', 'error');
+        return;
+    }
+
+    // Clear existing clauses and re-analyze
+    doc.clauses = [];
+    doc.status = 'pending';
+    window.saveData();
+    window.closeModal();
+
+    // Trigger re-analysis
+    await window.analyzeStandard(docId);
+};
 // Analyze SOP or Policy document
 window.analyzeDocument = async function (type, docId) {
     const kb = window.state.knowledgeBase;
