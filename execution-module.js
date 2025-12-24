@@ -1379,18 +1379,8 @@ window.bulkUpdateStatus = function (reportId, status) {
     }
 
     // Close dropdown
-    const menu = document.getElementById(`bulk-actions-menu-${reportId}`);
+    const menu = document.getElementById(`bulk-menu-${reportId}`);
     if (menu) menu.classList.add('hidden');
-
-    // Also try to close the relative one if it exists (from the new UI)
-    const relativeMenu = document.querySelector('.btn-outline-secondary + .hidden');
-    if (relativeMenu && !relativeMenu.classList.contains('hidden')) {
-        relativeMenu.classList.add('hidden');
-    } else {
-        // In case it was toggled open and doesn't have hidden class
-        const openRelativeMenu = document.querySelector('.btn-outline-secondary + div:not(.hidden)');
-        if (openRelativeMenu) openRelativeMenu.classList.add('hidden');
-    }
 
     window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
     window.saveChecklist(reportId);
