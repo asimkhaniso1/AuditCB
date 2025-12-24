@@ -1198,8 +1198,13 @@ window.toggleSectionSelection = function (sectionId, checkbox) {
 };
 
 window.setChecklistStatus = function (uniqueId, status) {
+    console.log('setChecklistStatus called:', uniqueId, status);
+
     const row = document.getElementById('row-' + uniqueId);
-    if (!row) return;
+    if (!row) {
+        console.error('Row not found:', 'row-' + uniqueId);
+        return;
+    }
 
     // Update buttons
     row.querySelectorAll('.btn-icon').forEach(btn => btn.classList.remove('active'));
@@ -1212,17 +1217,26 @@ window.setChecklistStatus = function (uniqueId, status) {
     if (activeBtnClass) row.querySelector(activeBtnClass)?.classList.add('active');
 
     // Show/Hide NCR Panel
-    const panel = document.getElementById('ncr-panel-' + uniqueId);
+    const panelId = 'ncr-panel-' + uniqueId;
+    const panel = document.getElementById(panelId);
+    console.log('Looking for panel:', panelId, 'Found:', !!panel);
+
     if (panel) {
         if (status === window.CONSTANTS.STATUS.NC) {
             panel.style.display = 'block';
+            console.log('NCR Panel shown for:', uniqueId);
         } else {
             panel.style.display = 'none';
         }
+    } else {
+        console.error('NCR Panel not found:', panelId);
     }
 
     // Update hidden input
-    document.getElementById('status-' + uniqueId).value = status;
+    const statusInput = document.getElementById('status-' + uniqueId);
+    if (statusInput) {
+        statusInput.value = status;
+    }
 };
 
 window.addCustomQuestion = function (reportId) {
