@@ -62,9 +62,14 @@ function renderChecklistLibrary() {
                         ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklistFilterScope === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
                     </select>
                 </div>
-                <button id="btn-new-checklist" class="btn btn-primary">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Checklist
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="btn-import-checklist" class="btn btn-secondary">
+                        <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import Checklist
+                    </button>
+                    <button id="btn-new-checklist" class="btn btn-primary">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Checklist
+                    </button>
+                </div>
             </div>
 
             <!-- Cert Manager/Admin Badge -->
@@ -208,6 +213,7 @@ function renderChecklistLibrary() {
 
     // Event Listeners
     document.getElementById('btn-new-checklist')?.addEventListener('click', openAddChecklistModal);
+    document.getElementById('btn-import-checklist')?.addEventListener('click', openImportChecklistModal);
 
     document.getElementById('checklist-search')?.addEventListener('input', (e) => {
         checklistSearchTerm = e.target.value;
@@ -301,6 +307,204 @@ function downloadChecklistTemplate() {
 }
 
 window.downloadChecklistTemplate = downloadChecklistTemplate;
+
+// Import Checklist Modal - allows bulk import from CSV
+function openImportChecklistModal() {
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+    const modalCancel = document.getElementById('modal-cancel');
+
+    const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const userRole = state.currentUser?.role;
+    const isAdmin = state.settings?.isAdmin || false;
+    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const canEditGlobal = isCertManager || isAdmin;
+
+    modalTitle.textContent = 'Import Checklist from CSV';
+    modalBody.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+            <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <i class="fa-solid fa-lightbulb" style="color: #0284c7; margin-right: 0.5rem;"></i>
+                <span style="color: #0284c7;">
+                    Upload a CSV file with audit checklist items. The file should have columns: <strong>Clause, Requirement</strong>
+                </span>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.downloadChecklistTemplate()">
+                <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>Download Template
+            </button>
+        </div>
+
+        <form id="import-checklist-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>Checklist Name <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" class="form-control" id="import-checklist-name" placeholder="e.g. ISO 9001 Full Audit Checklist" required>
+                </div>
+                <div class="form-group">
+                    <label>Standard</label>
+                    <select class="form-control" id="import-checklist-standard">
+                        ${standards.map(s => `<option value="${window.UTILS.escapeHtml(s)}">${window.UTILS.escapeHtml(s)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select class="form-control" id="import-checklist-type">
+                        <option value="custom">Custom (Personal)</option>
+                        ${canEditGlobal ? '<option value="global">Global (Organization-wide)</option>' : ''}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Select CSV File <span style="color: var(--danger-color);">*</span></label>
+                <input type="file" class="form-control" id="import-checklist-file" accept=".csv" required>
+                <small style="color: var(--text-secondary); margin-top: 0.25rem; display: block;">
+                    Supported formats: CSV (comma-separated values)
+                </small>
+            </div>
+
+            <div id="import-preview" style="display: none; margin-top: 1rem;">
+                <h5 style="margin-bottom: 0.5rem;"><i class="fa-solid fa-eye" style="margin-right: 0.5rem;"></i>Preview</h5>
+                <div id="import-preview-content" style="max-height: 200px; overflow-y: auto; background: #f8fafc; padding: 0.75rem; border-radius: 6px; font-size: 0.85rem;"></div>
+            </div>
+        </form>
+    `;
+
+    window.openModal();
+
+    // File input change handler - show preview
+    document.getElementById('import-checklist-file')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split(/\r\n|\n/).filter(l => l.trim());
+
+            const previewDiv = document.getElementById('import-preview');
+            const previewContent = document.getElementById('import-preview-content');
+
+            if (lines.length > 0) {
+                previewDiv.style.display = 'block';
+                const previewLines = lines.slice(0, 6);
+                previewContent.innerHTML = `
+                    <div style="margin-bottom: 0.5rem; color: var(--text-secondary);">
+                        Found <strong>${lines.length - 1}</strong> items (excluding header)
+                    </div>
+                    <table style="width: 100%; font-size: 0.8rem;">
+                        <thead>
+                            <tr style="background: #e2e8f0;">
+                                <th style="padding: 4px 8px;">Clause</th>
+                                <th style="padding: 4px 8px;">Requirement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${previewLines.map((line, idx) => {
+                    if (idx === 0 && (line.toLowerCase().includes('clause') || line.toLowerCase().includes('requirement'))) {
+                        return ''; // Skip header
+                    }
+                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
+                    if (parts.length >= 2) {
+                        return `<tr><td style="padding: 4px 8px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(parts[0])}</td><td style="padding: 4px 8px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(parts[1].substring(0, 60))}${parts[1].length > 60 ? '...' : ''}</td></tr>`;
+                    }
+                    return '';
+                }).join('')}
+                            ${lines.length > 6 ? '<tr><td colspan="2" style="padding: 4px 8px; text-align: center; color: var(--text-secondary);">... and more</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                `;
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    modalSave.textContent = 'Import Checklist';
+    modalSave.onclick = () => {
+        const name = document.getElementById('import-checklist-name').value.trim();
+        const standard = document.getElementById('import-checklist-standard').value;
+        const type = document.getElementById('import-checklist-type').value;
+        const fileInput = document.getElementById('import-checklist-file');
+
+        if (!name) {
+            window.showNotification('Please enter a checklist name', 'error');
+            return;
+        }
+
+        if (!fileInput.files[0]) {
+            window.showNotification('Please select a CSV file', 'error');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split(/\r\n|\n/).filter(l => l.trim());
+
+            const rawRows = [];
+            lines.forEach((line, idx) => {
+                // Skip header row
+                if (idx === 0 && (line.toLowerCase().includes('clause') || line.toLowerCase().includes('requirement'))) {
+                    return;
+                }
+
+                const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
+                if (parts.length >= 2) {
+                    const clause = parts[0];
+                    const requirement = parts[1];
+                    const clauseParts = clause.split('.');
+                    const mClause = clauseParts[0] || '';
+                    const mTitle = getClauseTitleFromNumber(mClause);
+                    rawRows.push({ mClause, mTitle, clause, requirement });
+                }
+            });
+
+            if (rawRows.length === 0) {
+                window.showNotification('No valid items found in the CSV file', 'error');
+                return;
+            }
+
+            // Build hierarchical structure
+            const clauses = [];
+            let currentMain = null;
+
+            rawRows.forEach(row => {
+                if (row.mClause) {
+                    if (!currentMain || currentMain.mainClause !== row.mClause) {
+                        currentMain = { mainClause: row.mClause, title: row.mTitle || 'Untitled', subClauses: [] };
+                        clauses.push(currentMain);
+                    }
+                }
+                if (currentMain && (row.clause || row.requirement)) {
+                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
+                }
+            });
+
+            const newChecklist = {
+                id: Date.now(),
+                name,
+                standard,
+                type,
+                clauses,
+                createdBy: state.currentUser?.name || 'Current User',
+                createdAt: new Date().toISOString().split('T')[0],
+                updatedAt: new Date().toISOString().split('T')[0]
+            };
+
+            if (!state.checklists) state.checklists = [];
+            state.checklists.push(newChecklist);
+            window.saveData();
+            window.closeModal();
+            renderChecklistLibrary();
+            window.showNotification(`Imported checklist "${name}" with ${rawRows.length} items`, 'success');
+        };
+        reader.readAsText(file);
+    };
+}
+
+window.openImportChecklistModal = openImportChecklistModal;
 
 function setupCSVUpload() {
     const csvInput = document.getElementById('csv-upload-input');
