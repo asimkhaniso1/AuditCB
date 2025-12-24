@@ -647,7 +647,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                                             <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); user-select: none;">
                                                 <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
-                                                    <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" onclick="event.stopPropagation(); window.toggleSectionSelection('${sectionId}')" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
+                                                    <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" onclick="event.stopPropagation(); window.toggleSectionSelection('${sectionId}', this)" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
                                                     <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">Clause ${clause.mainClause}</span>
                                                     <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" onclick="window.toggleAccordion('${sectionId}')">${clause.title}</span>
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${clause.subClauses.length} items)</span>
@@ -726,10 +726,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
                             <div style="position: relative;">
-                                <button class="btn btn-outline-secondary" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                                <button class="btn btn-outline-secondary" onclick="document.getElementById('bulk-menu-${report.id}').classList.toggle('hidden')">
                                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i> Bulk Actions
                                 </button>
-                                <div class="hidden" style="position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 220px; z-index: 1000;">
+                                <div id="bulk-menu-${report.id}" class="hidden" style="position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 220px; z-index: 1000;">
                                     <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
                                         <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Items As:</div>
                                     </div>
@@ -1149,27 +1149,32 @@ window.toggleAccordion = function (sectionId) {
     }
 };
 
-window.toggleSectionSelection = function (sectionId) {
+window.toggleSectionSelection = function (sectionId, checkbox) {
     const section = document.getElementById(sectionId);
     if (!section) return;
 
-    // Find the checkbox for this section via data attribute
-    const checkbox = document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
-    const isChecked = checkbox ? checkbox.checked : false;
+    // Use passed checkbox or find it
+    const box = checkbox || document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
+    const isChecked = box ? box.checked : false;
 
     // Toggle items in this section
+    let count = 0;
     const items = section.querySelectorAll('.checklist-item');
     items.forEach(item => {
         if (isChecked) {
             item.classList.add('selected-item');
             item.style.background = '#eff6ff'; // Light blue highlight
             item.style.borderLeft = '4px solid var(--primary-color)';
+            count++;
         } else {
             item.classList.remove('selected-item');
             item.style.background = ''; // Reset
             item.style.borderLeft = '4px solid #e2e8f0'; // Reset
         }
     });
+
+    // Optional: Update UI or show brief feedback
+    // window.showNotification(isChecked ? `Selected ${count} items` : 'Selection cleared', 'info');
 };
 
 window.setChecklistStatus = function (uniqueId, status) {
