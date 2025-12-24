@@ -366,7 +366,7 @@ window.generateAIConclusion = async function (reportId) {
         let clause = 'Checklist Item';
         // Resolve clause from checklist definition
         if (item.checklistId) {
-            const cl = state.checklists.find(c => c.id == item.checklistId);
+            const cl = window.state.checklists.find(c => c.id == item.checklistId);
             if (cl) {
                 if (cl.clauses && (String(item.itemIdx).includes('-'))) {
                     const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
