@@ -2163,3 +2163,38 @@ window.captureWebcam = function (uniqueId) {
         window.showNotification("Failed to capture image", "error");
     }
 };
+
+// Global event delegation for section checkboxes (works with dynamically rendered content)
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('section-checkbox')) {
+        e.stopPropagation();
+        const sectionId = e.target.getAttribute('data-section-id');
+        const isChecked = e.target.checked;
+        console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
+
+        // Find all items in this section and toggle selection
+        const section = document.getElementById(sectionId);
+        if (!section) {
+            console.error('Section not found:', sectionId);
+            return;
+        }
+
+        const items = section.querySelectorAll('.checklist-item');
+        console.log('Found', items.length, 'items in section');
+
+        items.forEach((item, idx) => {
+            if (isChecked) {
+                item.classList.add('selected-item');
+                item.style.background = '#eff6ff';
+                item.style.borderLeft = '4px solid var(--primary-color)';
+            } else {
+                item.classList.remove('selected-item');
+                item.style.background = '';
+                item.style.borderLeft = '4px solid #e2e8f0';
+            }
+        });
+
+        console.log('Selection complete for', items.length, 'items');
+    }
+});
+
