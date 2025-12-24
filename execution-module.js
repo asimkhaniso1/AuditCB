@@ -1149,6 +1149,29 @@ window.toggleAccordion = function (sectionId) {
     }
 };
 
+window.toggleSectionSelection = function (sectionId) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    // Find the checkbox for this section via data attribute
+    const checkbox = document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
+    const isChecked = checkbox ? checkbox.checked : false;
+
+    // Toggle items in this section
+    const items = section.querySelectorAll('.checklist-item');
+    items.forEach(item => {
+        if (isChecked) {
+            item.classList.add('selected-item');
+            item.style.background = '#eff6ff'; // Light blue highlight
+            item.style.borderLeft = '4px solid var(--primary-color)';
+        } else {
+            item.classList.remove('selected-item');
+            item.style.background = ''; // Reset
+            item.style.borderLeft = '4px solid #e2e8f0'; // Reset
+        }
+    });
+};
+
 window.setChecklistStatus = function (uniqueId, status) {
     const row = document.getElementById('row-' + uniqueId);
     if (!row) return;
