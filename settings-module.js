@@ -2322,7 +2322,12 @@ window.viewKBAnalysis = function (docId) {
                         ${clauses.length} clauses extracted • Uploaded ${doc.uploadDate}
                     </div>
                 </div>
-                <span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-sm btn-secondary" onclick="window.reanalyzeStandard('${doc.id}')" title="Re-analyze with AI for more detailed extraction">
+                        <i class="fa-solid fa-rotate" style="margin-right: 0.25rem;"></i>Re-analyze
+                    </button>
+                    <span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>
+                </div>
             </div>
             
             <!-- NCR References -->
@@ -2409,4 +2414,95 @@ window.viewKBAnalysis = function (docId) {
 
     document.getElementById('modal-save').style.display = 'none';
     window.openModal();
+};
+
+// Re-analyze standard with AI for more detailed extraction
+window.reanalyzeStandard = async function (docId) {
+    const kb = window.state.knowledgeBase;
+    const doc = kb.standards.find(d => d.id === docId);
+    if (!doc) return;
+
+    // Close the current modal
+    window.closeModal();
+
+    // Show processing notification
+    window.showNotification(`Re-analyzing ${doc.name} for detailed clauses...`, 'info');
+
+    // Update status to processing
+    doc.status = 'processing';
+    window.saveData();
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+
+    try {
+        // Enhanced prompt for detailed extraction with sub-requirements
+        const prompt = `You are an ISO standards expert. For the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL clauses with DETAILED sub-requirements.
+
+For each clause, include:
+- "clause": The clause number (e.g., "4.4.1", "7.1.5.2")
+- "title": The official clause title
+- "requirement": The main requirement statement
+- "subRequirements": An array of the specific bullet points (a, b, c, d, etc.) that the clause contains
+
+Example format:
+[
+  {
+    "clause": "4.4.1",
+    "title": "QMS processes - Requirements",
+    "requirement": "The organization shall determine the processes needed for the QMS and shall:",
+    "subRequirements": [
+      "a) determine the inputs required and outputs expected",
+      "b) determine the sequence and interaction of processes",
+      "c) determine criteria and methods for effective operation",
+      "d) determine resources needed and ensure availability",
+      "e) assign responsibilities and authorities",
+      "f) address risks and opportunities per 6.1",
+      "g) evaluate and implement changes as needed",
+      "h) improve processes and QMS"
+    ]
+  }
+]
+
+Include ALL clauses from 4 through 10 with ALL sub-clauses (4.4.1, 5.1.1, 7.1.5.2, 8.5.1, 9.2.2, 10.2.1, etc.) and ALL their bullet point sub-requirements.
+Return ONLY the JSON array, no markdown or explanation.`;
+
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            // Parse JSON from response
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const newClauses = JSON.parse(jsonMatch[0]);
+                doc.clauses = newClauses;
+                doc.status = 'ready';
+                doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+                window.saveData();
+
+                window.showNotification(`Re-analysis complete! ${newClauses.length} clauses with detailed sub-requirements extracted.`, 'success');
+
+                // Re-render and open the analysis view
+                switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+                setTimeout(() => window.viewKBAnalysis(docId), 500);
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Re-analysis error:', error);
+    }
+
+    // Fallback if AI fails - use built-in detailed clauses
+    doc.clauses = getBuiltInClauses(doc.name);
+    doc.status = 'ready';
+    doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+    window.saveData();
+
+    window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
+    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    setTimeout(() => window.viewKBAnalysis(docId), 500);
 };
