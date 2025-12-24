@@ -1519,6 +1519,13 @@ function calculateManDays(employees, sites, effectiveness, shiftWork, riskLevel)
 function renderManDayCalculator() {
     const html = `
         <div class="fade-in">
+            <!-- Back Button -->
+            <div style="margin-bottom: 1rem;">
+                <button class="btn btn-secondary" onclick="window.location.hash = 'dashboard'">
+                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to Dashboard
+                </button>
+            </div>
+            
             <div class="card" style="max-width: 800px; margin: 0 auto;">
                 <h2 style="margin-bottom: 1rem; color: var(--primary-color);">
                     <i class="fa-solid fa-calculator" style="margin-right: 0.5rem;"></i>
