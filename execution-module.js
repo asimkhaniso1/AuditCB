@@ -2238,8 +2238,17 @@ document.addEventListener('click', function (e) {
 
 // Global event delegation for status buttons (OK, NC, N/A)
 document.addEventListener('click', function (e) {
-    const btn = e.target.closest('.status-btn');
-    if (btn) {
+    // Check if clicked element or any parent has status-btn class
+    let btn = e.target;
+    while (btn && !btn.classList.contains('status-btn')) {
+        btn = btn.parentElement;
+        if (!btn || btn === document.body) {
+            btn = null;
+            break;
+        }
+    }
+
+    if (btn && btn.classList.contains('status-btn')) {
         const uniqueId = btn.getAttribute('data-unique-id');
         const status = btn.getAttribute('data-status');
         console.log('Status button clicked:', status, 'for item:', uniqueId);
