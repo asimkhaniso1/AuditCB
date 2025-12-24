@@ -2517,6 +2517,17 @@ window.updateKBSection = function (docId, clauseId, newContent) {
     }
 };
 
+// Handle Re-analyze / Reset Action
+window.handleReanalyze = function (docId, docType) {
+    if (docType === 'standard') {
+        window.reanalyzeStandard(docId);
+    } else {
+        // Reset analysis (uses template)
+        window.analyzeDocument(docType, docId);
+        window.closeModal();
+    }
+};
+
 // Delete Knowledge Document
 window.deleteKnowledgeDoc = function (type, id) {
     if (!confirm('Are you sure you want to delete this document from the Knowledge Base?')) return;
@@ -2600,7 +2611,7 @@ window.viewKBAnalysis = function (docId) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-secondary" onclick="${docType === 'standard' ? `window.reanalyzeStandard('${doc.id}')` : `window.analyzeDocument('${docType}', '${doc.id}'); window.closeModal();`}" title="${docType === 'standard' ? 'Re-analyze with AI' : 'Reset Analysis'}">
+                    <button class="btn btn-sm btn-secondary" onclick="window.handleReanalyze('${doc.id}', '${docType}')" title="${docType === 'standard' ? 'Re-analyze with AI' : 'Reset Analysis Template'}">
                         <i class="fa-solid fa-rotate" style="margin-right: 0.25rem;"></i>${docType === 'standard' ? 'Re-analyze' : 'Reset'}
                     </button>
                     ${docType === 'standard' ? `<span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>` : ''}
