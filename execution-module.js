@@ -1240,6 +1240,41 @@ window.setChecklistStatus = function (uniqueId, status) {
     if (statusInput) {
         statusInput.value = status;
     }
+
+    // Update accordion counter dynamically
+    window.updateAccordionCounter(uniqueId);
+};
+
+// Update accordion counter based on current statuses
+window.updateAccordionCounter = function (changedId) {
+    // Find the section containing this item
+    const row = document.getElementById('row-' + changedId);
+    if (!row) return;
+
+    const accordionContent = row.closest('.accordion-content');
+    if (!accordionContent) return;
+
+    const sectionId = accordionContent.id;
+    const items = accordionContent.querySelectorAll('.checklist-item');
+    let completed = 0;
+
+    items.forEach(item => {
+        const itemId = item.id.replace('row-', '');
+        const statusInput = document.getElementById('status-' + itemId);
+        const status = statusInput?.value || '';
+        if (status === 'conform' || status === 'nc' || status === 'na') {
+            completed++;
+        }
+    });
+
+    // Update the counter text in the accordion header
+    const accordionSection = accordionContent.closest('.accordion-section');
+    if (accordionSection) {
+        const counterSpan = accordionSection.querySelector('.accordion-header span[style*="text-secondary"]');
+        if (counterSpan && counterSpan.textContent.includes('/')) {
+            counterSpan.textContent = `${completed}/${items.length}`;
+        }
+    }
 };
 
 window.addCustomQuestion = function (reportId) {
