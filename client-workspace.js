@@ -362,71 +362,129 @@ function renderClientOverview(client) {
 
     return `
         <div class="fade-in">
-            <!-- Action Bar -->
-            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 1rem;">
-                <button class="btn btn-outline-primary" onclick="window.openEditClientModal(${client.id})">
-                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem;"></i>Edit Client
-                </button>
-                <button class="btn btn-outline-primary" onclick="window.openCreatePlanModal('${client.name}')">
+            <!-- Client Header with Status -->
+            <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700;">
+                            ${client.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.5rem;">${window.UTILS.escapeHtml(client.name)}</h2>
+                            <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; opacity: 0.9; font-size: 0.9rem;">
+                                <span><i class="fa-solid fa-industry" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(client.industry || 'N/A')}</span>
+                                <span>•</span>
+                                <span><i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>${window.UTILS.escapeHtml(client.standard || 'N/A')}</span>
+                                <span>•</span>
+                                <span><i class="fa-solid fa-map-marker-alt" style="margin-right: 0.25rem;"></i>${totalSites || 1} Site${totalSites !== 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span style="background: ${client.status === 'Active' ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)'}; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 500;">${window.UTILS.escapeHtml(client.status || 'Active')}</span>
+                        <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/settings'" title="Settings">
+                            <i class="fa-solid fa-cog"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Bar -->
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="window.openCreatePlanModal('${window.UTILS.escapeHtml(client.name).replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
                 </button>
+                <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/execution'">
+                    <i class="fa-solid fa-play" style="margin-right: 0.5rem;"></i>Start Execution
+                </button>
+                <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">
+                    <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Raise NCR
+                </button>
+                <button class="btn btn-outline-secondary" onclick="window.openEditClientModal(${client.id})">
+                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem;"></i>Edit Profile
+                </button>
             </div>
 
-            <!-- Sub-Tabs Navigation -->
-            <div class="tabs" style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; gap: 1rem;">
-                <div class="tab-item active" onclick="window.switchClientOverviewTab(this, 'dashboard', ${client.id})" style="padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid var(--primary-color); color: var(--primary-color); font-weight: 500;">
-                    <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>Dashboard
+            <!-- Alerts Section -->
+            ${openNCs > 0 || upcomingAudits > 0 ? `
+            <div style="margin-bottom: 1.5rem;">
+                ${openNCs > 0 ? `
+                <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div><i class="fa-solid fa-exclamation-triangle" style="color: #f59e0b; margin-right: 0.5rem;"></i><strong>${openNCs} Open NC${openNCs !== 1 ? 's' : ''}</strong> - Action required</div>
+                    <button class="btn btn-sm" style="background: #f59e0b; color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/findings'">View</button>
+                </div>` : ''}
+                ${upcomingAudits > 0 ? `
+                <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div><i class="fa-solid fa-calendar-alt" style="color: #3b82f6; margin-right: 0.5rem;"></i><strong>${upcomingAudits} Upcoming Audit${upcomingAudits !== 1 ? 's' : ''}</strong></div>
+                    <button class="btn btn-sm" style="background: #3b82f6; color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/plans'">View</button>
+                </div>` : ''}
+            </div>` : ''}
+
+            <!-- Stats Cards Row -->
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/plans'">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 1.25rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
                 </div>
-                <div class="tab-item" onclick="window.switchClientOverviewTab(this, 'profile')" style="padding: 0.5rem 1rem; cursor: pointer; color: var(--text-secondary);">
-                    <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>Profile
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/certs'">
+                    <i class="fa-solid fa-certificate" style="font-size: 1.25rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${validCerts}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Valid Certs</p>
                 </div>
-                <div class="tab-item" onclick="window.switchClientOverviewTab(this, 'contacts')" style="padding: 0.5rem 1rem; cursor: pointer; color: var(--text-secondary);">
-                    <i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Contacts
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/findings'">
+                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
                 </div>
-                <div class="tab-item" onclick="window.switchClientOverviewTab(this, 'organization')" style="padding: 0.5rem 1rem; cursor: pointer; color: var(--text-secondary);">
-                    <i class="fa-solid fa-sitemap" style="margin-right: 0.5rem;"></i>Organization
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
+                    <i class="fa-solid fa-users" style="font-size: 1.25rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${totalEmployees}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Employees</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #ec4899;">
+                    <i class="fa-solid fa-check-double" style="font-size: 1.25rem; color: #ec4899; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${completedAudits}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Completed</p>
                 </div>
             </div>
 
-            <!-- TAB: DASHBOARD -->
-            <div id="tab-dashboard" class="tab-content">
-                <!-- Summary Cards -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'plans', null)">
-                        <i class="fa-solid fa-clipboard-list" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
-                    </div>
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'certs', null)">
-                        <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${clientCerts.length}</p>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Certificates</p>
-                    </div>
-                    <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.renderClientModule(${client.id}, 'findings', null)">
-                        <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
-                    </div>
-                     <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #8b5cf6;">
-                        <i class="fa-solid fa-users" style="font-size: 1.5rem; color: #8b5cf6; margin-bottom: 0.5rem;"></i>
-                        <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalEmployees}</p>
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Employees</p>
-                    </div>
-                </div>
-
-                <!-- Dashboard Charts -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-                    <div class="card" style="min-height: 300px;">
+            <!-- Main Content: Charts + Sidebar -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <!-- Charts Column -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div class="card" style="min-height: 280px;">
                         <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-bar" style="margin-right: 0.5rem; color: var(--primary-color);"></i>NCR Analysis</h3>
-                        <div style="position: relative; height: 220px; width: 100%;">
-                            <canvas id="ncrTrendChart"></canvas>
+                        <div style="position: relative; height: 200px; width: 100%;"><canvas id="ncrTrendChart"></canvas></div>
+                    </div>
+                    <div class="card" style="min-height: 280px;">
+                        <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Performance</h3>
+                        <div style="position: relative; height: 200px; width: 100%; display: flex; justify-content: center;"><canvas id="auditPerformanceChart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Right Sidebar -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- Quick Info Card -->
+                    <div class="card">
+                        <h4 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Quick Info</h4>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Next Audit:</span><strong>${client.nextAudit || 'Not scheduled'}</strong></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Industry:</span><span>${window.UTILS.escapeHtml(client.industry || '-')}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Standard:</span><span>${window.UTILS.escapeHtml(client.standard || '-')}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Sites:</span><span>${totalSites || 1}</span></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Shifts:</span><span>${client.shifts === 'Yes' ? 'Multiple' : 'General'}</span></div>
                         </div>
                     </div>
-                    <div class="card" style="min-height: 300px;">
-                        <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Performance</h3>
-                        <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center;">
-                            <canvas id="auditPerformanceChart"></canvas>
-                        </div>
+                    <!-- Recent Reports Card -->
+                    <div class="card">
+                        <h4 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-file-alt" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Recent Reports</h4>
+                        ${clientReports.length > 0 ? `<div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">${clientReports.slice(0, 3).map(r => `<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f8fafc; border-radius: 6px;"><span>${r.date || 'N/A'}</span><span class="badge" style="background: ${r.status === 'Finalized' ? '#d1fae5' : '#fef3c7'}; color: ${r.status === 'Finalized' ? '#065f46' : '#92400e'}; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${r.status || 'Draft'}</span></div>`).join('')}</div><button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-top: 0.75rem;" onclick="window.location.hash = 'client/${client.id}/reporting'">View All</button>` : '<p style="color: var(--text-secondary); text-align: center; margin: 1rem 0; font-size: 0.9rem;">No reports yet</p>'}
+                    </div>
+                    <!-- Key Contacts Card -->
+                    <div class="card">
+                        <h4 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Key Contacts</h4>
+                        ${(client.contacts || []).length > 0 ? `<div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">${(client.contacts || []).slice(0, 2).map(c => `<div style="padding: 0.5rem; background: #f8fafc; border-radius: 6px;"><div style="font-weight: 500;">${window.UTILS.escapeHtml(c.name || 'N/A')}</div><div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(c.designation || c.email || '-')}</div></div>`).join('')}</div>` : '<p style="color: var(--text-secondary); text-align: center; margin: 1rem 0; font-size: 0.9rem;">No contacts added</p>'}
                     </div>
                 </div>
             </div>
