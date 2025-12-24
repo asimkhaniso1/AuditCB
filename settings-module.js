@@ -2575,19 +2575,19 @@ window.viewKBAnalysis = function (docId) {
                 <div>
                     <strong style="color: #166534;"><i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i>Analysis Complete</strong>
                     <div style="font-size: 0.85rem; color: #166534; margin-top: 0.25rem;">
-                        ${clauses.length} clauses extracted • Uploaded ${doc.uploadDate}
+                        ${clauses.length} ${docType === 'standard' ? 'clauses' : 'sections'} extracted • Uploaded ${doc.uploadDate}
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-secondary" onclick="window.reanalyzeStandard('${doc.id}')" title="Re-analyze with AI for more detailed extraction">
-                        <i class="fa-solid fa-rotate" style="margin-right: 0.25rem;"></i>Re-analyze
+                    <button class="btn btn-sm btn-secondary" onclick="${docType === 'standard' ? `window.reanalyzeStandard('${doc.id}')` : `window.analyzeDocument('${docType}', '${doc.id}'); window.closeModal();`}" title="${docType === 'standard' ? 'Re-analyze with AI' : 'Reset Analysis'}">
+                        <i class="fa-solid fa-rotate" style="margin-right: 0.25rem;"></i>${docType === 'standard' ? 'Re-analyze' : 'Reset'}
                     </button>
-                    <span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>
+                    ${docType === 'standard' ? `<span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>` : ''}
                 </div>
             </div>
             
-            <!-- NCR References -->
-            ${referencedNCRs.length > 0 ? `
+            <!-- NCR References (Standards Only) -->
+            ${docType === 'standard' ? (referencedNCRs.length > 0 ? `
                 <div style="margin-bottom: 1.5rem;">
                     <h4 style="margin: 0 0 0.75rem 0; color: #7c3aed;">
                         <i class="fa-solid fa-link" style="margin-right: 0.5rem;"></i>NCR References (${referencedNCRs.length})
@@ -2620,19 +2620,19 @@ window.viewKBAnalysis = function (docId) {
                     <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
                     No NCRs have referenced this standard yet. Clauses will be used when generating new NCR findings.
                 </div>
-            `}
+            `) : ''}
             
-            <!-- Extracted Clauses -->
+            <!-- Extracted Sections -->
             <h4 style="margin: 0 0 0.75rem 0; color: #0369a1;">
-                <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Extracted Clauses (${clauses.length})
+                <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>${docType === 'standard' ? 'Extracted Clauses' : 'Document Sections'} (${clauses.length})
             </h4>
             <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
                 <table style="width: 100%; font-size: 0.85rem;">
                     <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
                         <tr>
-                            <th style="padding: 0.5rem; width: 70px;">Clause</th>
+                            <th style="padding: 0.5rem; width: 70px;">${docType === 'standard' ? 'Clause' : 'Section'}</th>
                             <th style="padding: 0.5rem; width: 25%;">Title</th>
-                            <th style="padding: 0.5rem;">Requirement & Sub-Requirements</th>
+                            <th style="padding: 0.5rem;">Description / Content</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2660,9 +2660,19 @@ window.viewKBAnalysis = function (docId) {
             <div style="margin-top: 1rem; padding: 0.75rem; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
                 <strong style="color: #1e40af;">How this is used:</strong>
                 <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0; font-size: 0.85rem; color: #1e40af;">
-                    <li>When creating NCRs, AI references these clauses to suggest findings</li>
-                    <li>Clause requirements are included in NCR descriptions</li>
-                    <li>Helps ensure audit findings align with standard requirements</li>
+                    ${docType === 'standard' ? `
+                        <li>When creating NCRs, AI references these clauses to suggest findings</li>
+                        <li>Clause requirements are included in NCR descriptions</li>
+                        <li>Helps ensure audit findings align with standard requirements</li>
+                    ` : docType === 'marketing' ? `
+                        <li>Provides organizational context for Audit Planning</li>
+                        <li>Used to brief auditors on company products, services, and market</li>
+                        <li>Helps tailor audit questions to the organization's context</li>
+                    ` : `
+                        <li>References for confirming process compliance</li>
+                        <li>Used to cross-check specific procedure steps</li>
+                        <li>Ensures audit evidence aligns with internal controls</li>
+                    `}
                 </ul>
             </div>
         </div>
