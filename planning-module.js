@@ -1742,19 +1742,46 @@ window.viewAuditPlan = viewAuditPlan;
 
 // Navigation Helpers (Integrated Lifecycle)
 window.navigateToAuditExecution = function (planId) {
-    const report = window.state.auditReports.find(r => r.planId === planId);
+    let report = window.state.auditReports.find(r => r.planId === planId);
+    const plan = window.state.auditPlans.find(p => p.id === planId);
+
+    if (!plan) {
+        window.showNotification('Plan not found', 'error');
+        return;
+    }
+
+    // If no report exists, create one automatically
+    if (!report) {
+        report = {
+            id: Date.now(),
+            planId: plan.id,
+            client: plan.client,
+            date: new Date().toISOString().split('T')[0],
+            findings: 0,
+            status: window.CONSTANTS.STATUS.IN_PROGRESS
+        };
+
+        if (!window.state.auditReports) window.state.auditReports = [];
+        window.state.auditReports.push(report);
+
+        // Mark plan as executed
+        plan.reportId = report.id;
+        plan.status = 'In Progress';
+
+        window.saveData();
+        window.showNotification('Audit started! Loading checklist...', 'success');
+    }
 
     // Switch to execution tab
     const tab = document.querySelector('[data-module="audit-execution"]');
     if (tab) tab.click();
 
     setTimeout(() => {
-        if (report) {
-            // Open specific audit
-            if (window.renderExecutionDetail) window.renderExecutionDetail(report.id);
-        } else {
-            // Suggest creating one
-            window.showNotification('Plan selected. Click "Start Audit" to begin checklisting.', 'info');
+        // Open specific audit
+        if (window.renderExecutionDetail) {
+            window.renderExecutionDetail(report.id);
+        } else if (window.renderAuditExecutionEnhanced) {
+            window.renderAuditExecutionEnhanced(report.id);
         }
     }, 200);
 };
