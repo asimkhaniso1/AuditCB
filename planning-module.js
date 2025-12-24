@@ -1112,9 +1112,10 @@ function openChecklistSelectionModal(planId) {
 
     const checklists = state.checklists || [];
 
-    // Get client's standards (from client record or plan)
+    // Get client's standards (from client record - stored as comma-separated string)
     const client = state.clients.find(c => c.name === plan.client);
-    const clientStandards = client?.standards || [];
+    const clientStandardsStr = client?.standard || '';
+    const clientStandards = clientStandardsStr ? clientStandardsStr.split(', ').map(s => s.trim()).filter(s => s) : [];
 
     // Combine plan standard and client standards
     let allStandards = [];
