@@ -1398,14 +1398,20 @@ window.bulkUpdateStatus = function (reportId, status) {
         ? `Mark ${targetItems.length} selected item(s) as "${status.toUpperCase()}"?`
         : `Mark ${targetItems.length} filtered item(s) as "${status.toUpperCase()}"?`;
 
-    if (!confirm(confirmMsg)) return;
+    if (!confirm(confirmMsg)) {
+        console.log('User cancelled confirm dialog');
+        return;
+    }
 
+    console.log('User confirmed, updating items...');
     let updatedCount = 0;
     targetItems.forEach(item => {
         const uniqueId = item.id.replace('row-', '');
+        console.log('Updating item:', uniqueId, 'to status:', status);
         window.setChecklistStatus(uniqueId, status);
         updatedCount++;
     });
+    console.log('Updated', updatedCount, 'items');
 
     // Clear selections if items were selected
     if (useSelection) {
