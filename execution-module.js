@@ -733,15 +733,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
                                         <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Items As:</div>
                                     </div>
-                                    <button onclick="window.bulkUpdateStatus(${report.id}, 'conform'); document.getElementById('bulk-menu-${report.id}').classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                    <button class="bulk-action-btn" data-action="conform" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
                                         <i class="fa-solid fa-check" style="color: var(--success-color); width: 18px;"></i>
                                         <span>Conform</span>
                                     </button>
-                                    <button onclick="window.bulkUpdateStatus(${report.id}, 'nc'); document.getElementById('bulk-menu-${report.id}').classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                    <button class="bulk-action-btn" data-action="nc" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
                                         <i class="fa-solid fa-times" style="color: var(--danger-color); width: 18px;"></i>
                                         <span>Non-Conform</span>
                                     </button>
-                                    <button onclick="window.bulkUpdateStatus(${report.id}, 'na'); document.getElementById('bulk-menu-${report.id}').classList.add('hidden')" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                    <button class="bulk-action-btn" data-action="na" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
                                         <i class="fa-solid fa-ban" style="color: #9ca3af; width: 18px;"></i>
                                         <span>Not Applicable</span>
                                     </button>
@@ -2198,3 +2198,20 @@ document.addEventListener('click', function (e) {
     }
 });
 
+// Global event delegation for bulk action buttons
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.bulk-action-btn');
+    if (btn) {
+        const action = btn.getAttribute('data-action');
+        const reportId = btn.getAttribute('data-report-id');
+        console.log('Bulk action button clicked:', action, 'for report:', reportId);
+
+        if (action && reportId) {
+            window.bulkUpdateStatus(parseInt(reportId), action);
+
+            // Close menu
+            const menu = document.getElementById('bulk-menu-' + reportId);
+            if (menu) menu.classList.add('hidden');
+        }
+    }
+});
