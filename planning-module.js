@@ -674,10 +674,22 @@ function viewAuditPlan(id) {
     let completedItems = 0;
     let totalItems = 0;
 
-    // Sum total items from assigned checklists
+    // Sum total items from assigned checklists (support both old and new formats)
     planChecklists.forEach(clId => {
         const cl = checklists.find(c => c.id === clId);
-        if (cl && cl.items) totalItems += cl.items.length;
+        if (cl) {
+            if (cl.clauses && Array.isArray(cl.clauses)) {
+                // New format: clauses with subClauses
+                cl.clauses.forEach(clause => {
+                    if (clause.subClauses) {
+                        totalItems += clause.subClauses.length;
+                    }
+                });
+            } else if (cl.items) {
+                // Old format: items array
+                totalItems += cl.items.length;
+            }
+        }
     });
 
     if (report && report.checklistProgress && totalItems > 0) {
