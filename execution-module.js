@@ -1150,16 +1150,23 @@ window.toggleAccordion = function (sectionId) {
 };
 
 window.toggleSectionSelection = function (sectionId, checkbox) {
+    console.log('toggleSectionSelection called for:', sectionId);
     const section = document.getElementById(sectionId);
-    if (!section) return;
+    if (!section) {
+        console.error('Section not found:', sectionId);
+        return;
+    }
 
     // Use passed checkbox or find it
     const box = checkbox || document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
     const isChecked = box ? box.checked : false;
 
+    console.log('Checkbox is checked:', isChecked);
+
     // Toggle items in this section
     let count = 0;
     const items = section.querySelectorAll('.checklist-item');
+    console.log('Found items:', items.length);
     items.forEach(item => {
         if (isChecked) {
             item.classList.add('selected-item');
