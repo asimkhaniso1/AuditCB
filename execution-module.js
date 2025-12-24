@@ -1341,13 +1341,18 @@ window.filterChecklistItems = function (filterType) {
 
 // Bulk update status - prioritizes selected items, falls back to filtered items
 window.bulkUpdateStatus = function (reportId, status) {
+    console.log('bulkUpdateStatus called:', reportId, status);
+
     // Check if any items are selected via checkboxes
     let targetItems = document.querySelectorAll('.checklist-item.selected-item');
     let useSelection = targetItems.length > 0;
 
+    console.log('Selected items:', targetItems.length);
+
     // If no items selected, fall back to filtered items
     if (!useSelection) {
         targetItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
+        console.log('Using filtered items:', targetItems.length);
     }
 
     if (targetItems.length === 0) {
@@ -1380,7 +1385,12 @@ window.bulkUpdateStatus = function (reportId, status) {
 
     // Close dropdown
     const menu = document.getElementById(`bulk-menu-${reportId}`);
-    if (menu) menu.classList.add('hidden');
+    if (menu) {
+        menu.classList.add('hidden');
+        console.log('Menu closed');
+    } else {
+        console.error('Menu not found:', `bulk-menu-${reportId}`);
+    }
 
     window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
     window.saveChecklist(reportId);
