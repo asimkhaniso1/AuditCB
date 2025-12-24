@@ -1752,7 +1752,7 @@ function getKnowledgeBaseHTML() {
                                                     <span class="badge" style="background: #f59e0b; color: white;">
                                                         <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
                                                     </span>
-                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeStandard(${doc.id})">
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeStandard('${doc.id}')">
                                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze Now
                                                     </button>
                                                 </div>
@@ -1760,11 +1760,11 @@ function getKnowledgeBaseHTML() {
                                         </td>
                                         <td>
                                             ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
-                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis(${doc.id})" title="View Analysis">
+                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
                                                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                                                 </button>
                                             ` : ''}
-                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('standard', ${doc.id})" title="Delete">
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('standard', '${doc.id}')" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         </td>
