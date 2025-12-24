@@ -1432,16 +1432,7 @@ window.bulkUpdateStatus = function (reportId, status) {
         return;
     }
 
-    const confirmMsg = useSelection
-        ? `Mark ${targetItems.length} selected item(s) as "${status.toUpperCase()}"?`
-        : `Mark ${targetItems.length} filtered item(s) as "${status.toUpperCase()}"?`;
-
-    if (!confirm(confirmMsg)) {
-        console.log('User cancelled confirm dialog');
-        return;
-    }
-
-    console.log('User confirmed, updating items...');
+    console.log('Bulk updating', targetItems.length, 'items to status:', status);
     let updatedCount = 0;
     targetItems.forEach(item => {
         const uniqueId = item.id.replace('row-', '');
