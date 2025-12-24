@@ -339,6 +339,14 @@ window.generateAIConclusion = async function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
+    // Show loading state on button
+    const aiBtn = document.querySelector('[onclick*="generateAIConclusion"]');
+    const originalBtnHTML = aiBtn ? aiBtn.innerHTML : '';
+    if (aiBtn) {
+        aiBtn.disabled = true;
+        aiBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating...';
+    }
+
     window.showNotification('AI Agent analyzing audit findings...', 'info');
 
     const ncrCount = (report.ncrs || []).length;
@@ -373,6 +381,8 @@ Generate the following sections for the audit report:
 
 Format each section with its header on a new line. Use professional certification body language.`;
 
+    let useAI = false;
+
     try {
         const response = await fetch('/api/gemini', {
             method: 'POST',
@@ -383,7 +393,10 @@ Format each section with its header on a new line. Use professional certificatio
             })
         });
 
-        if (!response.ok) throw new Error('API request failed');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `API request failed with status ${response.status}`);
+        }
 
         const data = await response.json();
         const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -406,15 +419,24 @@ Format each section with its header on a new line. Use professional certificatio
                 else document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.RECOMMEND;
             }
 
+            useAI = true;
             window.showNotification('AI Draft generated successfully!', 'success');
-            return;
         }
     } catch (error) {
         console.error('AI Generation Error:', error);
+        window.showNotification('AI service unavailable. Using template-based generation.', 'warning');
     }
 
-    // Fallback: Template-based generation
-    generateTemplateDraft(report, plan, ncrCount, majorCount, minorCount);
+    // Restore button
+    if (aiBtn) {
+        aiBtn.disabled = false;
+        aiBtn.innerHTML = originalBtnHTML;
+    }
+
+    // Fallback: Template-based generation if AI failed
+    if (!useAI) {
+        generateTemplateDraft(report, plan, ncrCount, majorCount, minorCount);
+    }
 };
 
 // Parse AI response into report sections
