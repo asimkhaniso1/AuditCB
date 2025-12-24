@@ -470,7 +470,7 @@ function renderExecutionDetail(reportId) {
                 <button class="tab-btn" data-tab="ncr">NCRs</button>
                 <button class="tab-btn" data-tab="capa">CAPA</button>
                 <button class="tab-btn" data-tab="observations">Observations</button>
-                <button class="tab-btn" data-tab="review" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                <button class="tab-btn" data-tab="review">
                     <i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i> Review & Submit
                 </button>
                 <button class="tab-btn" data-tab="summary">Summary</button>
