@@ -2236,11 +2236,17 @@ document.addEventListener('click', function (e) {
     }
 });
 
-// Global event delegation for status buttons (OK, NC, N/A)
+// Global event delegation for status buttons (OK, NC, N/A) - using capture phase
 document.addEventListener('click', function (e) {
     // Check if clicked element or any parent has status-btn class
     let btn = e.target;
-    while (btn && !btn.classList.contains('status-btn')) {
+
+    // Log all clicks for debugging
+    if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+        console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
+    }
+
+    while (btn && btn.classList && !btn.classList.contains('status-btn')) {
         btn = btn.parentElement;
         if (!btn || btn === document.body) {
             btn = null;
@@ -2248,7 +2254,10 @@ document.addEventListener('click', function (e) {
         }
     }
 
-    if (btn && btn.classList.contains('status-btn')) {
+    if (btn && btn.classList && btn.classList.contains('status-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+
         const uniqueId = btn.getAttribute('data-unique-id');
         const status = btn.getAttribute('data-status');
         console.log('Status button clicked:', status, 'for item:', uniqueId);
@@ -2257,4 +2266,4 @@ document.addEventListener('click', function (e) {
             window.setChecklistStatus(uniqueId, status);
         }
     }
-});
+}, true); // true = capture phase
