@@ -1285,7 +1285,7 @@ function renderReportsTableRows(reports) {
             <td><span class="badge" style="${badgeStyle}">${r.status}</span></td>
             <td><div style="display: flex; align-items: center; gap: 0.5rem;"><div style="width: 24px; height: 24px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #64748b;"><i class="fa-solid fa-user"></i></div> ${r.leadAuditor || 'System'}</div></td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="window.renderExecutionDetail(${r.id})">
+                <button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${r.id})">
                     <i class="fa-solid fa-eye"></i> View
                 </button>
             </td>
