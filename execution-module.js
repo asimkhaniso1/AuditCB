@@ -1410,7 +1410,7 @@ window.submitToLeadAuditor = function (reportId) {
 
     // Navigate back to execution list
     setTimeout(() => {
-        renderExecutionEnhanced();
+        renderAuditExecutionEnhanced();
     }, 1500);
 };
 
