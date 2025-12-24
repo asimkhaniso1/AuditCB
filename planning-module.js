@@ -1089,10 +1089,29 @@ function openChecklistSelectionModal(planId) {
     if (!plan) return;
 
     const checklists = state.checklists || [];
-    const matchingChecklists = checklists.filter(c => c.standard === plan.standard);
+
+    // Improved matching: check if standard contains the plan standard or vice versa
+    const planStandards = (plan.standard || '').split(', ').map(s => s.trim().toLowerCase());
+    const matchingChecklists = checklists.filter(c => {
+        if (!c.standard) return true; // If no standard specified, include it
+        const checklistStandard = c.standard.toLowerCase();
+        return planStandards.some(ps =>
+            checklistStandard.includes(ps.split(':')[0]) || // Check base standard (e.g., "iso 9001")
+            ps.includes(checklistStandard.split(':')[0])
+        );
+    });
+
     const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
-    const customChecklists = matchingChecklists.filter(c => c.type === 'custom');
+    const customChecklists = matchingChecklists.filter(c => c.type === 'custom' || !c.type);
     const selectedIds = plan.selectedChecklists || [];
+
+    // Helper function to count items in a checklist (supports both flat and hierarchical)
+    const getItemCount = (cl) => {
+        if (cl.clauses && cl.clauses.length > 0) {
+            return cl.clauses.reduce((sum, clause) => sum + (clause.subClauses?.length || 0), 0);
+        }
+        return cl.items?.length || 0;
+    };
 
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
@@ -1102,7 +1121,7 @@ function openChecklistSelectionModal(planId) {
     modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin: 0;">
-                Select checklists to use during this audit. Only checklists matching <strong>${plan.standard}</strong> are shown.
+                Select checklists to use during this audit. Showing checklists for <strong>${plan.standard || 'All Standards'}</strong>.
             </p>
         </div>
 
@@ -1121,7 +1140,7 @@ function openChecklistSelectionModal(planId) {
                             </div>
                             <div style="text-align: left;">
                                 <p style="font-weight: 600; margin: 0; color: var(--text-primary); text-align: left;">${cl.name}</p>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${cl.items?.length || 0} items</p>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${getItemCount(cl)} items • ${cl.standard || 'Generic'}</p>
                             </div>
                         </label>
                     `).join('')}
@@ -1144,7 +1163,7 @@ function openChecklistSelectionModal(planId) {
                             </div>
                             <div style="text-align: left;">
                                 <p style="font-weight: 600; margin: 0; color: var(--text-primary); text-align: left;">${cl.name}</p>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${cl.items?.length || 0} items • by ${cl.createdBy || 'Unknown'}</p>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${getItemCount(cl)} items • by ${cl.createdBy || 'Unknown'}</p>
                             </div>
                         </label>
                     `).join('')}
