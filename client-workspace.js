@@ -251,13 +251,14 @@ window.renderClientModule = function (clientId, moduleName) {
 
     switch (moduleName) {
         case 'overview':
-            // Use the full Client Dashboard (same as old client detail page)
-            // Hide Account Setup tab - it's accessed via Settings
-            if (typeof renderClientDetail === 'function') {
-                renderClientDetail(client.id, { showAccountSetup: false });
-            } else {
-                contentArea.innerHTML = 'Overview not available';
-            }
+            // Use the modern Client Dashboard with charts and quick actions
+            contentArea.innerHTML = renderClientOverview(client);
+            // Initialize dashboard charts after DOM is ready
+            setTimeout(() => {
+                if (typeof initClientDashboardCharts === 'function') {
+                    initClientDashboardCharts(client.id);
+                }
+            }, 100);
             break;
         case 'cycle':
             contentArea.innerHTML = renderAuditCycleTimeline(client);
