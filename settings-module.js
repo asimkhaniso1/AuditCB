@@ -1992,32 +1992,159 @@ Return ONLY the JSON array, no markdown or explanation.`;
     window.saveData();
 }
 
-// Built-in clause database for common standards (fallback) - COMPREHENSIVE with sub-clauses
+// Built-in clause database for common standards (fallback) - COMPREHENSIVE with sub-clauses and bullet points
 function getBuiltInClauses(standardName) {
     const iso9001Clauses = [
         // Clause 4 - Context of the organization
         { clause: "4.1", title: "Understanding the organization and its context", requirement: "The organization shall determine external and internal issues that are relevant to its purpose and strategic direction and that affect its ability to achieve the intended results of its QMS." },
-        { clause: "4.2", title: "Understanding the needs and expectations of interested parties", requirement: "The organization shall determine: a) the interested parties that are relevant to the QMS; b) the requirements of these interested parties that are relevant to the QMS." },
-        { clause: "4.3", title: "Determining the scope of the quality management system", requirement: "The organization shall determine the boundaries and applicability of the QMS to establish its scope. The scope shall be available and maintained as documented information." },
+        {
+            clause: "4.2",
+            title: "Understanding the needs and expectations of interested parties",
+            requirement: "The organization shall determine the interested parties and their relevant requirements.",
+            subRequirements: [
+                "a) the interested parties that are relevant to the QMS",
+                "b) the requirements of these interested parties that are relevant to the QMS",
+                "c) which of these requirements will be addressed through the QMS"
+            ]
+        },
+        {
+            clause: "4.3",
+            title: "Determining the scope of the quality management system",
+            requirement: "The organization shall determine the boundaries and applicability of the QMS to establish its scope, considering:",
+            subRequirements: [
+                "a) the external and internal issues referred to in 4.1",
+                "b) the requirements of relevant interested parties referred to in 4.2",
+                "c) the products and services of the organization"
+            ]
+        },
         { clause: "4.4", title: "Quality management system and its processes", requirement: "The organization shall establish, implement, maintain and continually improve a QMS, including the processes needed and their interactions." },
-        { clause: "4.4.1", title: "QMS processes - Requirements", requirement: "The organization shall determine inputs required and outputs expected, sequence and interaction, criteria and methods, resources needed, responsibilities, risks and opportunities, and evaluation methods." },
-        { clause: "4.4.2", title: "QMS processes - Documentation", requirement: "The organization shall maintain documented information to support the operation of its processes and retain documented information to have confidence that the processes are being carried out as planned." },
+        {
+            clause: "4.4.1",
+            title: "QMS processes - Requirements",
+            requirement: "The organization shall determine the processes needed for the QMS and shall:",
+            subRequirements: [
+                "a) determine the inputs required and the outputs expected from these processes",
+                "b) determine the sequence and interaction of these processes",
+                "c) determine and apply the criteria and methods needed to ensure effective operation and control",
+                "d) determine the resources needed for these processes and ensure their availability",
+                "e) assign the responsibilities and authorities for these processes",
+                "f) address the risks and opportunities as determined in accordance with 6.1",
+                "g) evaluate these processes and implement any changes needed to ensure they achieve intended results",
+                "h) improve the processes and the QMS"
+            ]
+        },
+        {
+            clause: "4.4.2",
+            title: "QMS processes - Documentation",
+            requirement: "To the extent necessary, the organization shall:",
+            subRequirements: [
+                "a) maintain documented information to support the operation of its processes",
+                "b) retain documented information to have confidence that the processes are being carried out as planned"
+            ]
+        },
 
         // Clause 5 - Leadership
         { clause: "5.1", title: "Leadership and commitment", requirement: "Top management shall demonstrate leadership and commitment with respect to the quality management system." },
-        { clause: "5.1.1", title: "Leadership and commitment - General", requirement: "Top management shall take accountability for QMS effectiveness, ensure quality policy and objectives are established, ensure integration of QMS into business processes, promote use of process approach and risk-based thinking." },
-        { clause: "5.1.2", title: "Customer focus", requirement: "Top management shall demonstrate leadership and commitment with respect to customer focus by ensuring customer requirements are determined and met, risks and opportunities are addressed, and focus on enhancing customer satisfaction is maintained." },
+        {
+            clause: "5.1.1",
+            title: "Leadership and commitment - General",
+            requirement: "Top management shall demonstrate leadership and commitment with respect to the QMS by:",
+            subRequirements: [
+                "a) taking accountability for the effectiveness of the QMS",
+                "b) ensuring that the quality policy and quality objectives are established and compatible with strategic direction",
+                "c) ensuring the integration of the QMS requirements into the organization's business processes",
+                "d) promoting the use of the process approach and risk-based thinking",
+                "e) ensuring that the resources needed for the QMS are available",
+                "f) communicating the importance of effective quality management and conforming to the QMS requirements",
+                "g) ensuring that the QMS achieves its intended results",
+                "h) engaging, directing and supporting persons to contribute to the effectiveness of the QMS",
+                "i) promoting improvement",
+                "j) supporting other relevant management roles to demonstrate their leadership"
+            ]
+        },
+        {
+            clause: "5.1.2",
+            title: "Customer focus",
+            requirement: "Top management shall demonstrate leadership and commitment with respect to customer focus by ensuring that:",
+            subRequirements: [
+                "a) customer and applicable statutory and regulatory requirements are determined, understood and consistently met",
+                "b) the risks and opportunities that can affect conformity of products and services and ability to enhance customer satisfaction are determined and addressed",
+                "c) the focus on enhancing customer satisfaction is maintained"
+            ]
+        },
         { clause: "5.2", title: "Policy", requirement: "Top management shall establish, implement and maintain a quality policy." },
-        { clause: "5.2.1", title: "Establishing the quality policy", requirement: "The quality policy shall be appropriate to the purpose and context, provide a framework for setting quality objectives, include commitment to satisfy applicable requirements, and include commitment to continual improvement." },
-        { clause: "5.2.2", title: "Communicating the quality policy", requirement: "The quality policy shall be available and maintained as documented information, be communicated, understood and applied within the organization, and be available to relevant interested parties." },
-        { clause: "5.3", title: "Organizational roles, responsibilities and authorities", requirement: "Top management shall ensure that the responsibilities and authorities for relevant roles are assigned, communicated and understood within the organization." },
+        {
+            clause: "5.2.1",
+            title: "Establishing the quality policy",
+            requirement: "The quality policy shall:",
+            subRequirements: [
+                "a) be appropriate to the purpose and context of the organization and supports its strategic direction",
+                "b) provide a framework for setting quality objectives",
+                "c) include a commitment to satisfy applicable requirements",
+                "d) include a commitment to continual improvement of the QMS"
+            ]
+        },
+        {
+            clause: "5.2.2",
+            title: "Communicating the quality policy",
+            requirement: "The quality policy shall:",
+            subRequirements: [
+                "a) be available and be maintained as documented information",
+                "b) be communicated, understood and applied within the organization",
+                "c) be available to relevant interested parties, as appropriate"
+            ]
+        },
+        {
+            clause: "5.3",
+            title: "Organizational roles, responsibilities and authorities",
+            requirement: "Top management shall ensure that the responsibilities and authorities for relevant roles are assigned, communicated and understood. Top management shall assign responsibility and authority for:",
+            subRequirements: [
+                "a) ensuring that the QMS conforms to the requirements of ISO 9001",
+                "b) ensuring that the processes are delivering their intended outputs",
+                "c) reporting on the performance of the QMS and on opportunities for improvement, in particular to top management",
+                "d) ensuring the promotion of customer focus throughout the organization",
+                "e) ensuring that the integrity of the QMS is maintained when changes to the QMS are planned and implemented"
+            ]
+        },
 
         // Clause 6 - Planning
-        { clause: "6.1", title: "Actions to address risks and opportunities", requirement: "When planning for the QMS, the organization shall consider the issues referred to in 4.1 and the requirements referred to in 4.2 and determine the risks and opportunities that need to be addressed." },
-        { clause: "6.1.1", title: "Planning - Risks and opportunities", requirement: "The organization shall plan actions to address these risks and opportunities, considering how to integrate and implement the actions into its QMS processes and evaluate the effectiveness of these actions." },
+        {
+            clause: "6.1",
+            title: "Actions to address risks and opportunities",
+            requirement: "When planning for the QMS, the organization shall consider the issues referred to in 4.1 and the requirements referred to in 4.2 and determine the risks and opportunities that need to be addressed to:",
+            subRequirements: [
+                "a) give assurance that the QMS can achieve its intended results",
+                "b) enhance desirable effects",
+                "c) prevent, or reduce, undesired effects",
+                "d) achieve improvement"
+            ]
+        },
+        {
+            clause: "6.1.1",
+            title: "Planning - Risks and opportunities",
+            requirement: "The organization shall plan:",
+            subRequirements: [
+                "a) actions to address these risks and opportunities",
+                "b) how to integrate and implement the actions into its QMS processes",
+                "c) evaluate the effectiveness of these actions"
+            ]
+        },
         { clause: "6.1.2", title: "Planning - Objectives of actions", requirement: "Actions taken to address risks and opportunities shall be proportionate to the potential impact on the conformity of products and services." },
         { clause: "6.2", title: "Quality objectives and planning to achieve them", requirement: "The organization shall establish quality objectives at relevant functions, levels and processes needed for the QMS." },
-        { clause: "6.2.1", title: "Quality objectives - Requirements", requirement: "Quality objectives shall be consistent with the quality policy, be measurable, take into account applicable requirements, be relevant to conformity of products and services, be monitored, communicated and updated." },
+        {
+            clause: "6.2.1",
+            title: "Quality objectives - Requirements",
+            requirement: "The quality objectives shall:",
+            subRequirements: [
+                "a) be consistent with the quality policy",
+                "b) be measurable",
+                "c) take into account applicable requirements",
+                "d) be relevant to conformity of products and services and to enhancement of customer satisfaction",
+                "e) be monitored",
+                "f) be communicated",
+                "g) be updated as appropriate"
+            ]
+        },
         { clause: "6.2.2", title: "Planning to achieve objectives", requirement: "When planning how to achieve quality objectives, the organization shall determine what will be done, what resources will be required, who will be responsible, when it will be completed, and how results will be evaluated." },
         { clause: "6.3", title: "Planning of changes", requirement: "When the organization determines the need for changes to the QMS, changes shall be carried out in a planned manner considering the purpose, consequences, integrity and availability of resources." },
 
@@ -2238,21 +2365,30 @@ window.viewKBAnalysis = function (docId) {
             <h4 style="margin: 0 0 0.75rem 0; color: #0369a1;">
                 <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Extracted Clauses (${clauses.length})
             </h4>
-            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
                 <table style="width: 100%; font-size: 0.85rem;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
                         <tr>
                             <th style="padding: 0.5rem; width: 70px;">Clause</th>
-                            <th style="padding: 0.5rem;">Title</th>
-                            <th style="padding: 0.5rem;">Requirement</th>
+                            <th style="padding: 0.5rem; width: 25%;">Title</th>
+                            <th style="padding: 0.5rem;">Requirement & Sub-Requirements</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${clauses.map(c => `
-                            <tr>
+                            <tr style="vertical-align: top;">
                                 <td style="padding: 0.5rem;"><span class="badge bg-blue">${window.UTILS.escapeHtml(c.clause)}</span></td>
                                 <td style="padding: 0.5rem; font-weight: 500;">${window.UTILS.escapeHtml(c.title)}</td>
-                                <td style="padding: 0.5rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(c.requirement)}</td>
+                                <td style="padding: 0.5rem; color: var(--text-secondary);">
+                                    <div>${window.UTILS.escapeHtml(c.requirement)}</div>
+                                    ${c.subRequirements && c.subRequirements.length > 0 ? `
+                                        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; color: #374151;">
+                                            ${c.subRequirements.map(sub => `
+                                                <li style="margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(sub)}</li>
+                                            `).join('')}
+                                        </ul>
+                                    ` : ''}
+                                </td>
                             </tr>
                         `).join('')}
                     </tbody>
