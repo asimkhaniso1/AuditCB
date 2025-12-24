@@ -509,7 +509,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 return `
                     <div class="card checklist-item" id="row-${uniqueId}" style="margin-bottom: 0.5rem; padding: 1rem; border-left: 4px solid #e2e8f0;">
-                         <div style="display: grid; grid-template-columns: 80px 1fr 180px; gap: 1rem; align-items: start;">
+                         <div style="display: grid; grid-template-columns: 30px 80px 1fr 180px; gap: 1rem; align-items: start;">
+                            <div style="display: flex; align-items: center;">
+                                <input type="checkbox" class="item-checkbox" data-unique-id="${uniqueId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select this item for bulk action">
+                            </div>
                             <div style="font-weight: bold; color: var(--primary-color);">${item.clause || 'N/A'}</div>
                             <div>
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(item.requirement)}</div>
@@ -2203,6 +2206,12 @@ document.addEventListener('click', function (e) {
         console.log('Found', items.length, 'items in section');
 
         items.forEach((item, idx) => {
+            // Toggle the individual checkbox too
+            const itemCheckbox = item.querySelector('.item-checkbox');
+            if (itemCheckbox) {
+                itemCheckbox.checked = isChecked;
+            }
+
             if (isChecked) {
                 item.classList.add('selected-item');
                 item.style.background = '#eff6ff';
@@ -2215,6 +2224,27 @@ document.addEventListener('click', function (e) {
         });
 
         console.log('Selection complete for', items.length, 'items');
+    }
+});
+
+// Global event delegation for individual item checkboxes
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('item-checkbox')) {
+        const checkbox = e.target;
+        const uniqueId = checkbox.getAttribute('data-unique-id');
+        const row = document.getElementById('row-' + uniqueId);
+
+        if (row) {
+            if (checkbox.checked) {
+                row.classList.add('selected-item');
+                row.style.background = '#eff6ff';
+                row.style.borderLeft = '4px solid var(--primary-color)';
+            } else {
+                row.classList.remove('selected-item');
+                row.style.background = '';
+                row.style.borderLeft = '4px solid #e2e8f0';
+            }
+        }
     }
 });
 
