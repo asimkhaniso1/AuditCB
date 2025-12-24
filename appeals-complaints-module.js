@@ -541,6 +541,10 @@ window.viewAppealDetail = function (id) {
         return colors[status] || '#6b7280';
     };
 
+    // Get panel records if they exist
+    const panelRecords = appeal.panelRecords || {};
+    const panelMembers = panelRecords.members || [];
+
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
@@ -588,6 +592,100 @@ window.viewAppealDetail = function (id) {
                     <button class="btn btn-secondary" onclick="window.addAppealNote(${appeal.id})">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add Note
                     </button>
+                    <button class="btn btn-outline-primary" onclick="window.managePanelRecords(${appeal.id})">
+                        <i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Panel Records
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Panel Records Section (ISO 17021 Clause 9.10.3) -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">
+                        <i class="fa-solid fa-users-rectangle" style="margin-right: 0.5rem; color: #7c3aed;"></i>
+                        Appeals Panel Records
+                    </h3>
+                    <span class="badge" style="background: #ede9fe; color: #7c3aed;">ISO 17021 Clause 9.10.3</span>
+                </div>
+                
+                ${panelMembers.length > 0 ? `
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="margin-bottom: 0.75rem; color: #374151;">Panel Composition</h4>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Role</th>
+                                        <th>Expertise</th>
+                                        <th>Independence Verified</th>
+                                        <th>COI Declaration</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${panelMembers.map(m => `
+                                        <tr>
+                                            <td><strong>${window.UTILS.escapeHtml(m.name)}</strong></td>
+                                            <td><span class="badge" style="background: ${m.role === 'Chair' ? '#fef3c7' : '#e0f2fe'}; color: ${m.role === 'Chair' ? '#92400e' : '#0369a1'};">${window.UTILS.escapeHtml(m.role)}</span></td>
+                                            <td>${window.UTILS.escapeHtml(m.expertise || '-')}</td>
+                                            <td>
+                                                ${m.independenceVerified
+            ? '<span style="color: #16a34a;"><i class="fa-solid fa-check-circle"></i> Yes</span>'
+            : '<span style="color: #dc2626;"><i class="fa-solid fa-times-circle"></i> No</span>'}
+                                            </td>
+                                            <td>
+                                                ${m.coiDeclared
+            ? '<span style="color: #16a34a;"><i class="fa-solid fa-file-signature"></i> Signed</span>'
+            : '<span style="color: #6b7280;">Pending</span>'}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    ${panelRecords.meetingDate ? `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                            <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                                <strong style="color: #374151;">Meeting Details</strong>
+                                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                    <strong>Date:</strong> ${window.UTILS.escapeHtml(panelRecords.meetingDate)}<br>
+                                    <strong>Duration:</strong> ${window.UTILS.escapeHtml(panelRecords.meetingDuration || 'Not recorded')}<br>
+                                    <strong>Location:</strong> ${window.UTILS.escapeHtml(panelRecords.meetingLocation || 'Not specified')}
+                                </p>
+                            </div>
+                            <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                                <strong style="color: #374151;">Decision Record</strong>
+                                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                    <strong>Outcome:</strong> <span class="badge" style="background: ${panelRecords.decision === 'Upheld' ? '#dcfce7' : panelRecords.decision === 'Rejected' ? '#fee2e2' : '#fef3c7'}; color: ${panelRecords.decision === 'Upheld' ? '#166534' : panelRecords.decision === 'Rejected' ? '#991b1b' : '#92400e'};">${window.UTILS.escapeHtml(panelRecords.decision || 'Pending')}</span><br>
+                                    <strong>Voting:</strong> ${window.UTILS.escapeHtml(panelRecords.voting || 'Not recorded')}
+                                </p>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${panelRecords.rationale ? `
+                        <div style="margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem; color: #374151;">Decision Rationale</h4>
+                            <p style="background: #eff6ff; padding: 1rem; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                                ${window.UTILS.escapeHtml(panelRecords.rationale)}
+                            </p>
+                        </div>
+                    ` : ''}
+                ` : `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                        <i class="fa-solid fa-users" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                        <p>No panel records have been created yet.</p>
+                        <p style="font-size: 0.85rem;">Click "Panel Records" button to configure the appeals panel for this case.</p>
+                    </div>
+                `}
+                
+                <div style="padding: 0.75rem; background: #faf5ff; border-left: 4px solid #7c3aed; border-radius: 4px; margin-top: 1rem;">
+                    <small style="color: #6b21a8;">
+                        <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                        ISO 17021-1 Clause 9.10.3 requires records of panel composition, independence verification, and decision rationale for all appeals.
+                    </small>
                 </div>
             </div>
             
@@ -995,6 +1093,240 @@ window.printACRegister = function (type) {
 
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
+};
+
+// ============================================
+// APPEALS PANEL RECORDS (ISO 17021 Clause 9.10.3)
+// ============================================
+window.managePanelRecords = function (appealId) {
+    const appeal = window.state.appeals.find(a => a.id === appealId);
+    if (!appeal) return;
+
+    // Initialize panel records if not exists
+    if (!appeal.panelRecords) {
+        appeal.panelRecords = {
+            members: [],
+            meetingDate: '',
+            meetingDuration: '',
+            meetingLocation: '',
+            decision: '',
+            voting: '',
+            rationale: ''
+        };
+    }
+
+    const panelRecords = appeal.panelRecords;
+    const members = panelRecords.members || [];
+
+    // Get impartiality committee members as potential panel members
+    const impartialityMembers = window.state.impartialityCommittee?.members || [];
+
+    document.getElementById('modal-title').textContent = `Appeals Panel Records - APP-${String(appeal.id).padStart(3, '0')}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #faf5ff; border-left: 4px solid #7c3aed; border-radius: 4px;">
+            <strong style="color: #6b21a8;">ISO 17021-1 Clause 9.10.3</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #7c3aed;">
+                Records must include panel composition, independence verification, conflict of interest declarations, and decision rationale.
+            </p>
+        </div>
+        
+        <form id="panel-records-form">
+            <h4 style="margin: 1.5rem 0 1rem 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">
+                <i class="fa-solid fa-users" style="margin-right: 0.5rem; color: #7c3aed;"></i>Panel Composition
+            </h4>
+            
+            <div id="panel-members-list">
+                ${members.length > 0 ? members.map((m, idx) => `
+                    <div class="panel-member-row" style="display: grid; grid-template-columns: 2fr 1fr 2fr 1fr 1fr auto; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;">
+                        <input type="text" class="form-control member-name" placeholder="Name" value="${window.UTILS.escapeHtml(m.name)}" style="margin: 0;">
+                        <select class="form-control member-role" style="margin: 0;">
+                            <option value="Chair" ${m.role === 'Chair' ? 'selected' : ''}>Chair</option>
+                            <option value="Member" ${m.role === 'Member' ? 'selected' : ''}>Member</option>
+                            <option value="Observer" ${m.role === 'Observer' ? 'selected' : ''}>Observer</option>
+                        </select>
+                        <input type="text" class="form-control member-expertise" placeholder="Expertise" value="${window.UTILS.escapeHtml(m.expertise || '')}" style="margin: 0;">
+                        <label style="display: flex; align-items: center; gap: 0.25rem; margin: 0; font-size: 0.85rem;">
+                            <input type="checkbox" class="member-independence" ${m.independenceVerified ? 'checked' : ''}> Independent
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.25rem; margin: 0; font-size: 0.85rem;">
+                            <input type="checkbox" class="member-coi" ${m.coiDeclared ? 'checked' : ''}> COI Signed
+                        </label>
+                        <button type="button" class="btn btn-sm btn-icon" onclick="this.closest('.panel-member-row').remove()" title="Remove">
+                            <i class="fa-solid fa-times" style="color: #dc2626;"></i>
+                        </button>
+                    </div>
+                `).join('') : '<p style="color: #6b7280; font-size: 0.9rem;">No panel members added yet.</p>'}
+            </div>
+            
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="window.addPanelMemberRow()">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Member
+                </button>
+                ${impartialityMembers.length > 0 ? `
+                    <select id="quick-add-member" class="form-control" style="max-width: 200px; margin: 0;" onchange="window.quickAddPanelMember(this.value)">
+                        <option value="">Quick Add from Committee...</option>
+                        ${impartialityMembers.map(m => `<option value="${window.UTILS.escapeHtml(m.name)}|${window.UTILS.escapeHtml(m.expertise || '')}">${window.UTILS.escapeHtml(m.name)}</option>`).join('')}
+                    </select>
+                ` : ''}
+            </div>
+            
+            <h4 style="margin: 1.5rem 0 1rem 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">
+                <i class="fa-solid fa-calendar" style="margin-right: 0.5rem; color: #0284c7;"></i>Meeting Details
+            </h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label>Meeting Date</label>
+                    <input type="date" id="panel-meeting-date" class="form-control" value="${panelRecords.meetingDate || ''}">
+                </div>
+                <div>
+                    <label>Duration</label>
+                    <input type="text" id="panel-meeting-duration" class="form-control" placeholder="e.g., 2 hours" value="${window.UTILS.escapeHtml(panelRecords.meetingDuration || '')}">
+                </div>
+                <div>
+                    <label>Location</label>
+                    <input type="text" id="panel-meeting-location" class="form-control" placeholder="e.g., Conference Room A" value="${window.UTILS.escapeHtml(panelRecords.meetingLocation || '')}">
+                </div>
+            </div>
+            
+            <h4 style="margin: 1.5rem 0 1rem 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">
+                <i class="fa-solid fa-gavel" style="margin-right: 0.5rem; color: #16a34a;"></i>Decision Record
+            </h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label>Decision</label>
+                    <select id="panel-decision" class="form-control">
+                        <option value="">-- Select Decision --</option>
+                        <option value="Upheld" ${panelRecords.decision === 'Upheld' ? 'selected' : ''}>Appeal Upheld</option>
+                        <option value="Partially Upheld" ${panelRecords.decision === 'Partially Upheld' ? 'selected' : ''}>Partially Upheld</option>
+                        <option value="Rejected" ${panelRecords.decision === 'Rejected' ? 'selected' : ''}>Appeal Rejected</option>
+                        <option value="Referred" ${panelRecords.decision === 'Referred' ? 'selected' : ''}>Referred to Higher Authority</option>
+                        <option value="Pending" ${panelRecords.decision === 'Pending' ? 'selected' : ''}>Decision Pending</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Voting Record</label>
+                    <input type="text" id="panel-voting" class="form-control" placeholder="e.g., 3 for, 1 against, 1 abstain" value="${window.UTILS.escapeHtml(panelRecords.voting || '')}">
+                </div>
+            </div>
+            
+            <div style="margin-top: 1rem;">
+                <label>Decision Rationale <span style="color: var(--danger-color);">*</span></label>
+                <textarea id="panel-rationale" class="form-control" rows="4" placeholder="Document the reasoning behind the panel's decision. This is required for ISO 17021 compliance.">${window.UTILS.escapeHtml(panelRecords.rationale || '')}</textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = function () {
+        // Collect panel members
+        const memberRows = document.querySelectorAll('.panel-member-row');
+        const newMembers = [];
+        memberRows.forEach(row => {
+            const name = row.querySelector('.member-name').value.trim();
+            if (name) {
+                newMembers.push({
+                    name: name,
+                    role: row.querySelector('.member-role').value,
+                    expertise: row.querySelector('.member-expertise').value.trim(),
+                    independenceVerified: row.querySelector('.member-independence').checked,
+                    coiDeclared: row.querySelector('.member-coi').checked
+                });
+            }
+        });
+
+        // Update panel records
+        appeal.panelRecords = {
+            members: newMembers,
+            meetingDate: document.getElementById('panel-meeting-date').value,
+            meetingDuration: document.getElementById('panel-meeting-duration').value.trim(),
+            meetingLocation: document.getElementById('panel-meeting-location').value.trim(),
+            decision: document.getElementById('panel-decision').value,
+            voting: document.getElementById('panel-voting').value.trim(),
+            rationale: document.getElementById('panel-rationale').value.trim()
+        };
+
+        // Add to history
+        appeal.history.push({
+            date: new Date().toISOString().split('T')[0],
+            action: 'Panel Records Updated',
+            user: window.state.currentUser.name,
+            notes: `Panel records updated: ${newMembers.length} members, Decision: ${appeal.panelRecords.decision || 'Pending'}`
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Panel records saved successfully', 'success');
+        window.viewAppealDetail(appealId);
+    };
+
+    window.openModal();
+};
+
+window.addPanelMemberRow = function () {
+    const container = document.getElementById('panel-members-list');
+    // Remove "no members" message if present
+    const noMembersMsg = container.querySelector('p');
+    if (noMembersMsg) noMembersMsg.remove();
+
+    const newRow = document.createElement('div');
+    newRow.className = 'panel-member-row';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 2fr 1fr 1fr auto; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;';
+    newRow.innerHTML = `
+        <input type="text" class="form-control member-name" placeholder="Name" style="margin: 0;">
+        <select class="form-control member-role" style="margin: 0;">
+            <option value="Chair">Chair</option>
+            <option value="Member" selected>Member</option>
+            <option value="Observer">Observer</option>
+        </select>
+        <input type="text" class="form-control member-expertise" placeholder="Expertise" style="margin: 0;">
+        <label style="display: flex; align-items: center; gap: 0.25rem; margin: 0; font-size: 0.85rem;">
+            <input type="checkbox" class="member-independence"> Independent
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.25rem; margin: 0; font-size: 0.85rem;">
+            <input type="checkbox" class="member-coi"> COI Signed
+        </label>
+        <button type="button" class="btn btn-sm btn-icon" onclick="this.closest('.panel-member-row').remove()" title="Remove">
+            <i class="fa-solid fa-times" style="color: #dc2626;"></i>
+        </button>
+    `;
+    container.appendChild(newRow);
+};
+
+window.quickAddPanelMember = function (value) {
+    if (!value) return;
+    const [name, expertise] = value.split('|');
+
+    const container = document.getElementById('panel-members-list');
+    const noMembersMsg = container.querySelector('p');
+    if (noMembersMsg) noMembersMsg.remove();
+
+    const newRow = document.createElement('div');
+    newRow.className = 'panel-member-row';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 2fr 1fr 1fr auto; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;';
+    newRow.innerHTML = `
+        <input type="text" class="form-control member-name" placeholder="Name" value="${window.UTILS.escapeHtml(name)}" style="margin: 0;">
+        <select class="form-control member-role" style="margin: 0;">
+            <option value="Chair">Chair</option>
+            <option value="Member" selected>Member</option>
+            <option value="Observer">Observer</option>
+        </select>
+        <input type="text" class="form-control member-expertise" placeholder="Expertise" value="${window.UTILS.escapeHtml(expertise)}" style="margin: 0;">
+        <label style="display: flex; align-items: center; gap: 0.25rem; margin: 0; font-size: 0.85rem;">
+            <input type="checkbox" class="member-independence" checked> Independent
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.25rem; margin: 0; font-size: 0.85rem;">
+            <input type="checkbox" class="member-coi"> COI Signed
+        </label>
+        <button type="button" class="btn btn-sm btn-icon" onclick="this.closest('.panel-member-row').remove()" title="Remove">
+            <i class="fa-solid fa-times" style="color: #dc2626;"></i>
+        </button>
+    `;
+    container.appendChild(newRow);
+
+    // Reset the select
+    document.getElementById('quick-add-member').value = '';
 };
 
 // Export

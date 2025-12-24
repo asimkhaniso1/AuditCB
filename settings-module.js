@@ -1759,6 +1759,11 @@ function getKnowledgeBaseHTML() {
                                             `}
                                         </td>
                                         <td>
+                                            ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
+                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis(${doc.id})" title="View Analysis">
+                                                    <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
+                                                </button>
+                                            ` : ''}
                                             <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('standard', ${doc.id})" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
@@ -2052,3 +2057,125 @@ window.deleteKnowledgeDoc = function (type, id) {
     window.showNotification('Document removed from Knowledge Base', 'success');
 };
 
+// ============================================
+// VIEW KNOWLEDGE BASE ANALYSIS
+// Shows extracted clauses and NCR references
+// ============================================
+window.viewKBAnalysis = function (docId) {
+    const kb = window.state.knowledgeBase;
+    const doc = kb.standards.find(d => d.id === docId);
+    if (!doc) return;
+
+    const clauses = doc.clauses || [];
+
+    // Find NCRs that reference this standard
+    const auditReports = window.state.auditReports || [];
+    const referencedNCRs = [];
+
+    auditReports.forEach(report => {
+        const ncrs = report.ncrs || [];
+        ncrs.forEach(ncr => {
+            // Check if NCR references this standard
+            if (ncr.standard && doc.name.toLowerCase().includes(ncr.standard.toLowerCase().replace('iso ', ''))) {
+                referencedNCRs.push({
+                    reportId: report.id,
+                    clientName: report.clientName,
+                    ncrId: ncr.id,
+                    clause: ncr.clause,
+                    finding: ncr.finding,
+                    severity: ncr.type || ncr.severity
+                });
+            }
+        });
+    });
+
+    document.getElementById('modal-title').textContent = `Analysis: ${doc.name}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem;">
+            <!-- Analysis Status -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f0fdf4; border-radius: 8px; margin-bottom: 1rem;">
+                <div>
+                    <strong style="color: #166534;"><i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i>Analysis Complete</strong>
+                    <div style="font-size: 0.85rem; color: #166534; margin-top: 0.25rem;">
+                        ${clauses.length} clauses extracted • Uploaded ${doc.uploadDate}
+                    </div>
+                </div>
+                <span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>
+            </div>
+            
+            <!-- NCR References -->
+            ${referencedNCRs.length > 0 ? `
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="margin: 0 0 0.75rem 0; color: #7c3aed;">
+                        <i class="fa-solid fa-link" style="margin-right: 0.5rem;"></i>NCR References (${referencedNCRs.length})
+                    </h4>
+                    <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <table style="width: 100%; font-size: 0.85rem;">
+                            <thead style="position: sticky; top: 0; background: #f8fafc;">
+                                <tr>
+                                    <th style="padding: 0.5rem;">Client</th>
+                                    <th style="padding: 0.5rem;">Clause</th>
+                                    <th style="padding: 0.5rem;">Finding</th>
+                                    <th style="padding: 0.5rem;">Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${referencedNCRs.map(ncr => `
+                                    <tr>
+                                        <td style="padding: 0.5rem;">${window.UTILS.escapeHtml(ncr.clientName || '-')}</td>
+                                        <td style="padding: 0.5rem;"><span class="badge bg-blue">${window.UTILS.escapeHtml(ncr.clause || '-')}</span></td>
+                                        <td style="padding: 0.5rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.finding || '-')}">${window.UTILS.escapeHtml(ncr.finding || '-')}</td>
+                                        <td style="padding: 0.5rem;"><span class="badge" style="background: ${ncr.severity === 'Major' ? '#fee2e2' : '#fef3c7'}; color: ${ncr.severity === 'Major' ? '#991b1b' : '#92400e'};">${window.UTILS.escapeHtml(ncr.severity || 'NC')}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : `
+                <div style="padding: 0.75rem; background: #f8fafc; border-radius: 6px; margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    No NCRs have referenced this standard yet. Clauses will be used when generating new NCR findings.
+                </div>
+            `}
+            
+            <!-- Extracted Clauses -->
+            <h4 style="margin: 0 0 0.75rem 0; color: #0369a1;">
+                <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Extracted Clauses (${clauses.length})
+            </h4>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                <table style="width: 100%; font-size: 0.85rem;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc;">
+                        <tr>
+                            <th style="padding: 0.5rem; width: 70px;">Clause</th>
+                            <th style="padding: 0.5rem;">Title</th>
+                            <th style="padding: 0.5rem;">Requirement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${clauses.map(c => `
+                            <tr>
+                                <td style="padding: 0.5rem;"><span class="badge bg-blue">${window.UTILS.escapeHtml(c.clause)}</span></td>
+                                <td style="padding: 0.5rem; font-weight: 500;">${window.UTILS.escapeHtml(c.title)}</td>
+                                <td style="padding: 0.5rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(c.requirement)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- How it's used -->
+            <div style="margin-top: 1rem; padding: 0.75rem; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
+                <strong style="color: #1e40af;">How this is used:</strong>
+                <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0; font-size: 0.85rem; color: #1e40af;">
+                    <li>When creating NCRs, AI references these clauses to suggest findings</li>
+                    <li>Clause requirements are included in NCR descriptions</li>
+                    <li>Helps ensure audit findings align with standard requirements</li>
+                </ul>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
