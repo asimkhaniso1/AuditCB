@@ -2545,26 +2545,47 @@ window.updateKBSection = function (docId, clauseId, newContent) {
 
 // Helper: Extract text from file (PDF/Text)
 window.extractTextFromFile = async function (file) {
-    try {
-        if (file.type === 'application/pdf') {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            let fullText = '';
-            const maxPages = Math.min(pdf.numPages, 15); // Limit pages for performance
-            for (let i = 1; i <= maxPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                fullText += pageText + '\n';
-            }
-            return fullText;
-        } else if (file.type.startsWith('text/')) {
-            return await file.text();
-        }
-    } catch (e) {
-        console.error('Text extraction failed:', e);
+    // Check if PDF.js is loaded
+    if (file.type === 'application/pdf' && (typeof pdfjsLib === 'undefined')) {
+        console.warn('PDF.js library not loaded. Skipping text extraction.');
+        return null; // Graceful degradation
     }
-    return null;
+
+    const extractionPromise = async () => {
+        try {
+            if (file.type === 'application/pdf') {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                let fullText = '';
+                const maxPages = Math.min(pdf.numPages, 10);
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
+                }
+                return fullText;
+            } else if (file.type.startsWith('text/')) {
+                return await file.text();
+            }
+        } catch (e) {
+            console.error('Text extraction extraction error:', e);
+            throw e;
+        }
+        return null;
+    };
+
+    // Race against 4-second timeout to prevent UI freeze
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => {
+        console.warn('Text extraction timed out - skipping');
+        resolve(null);
+    }, 4000));
+
+    try {
+        return await Promise.race([extractionPromise(), timeoutPromise]);
+    } catch (e) {
+        return null;
+    }
 };
 
 // Analyze Custom Document with AI
