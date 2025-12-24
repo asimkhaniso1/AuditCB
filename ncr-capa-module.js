@@ -312,13 +312,25 @@ function renderNCRTable(ncrs) {
                                     ${ncr.status}
                                 </span>
                             </td>
-                            <td>
+                            <td style="white-space: nowrap;">
                                 <button class="btn btn-sm btn-icon" onclick="viewNCRDetails(${ncr.id})" title="View Details">
                                     <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                 </button>
                                 <button class="btn btn-sm btn-icon" onclick="editNCR(${ncr.id})" title="Edit">
                                     <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                 </button>
+                                ${ncr.status === 'Open' ? `
+                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" onclick="openAddCAPAModal(${ncr.id})" title="Add CAPA">
+                                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA
+                                </button>` : ''}
+                                ${ncr.status === 'In Progress' && ncr.capaImplementedDate ? `
+                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" onclick="verifyCAPA(${ncr.id})" title="Verify CAPA">
+                                    <i class="fa-solid fa-check"></i> Verify
+                                </button>` : ''}
+                                ${ncr.status === 'In Progress' && !ncr.correctiveAction ? `
+                                <button class="btn btn-sm" style="background: #f59e0b; color: white; margin-left: 0.25rem;" onclick="openAddCAPAModal(${ncr.id})" title="Define CAPA">
+                                    <i class="fa-solid fa-tasks"></i> Define CAPA
+                                </button>` : ''}
                             </td>
                         </tr>
                     `;
@@ -1026,6 +1038,109 @@ window.updateCAPAProgress = function (ncrId) {
         window.closeModal();
         renderNCRCAPAModule();
         window.showNotification('CAPA progress updated', 'success');
+    };
+
+    window.openModal();
+};
+
+// ============================================
+// ADD CAPA MODAL - DEDICATED WORKFLOW
+// ============================================
+window.openAddCAPAModal = function (ncrId) {
+    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    if (!ncr) return;
+
+    document.getElementById('modal-title').textContent = `Add CAPA - NCR-${String(ncrId).padStart(3, '0')}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 1rem; margin-bottom: 1.5rem; border-radius: 0 8px 8px 0;">
+            <strong style="color: #0284c7;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>NCR Summary</strong>
+            <p style="margin: 0.5rem 0 0 0; color: #374151;"><strong>Finding:</strong> ${window.UTILS.escapeHtml(ncr.description)}</p>
+            <p style="margin: 0.25rem 0 0 0; color: #6b7280; font-size: 0.9rem;"><strong>Clause:</strong> ${ncr.clause} | <strong>Severity:</strong> ${ncr.severity} | <strong>Due:</strong> ${ncr.dueDate}</p>
+        </div>
+        
+        <form id="add-capa-form">
+            <!-- Step 1: Correction -->
+            <div class="form-group" style="background: #fefce8; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <label style="color: #854d0e; font-weight: 600;">
+                    <i class="fa-solid fa-1" style="background: #854d0e; color: white; padding: 2px 6px; border-radius: 50%; margin-right: 0.5rem; font-size: 0.75rem;"></i>
+                    Correction (Immediate Fix) <span style="color: #dc2626;">*</span>
+                </label>
+                <textarea class="form-control" id="add-capa-correction" rows="2" placeholder="What immediate action was taken to fix the problem?" required>${window.UTILS.escapeHtml(ncr.correction || '')}</textarea>
+                <small style="color: #92400e;">Action taken to address the immediate non-conformity</small>
+            </div>
+
+            <!-- Step 2: Root Cause -->
+            <div class="form-group" style="background: #fef3c7; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <label style="color: #92400e; font-weight: 600;">
+                    <i class="fa-solid fa-2" style="background: #92400e; color: white; padding: 2px 6px; border-radius: 50%; margin-right: 0.5rem; font-size: 0.75rem;"></i>
+                    Root Cause Analysis <span style="color: #dc2626;">*</span>
+                </label>
+                <textarea class="form-control" id="add-capa-root-cause" rows="3" placeholder="Why did this problem occur? Use 5-Why or Fishbone analysis." required>${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+                <small style="color: #92400e;">Identify the underlying cause to prevent recurrence</small>
+            </div>
+
+            <!-- Step 3: Corrective Action -->
+            <div class="form-group" style="background: #dcfce7; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <label style="color: #166534; font-weight: 600;">
+                    <i class="fa-solid fa-3" style="background: #166534; color: white; padding: 2px 6px; border-radius: 50%; margin-right: 0.5rem; font-size: 0.75rem;"></i>
+                    Corrective Action (CAPA) <span style="color: #dc2626;">*</span>
+                </label>
+                <textarea class="form-control" id="add-capa-action" rows="3" placeholder="What systemic change will prevent this from happening again?" required>${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
+                <small style="color: #166534;">Long-term solution addressing the root cause</small>
+            </div>
+
+            <!-- Step 4: Assignment -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin: 0;">
+                    <label><i class="fa-solid fa-user" style="margin-right: 0.5rem;"></i>Responsible Person <span style="color: #dc2626;">*</span></label>
+                    <input type="text" class="form-control" id="add-capa-responsible" value="${window.UTILS.escapeHtml(ncr.capaResponsible || '')}" placeholder="Who will implement this CAPA?" required>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label><i class="fa-solid fa-calendar" style="margin-right: 0.5rem;"></i>Target Completion Date</label>
+                    <input type="date" class="form-control" id="add-capa-target-date" value="${ncr.capaImplementedDate || ''}">
+                </div>
+            </div>
+
+            <!-- Step 5: Verification -->
+            <div class="form-group" style="background: #ede9fe; padding: 1rem; border-radius: 8px;">
+                <label style="color: #5b21b6; font-weight: 600;">
+                    <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i>
+                    Verification Method
+                </label>
+                <textarea class="form-control" id="add-capa-verification" rows="2" placeholder="How will effectiveness be verified? (e.g., review of 10 subsequent batches)">${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</textarea>
+                <small style="color: #5b21b6;">Define how the auditor will verify CAPA effectiveness</small>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').textContent = 'Save CAPA';
+    document.getElementById('modal-save').onclick = () => {
+        // Validation
+        const correction = document.getElementById('add-capa-correction').value.trim();
+        const rootCause = document.getElementById('add-capa-root-cause').value.trim();
+        const action = document.getElementById('add-capa-action').value.trim();
+        const responsible = document.getElementById('add-capa-responsible').value.trim();
+
+        if (!correction || !rootCause || !action || !responsible) {
+            window.showNotification('Please fill all required fields', 'error');
+            return;
+        }
+
+        // Save CAPA
+        ncr.correction = window.Sanitizer.sanitizeText(correction);
+        ncr.correctionDate = ncr.correctionDate || new Date().toISOString().split('T')[0];
+        ncr.rootCause = window.Sanitizer.sanitizeText(rootCause);
+        ncr.correctiveAction = window.Sanitizer.sanitizeText(action);
+        ncr.capaResponsible = window.Sanitizer.sanitizeText(responsible);
+        ncr.capaImplementedDate = document.getElementById('add-capa-target-date').value || null;
+        ncr.verificationMethod = window.Sanitizer.sanitizeText(document.getElementById('add-capa-verification').value);
+        ncr.status = 'In Progress';
+
+        window.saveData();
+        window.closeModal();
+        renderNCRCAPAModule(window.state.ncrContextClientId);
+        window.showNotification('CAPA added successfully! NCR is now In Progress.', 'success');
     };
 
     window.openModal();
