@@ -697,15 +697,25 @@ function viewAuditPlan(id) {
         progress = Math.round((completedItems / totalItems) * 100);
     }
 
+    // Helper to count items in a checklist (supports both formats)
+    const getChecklistItemCount = (cl) => {
+        if (!cl) return 0;
+        if (cl.clauses && Array.isArray(cl.clauses)) {
+            return cl.clauses.reduce((sum, clause) => sum + (clause.subClauses?.length || 0), 0);
+        }
+        return cl.items?.length || 0;
+    };
+
     // Helper to render checklist list
     const checklistListHTML = planChecklists.length > 0 ? planChecklists.map(clId => {
         const cl = checklists.find(c => c.id === clId);
         if (!cl) return '';
+        const itemCount = getChecklistItemCount(cl);
         return `
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
                 <div>
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${cl.items?.length || 0} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${itemCount} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
                 </div>
                 <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
                     <i class="fa-solid fa-eye"></i>
