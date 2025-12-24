@@ -1788,28 +1788,48 @@ function getKnowledgeBaseHTML() {
                         <i class="fa-solid fa-file-lines" style="margin-right: 0.5rem;"></i>
                         Standard Operating Procedures
                     </h4>
-                    <button class="btn btn-secondary btn-sm" onclick="window.uploadKnowledgeDoc('sop')">
+                    <button class="btn btn-primary btn-sm" style="background: #059669; border-color: #059669;" onclick="window.uploadKnowledgeDoc('sop')">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload SOP
                     </button>
                 </div>
                 
                 ${kb.sops.length > 0 ? `
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
-                        ${kb.sops.map(doc => `
-                            <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <strong>${window.UTILS.escapeHtml(doc.name)}</strong>
-                                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.uploadDate)}</div>
-                                </div>
-                                <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('sop', ${doc.id})">
-                                    <i class="fa-solid fa-times" style="color: var(--danger-color);"></i>
-                                </button>
-                            </div>
-                        `).join('')}
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>File</th>
+                                    <th>Uploaded</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${kb.sops.map(doc => `
+                                    <tr>
+                                        <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
+                                        <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
+                                        <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
+                                        <td>
+                                            <span class="badge" style="background: #10b981; color: white;">
+                                                <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Uploaded
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('sop', '${doc.id}')" title="Delete">
+                                                <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 ` : `
-                    <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
-                        <p style="margin: 0;">No SOPs uploaded yet.</p>
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
+                        <i class="fa-solid fa-file-lines" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+                        <p style="margin: 0;">No SOPs uploaded. Click "Upload SOP" to add.</p>
                     </div>
                 `}
             </div>
@@ -1821,28 +1841,48 @@ function getKnowledgeBaseHTML() {
                         <i class="fa-solid fa-shield" style="margin-right: 0.5rem;"></i>
                         CB Policies
                     </h4>
-                    <button class="btn btn-secondary btn-sm" onclick="window.uploadKnowledgeDoc('policy')">
+                    <button class="btn btn-primary btn-sm" style="background: #7c3aed; border-color: #7c3aed;" onclick="window.uploadKnowledgeDoc('policy')">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload Policy
                     </button>
                 </div>
                 
                 ${kb.policies.length > 0 ? `
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
-                        ${kb.policies.map(doc => `
-                            <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <strong>${window.UTILS.escapeHtml(doc.name)}</strong>
-                                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.uploadDate)}</div>
-                                </div>
-                                <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('policy', ${doc.id})">
-                                    <i class="fa-solid fa-times" style="color: var(--danger-color);"></i>
-                                </button>
-                            </div>
-                        `).join('')}
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>File</th>
+                                    <th>Uploaded</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${kb.policies.map(doc => `
+                                    <tr>
+                                        <td><strong>${window.UTILS.escapeHtml(doc.name)}</strong></td>
+                                        <td style="font-size: 0.85rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(doc.fileName || '-')}</td>
+                                        <td>${window.UTILS.escapeHtml(doc.uploadDate)}</td>
+                                        <td>
+                                            <span class="badge" style="background: #10b981; color: white;">
+                                                <i class="fa-solid fa-check-circle" style="margin-right: 4px;"></i>Uploaded
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('policy', '${doc.id}')" title="Delete">
+                                                <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 ` : `
-                    <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
-                        <p style="margin: 0;">No policies uploaded yet.</p>
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary); background: #f8fafc; border-radius: 8px;">
+                        <i class="fa-solid fa-shield" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+                        <p style="margin: 0;">No policies uploaded. Click "Upload Policy" to add.</p>
                     </div>
                 `}
             </div>
