@@ -348,13 +348,58 @@ const SupabaseClient = {
             try {
                 const { data, error } = await SupabaseClient.client.storage
                     .from(bucket)
-                    .upload(path, file);
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
 
                 if (error) throw error;
+                Logger.info('File uploaded:', path);
                 return data;
             } catch (error) {
                 Logger.error('File upload failed:', error);
                 throw error;
+            }
+        },
+
+        /**
+         * Upload audit image
+         * @param {File} file - The image file
+         * @param {string} context - Context (e.g., 'client-logo', 'ncr-evidence', 'checklist')
+         * @param {string} entityId - Related entity ID
+         * @returns {object} { url, path } or null
+         */
+        uploadAuditImage: async function (file, context, entityId) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using base64 fallback');
+                return null;
+            }
+
+            try {
+                // Generate unique filename
+                const timestamp = Date.now();
+                const ext = file.name.split('.').pop().toLowerCase();
+                const filename = `${context}_${entityId}_${timestamp}.${ext}`;
+                const path = `${context}/${filename}`;
+
+                // Upload to audit-images bucket
+                const { data, error } = await SupabaseClient.client.storage
+                    .from('audit-images')
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Get signed URL for the image
+                const url = await this.getSignedUrl('audit-images', path);
+
+                Logger.info('Audit image uploaded:', path);
+                return { url, path };
+            } catch (error) {
+                Logger.error('Audit image upload failed:', error);
+                return null;
             }
         },
 
@@ -394,8 +439,76 @@ const SupabaseClient = {
                 .getPublicUrl(path);
 
             return data.publicUrl;
+        },
+
+        /**
+         * Get signed URL (for private buckets)
+         */
+        getSignedUrl: async function (bucket, path, expiresIn = 3600) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return null;
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .createSignedUrl(path, expiresIn);
+
+                if (error) throw error;
+                return data.signedUrl;
+            } catch (error) {
+                Logger.error('Get signed URL failed:', error);
+                return null;
+            }
+        },
+
+        /**
+         * Delete file
+         */
+        deleteFile: async function (bucket, path) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return false;
+            }
+
+            try {
+                const { error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .remove([path]);
+
+                if (error) throw error;
+                Logger.info('File deleted:', path);
+                return true;
+            } catch (error) {
+                Logger.error('File delete failed:', error);
+                return false;
+            }
+        },
+
+        /**
+         * List files in a bucket path
+         */
+        listFiles: async function (bucket, folder = '') {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return [];
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .list(folder);
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                Logger.error('List files failed:', error);
+                return [];
+            }
         }
     }
+
 };
 
 // Export to window
