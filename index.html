@@ -4,6 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
+        font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
+        img-src 'self' data: https: blob:;
+        connect-src 'self' https://*.supabase.co;
+        frame-src 'none';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+    ">
+
     <title>AuditCB360 – ISO CB Auditor & Audit Management</title>
     <meta name="description"
         content="Manage ISO Certification Body operations including clients, auditors, audits, and certification decisions.">
@@ -163,17 +178,31 @@
         </div>
     </div>
 
-    <!-- Load core script FIRST synchronously to initialize window.state -->
-    <script src="script.js?v=8"></script>
-
-    <!-- Security Libraries -->
+    <!-- Security Libraries (Load FIRST) -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- New Security & Utility Modules (Load BEFORE core script) -->
+    <script src="logger.js"></script>
+    <script src="error-handler.js"></script>
+    <script src="safe-dom.js"></script>
+
+    <!-- Load core script to initialize window.state -->
+    <script src="script.js?v=9"></script>
 
     <!-- Core Modules load after state is initialized -->
     <script src="constants.js"></script>
     <script src="utils.js"></script>
     <script src="validation.js"></script>
     <script src="sanitization.js"></script>
+    <script src="auth-manager.js"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-client.js"></script>
+    <script src="form-validator.js"></script>
+    <script src="audit-logger.js"></script>
+    <script src="backup-manager.js"></script>
     <script src="advanced-modules.js"></script>
     <script src="planning-module.js"></script>
     <script src="ai-service.js"></script>
