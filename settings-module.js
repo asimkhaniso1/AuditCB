@@ -135,7 +135,7 @@ function renderSettings() {
                     <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
                     <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
                     <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('data', this)">Data Backup</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('data-management', this)"><i class="fa-solid fa-database" style="margin-right: 0.25rem;"></i>Data Management</button>
                     <button class="tab-btn" onclick="switchSettingsTab('knowledgebase', this)"><i class="fa-solid fa-brain" style="margin-right: 0.25rem;"></i>Knowledge Base</button>
                 </div>
 
@@ -161,7 +161,16 @@ function switchSettingsTab(tabName, btnElement) {
         case 'retention': container.innerHTML = getRetentionHTML(); break;
         case 'policy': container.innerHTML = getQualityPolicyHTML(); break;
         case 'defaults': container.innerHTML = getDefaultsHTML(); break;
-        case 'data': container.innerHTML = getDataManagementHTML(); break;
+        case 'data-management':
+            container.innerHTML = '<div id="admin-data-management"></div>';
+            setTimeout(() => {
+                if (window.DataMigration && typeof window.DataMigration.renderAdminUI === 'function') {
+                    window.DataMigration.renderAdminUI();
+                } else {
+                    document.getElementById('admin-data-management').innerHTML = '<div class="alert alert-warning">Data Migration module not loaded.</div>';
+                }
+            }, 50);
+            break;
         case 'cbpolicies': container.innerHTML = getCBPoliciesHTML(); break;
         case 'knowledgebase': container.innerHTML = getKnowledgeBaseHTML(); break;
     }
