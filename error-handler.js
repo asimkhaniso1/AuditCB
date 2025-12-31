@@ -225,7 +225,7 @@ const ErrorHandler = {
     /**
      * Safe async operation wrapper
      */
-    async safeAsync: function (asyncFn, context, fallbackValue = null) {
+    safeAsync: async function (asyncFn, context, fallbackValue = null) {
         try {
             return await asyncFn();
         } catch (error) {

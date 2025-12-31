@@ -9,12 +9,7 @@ const SupabaseConfig = {
      * Get Supabase URL
      */
     getUrl: function () {
-        // Try environment variable first (Vercel)
-        if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) {
-            return import.meta.env.VITE_SUPABASE_URL;
-        }
-
-        // Try window environment (set by build process)
+        // Try window environment (set by build process or manually)
         if (window.__SUPABASE_URL__) {
             return window.__SUPABASE_URL__;
         }
@@ -37,10 +32,6 @@ const SupabaseConfig = {
      * Get Supabase anon key
      */
     getAnonKey: function () {
-        // Try environment variable first (Vercel)
-        if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) {
-            return import.meta.env.VITE_SUPABASE_ANON_KEY;
-        }
 
         // Try window environment (set by build process)
         if (window.__SUPABASE_ANON_KEY__) {
@@ -199,9 +190,6 @@ const SupabaseConfig = {
      * Get configuration source
      */
     getConfigSource: function () {
-        if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) {
-            return 'Environment Variable (Vercel)';
-        }
         if (window.__SUPABASE_URL__) {
             return 'Build Environment';
         }
