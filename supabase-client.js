@@ -404,6 +404,59 @@ const SupabaseClient = {
         },
 
         /**
+         * Upload audit report (PDF)
+         * @param {Blob|File} pdfBlob - The PDF file/blob
+         * @param {string} reportType - Type of report (e.g., 'audit-report', 'ncr-report', 'certificate')
+         * @param {string} clientName - Client name for filename
+         * @param {string} reportId - Report ID
+         * @returns {object} { url, path } or null
+         */
+        uploadAuditReport: async function (pdfBlob, reportType, clientName, reportId) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, report saved locally only');
+                return null;
+            }
+
+            try {
+                // Generate unique filename
+                const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+                const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+                const filename = `${reportType}_${sanitizedClientName}_${reportId}_${timestamp}.pdf`;
+                const path = `${reportType}/${filename}`;
+
+                // Upload to audit-reports bucket
+                const { data, error } = await SupabaseClient.client.storage
+                    .from('audit-reports')
+                    .upload(path, pdfBlob, {
+                        contentType: 'application/pdf',
+                        cacheControl: '31536000', // 1 year cache for reports
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Get signed URL for the report (long expiry for reports)
+                const url = await this.getSignedUrl('audit-reports', path, 86400 * 30); // 30 days
+
+                Logger.info('Audit report uploaded:', path);
+
+                // Log to audit trail
+                if (window.AuditLogger) {
+                    AuditLogger.log('upload', 'report', reportId, {}, {
+                        summary: `Uploaded ${reportType} for ${clientName}`,
+                        path,
+                        size: pdfBlob.size
+                    });
+                }
+
+                return { url, path, filename };
+            } catch (error) {
+                Logger.error('Audit report upload failed:', error);
+                return null;
+            }
+        },
+
+        /**
          * Download file
          */
         download: async function (bucket, path) {
