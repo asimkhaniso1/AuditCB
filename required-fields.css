@@ -63,3 +63,21 @@ textarea[required]:focus {
     color: var(--required-color);
     font-weight: bold;
 }
+
+/* Modal Body Scrolling */
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.modal-content {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensure form is visible */
+#client-form {
+    width: 100%;
+}
