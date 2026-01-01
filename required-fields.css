@@ -1,0 +1,65 @@
+:root {
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --secondary-color: #64748b;
+    --background-color: #f1f5f9;
+    --surface-color: #ffffff;
+    --surface-glass: rgba(255, 255, 255, 0.8);
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --border-color: #e2e8f0;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --required-color: #dc2626;
+    /* Red for required fields */
+    --sidebar-width: 200px;
+    --client-sidebar-width: 260px;
+    --header-height: 70px;
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1),
+        0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1),
+        0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1),
+        0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+    --glass-backdrop: blur(12px);
+}
+
+/* Required Field Indicators */
+label.required::after,
+.required-label::after {
+    content: " *";
+    color: var(--required-color);
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+input[required],
+select[required],
+textarea[required] {
+    border-left: 3px solid var(--required-color);
+}
+
+input[required]:focus,
+select[required]:focus,
+textarea[required]:focus {
+    border-left-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Required field helper text */
+.required-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+.required-hint::before {
+    content: "* ";
+    color: var(--required-color);
+    font-weight: bold;
+}
