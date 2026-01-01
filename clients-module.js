@@ -1401,8 +1401,8 @@ function openAddClientModal() {
             </div>
             
             <div class="form-group">
-                <label>Next Audit Date <span style="color: var(--danger-color);">*</span></label>
-                <input type="date" class="form-control" id="client-next-audit" required>
+                <label>Next Audit Date</label>
+                <input type="date" class="form-control" id="client-next-audit">
             </div>
         </form >
     `;
@@ -1450,7 +1450,6 @@ function openAddClientModal() {
                 { rule: 'range', min: 1, max: 1000, fieldName: 'Number of Sites' }
             ],
             nextAudit: [
-                { rule: 'required', fieldName: 'Next Audit Date' },
                 { rule: 'date' }
             ]
         };
