@@ -329,7 +329,20 @@ const AuditLogger = {
         }
 
         try {
-            await window.SupabaseClient.db.insert('audit_log', entry);
+            // Transform camelCase to snake_case for database
+            const dbEntry = {
+                timestamp: entry.timestamp,
+                action: entry.action,
+                entity: entry.entity,
+                entity_id: entry.entityId, // camelCase → snake_case
+                user_id: entry.userId,     // camelCase → snake_case
+                user_name: entry.userName, // camelCase → snake_case
+                user_role: entry.userRole, // camelCase → snake_case
+                changes: entry.changes,
+                metadata: entry.metadata
+            };
+
+            await window.SupabaseClient.db.insert('audit_log', dbEntry);
             Logger.debug('Audit log sent to Supabase');
         } catch (error) {
             Logger.warn('Failed to send audit log to Supabase:', error);
