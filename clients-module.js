@@ -4652,30 +4652,64 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
 
 // Remove auditor assignment from a client
 window.removeClientAuditorAssignment = function (clientId, auditorId) {
-    console.log('[removeClientAuditorAssignment] Called with:', { clientId, auditorId });
+    console.log('[removeClientAuditorAssignment] Called with:', {
+        clientId,
+        auditorId,
+        typeC: typeof clientId,
+        typeA: typeof auditorId
+    });
 
     const client = window.state.clients.find(c => c.id == clientId);
     const auditor = window.state.auditors.find(a => a.id == auditorId);
 
-    const confirmMsg = `Remove ${auditor?.name || 'this auditor'} from ${client?.name || 'this client'}?
+    if (!client || !auditor) {
+        console.error('[removeClientAuditorAssignment] Client or Auditor not found');
+        window.showNotification('Error: Client or Auditor not found', 'error');
+        return;
+    }
+
+    const confirmMsg = `Remove ${auditor.name} from ${client.name}?
 
 Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
 
     if (confirm(confirmMsg)) {
+        // Normalize IDs to strings for comparison
+        const cid = String(clientId);
+        const aid = String(auditorId);
+
         const initialLength = (window.state.auditorAssignments || []).length;
 
-        window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(
-            a => !(String(a.auditorId) === String(auditorId) && String(a.clientId) === String(clientId))
-        );
+        console.log('[removeClientAuditorAssignment] Before filter:', {
+            totalAssignments: initialLength,
+            lookingFor: { cid, aid },
+            allAssignments: window.state.auditorAssignments.map(a => ({
+                clientId: a.clientId,
+                auditorId: a.auditorId,
+                clientIdStr: String(a.clientId),
+                auditorIdStr: String(a.auditorId)
+            }))
+        });
+
+        window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
+            const match = (String(a.clientId) === cid && String(a.auditorId) === aid);
+            if (match) {
+                console.log('[removeClientAuditorAssignment] Found matching assignment to remove:', a);
+            }
+            return !match; // Keep if NOT matching
+        });
 
         const newLength = window.state.auditorAssignments.length;
-        console.log('[removeClientAuditorAssignment] Removed:', initialLength - newLength, 'assignments');
+        const removedCount = initialLength - newLength;
 
-        if (initialLength === newLength) {
-            console.warn('[removeClientAuditorAssignment] No assignment found to remove!', {
-                assignments: window.state.auditorAssignments,
-                target: { clientId, auditorId }
-            });
+        console.log('[removeClientAuditorAssignment] After filter:', {
+            removed: removedCount,
+            remaining: newLength
+        });
+
+        if (removedCount === 0) {
+            console.warn('[removeClientAuditorAssignment] No assignment found to remove!');
+            window.showNotification('Could not find assignment to remove. Please refresh and try again.', 'error');
+            return;
         }
 
         window.saveData();
@@ -4686,6 +4720,6 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
             document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
         }, 100);
 
-        window.showNotification('Auditor removed from client. Historical records retained.', 'success');
+        window.showNotification(`${auditor.name} removed from ${client.name}. Historical records retained.`, 'success');
     }
 };
