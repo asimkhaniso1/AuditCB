@@ -975,7 +975,7 @@ function getClientAuditTeamHTML(client) {
                                 ${assignment?.assignedAt ? '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Assigned: ' + new Date(assignment.assignedAt).toLocaleDateString() + '</div>' : ''}
                             </div>
                         </div>
-                        ${canManage ? '<button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment(' + client.id + ', ' + auditor.id + ')" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>' : ''}
+                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment('${client.id}', '${auditor.id}')" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
                     </div>
                     `;
     }).join('')}
