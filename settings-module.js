@@ -3161,13 +3161,19 @@ window.removeAssignment = function (auditorId, clientId) {
     const auditor = window.state.auditors.find(a => a.id == auditorId);
     const client = window.state.clients.find(c => c.id == clientId);
 
-    if (confirm(`Remove assignment of ${client?.name || 'client'} from ${auditor?.name || 'auditor'}?`)) {
+    const confirmMsg = `Remove "${client?.name || 'client'}" from ${auditor?.name || 'auditor'}'s assignments?
+
+Note: All audit history, records, and reports involving this auditor will be RETAINED. The auditor will still have access to past audits they participated in.
+
+This only removes future access to new client data.`;
+
+    if (confirm(confirmMsg)) {
         // Use loose equality (==) to handle type mismatches (string vs number)
         window.state.auditorAssignments = window.state.auditorAssignments.filter(
             a => !(a.auditorId == auditorId && a.clientId == clientId)
         );
         window.saveData();
         switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
-        window.showNotification('Assignment removed.', 'success');
+        window.showNotification('Assignment removed. Historical audit records retained.', 'success');
     }
 };
