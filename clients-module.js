@@ -1347,6 +1347,12 @@ function getClientComplianceHTML(client) {
 function renderClientTab(client, tabName) {
     const tabContent = document.getElementById('tab-content');
 
+    // Safety check - if tab-content doesn't exist, the client workspace hasn't been rendered yet
+    if (!tabContent) {
+        console.warn('tab-content element not found. Client workspace may not be rendered.');
+        return;
+    }
+
     if (tabName === 'info') {
         tabContent.innerHTML = getClientInfoHTML(client);
     } else if (tabName === 'client_org') {
