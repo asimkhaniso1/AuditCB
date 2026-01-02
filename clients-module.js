@@ -4625,10 +4625,10 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
             window.state.auditorAssignments = [];
         }
 
-        // Add new assignment
+        // Add new assignment (ensure both IDs are integers for consistency)
         window.state.auditorAssignments.push({
-            auditorId: auditorId,
-            clientId: clientId,
+            auditorId: parseInt(auditorId),
+            clientId: parseInt(clientId),
             assignedBy: window.state.currentUser?.name || 'System',
             assignedAt: new Date().toISOString()
         });
@@ -4673,25 +4673,31 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
 Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
 
     if (confirm(confirmMsg)) {
-        // Normalize IDs to strings for comparison
+        // Normalize IDs - compare as both strings and numbers for compatibility
         const cid = String(clientId);
         const aid = String(auditorId);
+        const cidNum = parseInt(clientId);
+        const aidNum = parseInt(auditorId);
 
         const initialLength = (window.state.auditorAssignments || []).length;
 
         console.log('[removeClientAuditorAssignment] Before filter:', {
             totalAssignments: initialLength,
-            lookingFor: { cid, aid },
+            lookingFor: { cid, aid, cidNum, aidNum },
             allAssignments: window.state.auditorAssignments.map(a => ({
                 clientId: a.clientId,
                 auditorId: a.auditorId,
-                clientIdStr: String(a.clientId),
-                auditorIdStr: String(a.auditorId)
+                clientIdType: typeof a.clientId,
+                auditorIdType: typeof a.auditorId
             }))
         });
 
         window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
-            const match = (String(a.clientId) === cid && String(a.auditorId) === aid);
+            // Match if either string comparison OR number comparison matches
+            const stringMatch = (String(a.clientId) === cid && String(a.auditorId) === aid);
+            const numberMatch = (parseInt(a.clientId) === cidNum && parseInt(a.auditorId) === aidNum);
+            const match = stringMatch || numberMatch;
+
             if (match) {
                 console.log('[removeClientAuditorAssignment] Found matching assignment to remove:', a);
             }
