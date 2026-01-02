@@ -298,6 +298,9 @@ function renderAuditorDetail(auditorId) {
                 <button class="tab-btn" data-tab="documents">
                     <i class="fa-solid fa-folder-open" style="margin-right: 0.25rem;"></i>Documents
                 </button>
+                <button class="tab-btn" data-tab="clients">
+                    <i class="fa-solid fa-briefcase" style="margin-right: 0.25rem;"></i>Active Clients
+                </button>
             </div>
 
             <div id="tab-content"></div>
@@ -1092,6 +1095,10 @@ function renderAuditorTab(auditor, tabName) {
             `;
             break;
 
+        case 'clients':
+            tabContent.innerHTML = getAuditorClientsTabHTML(auditor);
+            break;
+
         case 'documents':
             tabContent.innerHTML = `
                 <div class="card">
@@ -1119,6 +1126,63 @@ function renderAuditorTab(auditor, tabName) {
             `;
             break;
     }
+}
+
+function getAuditorClientsTabHTML(auditor) {
+    const assignments = window.state.auditorAssignments || [];
+    // Filter assignments for this auditor
+    const assignedIds = assignments.filter(a => a.auditorId == auditor.id).map(a => a.clientId);
+    const assignedClients = window.state.clients.filter(c => assignedIds.includes(c.id));
+
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">
+                <i class="fa-solid fa-briefcase" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                Active Clients
+            </h3>
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                ${assignedClients.length} clients assigned
+            </div>
+        </div>
+        
+        ${assignedClients.length > 0 ? `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Client Name</th>
+                            <th>Status</th>
+                            <th>Location</th>
+                            <th>Standard</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${assignedClients.map(client => `
+                            <tr>
+                                <td style="font-weight: 500;">${window.UTILS.escapeHtml(client.name)}</td>
+                                <td><span class="status-badge status-${(client.status || 'Active').toLowerCase()}">${window.UTILS.escapeHtml(client.status || 'Active')}</span></td>
+                                <td>${window.UTILS.escapeHtml(client.city || '-')}</td>
+                                <td>${window.UTILS.escapeHtml(client.standard || '-')}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="window.renderClientDetail(${client.id})">
+                                        View Dashboard
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        ` : `
+            <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px;">
+                <i class="fa-solid fa-briefcase" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 0.5rem;"></i>
+                <p style="color: #64748b; margin: 0;">No clients currently assigned to this auditor.</p>
+            </div>
+        `}
+    </div>
+    `;
 }
 
 function renderCompetenceMatrix() {
