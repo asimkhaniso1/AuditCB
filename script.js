@@ -8,10 +8,11 @@ const DATA_VERSION = '1.3'; // Increment to force state reset
 const state = {
     version: DATA_VERSION,
     // Current User Context (For Demo Roles)
-    currentUser: {
-        name: 'Demo Manager',
-        role: 'Certification Manager'
-    },
+    currentUser: null,
+    // currentUser: {
+    //     name: 'Demo Manager',
+    //     role: 'Certification Manager'
+    // },
     currentModule: 'dashboard',
     clients: [
         {

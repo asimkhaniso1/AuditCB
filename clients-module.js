@@ -1290,7 +1290,7 @@ function openAddClientModal() {
             </div>
 
             <div class="form-group">
-                <label>Industry</label>
+                <label>Industry <span style="color: red;">*</span></label>
                 <select class="form-control" id="client-industry">
                     <option value="">-- Select Industry --</option>
                     <option>Manufacturing</option>
@@ -1310,7 +1310,7 @@ function openAddClientModal() {
                 </select>
             </div>
             <div class="form-group">
-                <label>Standard(s)</label>
+                <label>Standard(s) <span style="color: red;">*</span></label>
                 <select class="form-control" id="client-standard" multiple style="height: 100px;">
                     ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
         `<option value="${std}">${std}</option>`
@@ -1336,12 +1336,12 @@ function openAddClientModal() {
                 </div>
             </div>
 
-            <!--Primary Contact-- >
+            <!--Primary Contact-->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
 
             <div class="form-group">
-                <label>Contact Name</label>
-                <input type="text" class="form-control" id="client-contact-name" placeholder="John Doe">
+                <label>Contact Name <span style="color: red;">*</span></label>
+                <input type="text" class="form-control" id="client-contact-name" placeholder="John Doe" required>
             </div>
             <div class="form-group">
                 <label>Designation</label>
@@ -1356,7 +1356,7 @@ function openAddClientModal() {
                 <input type="email" class="form-control" id="client-contact-email" placeholder="john@example.com">
             </div>
 
-            <!--Location -->
+            <!--Location-->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Location</div>
 
             <div class="form-group" style="grid-column: 1 / -1;">
@@ -1381,15 +1381,15 @@ function openAddClientModal() {
                 </div>
             </div>
 
-            <!--Operational & Planning-- >
+            <!--Operational & Planning-->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Planning Data</div>
 
             <div class="form-group">
-                <label>Total Employees</label>
+                <label>Total Employees <span style="color: red;">*</span></label>
                 <input type="number" class="form-control" id="client-employees" min="1" value="10">
             </div>
             <div class="form-group">
-                <label>Number of Sites</label>
+                <label>Number of Sites <span style="color: red;">*</span></label>
                 <input type="number" class="form-control" id="client-sites" min="1" value="1">
             </div>
             <div class="form-group">
@@ -1435,12 +1435,12 @@ function openAddClientModal() {
                 { rule: 'length', min: 2, max: 200 },
                 { rule: 'noHtmlTags' }
             ],
-            contactEmail: [
-                { rule: 'email', fieldName: 'Contact Email' }
+            contactName: [
+                { rule: 'required', fieldName: 'Contact Name' },
+                { rule: 'length', min: 2, max: 100 },
+                { rule: 'noHtmlTags' }
             ],
-            website: [
-                { rule: 'url', fieldName: 'Website' }
-            ],
+            // contactEmail and website are validated conditionally below (only if values provided)
             employees: [
                 { rule: 'number', fieldName: 'Total Employees' },
                 { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
@@ -1449,9 +1449,7 @@ function openAddClientModal() {
                 { rule: 'number', fieldName: 'Number of Sites' },
                 { rule: 'range', min: 1, max: 1000, fieldName: 'Number of Sites' }
             ],
-            nextAudit: [
-                { rule: 'date' }
-            ]
+            // nextAudit is now optional - no validation rules needed
         };
 
         // 3. Validate
@@ -1460,6 +1458,17 @@ function openAddClientModal() {
         if (standardSelect.selectedOptions.length === 0) {
             window.showNotification('Please select at least one standard', 'error');
             return;
+        }
+
+        // Conditionally add validation for optional fields only if they have values
+        const websiteValue = document.getElementById('client-website')?.value?.trim();
+        const emailValue = document.getElementById('client-contact-email')?.value?.trim();
+
+        if (websiteValue) {
+            rules.website = [{ rule: 'url', fieldName: 'Website' }];
+        }
+        if (emailValue) {
+            rules.contactEmail = [{ rule: 'email', fieldName: 'Contact Email' }];
         }
 
         const result = Validator.validateFormElements(fieldIds, rules);

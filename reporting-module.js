@@ -65,8 +65,11 @@ function renderReportSummaryTab(report, tabContent) {
         `;
     } else if (report.status === window.CONSTANTS.STATUS.PUBLISHED || report.status === window.CONSTANTS.STATUS.FINALIZED) {
         actionButtons = `
-            <button class="btn btn-secondary" onclick="window.generateAuditReport(${report.id})">
-                <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i> Download Report
+            <button class="btn btn-outline-primary" onclick="window.generateAuditReport(${report.id})" title="Open print window">
+                <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Report
+            </button>
+            <button class="btn btn-secondary" onclick="window.downloadAuditReportPDF(${report.id})" title="Download as PDF file">
+                <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
             </button>
             <button class="btn btn-primary" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none;" onclick="window.uploadReportToCloud(${report.id})">
                 <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Save to Cloud
@@ -218,6 +221,44 @@ function renderReportSummaryTab(report, tabContent) {
                         </div>
                     </div>
 
+                    <!-- Meeting Records Section -->
+                     <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Meeting Records</h4>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
+                         <!-- Meeting Records (Existing) -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <!-- Opening Meeting -->
+                            <div>
+                                <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #2563eb;">Opening Meeting</label>
+                                <input type="datetime-local" id="opening-date" class="form-control" style="margin-bottom: 0.5rem;" value="${report.openingMeeting?.dateTime || ''}">
+                                <textarea id="opening-attendees" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)...">${h((report.openingMeeting?.attendees || []).join(', '))}</textarea>
+                            </div>
+                            <!-- Closing Meeting -->
+                            <div>
+                                <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #dc2626;">Closing Meeting</label>
+                                <input type="datetime-local" id="closing-date" class="form-control" style="margin-bottom: 0.5rem;" value="${report.closingMeeting?.dateTime || ''}">
+                                <textarea id="closing-attendees" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)...">${h((report.closingMeeting?.attendees || []).join(', '))}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Audit Evidence -->
+                    <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Audit Evidence</h4>
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Audit Agenda / Schedule</label>
+                        <textarea id="audit-agenda" rows="3" class="form-control" placeholder="Summary of audit activities and timeline...">${h(report.auditAgenda || '')}</textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Interviewees</label>
+                            <textarea id="interviewees" rows="3" class="form-control" placeholder="List of personnel interviewed...">${h(report.interviewees || '')}</textarea>
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Documents Reviewed</label>
+                            <textarea id="documents-reviewed" rows="3" class="form-control" placeholder="List of key documents reviewed...">${h(report.documentsReviewed || '')}</textarea>
+                        </div>
+                    </div>
+
                     <div style="margin-bottom: 1.5rem;">
                         <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Final Conclusion</label>
                         <textarea id="conclusion" rows="4" class="form-control" placeholder="Final verdict and compliance statement...">${h(report.conclusion)}</textarea>
@@ -251,6 +292,20 @@ function submitForReview(reportId) {
     if (document.getElementById('exec-summary')) report.execSummary = Sanitizer.sanitizeText(document.getElementById('exec-summary').value);
     if (document.getElementById('strengths')) report.strengths = Sanitizer.sanitizeText(document.getElementById('strengths').value);
     if (document.getElementById('improvements')) report.improvements = Sanitizer.sanitizeText(document.getElementById('improvements').value);
+
+    // Save Meeting Records
+    report.openingMeeting = {
+        dateTime: document.getElementById('opening-date')?.value || '',
+        attendees: (document.getElementById('opening-attendees')?.value || '').split(',').map(s => s.trim()).filter(s => s)
+    };
+    report.closingMeeting = {
+        dateTime: document.getElementById('closing-date')?.value || '',
+        attendees: (document.getElementById('closing-attendees')?.value || '').split(',').map(s => s.trim()).filter(s => s)
+    };
+
+    report.auditAgenda = Sanitizer.sanitizeText(document.getElementById('audit-agenda')?.value || '');
+    report.interviewees = Sanitizer.sanitizeText(document.getElementById('interviewees')?.value || '');
+    report.documentsReviewed = Sanitizer.sanitizeText(document.getElementById('documents-reviewed')?.value || '');
 
     report.status = window.CONSTANTS.STATUS.IN_REVIEW;
     window.saveData();
@@ -331,6 +386,21 @@ window.saveReportDraft = function (reportId) {
     report.conclusion = Sanitizer.sanitizeText(document.getElementById('conclusion')?.value || '');
     report.strengths = Sanitizer.sanitizeText(document.getElementById('strengths')?.value || '');
     report.improvements = Sanitizer.sanitizeText(document.getElementById('improvements')?.value || '');
+
+    // Save Meeting Records
+    report.openingMeeting = {
+        dateTime: document.getElementById('opening-date')?.value || '',
+        attendees: (document.getElementById('opening-attendees')?.value || '').split(',').map(s => s.trim()).filter(s => s)
+    };
+    report.closingMeeting = {
+        dateTime: document.getElementById('closing-date')?.value || '',
+        attendees: (document.getElementById('closing-attendees')?.value || '').split(',').map(s => s.trim()).filter(s => s)
+    };
+
+    report.auditAgenda = Sanitizer.sanitizeText(document.getElementById('audit-agenda')?.value || '');
+    report.interviewees = Sanitizer.sanitizeText(document.getElementById('interviewees')?.value || '');
+    report.documentsReviewed = Sanitizer.sanitizeText(document.getElementById('documents-reviewed')?.value || '');
+
     report.recommendation = document.getElementById('recommendation')?.value || '';
 
     window.saveData();
@@ -526,13 +596,25 @@ Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'hi
     window.showNotification('AI Draft generated (using template)!', 'success');
 }
 
-// Generate Printable PDF Report
-// Generate Printable PDF Report
-window.generateAuditReport = function (reportId) {
-    const h = window.UTILS.escapeHtml; // Alias for sanitization
+/**
+ * Generate and Download Audit Report as PDF
+ * Uses html2pdf.js for direct PDF download (no popup required)
+ * @param {number} reportId - The report ID to generate
+ */
+window.downloadAuditReportPDF = async function (reportId) {
+    // Save current state first
+    window.saveData();
+
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) {
         window.showNotification('Report not found', 'error');
+        return;
+    }
+
+    // Check if html2pdf is available
+    if (typeof html2pdf === 'undefined') {
+        window.showNotification('PDF library not loaded. Using print window instead...', 'warning');
+        window.generateAuditReport(reportId);
         return;
     }
 
@@ -540,99 +622,173 @@ window.generateAuditReport = function (reportId) {
         const plan = state.auditPlans.find(p => p.client === report.client) || {};
         const client = state.clients.find(c => c.name === report.client) || {};
 
-        // Combine Manual NCRs and Checklist Progress NCs
-        const manualNCRs = report.ncrs || [];
-        const checklistNCRs = (report.checklistProgress || [])
-            .filter(item => item.status === 'nc')
-            .map(item => {
-                let clause = 'Checklist Item';
-                if (item.checklistId) {
-                    const cl = state.checklists.find(c => c.id == item.checklistId);
-                    if (cl) {
-                        if (cl.clauses && (String(item.itemIdx).includes('-'))) {
-                            // Hierarchical: mainClause-subIdx
-                            const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
-                            // find clause where mainClause matches
-                            const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
-                            if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
-                                clause = mainObj.subClauses[subIdxVal].clause;
-                            }
-                        } else {
-                            // Flat: numeric index
-                            const clItem = cl.items?.[item.itemIdx];
-                            if (clItem) clause = clItem.clause;
-                        }
-                    }
-                } else if (item.isCustom) {
-                    const customItem = (report.customItems || [])[item.itemIdx];
-                    if (customItem) clause = customItem.clause;
-                }
+        // Validate report data
+        const validation = validateReportData(report, plan, client);
 
-                return {
-                    type: item.ncrType || 'minor',
-                    clause: clause,
-                    description: item.ncrDescription || item.comment || 'Non-conformity identified in checklist.',
-                    evidence: 'Checklist Finding',
-                    transcript: item.transcript,
-                    evidenceImage: item.evidenceImage,
-                    status: 'Open'
-                };
-            });
-
-        const combinedNCRs = [...manualNCRs, ...checklistNCRs];
-
-        const ncrCount = combinedNCRs.length;
-        const majorCount = combinedNCRs.filter(n => n.type === 'major').length;
-        const minorCount = combinedNCRs.filter(n => n.type === 'minor').length;
-        const capaCount = (report.capas || []).length;
-
-        // Calculate checklist progress
-        const assignedChecklists = (state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
-        const totalProgress = report.checklistProgress || [];
-        const conformCount = totalProgress.filter(p => p.status === 'conform').length;
-        const ncCount = totalProgress.filter(p => p.status === 'nc').length;
-        const naCount = totalProgress.filter(p => p.status === 'na').length;
-
-        // Calculate true total items (supporting hierarchy)
-        const totalItems = assignedChecklists.reduce((sum, c) => {
-            if (c.clauses) {
-                return sum + c.clauses.reduce((s, clause) => s + (clause.subClauses?.length || 0), 0);
-            }
-            return sum + (c.items?.length || 0);
-        }, 0) + (report.customItems?.length || 0);
-
-        const answeredCount = totalProgress.length;
-        const progressPercent = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
-
-        // QR Code URL
-        // Safe to not escape here as we encodeURIComponent the whole data string next
-        const qrData = `REP - ${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}% `;
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
-
-        // Compliance Score Logic
-        const complianceScore = Math.max(0, 100 - (majorCount * 15) - (minorCount * 5));
-        const conformHeight = complianceScore;
-        const majorHeight = Math.min(100, majorCount * 15 + 10);
-        const minorHeight = Math.min(100, minorCount * 10 + 10);
-
-        // Get audit team
-        const leadAuditor = state.auditors.find(a => plan.auditors?.includes(a.id));
-        const auditTeam = (plan.auditors || []).map(id => state.auditors.find(a => a.id === id)).filter(a => a);
-
-        // Get logos for PDF header
-        const cbSettings = state.cbSettings || {};
-        const cbLogo = cbSettings.logoUrl || '';
-        const cbName = cbSettings.cbName || 'AuditCB360';
-        const clientLogo = client.logoUrl || '';
-
-        const printWindow = window.open('', '_blank');
-
-        if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
-            window.showNotification('Popup blocked! Please allow popups for this site and try again.', 'error');
+        // Check for critical errors
+        if (validation.errors.length > 0) {
+            const errorMsg = 'Cannot generate report. Please fix the following issues:\n\n' +
+                validation.errors.join('\n');
+            alert(errorMsg);
+            window.showNotification('Report generation failed - missing required data', 'error');
             return;
         }
 
-        printWindow.document.write(`
+        // Show warnings if any
+        if (validation.warnings.length > 0) {
+            const warningMsg = 'The following issues were found:\n\n' +
+                validation.warnings.join('\n') +
+                '\n\nDo you want to continue anyway?';
+            if (!confirm(warningMsg)) {
+                return;
+            }
+        }
+
+        window.showNotification('Generating PDF report... This may take a moment.', 'info');
+
+        // Create a hidden container for the report HTML
+        const container = document.createElement('div');
+        container.style.cssText = 'position: absolute; left: -9999px; top: 0; width: 800px;';
+        document.body.appendChild(container);
+
+        // Generate the report HTML (reuse the same HTML generation logic)
+        container.innerHTML = generateReportHTML(report, plan, client);
+
+        // Configure PDF options
+        const opt = {
+            margin: [15, 10, 15, 10],
+            filename: `Audit_Report_${report.client.replace(/[^a-z0-9]/gi, '_')}_${report.id}.pdf`,
+            image: { type: 'jpeg', quality: 0.95 },
+            enableLinks: true, // Enable clickable links for TOC
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                letterRendering: true
+            },
+            jsPDF: {
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                compress: true
+            },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        // Generate and download PDF
+        await html2pdf().set(opt).from(container).save();
+
+        // Cleanup
+        document.body.removeChild(container);
+
+        window.showNotification('PDF report downloaded successfully!', 'success');
+
+        // Log the action
+        if (window.AuditLogger) {
+            window.AuditLogger.logAction('REPORT_DOWNLOAD', 'Report', report.id, {
+                client: report.client,
+                format: 'PDF'
+            });
+        }
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        window.showNotification('Failed to generate PDF: ' + error.message + '. Try using the print option instead.', 'error');
+    }
+};
+
+/**
+ * Generate Report HTML Content
+ * Extracted as a separate function for reuse in both print and PDF download
+ * @param {Object} report - The audit report
+ * @param {Object} plan - The audit plan
+ * @param {Object} client - The client data
+ * @returns {string} HTML content for the report
+ */
+function generateReportHTML(report, plan, client) {
+    const h = window.UTILS.escapeHtml;
+
+    // Combine Manual NCRs and Checklist Progress NCs
+    const manualNCRs = report.ncrs || [];
+    const checklistNCRs = (report.checklistProgress || [])
+        .filter(item => item.status === 'nc')
+        .map(item => {
+            let clause = 'Checklist Item';
+            if (item.checklistId) {
+                const cl = state.checklists.find(c => c.id == item.checklistId);
+                if (cl) {
+                    if (cl.clauses && (String(item.itemIdx).includes('-'))) {
+                        const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
+                        const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
+                        if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
+                            clause = mainObj.subClauses[subIdxVal].clause;
+                        }
+                    } else {
+                        const clItem = cl.items?.[item.itemIdx];
+                        if (clItem) clause = clItem.clause;
+                    }
+                }
+            } else if (item.isCustom) {
+                const customItem = (report.customItems || [])[item.itemIdx];
+                if (customItem) clause = customItem.clause;
+            }
+
+            return {
+                type: item.ncrType || 'minor',
+                clause: clause,
+                description: item.ncrDescription || item.comment || 'Non-conformity identified in checklist.',
+                evidence: 'Checklist Finding',
+                transcript: item.transcript,
+                evidenceImage: item.evidenceImage,
+                status: 'Open'
+            };
+        });
+
+    const combinedNCRs = [...manualNCRs, ...checklistNCRs];
+    const ncrCount = combinedNCRs.length;
+    const majorCount = combinedNCRs.filter(n => n.type === 'major').length;
+    const minorCount = combinedNCRs.filter(n => n.type === 'minor').length;
+    const capaCount = (report.capas || []).length;
+
+    // Calculate checklist progress
+    const assignedChecklists = (state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
+    const totalProgress = report.checklistProgress || [];
+    const conformCount = totalProgress.filter(p => p.status === 'conform').length;
+    const ncCount = totalProgress.filter(p => p.status === 'nc').length;
+    const naCount = totalProgress.filter(p => p.status === 'na').length;
+
+    const totalItems = assignedChecklists.reduce((sum, c) => {
+        if (c.clauses) {
+            return sum + c.clauses.reduce((s, clause) => s + (clause.subClauses?.length || 0), 0);
+        }
+        return sum + (c.items?.length || 0);
+    }, 0) + (report.customItems?.length || 0);
+
+    const answeredCount = totalProgress.length;
+    const progressPercent = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
+
+    // QR Code URL
+    const qrData = `REP-${report.id} | ${report.client} | ${report.date} | Score: ${Math.max(0, 100 - (majorCount * 15) - (minorCount * 5))}%`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+
+    // Compliance Score Logic
+    const complianceScore = Math.max(0, 100 - (majorCount * 15) - (minorCount * 5));
+    const conformHeight = complianceScore;
+    const majorHeight = Math.min(100, majorCount * 15 + 10);
+    const minorHeight = Math.min(100, minorCount * 10 + 10);
+
+    // Get audit team
+    const leadAuditor = state.auditors.find(a => plan.auditors?.includes(a.id));
+    const auditTeam = (plan.auditors || []).map(id => state.auditors.find(a => a.id === id)).filter(a => a);
+
+    // Get logos for PDF header
+    const cbSettings = state.cbSettings || {};
+    const cbLogo = cbSettings.logoUrl || '';
+    const cbName = cbSettings.cbName || 'AuditCB360';
+    const clientLogo = client.logoUrl || '';
+
+    // Return the complete HTML (same as in the print window version)
+    return `
+        <!DOCTYPE html>
         <html>
         <head>
             <title>Audit Report - ${h(report.client)}</title>
@@ -686,15 +842,27 @@ window.generateAuditReport = function (reportId) {
                 @media print {
                     @page { margin: 2cm; }
                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .no-print { display: none; }
+                }
+                
+                .watermark {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%) rotate(-45deg);
+                    font-size: 8rem;
+                    color: #ef4444;
+                    opacity: 0.15;
+                    font-weight: bold;
+                    pointer-events: none;
+                    z-index: 9999;
+                    border: 10px solid #ef4444;
+                    padding: 20px 60px;
+                    border-radius: 20px;
                 }
             </style>
         </head>
         <body>
-            <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000;">
-                <button onclick="window.print()" style="padding: 12px 24px; cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 1rem;"><i class="fa-solid fa-print"></i> Print PDF</button>
-            </div>
-
+            ${!report.finalizedAt ? '<div class="watermark">DRAFT</div>' : ''}
             <div class="report-container">
                 <div class="qr-header">
                     <img src="${qrCodeUrl}" alt="Report QR">
@@ -702,7 +870,6 @@ window.generateAuditReport = function (reportId) {
                 </div>
 
                 <div class="cover-page">
-                    <!-- Dual Logo Header: CB Logo (left) and Client Logo (right) -->
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2rem;">
                         <div style="text-align: left;">
                             ${cbLogo ? `<img src="${cbLogo}" style="max-height: 60px; max-width: 200px; object-fit: contain;" alt="${h(cbName)}">` : `<div style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;"><i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> ${h(cbName)}</div>`}
@@ -727,7 +894,42 @@ window.generateAuditReport = function (reportId) {
                     </div>
                 </div>
 
-                <h1>1. Audit Details</h1>
+                <!-- Table of Contents -->
+                <div class="toc-page" style="page-break-after: always; padding-top: 60px;">
+                    <h1 style="border: none; text-align: center; margin-bottom: 40px;">Table of Contents</h1>
+                    <ul style="list-style: none; padding: 0; font-size: 1.2rem;">
+                        <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#audit-details" style="text-decoration: none; color: #333; font-weight: 500;">1. Audit Details</a>
+                        </li>
+                        <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#exec-summary" style="text-decoration: none; color: #333; font-weight: 500;">2. Executive Summary</a>
+                        </li>
+                         <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#strengths" style="text-decoration: none; color: #333; font-weight: 500;">3. Strengths and Opportunities</a>
+                        </li>
+                        <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#findings" style="text-decoration: none; color: #333; font-weight: 500;">4. Detailed Findings and Evidence</a>
+                        </li>
+                        ${capaCount > 0 ? `
+                        <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#capa" style="text-decoration: none; color: #333; font-weight: 500;">5. Corrective & Preventive Actions</a>
+                        </li>` : ''}
+                        <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#meeting-records" style="text-decoration: none; color: #333; font-weight: 500;">${capaCount > 0 ? '6' : '5'}. Meeting Records</a>
+                        </li>
+                         <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#evidence" style="text-decoration: none; color: #333; font-weight: 500;">${capaCount > 0 ? '7' : '6'}. Audit Evidence</a>
+                        </li>
+                         <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#observations" style="text-decoration: none; color: #333; font-weight: 500;">${capaCount > 0 ? '8' : '7'}. Observations</a>
+                        </li>
+                        <li style="margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; display: flex; justify-content: space-between;">
+                            <a href="#conclusion" style="text-decoration: none; color: #333; font-weight: 500;">${capaCount > 0 ? '9' : '8'}. Conclusion and Recommendation</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <h1 id="audit-details">1. Audit Details</h1>
                 <table class="meta-table">
                     <tr><td>Client Name</td><td>${h(report.client)}</td></tr>
                     <tr><td>Audit Standard</td><td>${h(plan.standard || 'N/A')}</td></tr>
@@ -742,24 +944,23 @@ window.generateAuditReport = function (reportId) {
                     <tr><td>Report Status</td><td><strong>${h(report.status)}</strong></td></tr>
                 </table>
 
-                <!-- Client Organization Context -->
                 <h2>Organization Context</h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
                     <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
                         <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #92400e;">Goods & Services</h3>
                         ${(client.goodsServices && client.goodsServices.length > 0) ?
-                `<ul style="margin: 0; padding-left: 20px;">${client.goodsServices.map(g => `<li>${h(g.name)}${g.category ? ` (${g.category})` : ''}</li>`).join('')}</ul>` :
-                '<p style="color: #92400e; margin: 0; font-style: italic;">Not defined in Account Setup</p>'}
+            `<ul style="margin: 0; padding-left: 20px;">${client.goodsServices.map(g => `<li>${h(g.name)}${g.category ? ` (${g.category})` : ''}</li>`).join('')}</ul>` :
+            '<p style="color: #92400e; margin: 0; font-style: italic;">Not defined in Account Setup</p>'}
                     </div>
                     <div style="background: #ecfeff; padding: 15px; border-radius: 8px; border-left: 4px solid #06b6d4;">
                         <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: #0891b2;">Key Processes</h3>
                         ${(client.keyProcesses && client.keyProcesses.length > 0) ?
-                `<ul style="margin: 0; padding-left: 20px;">${client.keyProcesses.map(p => `<li>${h(p.name)}${p.category === 'Core' ? ' <strong>(Core)</strong>' : ''}</li>`).join('')}</ul>` :
-                '<p style="color: #0891b2; margin: 0; font-style: italic;">Not defined in Account Setup</p>'}
+            `<ul style="margin: 0; padding-left: 20px;">${client.keyProcesses.map(p => `<li>${h(p.name)}${p.category === 'Core' ? ' <strong>(Core)</strong>' : ''}</li>`).join('')}</ul>` :
+            '<p style="color: #0891b2; margin: 0; font-style: italic;">Not defined in Account Setup</p>'}
                     </div>
                 </div>
 
-                <h1>2. Executive Summary</h1>
+                <h1 id="exec-summary">2. Executive Summary</h1>
                 <p><strong>Overview:</strong></p>
                 <div style="margin-bottom: 2rem; background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6;">
                     ${h(report.execSummary || 'Executive summary pending...').replace(/\n/g, '<br>')}
@@ -795,9 +996,9 @@ window.generateAuditReport = function (reportId) {
                 </div>
                 
                 <h2>Audit Performance Analysis</h2>
-                 <div class="chart-section">
-                     <p>The following chart illustrates the distribution of findings and the overall compliance level observed during the audit.</p>
-                     <div class="chart-container">
+                <div class="chart-section">
+                    <p>The following chart illustrates the distribution of findings and the overall compliance level observed during the audit.</p>
+                    <div class="chart-container">
                         <div class="bar-group">
                             <span class="bar-val">${complianceScore}%</span>
                             <div class="bar" style="height: ${conformHeight}%; background: linear-gradient(to top, #059669, #10b981);"></div>
@@ -821,23 +1022,23 @@ window.generateAuditReport = function (reportId) {
                     </div>
                 </div>
 
-                <h1>3. Strengths and Opportunities</h1>
+                <h1 id="strengths">3. Strengths and Opportunities</h1>
                 <div class="grid-2">
                     <div>
                         <h3><i class="fa-solid fa-thumbs-up" style="color: #10b981; margin-right: 8px;"></i> Key Strengths</h3>
-                         <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; border: 1px solid #a7f3d0;">
+                        <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; border: 1px solid #a7f3d0;">
                             ${h(report.strengths || report.positiveObservations || 'None recorded').replace(/\n/g, '<br>')}
-                         </div>
+                        </div>
                     </div>
                     <div>
                         <h3><i class="fa-solid fa-lightbulb" style="color: #f59e0b; margin-right: 8px;"></i> Areas for Improvement</h3>
-                         <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border: 1px solid #fde68a;">
+                        <div style="background: #fffbeb; padding: 20px; border-radius: 8px; border: 1px solid #fde68a;">
                             ${h(report.improvements || report.ofi || 'None recorded').replace(/\n/g, '<br>')}
-                         </div>
+                        </div>
                     </div>
                 </div>
 
-                <h1>4. Detailed Findings and Evidence</h1>
+                <h1 id="findings">4. Detailed Findings and Evidence</h1>
                 ${ncrCount === 0 ? '<p style="background: #ecfdf5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;"><i class="fa-solid fa-circle-check" style="color: #10b981; margin-right: 8px;"></i><strong>No non-conformities were raised during this audit.</strong> The management system was found to be in full compliance with the standard requirements.</p>' : ''}
 
                 ${combinedNCRs.map((ncr, i) => `
@@ -856,7 +1057,7 @@ window.generateAuditReport = function (reportId) {
                             <div style="font-weight: 600; color: #555;">Objective Evidence:</div>
                             <div style="font-style: italic; color: #4b5563;">${h(ncr.evidence || 'Evidence reviewed on-site during audit.')}</div>
 
-                             ${ncr.transcript ? `
+                            ${ncr.transcript ? `
                                 <div style="font-weight: 600; color: #555;">Audio Transcript:</div>
                                 <div style="background: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.9rem; border-left: 3px solid #64748b;">
                                     <i class="fa-solid fa-microphone-lines" style="color: #64748b; margin-right: 5px;"></i> "${h(ncr.transcript)}"
@@ -866,7 +1067,7 @@ window.generateAuditReport = function (reportId) {
                             ${ncr.evidenceImage ? `
                                 <div style="font-weight: 600; color: #555;">Visual Evidence:</div>
                                 <div>
-                                    <img src="${h(ncr.evidenceImage)}" alt="Captured Evidence" style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #cbd5e1; border-radius: 6px; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open(this.src)">
+                                    <img src="${h(ncr.evidenceImage)}" alt="Captured Evidence" style="width: 150px; height: 150px; object-fit: cover; border: 2px solid #cbd5e1; border-radius: 6px; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                                 </div>
                             ` : ''}
                             
@@ -877,7 +1078,7 @@ window.generateAuditReport = function (reportId) {
                 `).join('')}
 
                 ${capaCount > 0 ? `
-                <h1>5. Corrective & Preventive Actions (CAPA)</h1>
+                <h1 id="capa">5. Corrective & Preventive Actions (CAPA)</h1>
                 <p>The following corrective and preventive actions have been identified to address the non-conformities raised during the audit:</p>
                 ${(report.capas || []).map((capa, i) => `
                     <div class="capa-box">
@@ -906,7 +1107,41 @@ window.generateAuditReport = function (reportId) {
                 `).join('')}
                 ` : ''}
 
-                <h1>${capaCount > 0 ? '6' : '5'}. Observations</h1>
+                <h1 id="meeting-records">${capaCount > 0 ? '6' : '5'}. Meeting Records</h1>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-top:0;">Opening Meeting</h3>
+                    <p><strong>Date/Time:</strong> ${h(report.openingMeeting?.dateTime?.replace('T', ' ') || 'Not recorded')}</p>
+                    <p><strong>Attendees:</strong> ${h((report.openingMeeting?.attendees || []).join(', ') || 'Not recorded')}</p>
+                </div>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-top:0;">Closing Meeting</h3>
+                    <p><strong>Date/Time:</strong> ${h(report.closingMeeting?.dateTime?.replace('T', ' ') || 'Not recorded')}</p>
+                    <p><strong>Attendees:</strong> ${h((report.closingMeeting?.attendees || []).join(', ') || 'Not recorded')}</p>
+                </div>
+
+                <h1 id="evidence">${capaCount > 0 ? '7' : '6'}. Audit Evidence</h1>
+                
+                <h2>Audit Agenda / Schedule</h2>
+                <div style="background: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                    ${h(report.auditAgenda || 'Agenda details pending...').replace(/\n/g, '<br>')}
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 20px;">
+                    <div>
+                        <h2>Interviewees</h2>
+                        <div style="background: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                            ${h(report.interviewees || 'None recorded').replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                    <div>
+                        <h2>Documents Reviewed</h2>
+                         <div style="background: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                            ${h(report.documentsReviewed || 'None recorded').replace(/\n/g, '<br>')}
+                         </div>
+                    </div>
+                </div>
+
+                <h1 id="observations">${capaCount > 0 ? '8' : '7'}. Observations</h1>
                 <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
                     <h3 style="color: #10b981; margin-top: 0;"><i class="fa-solid fa-star" style="margin-right: 8px;"></i>Positive Observations</h3>
                     <div style="background: white; padding: 15px; border-radius: 6px;">
@@ -920,7 +1155,7 @@ window.generateAuditReport = function (reportId) {
                     </div>
                 </div>
 
-                <h1>${capaCount > 0 ? '7' : '6'}. Conclusion and Recommendation</h1>
+                <h1 id="conclusion">${capaCount > 0 ? '9' : '8'}. Conclusion and Recommendation</h1>
                 <p><strong>Auditor Conclusion:</strong></p>
                 <div style="margin-bottom: 30px; background: #f8fafc; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 4px;">
                     ${h(report.conclusion || 'Conclusion pending finalization.').replace(/\n/g, '<br>')}
@@ -966,7 +1201,135 @@ window.generateAuditReport = function (reportId) {
             </div>
         </body>
         </html>
-    `);
+    `;
+}
+
+// Generate Printable PDF Report
+/**
+ * Validate Report Data Before Generation
+ * @param {Object} report - The audit report
+ * @param {Object} plan - The audit plan
+ * @param {Object} client - The client data
+ * @returns {Array} Array of validation error messages
+ */
+function validateReportData(report, plan, client) {
+    const errors = [];
+    const warnings = [];
+
+    // Critical validations
+    if (!report.execSummary || report.execSummary.trim() === '') {
+        errors.push('❌ Executive Summary is missing');
+    }
+
+    if (!report.conclusion || report.conclusion.trim() === '') {
+        errors.push('❌ Conclusion is missing');
+    }
+
+    if (!report.recommendation) {
+        errors.push('❌ Certification Recommendation is missing');
+    }
+
+    // Warning validations
+    if (!plan || Object.keys(plan).length === 0) {
+        warnings.push('⚠️ Audit Plan data not found - some details may be incomplete');
+    } else {
+        if (!plan.auditors || plan.auditors.length === 0) {
+            warnings.push('⚠️ No auditors assigned to this audit');
+        }
+    }
+
+    if (!client || Object.keys(client).length === 0) {
+        warnings.push('⚠️ Client data not found - organization context will be incomplete');
+    } else {
+        if (!client.contacts || client.contacts.length === 0) {
+            warnings.push('⚠️ Client contact information is missing');
+        }
+    }
+
+    if (!report.strengths && !report.positiveObservations) {
+        warnings.push('⚠️ No positive observations recorded');
+    }
+
+    if (!report.improvements && !report.ofi) {
+        warnings.push('⚠️ No opportunities for improvement recorded');
+    }
+
+    if (!report.auditAgenda) warnings.push('⚠️ Audit Agenda is missing');
+    if (!report.interviewees) warnings.push('⚠️ List of Interviewees is missing');
+    if (!report.documentsReviewed) warnings.push('⚠️ Documents Reviewed list is missing');
+    if (!report.openingMeeting?.dateTime) warnings.push('⚠️ Opening Meeting details missing');
+    if (!report.closingMeeting?.dateTime) warnings.push('⚠️ Closing Meeting details missing');
+
+    return { errors, warnings };
+}
+
+// Generate Printable PDF Report
+window.generateAuditReport = function (reportId) {
+    const h = window.UTILS.escapeHtml; // Alias for sanitization
+
+    // Save current state first to ensure all changes are captured
+    window.saveData();
+
+    const report = state.auditReports.find(r => r.id === reportId);
+    if (!report) {
+        window.showNotification('Report not found', 'error');
+        return;
+    }
+
+    try {
+        const plan = state.auditPlans.find(p => p.client === report.client) || {};
+        const client = state.clients.find(c => c.name === report.client) || {};
+
+        // Validate report data
+        const validation = validateReportData(report, plan, client);
+
+        // Check for critical errors
+        if (validation.errors.length > 0) {
+            const errorMsg = 'Cannot generate report. Please fix the following issues:\n\n' +
+                validation.errors.join('\n');
+            alert(errorMsg);
+            window.showNotification('Report generation failed - missing required data', 'error');
+            return;
+        }
+
+        // Show warnings if any
+        if (validation.warnings.length > 0) {
+            const warningMsg = 'The following issues were found:\n\n' +
+                validation.warnings.join('\n') +
+                '\n\nDo you want to continue anyway?';
+            if (!confirm(warningMsg)) {
+                return;
+            }
+        }
+
+        const printWindow = window.open('', '_blank');
+
+        if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
+            window.showNotification('Popup blocked! Please allow popups for this site and try again.', 'error');
+            return;
+        }
+
+        // Use reusable HTML generator
+        // Inject Print Button and Styles for Print Window view
+        let htmlContent = generateReportHTML(report, plan, client);
+
+        // 1. Inject Print Button
+        const printBtnHTML = `
+            <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000;">
+                <button onclick="window.print()" style="padding: 12px 24px; cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 1rem;"><i class="fa-solid fa-print"></i> Print PDF</button>
+            </div>`;
+        htmlContent = htmlContent.replace('<body>', '<body>' + printBtnHTML);
+
+        // 2. Inject .no-print styles
+        const noPrintStyles = `
+            .no-print { display: none; }
+            @media print {
+                .no-print { display: none; }
+            }
+        </style>`;
+        htmlContent = htmlContent.replace('</style>', noPrintStyles);
+
+        printWindow.document.write(htmlContent);
         printWindow.document.close();
         window.showNotification('Enhanced audit report generated successfully!', 'success');
     } catch (error) {
@@ -1046,39 +1409,20 @@ window.uploadReportToCloud = async function (reportId) {
         // Get report data
         const plan = state.auditPlans.find(p => p.client === report.client) || {};
         const client = state.clients.find(c => c.name === report.client) || {};
-        const cbSettings = state.cbSettings || {};
 
-        // Simple HTML for PDF (condensed version)
-        container.innerHTML = `
-            <div style="font-family: Arial, sans-serif; padding: 40px; color: #333;">
-                <h1 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px;">
-                    Audit Report - ${report.client}
-                </h1>
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Client</td><td style="padding: 8px; border: 1px solid #ddd;">${report.client}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Standard</td><td style="padding: 8px; border: 1px solid #ddd;">${plan.standard || 'N/A'}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Date</td><td style="padding: 8px; border: 1px solid #ddd;">${report.date}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Status</td><td style="padding: 8px; border: 1px solid #ddd;">${report.status}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Findings</td><td style="padding: 8px; border: 1px solid #ddd;">${(report.ncrs || []).length} NCRs</td></tr>
-                </table>
-                <h2>Executive Summary</h2>
-                <p>${report.execSummary || 'No summary available.'}</p>
-                <h2>Conclusion</h2>
-                <p>${report.conclusion || 'Pending finalization.'}</p>
-                <p style="margin-top: 40px; font-size: 12px; color: #666;">
-                    Generated by AuditCB360 on ${new Date().toLocaleString()}
-                </p>
-            </div>
-        `;
+        // Use the centralized HTML generator for consistency
+        container.innerHTML = generateReportHTML(report, plan, client);
 
         // Generate PDF blob
         const pdfBlob = await html2pdf()
             .set({
-                margin: 10,
+                margin: [15, 10, 15, 10],
                 filename: `Report_${report.id}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                enableLinks: true,
+                html2canvas: { scale: 2, useCORS: true, logging: false },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             })
             .from(container)
             .outputPdf('blob');

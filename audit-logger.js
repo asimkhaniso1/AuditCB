@@ -331,6 +331,7 @@ const AuditLogger = {
         try {
             // Transform camelCase to snake_case for database
             const dbEntry = {
+                id: entry.id,
                 timestamp: entry.timestamp,
                 action: entry.action,
                 entity: entry.entity,
