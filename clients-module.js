@@ -4426,6 +4426,8 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
 
 // Remove auditor assignment from a client
 window.removeClientAuditorAssignment = function (clientId, auditorId) {
+    console.log('[removeClientAuditorAssignment] Called with:', { clientId, auditorId });
+
     const client = window.state.clients.find(c => c.id == clientId);
     const auditor = window.state.auditors.find(a => a.id == auditorId);
 
@@ -4434,12 +4436,24 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
 Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
 
     if (confirm(confirmMsg)) {
+        const initialLength = (window.state.auditorAssignments || []).length;
+
         window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(
-            a => !(a.auditorId == auditorId && a.clientId == clientId)
+            a => !(String(a.auditorId) === String(auditorId) && String(a.clientId) === String(clientId))
         );
+
+        const newLength = window.state.auditorAssignments.length;
+        console.log('[removeClientAuditorAssignment] Removed:', initialLength - newLength, 'assignments');
+
+        if (initialLength === newLength) {
+            console.warn('[removeClientAuditorAssignment] No assignment found to remove!', {
+                assignments: window.state.auditorAssignments,
+                target: { clientId, auditorId }
+            });
+        }
+
         window.saveData();
 
-        // Refresh the wizard step
         // Refresh the view and switch to Audit Team tab
         renderClientDetail(clientId);
         setTimeout(() => {
