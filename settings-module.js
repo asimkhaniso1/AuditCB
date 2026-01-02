@@ -123,24 +123,36 @@ if (!window.state.cbPolicies) {
 }
 
 function renderSettings() {
+    // Track current main tab and sub-tab
+    if (!window.state.settingsMainTab) window.state.settingsMainTab = 'cb-profile';
+    if (!window.state.settingsSubTab) window.state.settingsSubTab = 'profile';
+
     const html = `
         <div class="fade-in">
             <div class="card" style="margin-bottom: 2rem;">
-                <div class="tab-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; overflow-x: auto; white-space: nowrap;">
-                    <button class="tab-btn active" onclick="switchSettingsTab('profile', this)">CB Profile</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('organization', this)">Organization</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('permissions', this)">Permissions</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('accreditation', this)">Accreditation</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('cbpolicies', this)">CB Policies</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('data-management', this)"><i class="fa-solid fa-database" style="margin-right: 0.25rem;"></i>Data Management</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('knowledgebase', this)"><i class="fa-solid fa-brain" style="margin-right: 0.25rem;"></i>Knowledge Base</button>
+                <!-- Main Tabs (4 categories) -->
+                <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 0; padding-bottom: 0;">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'cb-profile' ? 'active' : ''}" onclick="switchSettingsMainTab('cb-profile', this)">
+                        <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>CB Profile
+                    </button>
+                    <button class="tab-btn ${window.state.settingsMainTab === 'organization' ? 'active' : ''}" onclick="switchSettingsMainTab('organization', this)">
+                        <i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Organization
+                    </button>
+                    <button class="tab-btn ${window.state.settingsMainTab === 'policies' ? 'active' : ''}" onclick="switchSettingsMainTab('policies', this)">
+                        <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Policies
+                    </button>
+                    <button class="tab-btn ${window.state.settingsMainTab === 'system' ? 'active' : ''}" onclick="switchSettingsMainTab('system', this)">
+                        <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>System
+                    </button>
                 </div>
 
-                <div id="settings-content">
-                    ${getCBProfileHTML()}
+                <!-- Sub-tabs bar -->
+                <div id="settings-subtabs" style="background: #f8fafc; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color);">
+                    ${getSettingsSubTabs(window.state.settingsMainTab)}
+                </div>
+
+                <div id="settings-content" style="padding: 1.5rem;">
+                    ${getSettingsContent(window.state.settingsMainTab, window.state.settingsSubTab)}
                 </div>
             </div>
         </div>
@@ -148,31 +160,138 @@ function renderSettings() {
     window.contentArea.innerHTML = html;
 }
 
-function switchSettingsTab(tabName, btnElement) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    btnElement.classList.add('active');
+// Get sub-tabs for a main tab
+function getSettingsSubTabs(mainTab) {
+    const subTabs = {
+        'cb-profile': [
+            { id: 'profile', label: 'Profile & Logo', icon: 'fa-id-card' },
+            { id: 'accreditation', label: 'Accreditation', icon: 'fa-certificate' }
+        ],
+        'organization': [
+            { id: 'structure', label: 'Structure', icon: 'fa-sitemap' },
+            { id: 'permissions', label: 'Permissions', icon: 'fa-user-shield' }
+        ],
+        'policies': [
+            { id: 'quality', label: 'Quality Policy', icon: 'fa-star' },
+            { id: 'cbpolicies', label: 'CB Policies', icon: 'fa-gavel' },
+            { id: 'retention', label: 'Retention', icon: 'fa-archive' }
+        ],
+        'system': [
+            { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
+            { id: 'data', label: 'Data Management', icon: 'fa-database' },
+            { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-brain' }
+        ]
+    };
 
-    const container = document.getElementById('settings-content');
-    switch (tabName) {
-        case 'profile': container.innerHTML = getCBProfileHTML(); break;
-        case 'accreditation': container.innerHTML = getAccreditationHTML(); break;
-        case 'organization': container.innerHTML = getOrganizationHTML(); break;
-        case 'permissions': container.innerHTML = getPermissionsHTML(); break;
-        case 'retention': container.innerHTML = getRetentionHTML(); break;
-        case 'policy': container.innerHTML = getQualityPolicyHTML(); break;
-        case 'defaults': container.innerHTML = getDefaultsHTML(); break;
-        case 'data-management':
-            container.innerHTML = '<div id="admin-data-management"></div>';
-            setTimeout(() => {
-                if (window.DataMigration && typeof window.DataMigration.renderAdminUI === 'function') {
-                    window.DataMigration.renderAdminUI();
-                } else {
-                    document.getElementById('admin-data-management').innerHTML = '<div class="alert alert-warning">Data Migration module not loaded.</div>';
-                }
-            }, 50);
-            break;
-        case 'cbpolicies': container.innerHTML = getCBPoliciesHTML(); break;
-        case 'knowledgebase': container.innerHTML = getKnowledgeBaseHTML(); break;
+    const tabs = subTabs[mainTab] || [];
+    const currentSubTab = window.state.settingsSubTab;
+
+    return tabs.map(tab => `
+        <button class="btn btn-sm ${currentSubTab === tab.id ? 'btn-primary' : 'btn-outline-secondary'}" 
+            style="margin-right: 0.5rem;" 
+            onclick="switchSettingsSubTab('${mainTab}', '${tab.id}')">
+            <i class="fa-solid ${tab.icon}" style="margin-right: 0.25rem;"></i>${tab.label}
+        </button>
+    `).join('');
+}
+
+// Get content for a specific sub-tab
+function getSettingsContent(mainTab, subTab) {
+    const contentMap = {
+        'cb-profile': {
+            'profile': () => getCBProfileHTML(),
+            'accreditation': () => getAccreditationHTML()
+        },
+        'organization': {
+            'structure': () => getOrganizationHTML(),
+            'permissions': () => getPermissionsHTML()
+        },
+        'policies': {
+            'quality': () => getQualityPolicyHTML(),
+            'cbpolicies': () => getCBPoliciesHTML(),
+            'retention': () => getRetentionHTML()
+        },
+        'system': {
+            'defaults': () => getDefaultsHTML(),
+            'data': () => {
+                setTimeout(() => {
+                    if (window.DataMigration && typeof window.DataMigration.renderAdminUI === 'function') {
+                        window.DataMigration.renderAdminUI();
+                    } else {
+                        const dm = document.getElementById('admin-data-management');
+                        if (dm) dm.innerHTML = '<div class="alert alert-warning">Data Migration module not loaded.</div>';
+                    }
+                }, 50);
+                return '<div id="admin-data-management"></div>';
+            },
+            'knowledge': () => getKnowledgeBaseHTML()
+        }
+    };
+
+    const mainContent = contentMap[mainTab];
+    if (mainContent && mainContent[subTab]) {
+        return mainContent[subTab]();
+    }
+
+    // Default to first sub-tab of the main tab
+    const firstSubTab = Object.keys(contentMap[mainTab] || {})[0];
+    if (firstSubTab && contentMap[mainTab][firstSubTab]) {
+        window.state.settingsSubTab = firstSubTab;
+        return contentMap[mainTab][firstSubTab]();
+    }
+
+    return getCBProfileHTML();
+}
+
+// Switch main tab
+window.switchSettingsMainTab = function (mainTab, btnElement) {
+    window.state.settingsMainTab = mainTab;
+
+    // Set default sub-tab for the main tab
+    const defaultSubTabs = {
+        'cb-profile': 'profile',
+        'organization': 'structure',
+        'policies': 'quality',
+        'system': 'defaults'
+    };
+    window.state.settingsSubTab = defaultSubTabs[mainTab] || 'profile';
+
+    renderSettings();
+};
+
+// Switch sub-tab
+window.switchSettingsSubTab = function (mainTab, subTab) {
+    window.state.settingsMainTab = mainTab;
+    window.state.settingsSubTab = subTab;
+
+    // Update sub-tabs
+    document.getElementById('settings-subtabs').innerHTML = getSettingsSubTabs(mainTab);
+
+    // Update content
+    document.getElementById('settings-content').innerHTML = getSettingsContent(mainTab, subTab);
+};
+
+// Legacy function for compatibility
+function switchSettingsTab(tabName, btnElement) {
+    // Map old tab names to new structure
+    const mapping = {
+        'profile': { main: 'cb-profile', sub: 'profile' },
+        'accreditation': { main: 'cb-profile', sub: 'accreditation' },
+        'organization': { main: 'organization', sub: 'structure' },
+        'permissions': { main: 'organization', sub: 'permissions' },
+        'policy': { main: 'policies', sub: 'quality' },
+        'cbpolicies': { main: 'policies', sub: 'cbpolicies' },
+        'retention': { main: 'policies', sub: 'retention' },
+        'defaults': { main: 'system', sub: 'defaults' },
+        'data-management': { main: 'system', sub: 'data' },
+        'knowledgebase': { main: 'system', sub: 'knowledge' }
+    };
+
+    const mapped = mapping[tabName];
+    if (mapped) {
+        window.state.settingsMainTab = mapped.main;
+        window.state.settingsSubTab = mapped.sub;
+        renderSettings();
     }
 }
 
