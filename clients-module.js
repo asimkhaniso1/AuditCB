@@ -319,6 +319,9 @@ function renderClientDetail(clientId, options = {}) {
                     <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Account Setup
                 </button>
                 ` : ''}
+                <button class="tab-btn" data-tab="audit_team">
+                    <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team
+                </button>
                 <button class="tab-btn" data-tab="scopes">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>Scopes & Certs
                 </button>
@@ -1357,6 +1360,8 @@ function renderClientTab(client, tabName) {
         tabContent.innerHTML = getClientInfoHTML(client);
     } else if (tabName === 'client_org') {
         tabContent.innerHTML = getClientOrgSetupHTML(client);
+    } else if (tabName === 'audit_team') {
+        tabContent.innerHTML = getClientAuditTeamHTML(client);
     } else if (tabName === 'scopes') {
         tabContent.innerHTML = getClientCertificatesHTML(client);
     } else if (tabName === 'audits') {
@@ -3461,8 +3466,7 @@ function getClientOrgSetupHTML(client) {
         { id: 4, title: 'Designations', icon: 'fa-id-badge', color: '#84cc16' },
         { id: 5, title: 'Personnel', icon: 'fa-address-book', color: '#10b981' },
         { id: 6, title: 'Goods/Services', icon: 'fa-boxes-stacked', color: '#f59e0b' },
-        { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' },
-        { id: 8, title: 'Audit Team', icon: 'fa-user-shield', color: '#0ea5e9' }
+        { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' }
     ];
 
     const progressWidth = ((currentStep - 1) / (steps.length - 1)) * 100;
@@ -3545,13 +3549,12 @@ getClientOrgSetupHTML.renderWizardStep = function (client, step) {
         case 5: return getClientContactsHTML(client);
         case 6: return getClientGoodsServicesHTML(client);
         case 7: return getClientKeyProcessesHTML(client);
-        case 8: return getClientAuditTeamHTML(client);
         default: return getClientProfileHTML(client);
     }
 };
 
 window.setSetupWizardStep = function (clientId, step) {
-    if (step < 1 || step > 8) return;
+    if (step < 1 || step > 7) return;
     const client = window.state.clients.find(c => c.id === clientId);
     if (client) {
         client._wizardStep = step;
@@ -4408,13 +4411,11 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
         window.closeModal();
 
         // Refresh the wizard step to show updated team
-        if (client) {
-            client._wizardStep = 8; // Audit Team step
-            const tabContent = document.getElementById('tab-content');
-            if (tabContent) {
-                tabContent.innerHTML = getClientOrgSetupHTML(client);
-            }
-        }
+        // Refresh the view and switch to Audit Team tab
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
+        }, 100);
 
         const auditor = auditors.find(a => a.id == auditorId);
         window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
@@ -4439,13 +4440,11 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
         window.saveData();
 
         // Refresh the wizard step
-        if (client) {
-            client._wizardStep = 8;
-            const tabContent = document.getElementById('tab-content');
-            if (tabContent) {
-                tabContent.innerHTML = getClientOrgSetupHTML(client);
-            }
-        }
+        // Refresh the view and switch to Audit Team tab
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
+        }, 100);
 
         window.showNotification('Auditor removed from client. Historical records retained.', 'success');
     }
