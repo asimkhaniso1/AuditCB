@@ -914,6 +914,91 @@ function getClientDesignationsHTML(client) {
     `;
 }
 
+// Audit Team Step - Manage CB auditors assigned to this client
+function getClientAuditTeamHTML(client) {
+    const assignments = window.state.auditorAssignments || [];
+    const auditors = window.state.auditors || [];
+    const userRole = window.state.currentUser?.role;
+    const canManage = userRole === 'Admin' || userRole === 'Certification Manager';
+
+    // Get auditors assigned to this client
+    const assignedAuditorIds = assignments
+        .filter(a => a.clientId == client.id)
+        .map(a => a.auditorId);
+    const assignedAuditors = auditors.filter(a => assignedAuditorIds.includes(a.id));
+
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+                <h3 style="margin: 0;"><i class="fa-solid fa-user-shield" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Audit Team</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">CB auditors assigned to audit this organization</p>
+            </div>
+            ${canManage ? `
+            <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal(${client.id}, '${window.UTILS.escapeHtml(client.name)}')">
+                <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
+            </button>
+            ` : ''}
+        </div>
+        
+        <!-- Info Box -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: start;">
+                <i class="fa-solid fa-info-circle" style="color: #2563eb; margin-top: 2px;"></i>
+                <div style="font-size: 0.9rem; color: #1e40af;">
+                    <strong>Auditor Access Control</strong><br>
+                    Auditors assigned here can view this client's data, create audit plans, and submit reports.
+                    ${!canManage ? '<br><em>Only Certification Managers and Admins can modify assignments.</em>' : ''}
+                </div>
+            </div>
+        </div>
+
+        ${assignedAuditors.length > 0 ? `
+            <div style="display: grid; gap: 1rem;">
+                ${assignedAuditors.map(auditor => {
+        const assignment = assignments.find(a => a.clientId == client.id && a.auditorId == auditor.id);
+        return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="width: 48px; height: 48px; border-radius: 50%; background: ${auditor.role === 'Lead Auditor' ? '#e0f2fe' : '#eef2ff'}; color: ${auditor.role === 'Lead Auditor' ? '#0284c7' : '#4f46e5'}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                                <i class="fa-solid fa-user-tie"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 1rem;">${window.UTILS.escapeHtml(auditor.name)}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                    <span class="badge" style="background: ${auditor.role === 'Lead Auditor' ? '#e0f2fe' : '#f1f5f9'}; color: ${auditor.role === 'Lead Auditor' ? '#0284c7' : '#64748b'}; padding: 2px 8px; border-radius: 4px;">${window.UTILS.escapeHtml(auditor.role || 'Auditor')}</span>
+                                    ${auditor.email ? '<span style="margin-left: 0.5rem;">' + window.UTILS.escapeHtml(auditor.email) + '</span>' : ''}
+                                </div>
+                                ${assignment?.assignedAt ? '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Assigned: ' + new Date(assignment.assignedAt).toLocaleDateString() + '</div>' : ''}
+                            </div>
+                        </div>
+                        ${canManage ? '<button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment(' + client.id + ', ' + auditor.id + ')" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>' : ''}
+                    </div>
+                    `;
+    }).join('')}
+            </div>
+        ` : `
+            <div style="text-align: center; padding: 3rem; background: #f0f9ff; border-radius: 8px; border: 2px dashed #bae6fd;">
+                <i class="fa-solid fa-user-shield" style="font-size: 2.5rem; color: #0ea5e9; margin-bottom: 1rem;"></i>
+                <p style="color: #0369a1; margin-bottom: 0.5rem;">No auditors assigned to this client yet.</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                    ${canManage ? 'Click "Assign Auditor" to add CB auditors who can access this client data.' : 'A Certification Manager must assign auditors to this client.'}
+                </p >
+            </div >
+        `}
+        
+        ${assignedAuditors.length > 0 ? `
+        <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-check-circle" style="color: #16a34a;"></i>
+                <span style="font-size: 0.9rem; color: #166534;"><strong>${assignedAuditors.length}</strong> auditor${assignedAuditors.length !== 1 ? 's' : ''} assigned</span>
+            </div>
+        </div>
+        ` : ''}
+    </div>
+    `;
+}
+
 function getClientAuditsHTML(client) {
     // Get all audits for this client
     const clientPlans = (window.state.auditPlans || []).filter(p => p.client === client.name);
@@ -3370,7 +3455,8 @@ function getClientOrgSetupHTML(client) {
         { id: 4, title: 'Designations', icon: 'fa-id-badge', color: '#84cc16' },
         { id: 5, title: 'Personnel', icon: 'fa-address-book', color: '#10b981' },
         { id: 6, title: 'Goods/Services', icon: 'fa-boxes-stacked', color: '#f59e0b' },
-        { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' }
+        { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' },
+        { id: 8, title: 'Audit Team', icon: 'fa-user-shield', color: '#0ea5e9' }
     ];
 
     const progressWidth = ((currentStep - 1) / (steps.length - 1)) * 100;
@@ -3453,12 +3539,13 @@ getClientOrgSetupHTML.renderWizardStep = function (client, step) {
         case 5: return getClientContactsHTML(client);
         case 6: return getClientGoodsServicesHTML(client);
         case 7: return getClientKeyProcessesHTML(client);
+        case 8: return getClientAuditTeamHTML(client);
         default: return getClientProfileHTML(client);
     }
 };
 
 window.setSetupWizardStep = function (clientId, step) {
-    if (step < 1 || step > 7) return;
+    if (step < 1 || step > 8) return;
     const client = window.state.clients.find(c => c.id === clientId);
     if (client) {
         client._wizardStep = step;
@@ -4252,3 +4339,108 @@ function updateClientWorkspaceHeader(clientId) {
     }
 }
 window.updateClientWorkspaceHeader = updateClientWorkspaceHeader;
+
+// ============================================
+// CLIENT-LEVEL AUDITOR ASSIGNMENT FUNCTIONS
+// ============================================
+
+// Open modal to assign an auditor to this client
+window.openClientAuditorAssignmentModal = function (clientId, clientName) {
+    const client = window.state.clients.find(c => c.id == clientId);
+    const auditors = window.state.auditors || [];
+    const assignments = window.state.auditorAssignments || [];
+
+    // Get auditors not yet assigned to this client
+    const assignedAuditorIds = assignments
+        .filter(a => a.clientId == clientId)
+        .map(a => a.auditorId);
+    const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(a.id));
+
+    if (availableAuditors.length === 0) {
+        window.showNotification('All auditors are already assigned to this client.', 'info');
+        return;
+    }
+
+    document.getElementById('modal-title').textContent = `Assign Auditor to ${clientName}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div class="form-group">
+            <label>Select Auditor to Assign</label>
+            <select id="client-assign-auditor" class="form-control" required>
+                <option value="">-- Select Auditor --</option>
+                ${availableAuditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)} (${a.role || 'Auditor'})</option>`).join('')}
+            </select>
+        </div>
+        <div class="alert alert-info" style="margin-top: 1rem; padding: 0.75rem; background: #eff6ff; color: #1e40af; border-radius: 6px; border: 1px solid #bfdbfe;">
+            <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+            The selected auditor will be able to access this client's data, view audit plans, and submit reports.
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = function () {
+        const auditorId = parseInt(document.getElementById('client-assign-auditor').value);
+
+        if (!auditorId) {
+            window.showNotification('Please select an auditor.', 'error');
+            return;
+        }
+
+        // Initialize if not exists
+        if (!window.state.auditorAssignments) {
+            window.state.auditorAssignments = [];
+        }
+
+        // Add new assignment
+        window.state.auditorAssignments.push({
+            auditorId: auditorId,
+            clientId: clientId,
+            assignedBy: window.state.currentUser?.name || 'System',
+            assignedAt: new Date().toISOString()
+        });
+
+        window.saveData();
+        window.closeModal();
+
+        // Refresh the wizard step to show updated team
+        if (client) {
+            client._wizardStep = 8; // Audit Team step
+            const tabContent = document.getElementById('tab-content');
+            if (tabContent) {
+                tabContent.innerHTML = getClientOrgSetupHTML(client);
+            }
+        }
+
+        const auditor = auditors.find(a => a.id == auditorId);
+        window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
+    };
+
+    window.openModal();
+};
+
+// Remove auditor assignment from a client
+window.removeClientAuditorAssignment = function (clientId, auditorId) {
+    const client = window.state.clients.find(c => c.id == clientId);
+    const auditor = window.state.auditors.find(a => a.id == auditorId);
+
+    const confirmMsg = `Remove ${auditor?.name || 'this auditor'} from ${client?.name || 'this client'}?
+
+Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
+
+    if (confirm(confirmMsg)) {
+        window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(
+            a => !(a.auditorId == auditorId && a.clientId == clientId)
+        );
+        window.saveData();
+
+        // Refresh the wizard step
+        if (client) {
+            client._wizardStep = 8;
+            const tabContent = document.getElementById('tab-content');
+            if (tabContent) {
+                tabContent.innerHTML = getClientOrgSetupHTML(client);
+            }
+        }
+
+        window.showNotification('Auditor removed from client. Historical records retained.', 'success');
+    }
+};

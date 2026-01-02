@@ -134,7 +134,6 @@ function renderSettings() {
                     <button class="tab-btn" onclick="switchSettingsTab('cbpolicies', this)">CB Policies</button>
                     <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
                     <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
-                    <button class="tab-btn" onclick="switchSettingsTab('assignments', this)"><i class="fa-solid fa-user-plus" style="margin-right: 0.25rem;"></i>Assignments</button>
                     <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
                     <button class="tab-btn" onclick="switchSettingsTab('data-management', this)"><i class="fa-solid fa-database" style="margin-right: 0.25rem;"></i>Data Management</button>
                     <button class="tab-btn" onclick="switchSettingsTab('knowledgebase', this)"><i class="fa-solid fa-brain" style="margin-right: 0.25rem;"></i>Knowledge Base</button>
@@ -174,7 +173,6 @@ function switchSettingsTab(tabName, btnElement) {
             break;
         case 'cbpolicies': container.innerHTML = getCBPoliciesHTML(); break;
         case 'knowledgebase': container.innerHTML = getKnowledgeBaseHTML(); break;
-        case 'assignments': container.innerHTML = getAssignmentsHTML(); break;
     }
 }
 
