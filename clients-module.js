@@ -1372,154 +1372,212 @@ function renderClientTab(client, tabName) {
     }
 }
 
+window.handleLogoUpload = function (input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            window._tempClientLogo = e.target.result;
+            const previewImg = document.getElementById('client-logo-preview-img');
+            const placeholder = document.getElementById('client-logo-placeholder');
+            if (previewImg && placeholder) {
+                previewImg.style.backgroundImage = `url(${e.target.result})`;
+                previewImg.style.display = 'block';
+                placeholder.style.display = 'none';
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+};
+
 window.renderAddClient = function () {
     const html = `
-    <div class="fade-in">
-        <div style="margin-bottom: 1.5rem;">
-            <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
-                <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Clients
-            </button>
-        </div>
-
-        <div class="card">
-            <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-                <h2 style="margin: 0;">Add New Client</h2>
-                <p style="color: var(--text-secondary); margin-top: 0.25rem;">Enter organization details to create a new client workspace.</p>
+    <div class="fade-in" style="max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;">
+        <!-- Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+            <div>
+                <button class="btn btn-link" onclick="renderClientsEnhanced()" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Clients
+                </button>
+                <h1 style="font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, #1e293b 0%, #334155 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
+                    New Client Onboarding
+                </h1>
             </div>
-            
-            <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                <!--Basic Info-->
-                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
-                
-                <div class="form-group">
-                    <label>Company Name <span style="color: var(--danger-color);">*</span></label>
-                    <input type="text" class="form-control" id="client-name" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Industry <span style="color: red;">*</span></label>
-                    <select class="form-control" id="client-industry">
-                        <option value="">-- Select Industry --</option>
-                        <option>Manufacturing</option>
-                        <option>Automotive</option>
-                        <option>Aerospace</option>
-                        <option>IT</option>
-                        <option>Financial Services</option>
-                        <option>Healthcare</option>
-                        <option>Pharmaceutical</option>
-                        <option>Food & Beverage</option>
-                        <option>Construction</option>
-                        <option>Chemicals</option>
-                        <option>Oil & Gas</option>
-                        <option>Logistics</option>
-                        <option>Retail</option>
-                        <option>Education</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Standard(s) <span style="color: red;">*</span></label>
-                    <select class="form-control" id="client-standard" multiple style="height: 100px;">
-                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
-        `<option value="${std}">${std}</option>`
-    ).join('')}
-                    </select>
-                    <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Company Website</label>
-                    <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
-                </div>
-
-                <!--Company Logo-->
-                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
-                <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
-                    <div class="form-group" style="flex: 1; margin: 0;">
-                        <label>Upload Logo</label>
-                        <input type="file" class="form-control" id="client-logo-upload" accept="image/*" onchange="window.previewClientLogo(this)">
-                        <small style="color: var(--text-secondary);">Max 1MB, PNG/JPG (displayed in workspace header)</small>
-                    </div>
-                    <div id="client-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
-                        <i class="fa-solid fa-image" style="font-size: 1.5rem; color: var(--text-secondary);"></i>
-                    </div>
-                </div>
-
-                <!--Primary Contact-->
-                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
-
-                <div class="form-group">
-                    <label>Contact Name <span style="color: red;">*</span></label>
-                    <input type="text" class="form-control" id="client-contact-name" placeholder="John Doe" required>
-                </div>
-                <div class="form-group">
-                    <label>Designation</label>
-                    <input type="text" class="form-control" id="client-contact-designation" placeholder="Quality Manager">
-                </div>
-                <div class="form-group">
-                    <label>Phone</label>
-                    <input type="tel" class="form-control" id="client-contact-phone" placeholder="+1-555-0123">
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" class="form-control" id="client-contact-email" placeholder="john@example.com">
-                </div>
-
-                <!--Address & Location-->
-                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Location</div>
-
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Address</label>
-                    <input type="text" class="form-control" id="client-address" placeholder="Street Address">
-                </div>
-                <div class="form-group">
-                    <label>City</label>
-                    <input type="text" class="form-control" id="client-city" placeholder="City">
-                </div>
-                <div class="form-group">
-                    <label>Country</label>
-                    <input type="text" class="form-control" id="client-country" placeholder="Country">
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Geotag (Lat, Long)</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                         <input type="text" class="form-control" id="client-geotag" placeholder="e.g. 37.7749, -122.4194" style="margin-bottom: 0;">
-                         <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
-                            <i class="fa-solid fa-location-crosshairs"></i>
-                         </button>
-                    </div>
-                </div>
-
-                <!--Operational & Planning-->
-                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Planning Data</div>
-
-                <div class="form-group">
-                    <label>Total Employees <span style="color: red;">*</span></label>
-                    <input type="number" class="form-control" id="client-employees" min="1" value="10">
-                </div>
-                <div class="form-group">
-                    <label>Number of Sites <span style="color: red;">*</span></label>
-                    <input type="number" class="form-control" id="client-sites" min="1" value="1">
-                </div>
-                <div class="form-group">
-                    <label>Shift Work?</label>
-                    <select class="form-control" id="client-shifts">
-                        <option value="No">No (General Shift Only)</option>
-                        <option value="Yes">Yes (Multiple Shifts)</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Next Audit Date</label>
-                    <input type="date" class="form-control" id="client-next-audit">
-                </div>
-            </form>
-            
-            <div style="margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <div style="display: flex; gap: 1rem;">
                 <button class="btn btn-secondary" onclick="renderClientsEnhanced()">Cancel</button>
-                <button class="btn btn-primary" onclick="window.saveNewClient()">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Client
+                <button class="btn btn-primary" onclick="window.saveNewClient()" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                    <i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Create Client
                 </button>
             </div>
         </div>
+
+        <form id="client-form" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+            
+            <!-- Left Column -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                
+                <!-- Company Profile Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                    <div style="background: #f8fafc; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center;">
+                        <div style="width: 32px; height: 32px; background: #eff6ff; color: #3b82f6; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem;">
+                            <i class="fa-solid fa-building"></i>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Company Profile</h3>
+                    </div>
+                    <div style="padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Company Name <span class="text-danger">*</span></label>
+                            <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-id-card input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="text" class="form-control" id="client-name" placeholder="e.g. Acme Corp Global" required style="padding-left: 2.5rem;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector <span class="text-danger">*</span></label>
+                            <select class="form-control" id="client-industry" style="background-image: none;">
+                                <option value="">Select Industry...</option>
+                                ${['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'].map(i => `<option>${i}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Website</label>
+                             <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-globe input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="url" class="form-control" id="client-website" placeholder="https://..." style="padding-left: 2.5rem;">
+                             </div>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                                ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map((std, i) => `
+                                    <label class="standard-checkbox-btn" style="cursor: pointer;">
+                                        <input type="checkbox" name="client_standards" value="${std}" style="display: none;" onchange="this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#2563eb' : '#64748b'; this.nextElementSibling.style.background = this.checked ? '#eff6ff' : '#fff';">
+                                        <span style="display: inline-block; padding: 0.4rem 0.8rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 0.85rem; color: #64748b; transition: all 0.2s;">
+                                            ${std}
+                                        </span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                     <div style="background: #f8fafc; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center;">
+                        <div style="width: 32px; height: 32px; background: #fae8ff; color: #a21caf; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem;">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Head Office Location</h3>
+                    </div>
+                    <div style="padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                         <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Street Address</label>
+                            <input type="text" class="form-control" id="client-address" placeholder="123 Business Blvd, Suite 100">
+                        </div>
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" class="form-control" id="client-city" placeholder="Metropolis">
+                        </div>
+                         <div class="form-group">
+                            <label>Country</label>
+                            <input type="text" class="form-control" id="client-country" placeholder="Country">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="display: flex; justify-content: space-between;">
+                                <span>Geotag (Lat, Long)</span>
+                                <a href="#" onclick="event.preventDefault(); navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });" style="font-size: 0.8rem; color: var(--primary-color);">
+                                    <i class="fa-solid fa-location-crosshairs"></i> Detect My Location
+                                </a>
+                             </label>
+                             <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-map-pin input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="text" class="form-control" id="client-geotag" placeholder="37.7749, -122.4194" style="padding-left: 2.5rem;">
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Right Column -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+                 <!-- Branding Card -->
+                 <div class="card" style="padding: 1.5rem; text-align: center; border: 1px solid rgba(226, 232, 240, 0.8);">
+                    <div style="position: relative; width: 120px; height: 120px; margin: 0 auto 1rem auto; border-radius: 50%; border: 3px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff;">
+                         <div id="client-logo-preview-img" style="display: none; width: 100%; height: 100%; background-size: cover; background-position: center;"></div>
+                         <i id="client-logo-placeholder" class="fa-solid fa-image" style="font-size: 2.5rem; color: #cbd5e1;"></i>
+                    </div>
+                    <div>
+                         <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Logo
+                         </label>
+                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleLogoUpload(this)">
+                         <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
+                    </div>
+                 </div>
+
+                <!-- Contact Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                    <div style="background: #f8fafc; padding: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Primary Contact</h4>
+                    </div>
+                    <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Full Name <span class="text-danger">*</span></label>
+                             <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-user input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="text" class="form-control" id="client-contact-name" style="padding-left: 2.5rem;" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Designation</label>
+                            <input type="text" class="form-control" id="client-contact-designation" placeholder="e.g. Quality Manager">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Phone</label>
+                            <input type="tel" class="form-control" id="client-contact-phone">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Email</label>
+                            <input type="email" class="form-control" id="client-contact-email">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operating Metrics Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                     <div style="background: #f8fafc; padding: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Operations & Planning</h4>
+                    </div>
+                    <div style="padding: 1.25rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                             <label style="font-size: 0.8rem;">Employees <span class="text-danger">*</span></label>
+                             <input type="number" class="form-control" id="client-employees" value="10" min="1">
+                        </div>
+                         <div class="form-group">
+                             <label style="font-size: 0.8rem;">Sites <span class="text-danger">*</span></label>
+                             <input type="number" class="form-control" id="client-sites" value="1" min="1">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="font-size: 0.8rem;">Shift System</label>
+                             <select class="form-control" id="client-shifts">
+                                <option value="No">No (Single Shift)</option>
+                                <option value="Yes">Yes (Multiple Shifts)</option>
+                             </select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="font-size: 0.8rem;">Target Audit Date</label>
+                             <input type="date" class="form-control" id="client-next-audit">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </form>
     </div>
     `;
 
@@ -1568,8 +1626,10 @@ window.saveNewClient = function () {
     };
 
     // 3. Validate
-    const standardSelect = document.getElementById('client-standard');
-    if (standardSelect.selectedOptions.length === 0) {
+    // Check standards (checkboxes now)
+    const checkedStandards = Array.from(document.querySelectorAll('input[name="client_standards"]:checked')).map(cb => cb.value);
+
+    if (checkedStandards.length === 0) {
         window.showNotification('Please select at least one standard', 'error');
         return;
     }
@@ -1599,7 +1659,7 @@ window.saveNewClient = function () {
     );
 
     // 5. Construct Object
-    const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
+    const standard = checkedStandards.join(', ');
 
     const contacts = [];
     if (cleanData.contactName) {
