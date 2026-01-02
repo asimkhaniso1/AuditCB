@@ -4693,13 +4693,22 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
         });
 
         window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
-            // Match if either string comparison OR number comparison matches
+            // Match if either string comparison OR number comparison matches OR loose equality
             const stringMatch = (String(a.clientId) === cid && String(a.auditorId) === aid);
             const numberMatch = (parseInt(a.clientId) === cidNum && parseInt(a.auditorId) === aidNum);
-            const match = stringMatch || numberMatch;
+            const looseMatch = (a.clientId == clientId && a.auditorId == auditorId); // Fallback with type coercion
+            const match = stringMatch || numberMatch || looseMatch;
+
+            console.log('[removeClientAuditorAssignment] Checking assignment:', {
+                assignment: a,
+                stringMatch,
+                numberMatch,
+                looseMatch,
+                finalMatch: match
+            });
 
             if (match) {
-                console.log('[removeClientAuditorAssignment] Found matching assignment to remove:', a);
+                console.log('[removeClientAuditorAssignment] ✓ Found matching assignment to remove:', a);
             }
             return !match; // Keep if NOT matching
         });
