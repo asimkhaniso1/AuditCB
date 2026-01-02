@@ -183,7 +183,7 @@ function renderClientsEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Event listeners
-    document.getElementById('btn-new-client')?.addEventListener('click', openAddClientModal);
+    document.getElementById('btn-new-client')?.addEventListener('click', window.renderAddClient);
 
     document.getElementById('client-import-file')?.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
@@ -1372,270 +1372,280 @@ function renderClientTab(client, tabName) {
     }
 }
 
-function openAddClientModal() {
-    // Implementation for adding client
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+window.renderAddClient = function () {
+    const html = `
+    <div class="fade-in">
+        <div style="margin-bottom: 1.5rem;">
+            <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
+                <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Clients
+            </button>
+        </div>
 
-    modalTitle.textContent = 'Add New Client';
-    modalBody.innerHTML = `
-    <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            <!--Basic Info-->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
+        <div class="card">
+            <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                <h2 style="margin: 0;">Add New Client</h2>
+                <p style="color: var(--text-secondary); margin-top: 0.25rem;">Enter organization details to create a new client workspace.</p>
+            </div>
             
-            <div class="form-group">
-                <label>Company Name <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="client-name" required>
-            </div>
+            <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <!--Basic Info-->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
+                
+                <div class="form-group">
+                    <label>Company Name <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" class="form-control" id="client-name" required>
+                </div>
 
-            <div class="form-group">
-                <label>Industry <span style="color: red;">*</span></label>
-                <select class="form-control" id="client-industry">
-                    <option value="">-- Select Industry --</option>
-                    <option>Manufacturing</option>
-                    <option>Automotive</option>
-                    <option>Aerospace</option>
-                    <option>IT</option>
-                    <option>Financial Services</option>
-                    <option>Healthcare</option>
-                    <option>Pharmaceutical</option>
-                    <option>Food & Beverage</option>
-                    <option>Construction</option>
-                    <option>Chemicals</option>
-                    <option>Oil & Gas</option>
-                    <option>Logistics</option>
-                    <option>Retail</option>
-                    <option>Education</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Standard(s) <span style="color: red;">*</span></label>
-                <select class="form-control" id="client-standard" multiple style="height: 100px;">
-                    ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+                <div class="form-group">
+                    <label>Industry <span style="color: red;">*</span></label>
+                    <select class="form-control" id="client-industry">
+                        <option value="">-- Select Industry --</option>
+                        <option>Manufacturing</option>
+                        <option>Automotive</option>
+                        <option>Aerospace</option>
+                        <option>IT</option>
+                        <option>Financial Services</option>
+                        <option>Healthcare</option>
+                        <option>Pharmaceutical</option>
+                        <option>Food & Beverage</option>
+                        <option>Construction</option>
+                        <option>Chemicals</option>
+                        <option>Oil & Gas</option>
+                        <option>Logistics</option>
+                        <option>Retail</option>
+                        <option>Education</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Standard(s) <span style="color: red;">*</span></label>
+                    <select class="form-control" id="client-standard" multiple style="height: 100px;">
+                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
         `<option value="${std}">${std}</option>`
     ).join('')}
-                </select>
-                <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Company Website</label>
-                <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
-            </div>
-
-            <!--Company Logo-- >
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
-            <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
-                <div class="form-group" style="flex: 1; margin: 0;">
-                    <label>Upload Logo</label>
-                    <input type="file" class="form-control" id="client-logo-upload" accept="image/*" onchange="window.previewClientLogo(this)">
-                    <small style="color: var(--text-secondary);">Max 1MB, PNG/JPG (displayed in workspace header)</small>
+                    </select>
+                    <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
                 </div>
-                <div id="client-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
-                    <i class="fa-solid fa-image" style="font-size: 1.5rem; color: var(--text-secondary);"></i>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Company Website</label>
+                    <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
                 </div>
-            </div>
 
-            <!--Primary Contact-- >
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
-
-            <div class="form-group">
-                <label>Contact Name <span style="color: red;">*</span></label>
-                <input type="text" class="form-control" id="client-contact-name" placeholder="John Doe" required>
-            </div>
-            <div class="form-group">
-                <label>Designation</label>
-                <input type="text" class="form-control" id="client-contact-designation" placeholder="Quality Manager">
-            </div>
-            <div class="form-group">
-                <label>Phone</label>
-                <input type="text" class="form-control" id="client-contact-phone" placeholder="+1 234 567 8900">
-            </div>
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" class="form-control" id="client-contact-email" placeholder="john@example.com">
-            </div>
-
-            <!--Location-->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Location</div>
-
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Address</label>
-                <input type="text" class="form-control" id="client-address" placeholder="Street Address">
-            </div>
-            <div class="form-group">
-                <label>City</label>
-                <input type="text" class="form-control" id="client-city" placeholder="City">
-            </div>
-            <div class="form-group">
-                <label>Country</label>
-                <input type="text" class="form-control" id="client-country" placeholder="Country">
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Geotag (Lat, Long)</label>
-                <div style="display: flex; gap: 0.5rem;">
-                     <input type="text" class="form-control" id="client-geotag" placeholder="e.g. 37.7749, -122.4194" style="margin-bottom: 0;">
-                     <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
-                        <i class="fa-solid fa-location-crosshairs"></i>
-                     </button>
+                <!--Company Logo-->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
+                <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label>Upload Logo</label>
+                        <input type="file" class="form-control" id="client-logo-upload" accept="image/*" onchange="window.previewClientLogo(this)">
+                        <small style="color: var(--text-secondary);">Max 1MB, PNG/JPG (displayed in workspace header)</small>
+                    </div>
+                    <div id="client-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                        <i class="fa-solid fa-image" style="font-size: 1.5rem; color: var(--text-secondary);"></i>
+                    </div>
                 </div>
-            </div>
 
-            <!--Operational & Planning-- >
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Planning Data</div>
+                <!--Primary Contact-->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
 
-            <div class="form-group">
-                <label>Total Employees <span style="color: red;">*</span></label>
-                <input type="number" class="form-control" id="client-employees" min="1" value="10">
-            </div>
-            <div class="form-group">
-                <label>Number of Sites <span style="color: red;">*</span></label>
-                <input type="number" class="form-control" id="client-sites" min="1" value="1">
-            </div>
-            <div class="form-group">
-                <label>Shift Work?</label>
-                <select class="form-control" id="client-shifts">
-                    <option value="No">No (General Shift Only)</option>
-                    <option value="Yes">Yes (Multiple Shifts)</option>
-                </select>
-            </div>
+                <div class="form-group">
+                    <label>Contact Name <span style="color: red;">*</span></label>
+                    <input type="text" class="form-control" id="client-contact-name" placeholder="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label>Designation</label>
+                    <input type="text" class="form-control" id="client-contact-designation" placeholder="Quality Manager">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="tel" class="form-control" id="client-contact-phone" placeholder="+1-555-0123">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-control" id="client-contact-email" placeholder="john@example.com">
+                </div>
+
+                <!--Address & Location-->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Location</div>
+
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Address</label>
+                    <input type="text" class="form-control" id="client-address" placeholder="Street Address">
+                </div>
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" class="form-control" id="client-city" placeholder="City">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" class="form-control" id="client-country" placeholder="Country">
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Geotag (Lat, Long)</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                         <input type="text" class="form-control" id="client-geotag" placeholder="e.g. 37.7749, -122.4194" style="margin-bottom: 0;">
+                         <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                         </button>
+                    </div>
+                </div>
+
+                <!--Operational & Planning-->
+                <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Planning Data</div>
+
+                <div class="form-group">
+                    <label>Total Employees <span style="color: red;">*</span></label>
+                    <input type="number" class="form-control" id="client-employees" min="1" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Number of Sites <span style="color: red;">*</span></label>
+                    <input type="number" class="form-control" id="client-sites" min="1" value="1">
+                </div>
+                <div class="form-group">
+                    <label>Shift Work?</label>
+                    <select class="form-control" id="client-shifts">
+                        <option value="No">No (General Shift Only)</option>
+                        <option value="Yes">Yes (Multiple Shifts)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Next Audit Date</label>
+                    <input type="date" class="form-control" id="client-next-audit">
+                </div>
+            </form>
             
-            <div class="form-group">
-                <label>Next Audit Date</label>
-                <input type="date" class="form-control" id="client-next-audit">
+            <div style="margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <button class="btn btn-secondary" onclick="renderClientsEnhanced()">Cancel</button>
+                <button class="btn btn-primary" onclick="window.saveNewClient()">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create Client
+                </button>
             </div>
-        </form >
+        </div>
+    </div>
     `;
 
-    window.openModal();
+    window.contentArea.innerHTML = html;
+};
 
-    modalSave.onclick = () => {
-        // 1. Define Fields
-        const fieldIds = {
-            name: 'client-name',
-            industry: 'client-industry',
-            website: 'client-website',
-            contactName: 'client-contact-name',
-            contactDesignation: 'client-contact-designation',
-            contactPhone: 'client-contact-phone',
-            contactEmail: 'client-contact-email',
-            address: 'client-address',
-            city: 'client-city',
-            country: 'client-country',
-            geotag: 'client-geotag',
-            employees: 'client-employees',
-            siteCount: 'client-sites',
-            nextAudit: 'client-next-audit'
-        };
-
-        // 2. Define Rules
-        const rules = {
-            name: [
-                { rule: 'required', fieldName: 'Company Name' },
-                { rule: 'length', min: 2, max: 200 },
-                { rule: 'noHtmlTags' }
-            ],
-            contactName: [
-                { rule: 'required', fieldName: 'Contact Name' },
-                { rule: 'length', min: 2, max: 100 },
-                { rule: 'noHtmlTags' }
-            ],
-            // contactEmail and website are validated conditionally below (only if values provided)
-            employees: [
-                { rule: 'number', fieldName: 'Total Employees' },
-                { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
-            ],
-            siteCount: [
-                { rule: 'number', fieldName: 'Number of Sites' },
-                { rule: 'range', min: 1, max: 1000, fieldName: 'Number of Sites' }
-            ],
-            // nextAudit is now optional - no validation rules needed
-        };
-
-        // 3. Validate
-        // Check standards select
-        const standardSelect = document.getElementById('client-standard');
-        if (standardSelect.selectedOptions.length === 0) {
-            window.showNotification('Please select at least one standard', 'error');
-            return;
-        }
-
-        // Conditionally add validation for optional fields only if they have values
-        const websiteValue = document.getElementById('client-website')?.value?.trim();
-        const emailValue = document.getElementById('client-contact-email')?.value?.trim();
-
-        if (websiteValue) {
-            rules.website = [{ rule: 'url', fieldName: 'Website' }];
-        }
-        if (emailValue) {
-            rules.contactEmail = [{ rule: 'email', fieldName: 'Contact Email' }];
-        }
-
-        const result = Validator.validateFormElements(fieldIds, rules);
-        if (!result.valid) {
-            Validator.displayErrors(result.errors, fieldIds);
-            window.showNotification('Please fix the form errors', 'error');
-            return;
-        }
-        Validator.clearErrors(fieldIds);
-
-        // 4. Sanitize
-        const cleanData = Sanitizer.sanitizeFormData(result.formData,
-            ['name', 'contactName', 'contactDesignation', 'contactPhone',
-                'address', 'city', 'country', 'geotag'] // Sanitize as text
-        );
-
-        // 5. Construct Object
-        const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', '); // Safe values
-
-        // Build contacts array
-        const contacts = [];
-        if (cleanData.contactName) {
-            contacts.push({
-                name: cleanData.contactName,
-                designation: cleanData.contactDesignation,
-                phone: cleanData.contactPhone,
-                email: cleanData.contactEmail // already validated email
-            });
-        }
-
-        // Build sites array
-        const sites = [{
-            name: 'Head Office',
-            address: cleanData.address,
-            city: cleanData.city,
-            country: cleanData.country,
-            geotag: cleanData.geotag,
-            standards: standard // Inherit from client
-        }];
-
-        const newClient = {
-            id: Date.now(),
-            name: cleanData.name,
-            standard: standard,
-            nextAudit: cleanData.nextAudit,
-            industry: document.getElementById('client-industry').value, // select value
-            status: 'Active',
-            website: Sanitizer.sanitizeURL(cleanData.website),
-            contacts: contacts,
-            sites: sites,
-            employees: parseInt(cleanData.employees) || 0,
-            shifts: document.getElementById('client-shifts').value, // select value
-            logoUrl: window._tempClientLogo || '' // Client company logo
-        };
-
-        // 6. Save
-        window.state.clients.push(newClient);
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Client created! Complete the Account Setup wizard.', 'success');
-
-        // Redirect to Client Workspace Settings to complete the 7-step wizard
-        setTimeout(() => {
-            window.location.hash = `client / ${newClient.id}/settings`;
-        }, 300);
+window.saveNewClient = function () {
+    // 1. Define Fields
+    const fieldIds = {
+        name: 'client-name',
+        industry: 'client-industry',
+        website: 'client-website',
+        contactName: 'client-contact-name',
+        contactDesignation: 'client-contact-designation',
+        contactPhone: 'client-contact-phone',
+        contactEmail: 'client-contact-email',
+        address: 'client-address',
+        city: 'client-city',
+        country: 'client-country',
+        geotag: 'client-geotag',
+        employees: 'client-employees',
+        siteCount: 'client-sites',
+        nextAudit: 'client-next-audit'
     };
-}
+
+    // 2. Define Rules
+    const rules = {
+        name: [
+            { rule: 'required', fieldName: 'Company Name' },
+            { rule: 'length', min: 2, max: 200 },
+            { rule: 'noHtmlTags' }
+        ],
+        contactName: [
+            { rule: 'required', fieldName: 'Contact Name' },
+            { rule: 'length', min: 2, max: 100 },
+            { rule: 'noHtmlTags' }
+        ],
+        employees: [
+            { rule: 'number', fieldName: 'Total Employees' },
+            { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
+        ],
+        siteCount: [
+            { rule: 'number', fieldName: 'Number of Sites' },
+            { rule: 'range', min: 1, max: 1000, fieldName: 'Number of Sites' }
+        ]
+    };
+
+    // 3. Validate
+    const standardSelect = document.getElementById('client-standard');
+    if (standardSelect.selectedOptions.length === 0) {
+        window.showNotification('Please select at least one standard', 'error');
+        return;
+    }
+
+    const websiteValue = document.getElementById('client-website')?.value?.trim();
+    const emailValue = document.getElementById('client-contact-email')?.value?.trim();
+
+    if (websiteValue) {
+        rules.website = [{ rule: 'url', fieldName: 'Website' }];
+    }
+    if (emailValue) {
+        rules.contactEmail = [{ rule: 'email', fieldName: 'Contact Email' }];
+    }
+
+    const result = Validator.validateFormElements(fieldIds, rules);
+    if (!result.valid) {
+        Validator.displayErrors(result.errors, fieldIds);
+        window.showNotification('Please fix the form errors', 'error');
+        return;
+    }
+    Validator.clearErrors(fieldIds);
+
+    // 4. Sanitize
+    const cleanData = Sanitizer.sanitizeFormData(result.formData,
+        ['name', 'contactName', 'contactDesignation', 'contactPhone',
+            'address', 'city', 'country', 'geotag']
+    );
+
+    // 5. Construct Object
+    const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
+
+    const contacts = [];
+    if (cleanData.contactName) {
+        contacts.push({
+            name: cleanData.contactName,
+            designation: cleanData.contactDesignation,
+            phone: cleanData.contactPhone,
+            email: cleanData.contactEmail
+        });
+    }
+
+    const sites = [{
+        name: 'Head Office',
+        address: cleanData.address,
+        city: cleanData.city,
+        country: cleanData.country,
+        geotag: cleanData.geotag,
+        standards: standard
+    }];
+
+    const newClient = {
+        id: Date.now(),
+        name: cleanData.name,
+        standard: standard,
+        nextAudit: cleanData.nextAudit,
+        industry: document.getElementById('client-industry').value,
+        status: 'Active',
+        website: Sanitizer.sanitizeURL(cleanData.website),
+        contacts: contacts,
+        sites: sites,
+        employees: parseInt(cleanData.employees) || 0,
+        shifts: document.getElementById('client-shifts').value,
+        logoUrl: window._tempClientLogo || ''
+    };
+
+    // 6. Save
+    window.state.clients.push(newClient);
+    window.saveData();
+    window.showNotification('Client created! Redirecting to Workspace...', 'success');
+
+    // Redirect to Client Workspace Settings
+    renderClientDetail(newClient.id);
+    setTimeout(() => {
+        document.querySelector('.tab-btn[data-tab="client_org"]')?.click();
+    }, 500);
+};
 
 function openEditClientModal(clientId) {
     const client = window.state.clients.find(c => c.id === clientId);
@@ -2082,7 +2092,7 @@ window.deleteDocument = function (clientId, docId) {
 
 window.renderClientsEnhanced = renderClientsEnhanced;
 window.renderClientDetail = renderClientDetail;
-window.openAddClientModal = openAddClientModal;
+
 window.openEditClientModal = openEditClientModal;
 window.addContactPerson = addContactPerson;
 window.addSite = addSite;
