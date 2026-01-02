@@ -262,6 +262,7 @@ function renderClientDetail(clientId, options = {}) {
     <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
                 <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
+                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Clients
                 </button>
             </div>
             
@@ -281,9 +282,7 @@ function renderClientDetail(clientId, options = {}) {
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
                     ` : ''}
-                <button class="btn btn-secondary" onclick="window.renderClientsEnhanced()">
-                    <i class="fa-solid fa-arrow-left"></i> Back
-                </button>
+
                 <span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span>
             </div>
         </div>
