@@ -6,7 +6,8 @@
 
 function renderClientsEnhanced() {
     const searchTerm = window.state.clientSearchTerm || '';
-    const filterStatus = window.state.clientFilterStatus || 'All';
+    // Default to 'Active' status filter for better UX
+    const filterStatus = window.state.clientFilterStatus || 'Active';
 
 
     // Pagination State
@@ -33,7 +34,7 @@ function renderClientsEnhanced() {
     const paginatedClients = filteredClients.slice(startIndex, startIndex + window.state.clientPagination.itemsPerPage);
 
     const rows = paginatedClients.map(client => `
-        <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;">
+    < tr class="client-row" data - client - id="${client.id}" style = "cursor: pointer;" >
             <td>${window.UTILS.escapeHtml(client.name)}</td>
             <td>
                 ${(client.standard || '').split(',').map(s =>
@@ -48,15 +49,15 @@ function renderClientsEnhanced() {
                 ` : ''}
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
             </td>
-        </tr>
+        </tr >
     `).join('');
 
     const html = `
-        <div class="fade-in">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2 style="margin: 0;">Client Management</h2>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+    < div class="fade-in" >
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="margin: 0;">Client Management</h2>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
                         <button class="btn btn-sm btn-outline-secondary" onclick="downloadImportTemplate()" style="white-space: nowrap;" title="Restricted to Cert Managers">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
@@ -65,16 +66,16 @@ function renderClientsEnhanced() {
                             <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
                         </button>
                     ` : ''}
-                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
-                        <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
-                    </button>
-                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
+                    <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
+                </button>
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                     ` : ''}
-                </div>
             </div>
+        </div>
 
             ${window.state.showClientAnalytics !== false ? `
             <div class="fade-in" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
@@ -122,7 +123,8 @@ function renderClientsEnhanced() {
                     </div>
                 </div>
             </div>
-            ` : ''}
+            ` : ''
+        }
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
                 <div style="display: flex; gap: 1rem; flex: 1;">
@@ -173,8 +175,9 @@ function renderClientsEnhanced() {
                     </select>
                 </div>
             </div>
-            ` : ''}
-        </div>
+            ` : ''
+        }
+        </div >
     `;
 
     window.contentArea.innerHTML = html;
@@ -204,7 +207,7 @@ function renderClientsEnhanced() {
             if (!e.target.closest('.edit-client')) {
                 const clientId = parseInt(el.getAttribute('data-client-id'));
                 // Navigate directly to Client Workspace (no intermediate page)
-                window.location.hash = `client/${clientId}`;
+                window.location.hash = `client / ${clientId} `;
             }
         });
     });
@@ -256,35 +259,35 @@ function renderClientDetail(clientId, options = {}) {
     const certificationStatus = client.status === 'Active' ? 'Certified' : client.status;
 
     const html = `
-        <div class="fade-in">
+    < div class="fade-in" >
             <div style="margin-bottom: 1.5rem;">
                 <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
                 </button>
             </div>
             
-            <!-- Header Card with Client Info -->
-            <div class="card" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <div>
-                    <h2 style="margin: 0;">${window.UTILS.escapeHtml(client.name)}</h2>
-                    <p style="color: var(--text-secondary); margin: 0.25rem 0;">${window.UTILS.escapeHtml(client.industry || 'N/A')} • ${window.UTILS.escapeHtml(client.standard || 'N/A')}</p>
-                </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient(${client.id})">
-                        <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
-                    </button>
-                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+            <!--Header Card with Client Info-- >
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+                <h2 style="margin: 0;">${window.UTILS.escapeHtml(client.name)}</h2>
+                <p style="color: var(--text-secondary); margin: 0.25rem 0;">${window.UTILS.escapeHtml(client.industry || 'N/A')} • ${window.UTILS.escapeHtml(client.standard || 'N/A')}</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient(${client.id})">
+                    <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
+                </button>
+                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
                     ` : ''}
-                    <button class="btn btn-secondary" onclick="window.renderClientsEnhanced()">
-                        <i class="fa-solid fa-arrow-left"></i> Back
-                    </button>
-                    <span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span>
-                </div>
-                </div>
+                <button class="btn btn-secondary" onclick="window.renderClientsEnhanced()">
+                    <i class="fa-solid fa-arrow-left"></i> Back
+                </button>
+                <span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span>
             </div>
+        </div>
+    </div>
 
             ${showAnalytics ? `
             <!-- Performance Analytics Cards -->
@@ -306,7 +309,8 @@ function renderClientDetail(clientId, options = {}) {
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0;">${pendingAudits}</p>
                 </div>
             </div>
-            ` : ''}
+            ` : ''
+        }
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Summary</button>
@@ -321,7 +325,7 @@ function renderClientDetail(clientId, options = {}) {
             </div>
 
             <div id="tab-content"></div>
-        </div>
+        </div >
     `;
 
     window.contentArea.innerHTML = html;
@@ -369,7 +373,7 @@ function getClientInfoHTML(client) {
     }
 
     return `
-        <div class="card">
+    < div class="card" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Company Information</h3>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
@@ -421,17 +425,17 @@ function getClientInfoHTML(client) {
                     <p style="font-weight: 500; margin-top: 0.25rem;">${client.nextAudit}</p>
                 </div>
             </div>
-        </div>
+        </div >
 
-        ${getClientSitesHTML(client)}
+    ${getClientSitesHTML(client)}
 
-        <!-- Matching Auditors -->
-        <div class="card" style="margin-top: 1.5rem;">
-            <h3 style="margin-bottom: 1rem;">
-                <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
-                Auditors with ${client.industry || 'Matching'} Industry Experience
-            </h3>
-            ${matchingAuditors.length > 0 ? `
+        < !--Matching Auditors-- >
+    <div class="card" style="margin-top: 1.5rem;">
+        <h3 style="margin-bottom: 1rem;">
+            <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
+            Auditors with ${client.industry || 'Matching'} Industry Experience
+        </h3>
+        ${matchingAuditors.length > 0 ? `
                     <div style="display: grid; gap: 0.75rem;">
                         ${matchingAuditors.map(a => `
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
@@ -457,23 +461,23 @@ function getClientInfoHTML(client) {
                         <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
                     </p>
                 `}
-        </div>
-    `;
+    </div>
+`;
 }
 
 function getClientSitesHTML(client) {
     return `
-        <!-- Sites / Locations -->
-        <div class="card" style="margin-top: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+    < !--Sites / Locations-- >
+    <div class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
+            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="addSite(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
                 </button>
                 ` : ''}
-            </div>
-            ${(client.sites && client.sites.length > 0) ? `
+        </div>
+        ${(client.sites && client.sites.length > 0) ? `
 
                 <div class="table-container">
                     <table>
@@ -533,8 +537,8 @@ function getClientSitesHTML(client) {
                     ` : ''}
                 </div>
             `}
-        </div>
-    `;
+    </div>
+`;
 }
 
 
@@ -543,7 +547,7 @@ function getClientProfileHTML(client) {
     const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
 
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Organization Group & Context</h3>
@@ -569,8 +573,8 @@ function getClientProfileHTML(client) {
             </div>
         </div>
         
-        <!-- Uploaded Document Info -->
-        ${client.profileDocument ? `
+        <!--Uploaded Document Info-- >
+    ${client.profileDocument ? `
             <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #f0fdf4; border-radius: var(--radius-md); border: 1px solid #86efac; display: flex; align-items: center; justify-content: space-between;">
                 <div>
                     <i class="fa-solid fa-file-pdf" style="color: #16a34a; margin-right: 0.5rem;"></i>
@@ -583,7 +587,8 @@ function getClientProfileHTML(client) {
                 </button>
                 ` : ''}
             </div>
-        ` : ''}
+        ` : ''
+        }
             
             ${profile ? `
                 <div style="background: #f8fafc; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); line-height: 1.8;">
@@ -620,13 +625,13 @@ function getClientProfileHTML(client) {
         <i class="fa-solid fa-info-circle"></i> <strong>Usage:</strong> This organization context and group summary will be used to define the audit scope and will be included in the "Organization Overview" section of audit reports.
     </p>
 </div>
-        </div>
+        </div >
     `;
 }
 
 function getClientContactsHTML(client) {
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
@@ -677,14 +682,14 @@ function getClientContactsHTML(client) {
             ` : `
                 <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No contact persons added yet.</p>
             `}
-        </div>
+        </div >
     `;
 }
 
 function getClientDepartmentsHTML(client) {
     const departments = client.departments || [];
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
@@ -740,7 +745,7 @@ function getClientDepartmentsHTML(client) {
                     </div>
                 </div>
             `}
-        </div>
+        </div >
     `;
 }
 
@@ -748,7 +753,7 @@ function getClientDepartmentsHTML(client) {
 function getClientGoodsServicesHTML(client) {
     const items = client.goodsServices || [];
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-boxes-stacked" style="margin-right: 0.5rem; color: #f59e0b;"></i>Goods & Services</h3>
@@ -800,7 +805,7 @@ function getClientGoodsServicesHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary);">Use <strong>AI Generate</strong> in Org Context step or add manually.</p>
             </div>
         `}
-    </div>
+    </div >
     `;
 }
 
@@ -808,7 +813,7 @@ function getClientGoodsServicesHTML(client) {
 function getClientKeyProcessesHTML(client) {
     const processes = client.keyProcesses || [];
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem; color: #06b6d4;"></i>Key Processes</h3>
@@ -860,7 +865,7 @@ function getClientKeyProcessesHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary);">Use <strong>AI Generate</strong> in Org Context step or add manually.</p>
             </div>
         `}
-    </div>
+    </div >
     `;
 }
 
@@ -868,7 +873,7 @@ function getClientKeyProcessesHTML(client) {
 function getClientDesignationsHTML(client) {
     const designations = client.designations || [];
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-id-badge" style="margin-right: 0.5rem; color: #84cc16;"></i>Designations</h3>
@@ -905,7 +910,7 @@ function getClientDesignationsHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary);">Add common job titles like QA Manager, Production Head, etc.</p>
             </div>
         `}
-    </div>
+    </div >
     `;
 }
 
@@ -938,7 +943,7 @@ function getClientAuditsHTML(client) {
     const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
 
     return `
-    <div class="card" style="margin-bottom: 1.5rem;">
+    < div class="card" style = "margin-bottom: 1.5rem;" >
             <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-bar" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Summary</h3>
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
                 <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
@@ -962,9 +967,9 @@ function getClientAuditsHTML(client) {
                     <div style="font-size: 0.8rem; color: #64748b;">Open NCRs</div>
                 </div>
             </div>
-        </div>
+        </div >
         
-        <!-- Audit History Timeline -->
+        < !--Audit History Timeline-- >
         <div class="card" style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Audit History</h3>
             ${clientPlans.length > 0 ? `
@@ -1053,7 +1058,7 @@ function getClientAuditsHTML(client) {
 function getClientDocumentsHTML(client) {
     const docs = client.documents || [];
     return `
-    <div class="card">
+    < div class="card" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Documents</h3>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
@@ -1103,7 +1108,7 @@ function getClientDocumentsHTML(client) {
                     ` : ''}
                 </div>
             `}
-        </div>
+        </div >
     `;
 }
 
@@ -1125,7 +1130,7 @@ function getClientComplianceHTML(client) {
     };
 
     return `
-    <div class="card" style="margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};">
+    < div class="card" style = "margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};" >
             <h3 style="margin: 0 0 1rem 0;">
                 <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                 Application Status
@@ -1141,7 +1146,7 @@ function getClientComplianceHTML(client) {
                     </span>
                 `).join('')}
             </div>
-        </div>
+        </div >
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <!-- Contract Card -->
@@ -1280,8 +1285,8 @@ function openAddClientModal() {
 
     modalTitle.textContent = 'Add New Client';
     modalBody.innerHTML = `
-        <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            <!-- Basic Info -->
+    < form id = "client-form" style = "display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;" >
+            < !--Basic Info-- >
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
             
             <div class="form-group">
@@ -1323,7 +1328,7 @@ function openAddClientModal() {
                 <input type="url" class="form-control" id="client-website" placeholder="https://example.com">
             </div>
 
-            <!-- Company Logo -->
+            <!--Company Logo-- >
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
             <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
                 <div class="form-group" style="flex: 1; margin: 0;">
@@ -1336,7 +1341,7 @@ function openAddClientModal() {
                 </div>
             </div>
 
-            <!--Primary Contact-->
+            <!--Primary Contact-- >
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Primary Contact Person</div>
 
             <div class="form-group">
@@ -1381,7 +1386,7 @@ function openAddClientModal() {
                 </div>
             </div>
 
-            <!--Operational & Planning-->
+            <!--Operational & Planning-- >
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Planning Data</div>
 
             <div class="form-group">
@@ -1532,7 +1537,7 @@ function openAddClientModal() {
 
         // Redirect to Client Workspace Settings to complete the 7-step wizard
         setTimeout(() => {
-            window.location.hash = `client/${newClient.id}/settings`;
+            window.location.hash = `client / ${newClient.id}/settings`;
         }, 300);
     };
 }

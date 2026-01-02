@@ -813,6 +813,9 @@ function getVisibleClients() {
 
 /**
  * Get audit plans visible to the current user
+ * Plans are visible if:
+ * 1. Client is currently assigned to the auditor, OR
+ * 2. Auditor was on the audit team (historical records retained)
  * @returns {Array} Filtered audit plans
  */
 function getVisiblePlans() {
@@ -826,15 +829,36 @@ function getVisiblePlans() {
         return allPlans;
     }
 
-    // Get visible client names for filtering
+    // Find auditor profile for the current user
+    const auditor = window.state.auditors.find(a =>
+        a.email === user.email || a.name === user.name
+    );
+
+    // Get visible client names for current assignments
     const visibleClients = getVisibleClients();
     const visibleClientNames = visibleClients.map(c => c.name);
 
-    return allPlans.filter(p => visibleClientNames.includes(p.client));
+    return allPlans.filter(p => {
+        // Show if client is currently assigned
+        if (visibleClientNames.includes(p.client)) return true;
+
+        // Also show if auditor was on the team (historical records)
+        if (auditor && p.team && Array.isArray(p.team)) {
+            if (p.team.includes(auditor.name)) return true;
+        }
+        if (auditor && p.auditors && Array.isArray(p.auditors)) {
+            if (p.auditors.includes(auditor.id)) return true;
+        }
+
+        return false;
+    });
 }
 
 /**
  * Get audit reports visible to the current user
+ * Reports are visible if:
+ * 1. Client is currently assigned to the auditor, OR
+ * 2. Auditor was part of the audit (historical records retained)
  * @returns {Array} Filtered audit reports
  */
 function getVisibleReports() {
@@ -848,11 +872,36 @@ function getVisibleReports() {
         return allReports;
     }
 
-    // Get visible client names for filtering
+    // Find auditor profile for the current user
+    const auditor = window.state.auditors.find(a =>
+        a.email === user.email || a.name === user.name
+    );
+
+    // Get visible client names for current assignments
     const visibleClients = getVisibleClients();
     const visibleClientNames = visibleClients.map(c => c.name);
 
-    return allReports.filter(r => visibleClientNames.includes(r.client));
+    // Get visible plans to check team membership
+    const allPlans = window.state.auditPlans || [];
+
+    return allReports.filter(r => {
+        // Show if client is currently assigned
+        if (visibleClientNames.includes(r.client)) return true;
+
+        // Also show if auditor was on the plan's team (historical records)
+        if (auditor && r.planId) {
+            const plan = allPlans.find(p => p.id === r.planId);
+            if (plan) {
+                if (plan.team && Array.isArray(plan.team) && plan.team.includes(auditor.name)) return true;
+                if (plan.auditors && Array.isArray(plan.auditors) && plan.auditors.includes(auditor.id)) return true;
+            }
+        }
+
+        // Check if auditor created or is assigned to the report
+        if (auditor && r.leadAuditor === auditor.name) return true;
+
+        return false;
+    });
 }
 
 // Export filter utilities globally
