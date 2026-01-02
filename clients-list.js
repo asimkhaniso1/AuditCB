@@ -203,7 +203,7 @@ function renderClientsEnhanced() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const clientId = parseInt(btn.getAttribute('data-client-id'));
-            openEditClientModal(clientId);
+            window.renderEditClient(clientId);
         });
     });
 

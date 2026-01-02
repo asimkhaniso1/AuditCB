@@ -217,7 +217,7 @@ function renderClientsEnhanced() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const clientId = parseInt(btn.getAttribute('data-client-id'));
-            openEditClientModal(clientId);
+            window.renderEditClient(clientId);
         });
     });
 
@@ -278,7 +278,7 @@ function renderClientDetail(clientId, options = {}) {
                     <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
                 </button>
                 ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-primary" onclick="window.openEditClientModal(${client.id})">
+                    <button class="btn btn-primary" onclick="window.renderEditClient(${client.id})">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
                     ` : ''}
@@ -1707,196 +1707,353 @@ window.saveNewClient = function () {
     }, 500);
 };
 
-function openEditClientModal(clientId) {
+window.renderEditClient = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) {
+        window.showNotification('Client not found', 'error');
+        renderClientsEnhanced();
+        return;
+    }
+
+    const firstSite = client.sites && client.sites[0] ? client.sites[0] : {};
+    const firstContact = client.contacts && client.contacts[0] ? client.contacts[0] : {};
+    const standards = (client.standard || '').split(',').map(s => s.trim());
+
+    // Temporarily store original logo URL for comparison/fallback
+    window._originalClientLogo = client.logoUrl;
+    window._tempClientLogo = null; // Reset temp
+
+    const html = `
+    <div class="fade-in" style="max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;">
+        <!-- Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+            <div>
+                <button class="btn btn-link" onclick="renderClientsEnhanced()" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Clients
+                </button>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <h1 style="font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, #1e293b 0%, #334155 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
+                        Edit Client: ${client.name}
+                    </h1>
+                     <span class="status-badge status-${(client.status || 'Active').toLowerCase()}" style="font-size: 0.8em; vertical-align: middle;">${client.status}</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn btn-secondary" onclick="renderClientsEnhanced()">Cancel</button>
+                <button class="btn btn-primary" onclick="window.saveAuditClient(${client.id})" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                    <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
+                </button>
+            </div>
+        </div>
+
+        <form id="client-form" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+            
+            <!-- Left Column -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                
+                <!-- Company Profile Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                    <div style="background: #f8fafc; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center;">
+                        <div style="width: 32px; height: 32px; background: #eff6ff; color: #3b82f6; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem;">
+                            <i class="fa-solid fa-building"></i>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Company Profile</h3>
+                    </div>
+                    <div style="padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Company Name <span class="text-danger">*</span></label>
+                            <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-id-card input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="text" class="form-control" id="client-name" value="${client.name}" required style="padding-left: 2.5rem;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector <span class="text-danger">*</span></label>
+                            <select class="form-control" id="client-industry" style="background-image: none;">
+                                <option value="">Select Industry...</option>
+                                ${['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'].map(i => `<option ${client.industry === i ? 'selected' : ''}>${i}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                         <div class="form-group">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Website</label>
+                             <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-globe input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="url" class="form-control" id="client-website" value="${client.website || ''}" placeholder="https://..." style="padding-left: 2.5rem;">
+                             </div>
+                        </div>
+
+                        <div class="form-group">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Status</label>
+                             <select class="form-control" id="client-status">
+                                <option value="Active" ${client.status === 'Active' ? 'selected' : ''}>Active</option>
+                                <option value="Suspended" ${client.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                                <option value="Withdrawn" ${client.status === 'Withdrawn' ? 'selected' : ''}>Withdrawn</option>
+                             </select>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                                ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map((std) => {
+        const isChecked = standards.includes(std);
+        return `
+                                    <label class="standard-checkbox-btn ${isChecked ? 'active' : ''}" style="cursor: pointer;">
+                                        <input type="checkbox" name="client_standards" value="${std}" ${isChecked ? 'checked' : ''} style="display: none;" onchange="this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#2563eb' : '#64748b'; this.nextElementSibling.style.background = this.checked ? '#eff6ff' : '#fff';">
+                                        <span style="display: inline-block; padding: 0.4rem 0.8rem; background: ${isChecked ? '#eff6ff' : '#fff'}; border: 1px solid ${isChecked ? '#3b82f6' : '#cbd5e1'}; color: ${isChecked ? '#2563eb' : '#64748b'}; border-radius: 20px; font-size: 0.85rem; transition: all 0.2s;">
+                                            ${std}
+                                        </span>
+                                    </label>
+                                `}).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                     <div style="background: #f8fafc; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center;">
+                        <div style="width: 32px; height: 32px; background: #fae8ff; color: #a21caf; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem;">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Head Office Location</h3>
+                    </div>
+                    <div style="padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                         <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Street Address</label>
+                            <input type="text" class="form-control" id="client-address" value="${firstSite.address || ''}" placeholder="123 Business Blvd, Suite 100">
+                        </div>
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" class="form-control" id="client-city" value="${firstSite.city || ''}" placeholder="Metropolis">
+                        </div>
+                         <div class="form-group">
+                            <label>Country</label>
+                            <input type="text" class="form-control" id="client-country" value="${firstSite.country || ''}" placeholder="Country">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="display: flex; justify-content: space-between;">
+                                <span>Geotag (Lat, Long)</span>
+                                <a href="#" onclick="event.preventDefault(); navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });" style="font-size: 0.8rem; color: var(--primary-color);">
+                                    <i class="fa-solid fa-location-crosshairs"></i> Detect My Location
+                                </a>
+                             </label>
+                             <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-map-pin input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="text" class="form-control" id="client-geotag" value="${firstSite.geotag || ''}" placeholder="37.7749, -122.4194" style="padding-left: 2.5rem;">
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Right Column -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+                 <!-- Branding Card -->
+                 <div class="card" style="padding: 1.5rem; text-align: center; border: 1px solid rgba(226, 232, 240, 0.8);">
+                    <div style="position: relative; width: 120px; height: 120px; margin: 0 auto 1rem auto; border-radius: 50%; border: 3px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff;">
+                         <div id="client-logo-preview-img" style="display: ${client.logoUrl ? 'block' : 'none'}; width: 100%; height: 100%; background-size: cover; background-position: center; background-image: ${client.logoUrl ? `url(${client.logoUrl})` : 'none'}"></div>
+                         <i id="client-logo-placeholder" class="fa-solid fa-image" style="display: ${client.logoUrl ? 'none' : 'block'}; font-size: 2.5rem; color: #cbd5e1;"></i>
+                    </div>
+                    <div>
+                         <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Change Logo
+                         </label>
+                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleLogoUpload(this)">
+                         <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
+                    </div>
+                 </div>
+
+                <!-- Contact Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                    <div style="background: #f8fafc; padding: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Primary Contact</h4>
+                    </div>
+                    <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Full Name <span class="text-danger">*</span></label>
+                             <div class="input-with-icon" style="position: relative;">
+                                <i class="fa-solid fa-user input-icon" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                                <input type="text" class="form-control" id="client-contact-name" value="${firstContact.name || ''}" style="padding-left: 2.5rem;" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Designation</label>
+                            <input type="text" class="form-control" id="client-contact-designation" value="${firstContact.designation || ''}" placeholder="e.g. Quality Manager">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Phone</label>
+                            <input type="tel" class="form-control" id="client-contact-phone" value="${firstContact.phone || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Email</label>
+                            <input type="email" class="form-control" id="client-contact-email" value="${firstContact.email || ''}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operating Metrics Card -->
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8);">
+                     <div style="background: #f8fafc; padding: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Operations & Planning</h4>
+                    </div>
+                    <div style="padding: 1.25rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                             <label style="font-size: 0.8rem;">Employees <span class="text-danger">*</span></label>
+                             <input type="number" class="form-control" id="client-employees" value="${client.employees || 0}" min="1">
+                        </div>
+                         <div class="form-group">
+                             <label style="font-size: 0.8rem;">Sites <span class="text-danger">*</span></label>
+                             <input type="number" class="form-control" id="client-sites" value="${client.sites ? client.sites.length : 1}" min="1" disabled style="background: #f1f5f9; cursor: not-allowed;" title="Manage sites from details page">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="font-size: 0.8rem;">Shift System</label>
+                             <select class="form-control" id="client-shifts">
+                                <option value="No" ${client.shifts === 'No' ? 'selected' : ''}>No (Single Shift)</option>
+                                <option value="Yes" ${client.shifts === 'Yes' ? 'selected' : ''}>Yes (Multiple Shifts)</option>
+                             </select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="font-size: 0.8rem;">Target Audit Date</label>
+                             <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit || ''}">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+    `;
+
+    window.contentArea.innerHTML = html;
+};
+
+window.saveAuditClient = function (clientId) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
-    const contacts = client.contacts || [];
-    const sites = client.sites || [];
-
-    modalTitle.textContent = 'Edit Client';
-    modalBody.innerHTML = `
-        <form id="client-form" style="max-height: 70vh; overflow-y: auto;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <!-- Basic Info -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Information</div>
-
-            <div class="form-group">
-                <label>Company Name <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="client-name" value="${client.name}" required>
-            </div>
-            <div class="form-group">
-                <label>Industry</label>
-                <select class="form-control" id="client-industry">
-                    <option value="">-- Select Industry --</option>
-                    ${industries.map(ind => `<option ${client.industry === ind ? 'selected' : ''}>${ind}</option>`).join('')}
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Standard(s)</label>
-                <select class="form-control" id="client-standard" multiple style="height: 100px;">
-                    ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
-        `<option value="${std}" ${(client.standard || '').split(', ').includes(std) ? 'selected' : ''}>${std}</option>`
-    ).join('')}
-                </select>
-                <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <select class="form-control" id="client-status">
-                    <option ${client.status === 'Active' ? 'selected' : ''}>Active</option>
-                    <option ${client.status === 'Suspended' ? 'selected' : ''}>Suspended</option>
-                    <option ${client.status === 'Withdrawn' ? 'selected' : ''}>Withdrawn</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Website</label>
-                <input type="url" class="form-control" id="client-website" value="${client.website || ''}" placeholder="https://...">
-            </div>
-            <div class="form-group">
-                <label>Next Audit Date</label>
-                <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit || ''}">
-            </div>
-
-            <!-- Company Logo -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Company Logo</div>
-            <div style="grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center;">
-                <div class="form-group" style="flex: 1; margin: 0;">
-                    <label>Upload New Logo</label>
-                    <input type="file" class="form-control" id="edit-client-logo-upload" accept="image/*" onchange="window.handleClientLogoUpload(this, ${client.id})">
-                    <small style="color: var(--text-secondary);">Max 1MB, PNG/JPG</small>
-                </div>
-                <div id="edit-client-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
-                    ${client.logoUrl ? `<img src="${client.logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">` : '<i class="fa-solid fa-image" style="font-size: 1.5rem; color: var(--text-secondary);"></i>'}
-                </div>
-            </div>
-
-            <!-- Operational -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Operational Details</div>
-
-            <div class="form-group">
-                <label>Number of Employees</label>
-                <input type="number" class="form-control" id="client-employees" value="${client.employees || 0}" min="0">
-            </div>
-            <div class="form-group">
-                <label>Shift Work</label>
-                <select class="form-control" id="client-shifts">
-                    <option ${client.shifts === 'No' ? 'selected' : ''}>No</option>
-                    <option ${client.shifts === 'Yes' ? 'selected' : ''}>Yes</option>
-                </select>
-            </div>
-
-            <!-- Contacts & Sites Summary -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Contacts & Sites</div>
-
-            <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <strong><i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Contacts</strong>
-                        <span style="background: var(--primary-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">${contacts.length}</span>
-                    </div>
-                    ${contacts.length > 0 ? `
-                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary);">
-                                ${contacts.slice(0, 3).map(c => `<li>${c.name} (${c.designation || 'N/A'})</li>`).join('')}
-                                ${contacts.length > 3 ? `<li>...and ${contacts.length - 3} more</li>` : ''}
-                            </ul>
-                        ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No contacts added</p>'}
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
-                        <i class="fa-solid fa-info-circle"></i> Manage contacts from client detail page
-                    </p>
-                </div>
-                <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <strong><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem;"></i>Sites</strong>
-                        <span style="background: #059669; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">${sites.length}</span>
-                    </div>
-                    ${sites.length > 0 ? `
-                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary);">
-                                ${sites.slice(0, 3).map(s => `<li>${s.name} - ${s.city || 'N/A'}</li>`).join('')}
-                                ${sites.length > 3 ? `<li>...and ${sites.length - 3} more</li>` : ''}
-                            </ul>
-                        ` : '<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No sites added</p>'}
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
-                        <i class="fa-solid fa-info-circle"></i> Manage sites from client detail page
-                    </p>
-                </div>
-            </div>
-        </div>
-        </form >
-    `;
-
-    window.openModal();
-
-    modalSave.onclick = () => {
-        // 1. Define Fields
-        const fieldIds = {
-            name: 'client-name',
-            industry: 'client-industry',
-            website: 'client-website',
-            employees: 'client-employees',
-            nextAudit: 'client-next-audit'
-        };
-
-        // 2. Define Rules
-        const rules = {
-            name: [
-                { rule: 'required', fieldName: 'Company Name' },
-                { rule: 'length', min: 2, max: 200 },
-                { rule: 'noHtmlTags' }
-            ],
-            website: [
-                { rule: 'url', fieldName: 'Website' }
-            ],
-            employees: [
-                { rule: 'number', fieldName: 'Total Employees' },
-                { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
-            ],
-            nextAudit: [
-                { rule: 'date', fieldName: 'Next Audit Date' }
-            ]
-        };
-
-        // 3. Validate
-        // Check standards select
-        const standardSelect = document.getElementById('client-standard');
-        if (standardSelect.selectedOptions.length === 0) {
-            window.showNotification('Please select at least one standard', 'error');
-            return;
-        }
-
-        const result = Validator.validateFormElements(fieldIds, rules);
-        if (!result.valid) {
-            Validator.displayErrors(result.errors, fieldIds);
-            window.showNotification('Please fix the form errors', 'error');
-            return;
-        }
-        Validator.clearErrors(fieldIds);
-
-        // 4. Sanitize (only name needs text sanitization here)
-        const cleanData = Sanitizer.sanitizeFormData(result.formData, ['name']);
-
-        // 5. Update Object
-        client.name = cleanData.name;
-        client.standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
-        client.status = document.getElementById('client-status').value;
-        client.nextAudit = cleanData.nextAudit;
-        client.industry = document.getElementById('client-industry').value;
-        client.website = Sanitizer.sanitizeURL(cleanData.website);
-        client.employees = parseInt(cleanData.employees) || 0;
-        client.shifts = document.getElementById('client-shifts').value;
-
-        // 6. Save
-        window.saveData();
-        window.closeModal();
-        renderClientDetail(clientId);
-        window.showNotification('Client updated successfully', 'success');
+    // 1. Define Fields
+    const fieldIds = {
+        name: 'client-name',
+        industry: 'client-industry',
+        website: 'client-website',
+        contactName: 'client-contact-name',
+        contactDesignation: 'client-contact-designation',
+        contactPhone: 'client-contact-phone',
+        contactEmail: 'client-contact-email',
+        address: 'client-address',
+        city: 'client-city',
+        country: 'client-country',
+        geotag: 'client-geotag',
+        employees: 'client-employees',
+        nextAudit: 'client-next-audit',
+        status: 'client-status'
     };
-}
+
+    // 2. Define Rules
+    const rules = {
+        name: [
+            { rule: 'required', fieldName: 'Company Name' },
+            { rule: 'length', min: 2, max: 200 },
+            { rule: 'noHtmlTags' }
+        ],
+        contactName: [
+            { rule: 'required', fieldName: 'Contact Name' },
+            { rule: 'length', min: 2, max: 100 },
+            { rule: 'noHtmlTags' }
+        ],
+        employees: [
+            { rule: 'number', fieldName: 'Total Employees' },
+            { rule: 'range', min: 1, max: 1000000, fieldName: 'Total Employees' }
+        ]
+    };
+
+    // 3. Validate
+    const checkedStandards = Array.from(document.querySelectorAll('input[name="client_standards"]:checked')).map(cb => cb.value);
+
+    // We allow explicit empty standard for updates if user desires, but warn if empty? 
+    // Usually standard is required. Let's enforce it.
+    if (checkedStandards.length === 0) {
+        window.showNotification('Please select at least one standard', 'error');
+        return;
+    }
+
+    const websiteValue = document.getElementById('client-website')?.value?.trim();
+    const emailValue = document.getElementById('client-contact-email')?.value?.trim();
+
+    if (websiteValue) {
+        rules.website = [{ rule: 'url', fieldName: 'Website' }];
+    }
+    if (emailValue) {
+        rules.contactEmail = [{ rule: 'email', fieldName: 'Contact Email' }];
+    }
+
+    const result = Validator.validateFormElements(fieldIds, rules);
+    if (!result.valid) {
+        Validator.displayErrors(result.errors, fieldIds);
+        window.showNotification('Please fix the form errors', 'error');
+        return;
+    }
+    Validator.clearErrors(fieldIds);
+
+    // 4. Sanitize
+    const cleanData = Sanitizer.sanitizeFormData(result.formData,
+        ['name', 'contactName', 'contactDesignation', 'contactPhone',
+            'address', 'city', 'country', 'geotag']
+    );
+
+    // 5. Update Record
+    // Update basic info
+    client.name = cleanData.name;
+    client.standard = checkedStandards.join(', ');
+    client.industry = document.getElementById('client-industry').value;
+    client.status = document.getElementById('client-status').value;
+    client.website = Sanitizer.sanitizeURL(cleanData.website);
+    client.employees = parseInt(cleanData.employees) || 0;
+    client.shifts = document.getElementById('client-shifts').value;
+    client.nextAudit = cleanData.nextAudit;
+
+    // Update Logo if changed
+    if (window._tempClientLogo) {
+        client.logoUrl = window._tempClientLogo;
+    }
+    // If user cleared it or didn't change it, we keep current (or can implement clear logic if needed)
+
+    // Update Primary Contact (Index 0)
+    if (!client.contacts) client.contacts = [];
+    if (client.contacts.length === 0) {
+        client.contacts.push({});
+    }
+    client.contacts[0].name = cleanData.contactName;
+    client.contacts[0].designation = cleanData.contactDesignation;
+    client.contacts[0].phone = cleanData.contactPhone;
+    client.contacts[0].email = cleanData.contactEmail;
+
+    // Update Head Office (Index 0)
+    if (!client.sites) client.sites = [];
+    if (client.sites.length === 0) {
+        client.sites.push({ name: 'Head Office', standards: client.standard });
+    }
+    // Ensure site 0 is updated
+    client.sites[0].address = cleanData.address;
+    client.sites[0].city = cleanData.city;
+    client.sites[0].country = cleanData.country;
+    client.sites[0].geotag = cleanData.geotag;
+
+    // 6. Save data
+    window.saveData();
+    window.showNotification('Client details updated successfully', 'success');
+
+    // Clean up
+    delete window._tempClientLogo;
+    delete window._originalClientLogo;
+
+    // Return to list
+    renderClientsEnhanced();
+};
 
 // Add Contact Person Modal
 function addContactPerson(clientId) {
@@ -2153,7 +2310,7 @@ window.deleteDocument = function (clientId, docId) {
 window.renderClientsEnhanced = renderClientsEnhanced;
 window.renderClientDetail = renderClientDetail;
 
-window.openEditClientModal = openEditClientModal;
+
 window.addContactPerson = addContactPerson;
 window.addSite = addSite;
 
@@ -4347,7 +4504,7 @@ window.processAccountSetupImport = function (clientId, input) {
 window.renderClientsModule = renderClientsEnhanced;
 // Ensure other helpers are exposed if defined locally but used in HTML
 if (typeof openNewClientModal !== 'undefined') window.openNewClientModal = openNewClientModal;
-if (typeof openEditClientModal !== 'undefined') window.openEditClientModal = openEditClientModal;
+
 if (typeof initiateAuditPlanFromClient !== 'undefined') window.initiateAuditPlanFromClient = initiateAuditPlanFromClient;
 if (typeof renderClientDetail !== 'undefined') window.renderClientDetail = renderClientDetail;
 
