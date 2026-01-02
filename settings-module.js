@@ -3158,12 +3158,13 @@ function saveAssignment() {
 
 // Remove assignment
 window.removeAssignment = function (auditorId, clientId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    const client = window.state.clients.find(c => c.id === clientId);
+    const auditor = window.state.auditors.find(a => a.id == auditorId);
+    const client = window.state.clients.find(c => c.id == clientId);
 
     if (confirm(`Remove assignment of ${client?.name || 'client'} from ${auditor?.name || 'auditor'}?`)) {
+        // Use loose equality (==) to handle type mismatches (string vs number)
         window.state.auditorAssignments = window.state.auditorAssignments.filter(
-            a => !(a.auditorId === auditorId && a.clientId === clientId)
+            a => !(a.auditorId == auditorId && a.clientId == clientId)
         );
         window.saveData();
         switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
