@@ -34,7 +34,7 @@ function renderClientsEnhanced() {
     const paginatedClients = filteredClients.slice(startIndex, startIndex + window.state.clientPagination.itemsPerPage);
 
     const rows = paginatedClients.map(client => `
-    < tr class="client-row" data - client - id="${client.id}" style = "cursor: pointer;" >
+    <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;" onclick="renderClientDetail(${client.id})">
             <td>${window.UTILS.escapeHtml(client.name)}</td>
             <td>
                 ${(client.standard || '').split(',').map(s =>
@@ -53,7 +53,7 @@ function renderClientsEnhanced() {
     `).join('');
 
     const html = `
-    < div class="fade-in" >
+    <div class="fade-in">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 style="margin: 0;">Client Management</h2>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -259,13 +259,13 @@ function renderClientDetail(clientId, options = {}) {
     const certificationStatus = client.status === 'Active' ? 'Certified' : client.status;
 
     const html = `
-    < div class="fade-in" >
+    <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
                 <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
                 </button>
             </div>
             
-            <!--Header Card with Client Info-- >
+            <!--Header Card with Client Info-->
     <div class="card" style="margin-bottom: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
@@ -373,7 +373,7 @@ function getClientInfoHTML(client) {
     }
 
     return `
-    < div class="card" >
+    <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Company Information</h3>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
@@ -429,7 +429,7 @@ function getClientInfoHTML(client) {
 
     ${getClientSitesHTML(client)}
 
-        < !--Matching Auditors-- >
+        <!--Matching Auditors-->
     <div class="card" style="margin-top: 1.5rem;">
         <h3 style="margin-bottom: 1rem;">
             <i class="fa-solid fa-user-check" style="margin-right: 0.5rem; color: var(--success-color);"></i>
@@ -467,7 +467,7 @@ function getClientInfoHTML(client) {
 
 function getClientSitesHTML(client) {
     return `
-    < !--Sites / Locations-- >
+    <!--Sites / Locations-->
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
@@ -547,7 +547,7 @@ function getClientProfileHTML(client) {
     const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
 
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-building" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Organization Group & Context</h3>
@@ -631,7 +631,7 @@ function getClientProfileHTML(client) {
 
 function getClientContactsHTML(client) {
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
@@ -689,7 +689,7 @@ function getClientContactsHTML(client) {
 function getClientDepartmentsHTML(client) {
     const departments = client.departments || [];
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
@@ -753,7 +753,7 @@ function getClientDepartmentsHTML(client) {
 function getClientGoodsServicesHTML(client) {
     const items = client.goodsServices || [];
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-boxes-stacked" style="margin-right: 0.5rem; color: #f59e0b;"></i>Goods & Services</h3>
@@ -813,7 +813,7 @@ function getClientGoodsServicesHTML(client) {
 function getClientKeyProcessesHTML(client) {
     const processes = client.keyProcesses || [];
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem; color: #06b6d4;"></i>Key Processes</h3>
@@ -873,7 +873,7 @@ function getClientKeyProcessesHTML(client) {
 function getClientDesignationsHTML(client) {
     const designations = client.designations || [];
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-id-badge" style="margin-right: 0.5rem; color: #84cc16;"></i>Designations</h3>
@@ -1028,7 +1028,7 @@ function getClientAuditsHTML(client) {
     const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
 
     return `
-    < div class="card" style = "margin-bottom: 1.5rem;" >
+    <div class="card" style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-bar" style="color: var(--primary-color); margin-right: 0.5rem;"></i>Audit Summary</h3>
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
                 <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
@@ -1054,7 +1054,7 @@ function getClientAuditsHTML(client) {
             </div>
         </div >
         
-        < !--Audit History Timeline-- >
+        <!--Audit History Timeline-->
         <div class="card" style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Audit History</h3>
             ${clientPlans.length > 0 ? `
@@ -1143,7 +1143,7 @@ function getClientAuditsHTML(client) {
 function getClientDocumentsHTML(client) {
     const docs = client.documents || [];
     return `
-    < div class="card" >
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Documents</h3>
             ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
@@ -1215,7 +1215,7 @@ function getClientComplianceHTML(client) {
     };
 
     return `
-    < div class="card" style = "margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};" >
+    <div class="card" style="margin-bottom: 1rem; border-left: 4px solid ${statusColors[appStatus] || '#6b7280'};">
             <h3 style="margin: 0 0 1rem 0;">
                 <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                 Application Status
@@ -1376,8 +1376,8 @@ function openAddClientModal() {
 
     modalTitle.textContent = 'Add New Client';
     modalBody.innerHTML = `
-    < form id = "client-form" style = "display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;" >
-            < !--Basic Info-- >
+    <form id="client-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <!--Basic Info-->
             <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
             
             <div class="form-group">
