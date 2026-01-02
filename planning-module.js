@@ -10,7 +10,7 @@ function renderAuditPlanningEnhanced() {
     const state = window.state;
     const searchTerm = state.planningSearchTerm || '';
 
-    let filteredPlans = state.auditPlans.filter(plan => {
+    let filteredPlans = window.getVisiblePlans().filter(plan => {
         return plan.client.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
@@ -71,7 +71,7 @@ function renderAuditPlanningEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Plans</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisiblePlans().length}</div>
                     </div>
                 </div>
 
@@ -82,7 +82,7 @@ function renderAuditPlanningEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Drafts</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.filter(p => p.status === 'Draft').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisiblePlans().filter(p => p.status === 'Draft').length}</div>
                     </div>
                 </div>
 
@@ -93,7 +93,7 @@ function renderAuditPlanningEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Scheduled</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.filter(p => p.status === 'Confirmed').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisiblePlans().filter(p => p.status === 'Confirmed').length}</div>
                     </div>
                 </div>
 
@@ -104,7 +104,7 @@ function renderAuditPlanningEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Completed</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditPlans.filter(p => p.status === 'Completed').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisiblePlans().filter(p => p.status === 'Completed').length}</div>
                     </div>
                 </div>
             </div>

@@ -14,7 +14,7 @@ function renderClientsEnhanced() {
         window.state.clientPagination = { currentPage: 1, itemsPerPage: 10 };
     }
 
-    let filteredClients = window.state.clients.filter(client => {
+    let filteredClients = window.getVisibleClients().filter(client => {
         const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
         return matchesSearch && matchesStatus;
@@ -85,7 +85,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Clients</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisibleClients().length}</div>
                     </div>
                 </div>
 
@@ -96,7 +96,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Active</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.filter(c => c.status === 'Active').length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisibleClients().filter(c => c.status === 'Active').length}</div>
                     </div>
                 </div>
 
@@ -107,7 +107,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Inactive</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisibleClients().filter(c => ['Suspended', 'Withdrawn'].includes(c.status)).length}</div>
                     </div>
                 </div>
                 
@@ -118,7 +118,7 @@ function renderClientsEnhanced() {
                     </div>
                     <div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Sites</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${window.state.clients.reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${window.getVisibleClients().reduce((acc, c) => acc + (c.sites ? c.sites.length : 1), 0)}</div>
                     </div>
                 </div>
             </div>

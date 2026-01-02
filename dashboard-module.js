@@ -3,14 +3,15 @@
 // ============================================
 
 function renderDashboardEnhanced() {
-    // Calculate Real Stats from Actual Data
-    const totalClients = state.clients.length;
-    const activeClients = state.clients.filter(c => c.status === 'Active').length;
-    const inactiveClients = state.clients.filter(c => c.status === 'Inactive').length;
+    // Calculate Real Stats from Actual Data (Filtered by User Role)
+    const visibleClients = window.getVisibleClients();
+    const totalClients = visibleClients.length;
+    const activeClients = visibleClients.filter(c => c.status === 'Active').length;
+    const inactiveClients = visibleClients.filter(c => c.status === 'Inactive').length;
     const totalAuditors = state.auditors.length;
     const leadAuditors = state.auditors.filter(a => a.role === 'Lead Auditor').length;
-    const auditPlans = state.auditPlans || [];
-    const auditReports = state.auditReports || [];
+    const auditPlans = window.getVisiblePlans() || [];
+    const auditReports = window.getVisibleReports() || [];
 
     // Advanced Calculations
     const upcomingAudits = auditPlans.filter(p => p.status !== 'Completed').length;
@@ -45,14 +46,14 @@ function renderDashboardEnhanced() {
 
     // Industry Distribution
     const industryStats = {};
-    state.clients.forEach(c => {
+    visibleClients.forEach(c => {
         const industry = c.industry || 'Other';
         industryStats[industry] = (industryStats[industry] || 0) + 1;
     });
 
     // Standard Distribution
     const standardStats = {};
-    state.clients.forEach(c => {
+    visibleClients.forEach(c => {
         if (c.standard) {
             const standards = c.standard.split(', ');
             standards.forEach(std => {
@@ -63,13 +64,13 @@ function renderDashboardEnhanced() {
 
     // Certificate Expiry Tracking
     const now = new Date();
-    const expiringIn30Days = state.clients.filter(c => {
+    const expiringIn30Days = visibleClients.filter(c => {
         if (!c.nextAudit) return false;
         const daysUntil = Math.ceil((new Date(c.nextAudit) - now) / (1000 * 60 * 60 * 24));
         return daysUntil <= 30 && daysUntil > 0;
     }).length;
 
-    const expiringIn90Days = state.clients.filter(c => {
+    const expiringIn90Days = visibleClients.filter(c => {
         if (!c.nextAudit) return false;
         const daysUntil = Math.ceil((new Date(c.nextAudit) - now) / (1000 * 60 * 60 * 24));
         return daysUntil <= 90 && daysUntil > 30;

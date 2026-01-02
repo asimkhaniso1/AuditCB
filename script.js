@@ -737,7 +737,17 @@ const state = {
         standards: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'],
         roles: ['Lead Auditor', 'Auditor', 'Technical Expert'],
         isAdmin: true  // Toggle for admin privileges (simulated)
-    }
+    },
+    // Auditor-Client Assignments for role-based filtering
+    // Auditors only see clients they are assigned to
+    // Synced with Supabase auditor_assignments table
+    auditorAssignments: [
+        // Example assignments for demo
+        { auditorId: 1, clientId: 1 },  // John Smith -> Tech Solutions
+        { auditorId: 1, clientId: 2 },  // John Smith -> Global Manufacturing
+        { auditorId: 2, clientId: 3 },  // Sarah Johnson -> SecureData Corp
+        { auditorId: 3, clientId: 2 }   // Mike Chen -> Global Manufacturing
+    ]
 };
 
 // Global Exports for Modules
@@ -748,6 +758,107 @@ window.showNotification = showNotification;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.renderModule = renderModule;
+
+// ============================================
+// ROLE-BASED FILTERING UTILITIES
+// ============================================
+// Auditors only see assigned clients/plans/reports
+// Cert Managers and Admins see everything
+
+/**
+ * Get clients visible to the current user based on role and assignments
+ * @returns {Array} Filtered client array
+ */
+function getVisibleClients() {
+    const user = window.state.currentUser;
+    const allClients = window.state.clients || [];
+
+    if (!user) return allClients; // No user = show all (demo mode)
+
+    // Roles that see ALL clients (management roles)
+    const fullAccessRoles = ['Admin', 'Certification Manager'];
+
+    // Roles that only see ASSIGNED clients (auditor roles)
+    const filteredRoles = ['Lead Auditor', 'Auditor', 'Technical Expert'];
+
+    // Admin and Cert Manager see all clients
+    if (fullAccessRoles.includes(user.role)) {
+        return allClients;
+    }
+
+    // Auditors (Lead Auditor, Auditor, Technical Expert) see only assigned clients
+    if (filteredRoles.includes(user.role)) {
+        const auditor = window.state.auditors.find(a =>
+            a.email === user.email || a.name === user.name
+        );
+
+        if (!auditor) {
+            // No matching auditor profile found
+            console.warn('No auditor profile found for user:', user.name, 'with role:', user.role);
+            return []; // In production, auditors with no profile see nothing
+        }
+
+        const assignedClientIds = (window.state.auditorAssignments || [])
+            .filter(a => a.auditorId === auditor.id)
+            .map(a => a.clientId);
+
+        console.log(`[RoleFilter] ${user.role} "${user.name}" has ${assignedClientIds.length} assigned clients`);
+        return allClients.filter(c => assignedClientIds.includes(c.id));
+    }
+
+    // Unknown role - default to seeing nothing for security
+    console.warn('Unknown role:', user.role);
+    return [];
+}
+
+/**
+ * Get audit plans visible to the current user
+ * @returns {Array} Filtered audit plans
+ */
+function getVisiblePlans() {
+    const user = window.state.currentUser;
+    const allPlans = window.state.auditPlans || [];
+
+    if (!user) return allPlans;
+
+    // Admin and Cert Manager see all
+    if (user.role === 'Admin' || user.role === 'Certification Manager') {
+        return allPlans;
+    }
+
+    // Get visible client names for filtering
+    const visibleClients = getVisibleClients();
+    const visibleClientNames = visibleClients.map(c => c.name);
+
+    return allPlans.filter(p => visibleClientNames.includes(p.client));
+}
+
+/**
+ * Get audit reports visible to the current user
+ * @returns {Array} Filtered audit reports
+ */
+function getVisibleReports() {
+    const user = window.state.currentUser;
+    const allReports = window.state.auditReports || [];
+
+    if (!user) return allReports;
+
+    // Admin and Cert Manager see all
+    if (user.role === 'Admin' || user.role === 'Certification Manager') {
+        return allReports;
+    }
+
+    // Get visible client names for filtering
+    const visibleClients = getVisibleClients();
+    const visibleClientNames = visibleClients.map(c => c.name);
+
+    return allReports.filter(r => visibleClientNames.includes(r.client));
+}
+
+// Export filter utilities globally
+window.getVisibleClients = getVisibleClients;
+window.getVisiblePlans = getVisiblePlans;
+window.getVisibleReports = getVisibleReports;
 
 // Global Error Handling
 window.addEventListener('error', (event) => {

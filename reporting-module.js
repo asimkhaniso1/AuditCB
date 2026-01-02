@@ -1558,8 +1558,8 @@ window.autoClassifyFinding = function (reportId, source, index, description) {
 // ============================================
 
 function renderReportingModule() {
-    // 1. Calculate Metrics
-    const reports = window.state.auditReports || [];
+    // 1. Calculate Metrics (Filtered by User Role)
+    const reports = window.getVisibleReports() || [];
     const totalReports = reports.length;
     const pendingReview = reports.filter(r => r.status === window.CONSTANTS.STATUS.IN_REVIEW).length;
     const approved = reports.filter(r => r.status === window.CONSTANTS.STATUS.APPROVED).length;

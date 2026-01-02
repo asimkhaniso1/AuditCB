@@ -134,6 +134,7 @@ function renderSettings() {
                     <button class="tab-btn" onclick="switchSettingsTab('cbpolicies', this)">CB Policies</button>
                     <button class="tab-btn" onclick="switchSettingsTab('policy', this)">Quality Policy</button>
                     <button class="tab-btn" onclick="switchSettingsTab('retention', this)">Retention</button>
+                    <button class="tab-btn" onclick="switchSettingsTab('assignments', this)"><i class="fa-solid fa-user-plus" style="margin-right: 0.25rem;"></i>Assignments</button>
                     <button class="tab-btn" onclick="switchSettingsTab('defaults', this)">Defaults</button>
                     <button class="tab-btn" onclick="switchSettingsTab('data-management', this)"><i class="fa-solid fa-database" style="margin-right: 0.25rem;"></i>Data Management</button>
                     <button class="tab-btn" onclick="switchSettingsTab('knowledgebase', this)"><i class="fa-solid fa-brain" style="margin-right: 0.25rem;"></i>Knowledge Base</button>
@@ -173,6 +174,7 @@ function switchSettingsTab(tabName, btnElement) {
             break;
         case 'cbpolicies': container.innerHTML = getCBPoliciesHTML(); break;
         case 'knowledgebase': container.innerHTML = getKnowledgeBaseHTML(); break;
+        case 'assignments': container.innerHTML = getAssignmentsHTML(); break;
     }
 }
 
@@ -2925,4 +2927,246 @@ Return ONLY the JSON array, no markdown or explanation.`;
     window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
     switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
     setTimeout(() => window.viewKBAnalysis(docId), 500);
+};
+
+// ============================================
+// TAB: AUDITOR-CLIENT ASSIGNMENTS
+// ============================================
+// Manage which auditors are assigned to which clients
+// Auditors only see clients they are assigned to
+
+function getAssignmentsHTML() {
+    const assignments = window.state.auditorAssignments || [];
+    const auditors = window.state.auditors || [];
+    const clients = window.state.clients || [];
+
+    // Build assignment matrix
+    const auditorAssignmentMap = {};
+    auditors.forEach(a => {
+        auditorAssignmentMap[a.id] = {
+            auditor: a,
+            assignedClients: assignments
+                .filter(asn => asn.auditorId === a.id)
+                .map(asn => clients.find(c => c.id === asn.clientId))
+                .filter(c => c)
+        };
+    });
+
+    return `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h3 style="color: var(--primary-color); margin: 0;">
+                        <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i>
+                        Auditor-Client Assignments
+                    </h3>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">
+                        Assign auditors to specific clients. Auditors will only see their assigned clients in the dashboard, planning, and reports.
+                    </p>
+                </div>
+                <button class="btn btn-primary" onclick="openAddAssignmentModal()">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
+                    New Assignment
+                </button>
+            </div>
+
+            <!-- Info Box -->
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; gap: 1rem; align-items: start;">
+                    <i class="fa-solid fa-info-circle" style="font-size: 1.25rem; color: #2563eb; margin-top: 2px;"></i>
+                    <div>
+                        <strong style="color: #1e40af;">Role-Based Visibility</strong>
+                        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; color: #1e40af; font-size: 0.9rem;">
+                            <li><strong>Admins & Cert Managers:</strong> See all clients, plans, and reports.</li>
+                            <li><strong>Lead Auditors & Auditors:</strong> Only see clients they are assigned to.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignment Cards by Auditor -->
+            <div style="display: grid; gap: 1.5rem;">
+                ${auditors.map(auditor => {
+        const data = auditorAssignmentMap[auditor.id];
+        const assignedClients = data.assignedClients || [];
+
+        return `
+                        <div class="card" style="margin: 0; padding: 1.5rem; border-left: 4px solid ${auditor.role === 'Lead Auditor' ? '#0ea5e9' : '#6366f1'};">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <div style="width: 48px; height: 48px; border-radius: 50%; background: ${auditor.role === 'Lead Auditor' ? '#e0f2fe' : '#eef2ff'}; color: ${auditor.role === 'Lead Auditor' ? '#0284c7' : '#4f46e5'}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                                        <i class="fa-solid fa-user-tie"></i>
+                                    </div>
+                                    <div>
+                                        <strong style="font-size: 1.1rem;">${window.UTILS.escapeHtml(auditor.name)}</strong>
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                            <span class="badge" style="background: ${auditor.role === 'Lead Auditor' ? '#e0f2fe' : '#f1f5f9'}; color: ${auditor.role === 'Lead Auditor' ? '#0284c7' : '#64748b'}; margin-right: 0.5rem;">${window.UTILS.escapeHtml(auditor.role)}</span>
+                                            ${auditor.email || ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                                    <strong>${assignedClients.length}</strong> client${assignedClients.length !== 1 ? 's' : ''} assigned
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; min-height: 40px;">
+                                ${assignedClients.length > 0 ? assignedClients.map(client => `
+                                    <span style="display: inline-flex; align-items: center; gap: 0.5rem; background: #f1f5f9; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
+                                        <i class="fa-solid fa-building" style="color: var(--text-secondary);"></i>
+                                        ${window.UTILS.escapeHtml(client.name)}
+                                        <button onclick="removeAssignment(${auditor.id}, ${client.id})" style="background: none; border: none; cursor: pointer; color: #94a3b8; padding: 0 0 0 4px;" title="Remove assignment">
+                                            <i class="fa-solid fa-times-circle" style="font-size: 0.9rem;"></i>
+                                        </button>
+                                    </span>
+                                `).join('') : `
+                                    <span style="color: #94a3b8; font-style: italic; font-size: 0.85rem; padding: 6px 0;">
+                                        <i class="fa-solid fa-circle-exclamation" style="margin-right: 0.5rem;"></i>
+                                        No clients assigned - auditor won't see any client data
+                                    </span>
+                                `}
+                                <button onclick="openQuickAssignModal(${auditor.id}, '${window.UTILS.escapeHtml(auditor.name)}')" 
+                                    style="background: #e0f2fe; border: 1px dashed #0284c7; color: #0284c7; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Client
+                                </button>
+                            </div>
+                        </div>
+                    `;
+    }).join('')}
+            </div>
+
+            <!-- Summary Stats -->
+            <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #16a34a;">${auditors.length}</div>
+                    <div style="font-size: 0.85rem; color: #166534;">Total Auditors</div>
+                </div>
+                <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #2563eb;">${clients.length}</div>
+                    <div style="font-size: 0.85rem; color: #1e40af;">Total Clients</div>
+                </div>
+                <div style="background: #fef3c7; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #d97706;">${assignments.length}</div>
+                    <div style="font-size: 0.85rem; color: #92400e;">Active Assignments</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Add new assignment modal
+window.openAddAssignmentModal = function () {
+    const auditors = window.state.auditors || [];
+    const clients = window.state.clients || [];
+
+    document.getElementById('modal-title').textContent = 'Create New Assignment';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="assignment-form">
+            <div class="form-group">
+                <label>Auditor <span style="color: var(--danger-color);">*</span></label>
+                <select id="assign-auditor" class="form-control" required>
+                    <option value="">-- Select Auditor --</option>
+                    ${auditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)} (${a.role})</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Client <span style="color: var(--danger-color);">*</span></label>
+                <select id="assign-client" class="form-control" required>
+                    <option value="">-- Select Client --</option>
+                    ${clients.map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea id="assign-notes" class="form-control" rows="2" placeholder="Any notes about this assignment..."></textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = saveAssignment;
+    window.openModal();
+};
+
+// Quick assign modal (for a specific auditor)
+window.openQuickAssignModal = function (auditorId, auditorName) {
+    const clients = window.state.clients || [];
+    const assignments = window.state.auditorAssignments || [];
+    const assignedClientIds = assignments.filter(a => a.auditorId === auditorId).map(a => a.clientId);
+    const unassignedClients = clients.filter(c => !assignedClientIds.includes(c.id));
+
+    if (unassignedClients.length === 0) {
+        window.showNotification('All clients are already assigned to this auditor.', 'info');
+        return;
+    }
+
+    document.getElementById('modal-title').textContent = `Assign Client to ${auditorName}`;
+    document.getElementById('modal-body').innerHTML = `
+        <input type="hidden" id="assign-auditor" value="${auditorId}">
+        <div class="form-group">
+            <label>Select Client to Assign</label>
+            <select id="assign-client" class="form-control" required>
+                <option value="">-- Select Client --</option>
+                ${unassignedClients.map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)} (${c.industry || 'N/A'})</option>`).join('')}
+            </select>
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = saveAssignment;
+    window.openModal();
+};
+
+// Save assignment
+function saveAssignment() {
+    const auditorId = parseInt(document.getElementById('assign-auditor').value);
+    const clientId = parseInt(document.getElementById('assign-client').value);
+    const notes = document.getElementById('assign-notes')?.value || '';
+
+    if (!auditorId || !clientId) {
+        window.showNotification('Please select both an auditor and a client.', 'error');
+        return;
+    }
+
+    // Initialize if not exists
+    if (!window.state.auditorAssignments) {
+        window.state.auditorAssignments = [];
+    }
+
+    // Check if assignment already exists
+    const exists = window.state.auditorAssignments.find(a => a.auditorId === auditorId && a.clientId === clientId);
+    if (exists) {
+        window.showNotification('This assignment already exists.', 'warning');
+        window.closeModal();
+        return;
+    }
+
+    // Add new assignment
+    window.state.auditorAssignments.push({
+        auditorId: auditorId,
+        clientId: clientId,
+        assignedBy: window.state.currentUser?.name || 'System',
+        assignedAt: new Date().toISOString(),
+        notes: notes
+    });
+
+    window.saveData();
+    window.closeModal();
+    switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
+    window.showNotification('Assignment created successfully!', 'success');
+}
+
+// Remove assignment
+window.removeAssignment = function (auditorId, clientId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const client = window.state.clients.find(c => c.id === clientId);
+
+    if (confirm(`Remove assignment of ${client?.name || 'client'} from ${auditor?.name || 'auditor'}?`)) {
+        window.state.auditorAssignments = window.state.auditorAssignments.filter(
+            a => !(a.auditorId === auditorId && a.clientId === clientId)
+        );
+        window.saveData();
+        switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
+        window.showNotification('Assignment removed.', 'success');
+    }
 };

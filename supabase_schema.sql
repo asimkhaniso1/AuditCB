@@ -131,7 +131,59 @@ create policy "Authenticated users can view audit logs"
 
 
 -- ==========================================
--- 8. Storage Buckets (Manual Setup Required)
+-- 9. Auditor-Client Assignments Table
+-- ==========================================
+-- Maps auditors to clients for role-based visibility
+-- Auditors only see clients they are assigned to
+-- Cert Managers and Admins see all clients
+
+create table if not exists public.auditor_assignments (
+  id uuid default uuid_generate_v4() primary key,
+  auditor_id text not null,           -- Matches auditor.id from app state
+  client_id text not null,            -- Matches client.id from app state
+  assigned_by text,                   -- User who made the assignment
+  assigned_at timestamp with time zone default now(),
+  notes text,                         -- Optional notes about the assignment
+  
+  -- Prevent duplicate assignments
+  unique (auditor_id, client_id)
+);
+
+comment on table public.auditor_assignments is 'Maps auditors to clients for role-based dashboard/report filtering.';
+comment on column public.auditor_assignments.auditor_id is 'ID of the auditor (from app state.auditors).';
+comment on column public.auditor_assignments.client_id is 'ID of the client (from app state.clients).';
+
+-- Enable RLS
+alter table public.auditor_assignments enable row level security;
+
+-- Policy: Anyone can view assignments (needed for filtering)
+create policy "Authenticated users can view assignments"
+  on public.auditor_assignments for select
+  to authenticated
+  using ( true );
+
+-- Policy: Only Cert Managers/Admins can insert assignments
+-- Note: Role check is done at application level since we don't sync roles to Supabase yet
+create policy "Authenticated users can insert assignments"
+  on public.auditor_assignments for insert
+  to authenticated
+  with check ( true );
+
+-- Policy: Only Cert Managers/Admins can update assignments
+create policy "Authenticated users can update assignments"
+  on public.auditor_assignments for update
+  to authenticated
+  using ( true );
+
+-- Policy: Only Cert Managers/Admins can delete assignments
+create policy "Authenticated users can delete assignments"
+  on public.auditor_assignments for delete
+  to authenticated
+  using ( true );
+
+
+-- ==========================================
+-- 10. Storage Buckets (Manual Setup Required)
 -- ==========================================
 -- 1. Create a public bucket named 'audit-reports'
 -- 2. Create a public bucket named 'audit-images'
