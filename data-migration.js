@@ -276,6 +276,10 @@ const DataMigration = {
                             <button class="btn btn-danger" onclick="DataMigration.handleClearData()">
                                 <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i> Clear Local Data
                             </button>
+                            
+                            <button class="btn btn-secondary" onclick="DataMigration.restoreDemoData()" style="margin-left: 0.5rem;">
+                                <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Restore Demo Data
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -290,6 +294,36 @@ const DataMigration = {
                 </div>
             </div>
         `;
+    },
+
+    /**
+     * Restore demo/mock data for testing and demos
+     * @param {object} options - Options { keepCBSettings: boolean }
+     */
+    restoreDemoData: function (options = { keepCBSettings: true }) {
+        if (!confirm('This will restore demo data. Any current data will be replaced. Continue?')) {
+            return;
+        }
+
+        try {
+            // Preserve CB settings if requested
+            const cbSettings = options.keepCBSettings ? window.state.cbSettings : null;
+            const currentUser = window.state.currentUser;
+
+            // Force reload defaults by clearing localStorage and refreshing
+            localStorage.removeItem('auditCB360State');
+
+            window.showNotification('Restoring demo data...', 'info');
+
+            // Reload page to get fresh default data
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+
+        } catch (error) {
+            console.error('Restore demo data failed:', error);
+            window.showNotification('Failed to restore demo data.', 'error');
+        }
     },
 
     // Handler wrapper to read checkbox values
