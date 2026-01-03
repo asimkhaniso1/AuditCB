@@ -8,11 +8,10 @@ const DATA_VERSION = '1.3'; // Increment to force state reset
 const state = {
     version: DATA_VERSION,
     // Current User Context (For Demo Roles)
-    currentUser: null,
-    // currentUser: {
-    //     name: 'Demo Manager',
-    //     role: 'Certification Manager'
-    // },
+    currentUser: {
+        name: 'Demo User',
+        role: 'Lead Auditor'
+    },
     currentModule: 'dashboard',
     clients: [
         {
@@ -1840,6 +1839,14 @@ async function lazyLoadModal(modulePath, functionName) {
 function renderRoleSwitcher() {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
+
+    // Initialize currentUser if it doesn't exist
+    if (!state.currentUser) {
+        state.currentUser = {
+            name: 'Demo User',
+            role: 'Lead Auditor'
+        };
+    }
 
     const switcher = document.createElement('div');
     switcher.id = 'role-switcher-container';
