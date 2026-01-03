@@ -985,6 +985,14 @@ function loadState() {
             // Check version compatibility
             if (data.version === DATA_VERSION) {
                 Object.assign(state, data);
+
+                // SAFETY: Ensure currentUser is always initialized (fix for legacy null values)
+                if (!state.currentUser) {
+                    state.currentUser = {
+                        name: 'Demo User',
+                        role: 'Lead Auditor'
+                    };
+                }
             } else {
                 console.log(`Version mismatch (Store: ${data.version}, App: ${DATA_VERSION}). Resetting to defaults.`);
                 // Do not load saved data, keep strictly default mock data
