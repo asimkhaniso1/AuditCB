@@ -197,8 +197,20 @@ const DataMigration = {
                 }];
             }
 
-            // 3. Save to localStorage
-            window.saveData();
+            // 3. Save to localStorage - Force immediate save
+            console.log('Clearing data - new state:', {
+                clients: window.state.clients.length,
+                auditors: window.state.auditors.length,
+                auditPlans: window.state.auditPlans.length
+            });
+
+            // Directly write to localStorage to ensure immediate persistence
+            try {
+                localStorage.setItem('auditCB360State', JSON.stringify(window.state));
+                console.log('Data saved to localStorage successfully');
+            } catch (e) {
+                console.error('Failed to save to localStorage:', e);
+            }
 
             // 4. Force specific reloads
             if (options.keepAdmin && window.state.currentUser) {
@@ -207,13 +219,13 @@ const DataMigration = {
                 // Determine if we need to logout
             }
 
-            window.showNotification('Local data cleared successfully!', 'success');
+            window.showNotification('Local data cleared successfully! Reloading...', 'success');
 
-            // 5. Refresh Admin UI
-            this.renderAdminUI();
-
-            // 6. Refresh stats on dashboard by reloading
-            setTimeout(() => window.location.reload(), 1000);
+            // 5. Force hard reload after short delay
+            setTimeout(() => {
+                window.location.href = window.location.href.split('#')[0] + '#dashboard';
+                window.location.reload(true);
+            }, 500);
 
         } catch (error) {
             console.error('Clear data failed:', error);
