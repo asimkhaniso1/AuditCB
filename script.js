@@ -1864,16 +1864,20 @@ function renderRoleSwitcher() {
             <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Demo Role
         </label>
         <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--card-bg); color: var(--text-color); cursor: pointer;">
-            <option value="Auditor" ${state.currentUser.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-            <option value="Lead Auditor" ${state.currentUser.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
-            <option value="Certification Manager" ${state.currentUser.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>
+            <option value="Auditor" ${state.currentUser?.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+            <option value="Lead Auditor" ${state.currentUser?.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
+            <option value="Certification Manager" ${state.currentUser?.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>
         </select>
     `;
     sidebar.appendChild(switcher);
 }
 
 window.switchUserRole = function (role) {
-    state.currentUser.role = role;
+    if (!state.currentUser) {
+        state.currentUser = { name: 'Demo User', role: role };
+    } else {
+        state.currentUser.role = role;
+    }
     window.showNotification(`Switched role to: ${role}`, 'info');
     // Re-render current module to reflect permissions
     window.renderModule(state.currentModule);
