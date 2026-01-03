@@ -163,8 +163,9 @@ const DataMigration = {
             const currentUser = options.keepAdmin ? window.state.currentUser : null;
             const settings = options.keepAdmin ? window.state.settings : {};
 
-            // 2. Reset State
+            // 2. Reset State with explicit version
             window.state = {
+                version: '1.3', // CRITICAL: Must match DATA_VERSION in script.js to prevent auto-reset
                 clients: [],
                 auditors: [],
                 auditPlans: [],
@@ -183,7 +184,13 @@ const DataMigration = {
                 // Default modules setup
                 activeModule: 'dashboard',
                 notifications: [],
-                knowledgeBase: { standards: [] }
+                knowledgeBase: { standards: [] },
+                auditPrograms: [],
+                certificationDecisions: [],
+                documents: [],
+                appeals: [],
+                complaints: [],
+                auditorAssignments: []
             };
 
             // Re-initialize default admin if cleared and no users
