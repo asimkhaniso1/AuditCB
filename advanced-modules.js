@@ -13,7 +13,7 @@ function renderAuditorsEnhanced() {
 
 
     // Permission Check
-    const userRole = window.state.currentUser.role;
+    const userRole = window.state.currentUser?.role || 'Auditor';
     const isAuthorized = userRole === 'Certification Manager' || userRole === 'Admin';
 
     // Pagination State

@@ -16,7 +16,7 @@ function renderAuditPlanningEnhanced() {
 
 
     // Permission Check
-    const userRole = window.state.currentUser.role;
+    const userRole = window.state.currentUser?.role || 'Auditor';
     const isManager = userRole === 'Certification Manager' || userRole === 'Admin';
 
     const rows = filteredPlans.map(plan => `
