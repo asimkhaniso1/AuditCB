@@ -180,7 +180,8 @@ function getSettingsSubTabs(mainTab) {
             { id: 'users', label: 'User Management', icon: 'fa-users-cog' },
             { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
             { id: 'data', label: 'Data Management', icon: 'fa-database' },
-            { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-brain' }
+            { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-brain' },
+            { id: 'activity-log', label: 'Activity Log', icon: 'fa-history' }
         ]
     };
 
@@ -226,7 +227,8 @@ function getSettingsContent(mainTab, subTab) {
                 }, 50);
                 return '<div id="admin-data-management"></div>';
             },
-            'knowledge': () => getKnowledgeBaseHTML()
+            'knowledge': () => getKnowledgeBaseHTML(),
+            'activity-log': () => getActivityLogHTML()
         }
     };
 
@@ -3643,6 +3645,71 @@ function saveAssignment() {
     window.closeModal();
     switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
     window.showNotification('Assignment created successfully!', 'success');
+}
+
+// ============================================
+// ACTIVITY LOG TAB
+// ============================================
+
+function getActivityLogHTML() {
+    const logs = window.AuditTrail?.getLogs() || [];
+    const recentLogs = logs.slice(0, 50);
+
+    return `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
+                    <i class="fa-solid fa-history" style="margin-right: 0.5rem;"></i>
+                    Activity Log
+                </h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.AuditTrail?.exportCSV()">
+                        <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Export CSV
+                    </button>
+                    ${window.state.currentUser?.role === 'Admin' ? `
+                    <button class="btn btn-outline-danger btn-sm" onclick="if(confirm('Clear all activity logs?')) { window.AuditTrail?.clear(); window.switchSettingsSubTab('system', 'activity-log'); }">
+                        <i class="fa-solid fa-trash" style="margin-right: 0.25rem;"></i>Clear Logs
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div class="card" style="max-height: 600px; overflow-y: auto;">
+                ${recentLogs.length > 0 ? `
+                    <div style="display: flex; flex-direction: column; gap: 0;">
+                        ${recentLogs.map(log => {
+        const style = window.AuditTrail?.getActionStyle(log.action) || { icon: 'fa-circle', color: '#64748b' };
+        return `
+                            <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; display: flex; align-items: start; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; border-radius: 50%; background: ${style.color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid ${style.icon}" style="color: white; font-size: 0.8rem;"></i>
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <p style="margin: 0; font-weight: 500; font-size: 0.9rem;">
+                                        <strong>${window.UTILS.escapeHtml(log.user.name)}</strong>
+                                        <span style="color: var(--text-secondary);"> ${log.action}</span>
+                                        <span style="color: var(--primary-color);"> ${log.resource}</span>
+                                        ${log.resourceName ? ` - ${window.UTILS.escapeHtml(log.resourceName)}` : ''}
+                                    </p>
+                                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #94a3b8;">
+                                        ${window.AuditTrail?.formatTime(log.timestamp) || log.timestamp}
+                                        ${log.user.role ? ` • ${log.user.role}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+    }).join('')}
+                    </div>
+                ` : `
+                    <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                        <i class="fa-solid fa-inbox" style="font-size: 2.5rem; margin-bottom: 1rem; color: #cbd5e1;"></i>
+                        <p style="margin: 0;">No activity logs yet.</p>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem;">Actions like login, create, edit, and delete will appear here.</p>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
 }
 
 // Remove assignment
