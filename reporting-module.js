@@ -859,10 +859,79 @@ function generateReportHTML(report, plan, client) {
                     padding: 20px 60px;
                     border-radius: 20px;
                 }
+
+                /* Running Page Header */
+                .page-header {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 35px;
+                    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+                    color: white;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0 30px;
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    z-index: 1000;
+                }
+                .page-header-left { display: flex; align-items: center; gap: 8px; }
+                .page-header-right { color: rgba(255,255,255,0.9); }
+
+                /* Running Page Footer */
+                .page-footer {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 30px;
+                    background: #f8fafc;
+                    border-top: 1px solid #e2e8f0;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0 30px;
+                    font-size: 0.7rem;
+                    color: #64748b;
+                    z-index: 1000;
+                }
+                .page-footer-center { 
+                    position: absolute; 
+                    left: 50%; 
+                    transform: translateX(-50%);
+                    font-weight: 500;
+                }
+
+                @media print {
+                    .page-header, .page-footer { display: flex; }
+                    body { padding-top: 45px; padding-bottom: 40px; }
+                }
+                @media screen {
+                    .page-header, .page-footer { display: none; }
+                }
             </style>
         </head>
         <body>
             ${!report.finalizedAt ? '<div class="watermark">DRAFT</div>' : ''}
+            
+            <!-- Running Page Header (visible in print) -->
+            <div class="page-header">
+                <div class="page-header-left">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>${h(cbName)} | Audit Report</span>
+                </div>
+                <div class="page-header-right">REP-${report.id}</div>
+            </div>
+
+            <!-- Running Page Footer (visible in print) -->
+            <div class="page-footer">
+                <div>${h(report.client)}</div>
+                <div class="page-footer-center">CONFIDENTIAL</div>
+                <div>${h(report.date)}</div>
+            </div>
+
             <div class="report-container">
                 <div class="qr-header">
                     <img src="${qrCodeUrl}" alt="Report QR">
