@@ -814,7 +814,7 @@ window.openAddUserModal = function (userId = null) {
             </div>
             <div class="form-group">
                 <label>Role <span style="color: var(--danger-color);">*</span></label>
-                ${window.state.currentUser?.role === 'Admin' ? `
+                ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                 <select id="user-role" class="form-control" required>
                     <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
                     <option value="Certification Manager" ${user.role === 'Certification Manager' ? 'selected' : ''}>Certification Manager</option>
