@@ -169,6 +169,7 @@ function getSettingsSubTabs(mainTab) {
         ],
         'organization': [
             { id: 'structure', label: 'Structure', icon: 'fa-sitemap' },
+            { id: 'users', label: 'Users', icon: 'fa-users-cog' },
             { id: 'permissions', label: 'Permissions', icon: 'fa-user-shield' }
         ],
         'policies': [
@@ -204,6 +205,7 @@ function getSettingsContent(mainTab, subTab) {
         },
         'organization': {
             'structure': () => getOrganizationHTML(),
+            'users': () => getUsersHTML(),
             'permissions': () => getPermissionsHTML()
         },
         'policies': {
@@ -250,7 +252,7 @@ window.switchSettingsMainTab = function (mainTab, btnElement) {
     // Set default sub-tab for the main tab
     const defaultSubTabs = {
         'cb-profile': 'profile',
-        'organization': 'structure',
+        'organization': 'users', // Default to users tab for convenience
         'policies': 'quality',
         'system': 'defaults'
     };
@@ -680,6 +682,204 @@ window.deleteDesignation = function (id) {
         switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
         window.showNotification('Designation deleted', 'success');
     }
+};
+
+// ============================================
+// TAB 3b: USER MANAGEMENT
+// ============================================
+
+function getUsersHTML() {
+    // Ensure mock users exist if none are present (state demo)
+    if (!window.state.users || window.state.users.length === 0) {
+        // Fallback to demo users if empty
+        window.state.users = [
+            { id: 1, name: 'Admin User', email: 'admin@auditcb360.com', role: 'Admin', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff' },
+            { id: 2, name: 'Cert Manager', email: 'manager@auditcb360.com', role: 'Certification Manager', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Cert+Manager&background=6b21a8&color=fff' },
+            { id: 3, name: 'Lead Auditor', email: 'auditor@auditcb360.com', role: 'Lead Auditor', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Lead+Auditor&background=0369a1&color=fff' }
+        ];
+    }
+    const users = window.state.users || [];
+
+    return `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="color: var(--primary-color);">
+                    <i class="fa-solid fa-users-cog" style="margin-right: 0.5rem;"></i>
+                    User Management
+                </h3>
+                ${window.AuthManager?.canPerform('create', 'user') ? `
+                <button class="btn btn-primary" onclick="openAddUserModal()">
+                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
+                    Add User
+                </button>
+                ` : ''}
+            </div>
+            
+            <div id="users-list-container" class="table-container">
+                ${renderUsersList(users)}
+            </div>
+        </div>
+    `;
+}
+
+function renderUsersList(users) {
+    if (users.length === 0) {
+        return `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No users found.</div>`;
+    }
+
+    return `
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50px;"></th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${users.map(user => `
+                    <tr style="opacity: ${user.status === 'Inactive' ? '0.6' : '1'};">
+                        <td>
+                            <img src="${user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}" 
+                                 style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color);">
+                        </td>
+                        <td><strong>${window.UTILS.escapeHtml(user.name)}</strong></td>
+                        <td>${window.UTILS.escapeHtml(user.email)}</td>
+                        <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(user.role)}</span></td>
+                        <td>
+                            <span class="badge" style="background: ${user.status === 'Active' ? '#dcfce7' : '#f1f5f9'}; color: ${user.status === 'Active' ? '#166534' : '#64748b'};">
+                                ${user.status}
+                            </span>
+                        </td>
+                        <td>
+                            ${window.AuthManager?.canPerform('edit', 'user') ? `
+                            <button class="btn btn-sm btn-icon" onclick="editUser(${user.id})" title="Edit">
+                                <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                            </button>
+                            ` : ''}
+                            ${window.AuthManager?.canPerform('edit', 'user') ? `
+                            <button class="btn btn-sm btn-icon" onclick="toggleUserStatus(${user.id})" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
+                                <i class="fa-solid ${user.status === 'Active' ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color: ${user.status === 'Active' ? '#16a34a' : '#cbd5e1'}; font-size: 1.2rem;"></i>
+                            </button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+window.openAddUserModal = function (userId = null) {
+    const isEdit = !!userId;
+    let user = {};
+    if (isEdit) {
+        user = window.state.users.find(u => u.id === userId) || {};
+    }
+
+    document.getElementById('modal-title').textContent = isEdit ? 'Edit User' : 'Add New User';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="user-form">
+            <div class="form-group">
+                <label>Full Name <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="user-name" value="${user.name || ''}" required>
+            </div>
+            <div class="form-group">
+                <label>Email Address <span style="color: var(--danger-color);">*</span></label>
+                <input type="email" class="form-control" id="user-email" value="${user.email || ''}" required ${isEdit ? 'disabled' : ''}>
+                ${isEdit ? '<small style="color: var(--text-secondary);">Email cannot be changed.</small>' : ''}
+            </div>
+            <div class="form-group">
+                <label>Role <span style="color: var(--danger-color);">*</span></label>
+                <select id="user-role" class="form-control" required>
+                    <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                    <option value="Certification Manager" ${user.role === 'Certification Manager' ? 'selected' : ''}>Certification Manager</option>
+                    <option value="Lead Auditor" ${user.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
+                    <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                    <option value="Technical Expert" ${user.role === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
+                </select>
+            </div>
+            ${!isEdit ? `
+            <div class="form-group">
+                <label>Temporary Password <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="user-password" value="Welcome123!" readonly style="background: #f8fafc;">
+                <small style="color: var(--text-secondary);">Default password for new users.</small>
+            </div>
+            ` : ''}
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = () => {
+        saveUser(userId);
+    };
+
+    window.openModal();
+};
+
+window.saveUser = function (userId) {
+    const name = document.getElementById('user-name').value.trim();
+    const email = document.getElementById('user-email').value.trim();
+    const role = document.getElementById('user-role').value;
+
+    if (!name || (!userId && !email)) {
+        window.showNotification('Please fill in all required fields', 'error');
+        return;
+    }
+
+    if (userId) {
+        // Update existing
+        const user = window.state.users.find(u => u.id === userId);
+        if (user) {
+            user.name = name;
+            user.role = role;
+            if (!user.avatar) {
+                user.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+            }
+            window.showNotification('User updated successfully', 'success');
+        }
+    } else {
+        // Create new
+        const newUser = {
+            id: Date.now(),
+            name: name,
+            email: email,
+            role: role,
+            status: 'Active',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+        };
+        window.state.users.push(newUser);
+        window.showNotification('User created successfully', 'success');
+    }
+
+    window.saveData();
+    window.closeModal();
+    // Refresh list
+    document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+};
+
+window.editUser = function (userId) {
+    window.openAddUserModal(userId);
+};
+
+window.toggleUserStatus = function (userId) {
+    const user = window.state.users.find(u => u.id === userId);
+    if (!user) return;
+
+    if (user.id === 1 || user.role === 'Admin') {
+        // Prevent disabling the main admin for safety in this demo
+        if (user.email === 'admin@auditcb360.com') {
+            window.showNotification('Cannot disable the main Administrator', 'warning');
+            return;
+        }
+    }
+
+    user.status = user.status === 'Active' ? 'Inactive' : 'Active';
+    window.saveData();
+    document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+    window.showNotification(`User ${user.status === 'Active' ? 'activated' : 'deactivated'}`, 'info');
 };
 
 // ============================================

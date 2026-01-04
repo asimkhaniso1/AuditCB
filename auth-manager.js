@@ -194,6 +194,61 @@ const AuthManager = {
     },
 
     /**
+     * Granular permission check: action on resource
+     * @param {string} action - e.g., 'delete', 'create', 'edit', 'view', 'finalize'
+     * @param {string} resource - e.g., 'user', 'client', 'report', 'audit'
+     * @returns {boolean}
+     */
+    canPerform: function (action, resource) {
+        const user = window.state?.currentUser;
+        if (!user) return false;
+
+        // Admin bypass
+        if (user.role === 'Admin') return true;
+
+        // Role-based permission matrix
+        const matrix = {
+            'Certification Manager': {
+                client: ['view', 'create', 'edit', 'delete'],
+                audit: ['view', 'create', 'edit', 'finalize'],
+                report: ['view', 'create', 'edit', 'finalize', 'download'],
+                user: ['view'],
+                auditor: ['view', 'assign']
+            },
+            'Lead Auditor': {
+                client: ['view'],
+                audit: ['view', 'edit'],
+                report: ['view', 'create', 'edit'],
+                user: [],
+                auditor: ['view']
+            },
+            'Auditor': {
+                client: ['view'],
+                audit: ['view'],
+                report: ['view'],
+                user: [],
+                auditor: []
+            },
+            'Technical Expert': {
+                client: ['view'],
+                audit: ['view'],
+                report: ['view'],
+                user: [],
+                auditor: []
+            }
+        };
+
+        const rolePerms = matrix[user.role];
+        if (!rolePerms) return false;
+
+        const resourcePerms = rolePerms[resource];
+        if (!resourcePerms) return false;
+
+        return resourcePerms.includes(action);
+    },
+
+
+    /**
      * Check if user has role
      * @param {string|Array} requiredRole 
      * @returns {boolean}
@@ -301,10 +356,23 @@ const AuthManager = {
         // Check session every minute
         setInterval(() => {
             const session = this.getSession();
-            if (session && !this.isSessionValid(session)) {
+            if (!session) return;
+
+            const timeLeft = session.expiresAt - Date.now();
+
+            // Session expired
+            if (timeLeft <= 0) {
                 Logger.warn('Session expired, logging out');
                 window.showNotification('Your session has expired. Please log in again.', 'warning');
                 this.logout();
+                return;
+            }
+
+            // Warning: 5 minutes before expiry
+            const FIVE_MINUTES = 5 * 60 * 1000;
+            if (timeLeft <= FIVE_MINUTES && !window._sessionWarningShown) {
+                window._sessionWarningShown = true;
+                this.showSessionWarning(Math.ceil(timeLeft / 60000));
             }
         }, 60000); // Check every minute
 
@@ -312,9 +380,44 @@ const AuthManager = {
         ['click', 'keypress', 'scroll'].forEach(event => {
             document.addEventListener(event, () => {
                 this.extendSession();
+                window._sessionWarningShown = false; // Reset warning flag on activity
             }, { passive: true, once: false });
         });
     },
+
+    /**
+     * Show session timeout warning modal
+     */
+    showSessionWarning: function (minutesLeft) {
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        if (!modalTitle || !modalBody) return;
+
+        modalTitle.textContent = 'Session Expiring Soon';
+        modalBody.innerHTML = `
+            <div style="text-align: center; padding: 1rem;">
+                <i class="fa-solid fa-clock" style="font-size: 3rem; color: #f59e0b; margin-bottom: 1rem;"></i>
+                <h4 style="margin-bottom: 0.5rem;">Your session will expire in ~${minutesLeft} minute(s)</h4>
+                <p style="color: var(--text-secondary);">
+                    Click "Stay Logged In" to extend your session, or you will be automatically logged out.
+                </p>
+            </div>
+        `;
+
+        modalSave.textContent = 'Stay Logged In';
+        modalSave.style.display = 'inline-block';
+        modalSave.onclick = () => {
+            this.extendSession();
+            window._sessionWarningShown = false;
+            window.closeModal();
+            window.showNotification('Session extended successfully', 'success');
+        };
+
+        window.openModal();
+    },
+
 
     /**
      * Extend session timeout

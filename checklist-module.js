@@ -588,107 +588,156 @@ function setupCSVUpload() {
 }
 
 function openAddChecklistModal() {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+    // Full-page editor instead of modal
+    renderChecklistEditor(null);
+}
+
+function renderChecklistEditor(checklistId) {
+    const contentArea = document.getElementById('content-area');
+    const isEdit = !!checklistId;
+    const checklist = isEdit ? state.checklists?.find(c => c.id === checklistId) : null;
 
     const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const userRole = state.currentUser?.role;
     const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
     const canEditGlobal = isCertManager || isAdmin;
-
     const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
-    // Reset save button visibility
-    modalSave.style.display = 'inline-block';
+    // Get existing items if editing
+    let existingItems = [];
+    if (checklist) {
+        if (checklist.clauses) {
+            checklist.clauses.forEach(main => {
+                (main.subClauses || []).forEach(sub => {
+                    existingItems.push({ clause: sub.clause, requirement: sub.requirement });
+                });
+            });
+        } else if (checklist.items) {
+            existingItems = checklist.items;
+        }
+    }
 
-    modalTitle.textContent = 'Create New Checklist';
-    modalBody.innerHTML = `
-        <form id="checklist-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Checklist Name <span style="color: var(--danger-color);">*</span></label>
-                    <input type="text" class="form-control" id="checklist-name" placeholder="e.g. ISO 9001 Core Requirements" required>
+    const html = `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <button class="btn btn-secondary" onclick="renderChecklistLibrary()">
+                        <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to Library
+                    </button>
                 </div>
-                <div class="form-group">
-                    <label>Standard</label>
-                    <select class="form-control" id="checklist-standard">
-                        ${standards.map(s => `<option value="${window.UTILS.escapeHtml(s)}">${window.UTILS.escapeHtml(s)}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Type</label>
-                    <select class="form-control" id="checklist-type">
-                        <option value="custom">Custom (Personal)</option>
-                        ${canEditGlobal ? '<option value="global">Global (Organization-wide)</option>' : ''}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Audit Type</label>
-                    <select class="form-control" id="checklist-audit-type">
-                        <option value="">-- Select --</option>
-                        ${auditTypes.map(t => `<option value="${window.UTILS.escapeHtml(t)}">${window.UTILS.escapeHtml(t)}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Audit Scope</label>
-                    <select class="form-control" id="checklist-audit-scope">
-                        <option value="">-- Select --</option>
-                        ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}">${window.UTILS.escapeHtml(s)}</option>`).join('')}
-                    </select>
-                </div>
+                <h2 style="margin: 0;">${isEdit ? 'Edit' : 'Create'} Checklist</h2>
+                <div style="width: 150px;"></div>
             </div>
 
-            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items</h4>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadChecklistTemplate()">
-                            <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i> Template
-                        </button>
-                        <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
-                            <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i> Import CSV
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Row
-                        </button>
+            <form id="checklist-editor-form">
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>Checklist Details</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Checklist Name <span style="color: var(--danger-color);">*</span></label>
+                            <input type="text" class="form-control" id="checklist-name" placeholder="e.g. ISO 9001 Core Requirements" value="${checklist?.name || ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Standard</label>
+                            <select class="form-control" id="checklist-standard">
+                                ${standards.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklist?.standard === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select class="form-control" id="checklist-type">
+                                <option value="custom" ${checklist?.type === 'custom' || !checklist ? 'selected' : ''}>Custom (Personal)</option>
+                                ${canEditGlobal ? `<option value="global" ${checklist?.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Audit Type</label>
+                            <select class="form-control" id="checklist-audit-type">
+                                <option value="">-- Select --</option>
+                                ${auditTypes.map(t => `<option value="${window.UTILS.escapeHtml(t)}" ${checklist?.auditType === t ? 'selected' : ''}>${window.UTILS.escapeHtml(t)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Audit Scope</label>
+                            <select class="form-control" id="checklist-audit-scope">
+                                <option value="">-- Select --</option>
+                                ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklist?.auditScope === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div id="checklist-items-container" style="max-height: 300px; overflow-y: auto;">
-                    <table style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th style="width: 120px;">Clause #</th>
-                                <th>Requirement</th>
-                                <th style="width: 50px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="checklist-items-body">
-                            <tr class="checklist-item-row">
-                                <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0; width: 100%; min-width: 80px;"></td>
-                                <td><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
-                                <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="margin: 0;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Checklist Items</h4>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadChecklistTemplate()">
+                                <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Template
+                            </button>
+                            <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
+                                <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i>Import CSV
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
+                                <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Row
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="checklist-items-container" style="max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <table style="width: 100%; margin: 0;">
+                            <thead style="position: sticky; top: 0; background: #f1f5f9;">
+                                <tr>
+                                    <th style="width: 120px; padding: 0.75rem;">Clause #</th>
+                                    <th style="padding: 0.75rem;">Requirement</th>
+                                    <th style="width: 50px; padding: 0.75rem;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="checklist-items-body">
+                                ${existingItems.length > 0 ? existingItems.map(item => `
+                                    <tr class="checklist-item-row">
+                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(item.clause || '')}" style="margin: 0;"></td>
+                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(item.requirement || '')}" style="margin: 0;"></td>
+                                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                                    </tr>
+                                `).join('') : `
+                                    <tr class="checklist-item-row">
+                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+                                        <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
+                                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                                    </tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
+                        <small style="color: var(--text-secondary);">
+                            <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
+                            Enter Clause # (e.g., 4.1) and Requirement - sections are auto-generated based on main clause numbers.
+                        </small>
+                    </div>
                 </div>
 
-                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
-                    <small style="color: var(--text-secondary);">
-                        <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
-                        Tip: Just enter Clause # (e.g., 4.1) and Requirement - sections are auto-generated
-                    </small>
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="renderChecklistLibrary()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-checklist-btn">
+                        <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>${isEdit ? 'Update' : 'Create'} Checklist
+                    </button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     `;
 
-    window.openModal();
+    contentArea.innerHTML = html;
     setupCSVUpload();
+    attachChecklistEditorListeners(checklistId);
+}
+
+function attachChecklistEditorListeners(checklistId) {
+    const isEdit = !!checklistId;
 
     // Add row functionality
     document.getElementById('add-item-row')?.addEventListener('click', () => {
@@ -696,65 +745,102 @@ function openAddChecklistModal() {
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
         newRow.innerHTML = `
-            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0; width: 100%; min-width: 80px;"></td>
-            <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
-            <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+            <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
+            <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
+            <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
         tbody.appendChild(newRow);
         attachRemoveRowListeners();
+        newRow.querySelector('.item-clause')?.focus();
     });
 
     attachRemoveRowListeners();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('checklist-name').value.trim();
-        const standard = document.getElementById('checklist-standard').value;
-        const type = document.getElementById('checklist-type').value;
+    // Save handler
+    document.getElementById('save-checklist-btn')?.addEventListener('click', () => {
+        saveChecklistFromEditor(checklistId);
+    });
+}
 
-        if (!name) {
-            window.showNotification('Please enter a checklist name', 'error');
-            return;
+function saveChecklistFromEditor(checklistId) {
+    const isEdit = !!checklistId;
+    const name = document.getElementById('checklist-name').value.trim();
+    const standard = document.getElementById('checklist-standard').value;
+    const type = document.getElementById('checklist-type').value;
+    const auditType = document.getElementById('checklist-audit-type').value;
+    const auditScope = document.getElementById('checklist-audit-scope').value;
+
+    if (!name) {
+        window.showNotification('Please enter a checklist name', 'error');
+        return;
+    }
+
+    // Permission check for global
+    const userRole = state.currentUser?.role;
+    const isAdmin = state.settings?.isAdmin || false;
+    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const canEditGlobal = isCertManager || isAdmin;
+
+    if (type === 'global' && !canEditGlobal) {
+        window.showNotification('Only Certification Managers or Admins can create global checklists', 'error');
+        return;
+    }
+
+    // Collect items
+    const rawRows = [];
+    document.querySelectorAll('.checklist-item-row').forEach(row => {
+        const clauseInput = row.querySelector('.item-clause');
+        const reqInput = row.querySelector('.item-requirement');
+        if (!clauseInput || !reqInput) return;
+
+        const clause = clauseInput.value.trim();
+        const requirement = reqInput.value.trim();
+
+        if (clause || requirement) {
+            const clauseParts = clause.split('.');
+            const mClause = clauseParts[0] || '';
+            const mTitle = getClauseTitleFromNumber(mClause);
+            rawRows.push({ mClause, mTitle, clause, requirement });
         }
+    });
 
-        // CRITICAL: Prevent unauthorized users from creating global checklists
-        const userRole = state.currentUser?.role;
-        const isAdmin = state.settings?.isAdmin || false;
-        const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
-        const canEditGlobal = isCertManager || isAdmin;
+    if (rawRows.length === 0) {
+        window.showNotification('Please add at least one checklist item', 'error');
+        return;
+    }
 
-        if (type === 'global' && !canEditGlobal) {
-            window.showNotification('Only Certification Managers or Admins can create global checklists', 'error');
-            return;
+    // Build hierarchical structure
+    const clauseGroups = {};
+    rawRows.forEach(row => {
+        if (!clauseGroups[row.mClause]) {
+            clauseGroups[row.mClause] = {
+                mainClause: row.mClause,
+                title: row.mTitle,
+                subClauses: []
+            };
         }
-
-        // Collect items and auto-extract main clauses
-        const rawRows = [];
-
-        document.querySelectorAll('.checklist-item-row').forEach(row => {
-            const clauseInput = row.querySelector('.item-clause');
-            const reqInput = row.querySelector('.item-requirement');
-            if (!clauseInput || !reqInput) return;
-
-            const clause = clauseInput.value.trim();
-            const requirement = reqInput.value.trim();
-
-            if (clause || requirement) {
-                // Auto-extract main clause from clause number (e.g., "4.1" → "4")
-                const clauseParts = clause.split('.');
-                const mClause = clauseParts[0] || '';
-                const mTitle = getClauseTitleFromNumber(mClause);
-                rawRows.push({ mClause, mTitle, clause, requirement });
-            }
-        });
-
-        if (rawRows.length === 0) {
-            window.showNotification('Please add at least one checklist item', 'error');
-            return;
+        if (row.clause || row.requirement) {
+            clauseGroups[row.mClause].subClauses.push({
+                clause: row.clause,
+                requirement: row.requirement
+            });
         }
+    });
 
-        const auditType = document.getElementById('checklist-audit-type').value;
-        const auditScope = document.getElementById('checklist-audit-scope').value;
-
+    if (isEdit) {
+        const checklist = state.checklists.find(c => c.id === checklistId);
+        if (checklist) {
+            checklist.name = name;
+            checklist.standard = standard;
+            checklist.type = type;
+            checklist.auditType = auditType;
+            checklist.auditScope = auditScope;
+            checklist.clauses = Object.values(clauseGroups);
+            delete checklist.items;
+            checklist.updatedAt = new Date().toISOString().split('T')[0];
+        }
+        window.showNotification('Checklist updated successfully', 'success');
+    } else {
         const newChecklist = {
             id: Date.now(),
             name,
@@ -762,49 +848,22 @@ function openAddChecklistModal() {
             type,
             auditType,
             auditScope,
+            clauses: Object.values(clauseGroups),
             createdBy: state.currentUser?.name || 'Current User',
             createdAt: new Date().toISOString().split('T')[0],
             updatedAt: new Date().toISOString().split('T')[0]
         };
-
-        if (hasMainClauses) {
-            // Build hierarchical structure
-            const clauses = [];
-            let currentMain = null;
-
-            rawRows.forEach(row => {
-                if (row.mClause) {
-                    if (!currentMain || currentMain.mainClause !== row.mClause) {
-                        currentMain = { mainClause: row.mClause, title: row.mTitle || 'Untitled', subClauses: [] };
-                        clauses.push(currentMain);
-                    }
-                }
-
-                if (currentMain && (row.clause || row.requirement)) {
-                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
-                } else if (!currentMain && (row.clause || row.requirement)) {
-                    // Orphan items, maybe create a default group
-                    if (!clauses.length) {
-                        currentMain = { mainClause: '0', title: 'General', subClauses: [] };
-                        clauses.push(currentMain);
-                    }
-                    currentMain.subClauses.push({ clause: row.clause, requirement: row.requirement });
-                }
-            });
-            newChecklist.clauses = clauses;
-        } else {
-            // Flat structure
-            newChecklist.items = rawRows.map(r => ({ clause: r.clause, requirement: r.requirement }));
-        }
-
         if (!state.checklists) state.checklists = [];
         state.checklists.push(newChecklist);
-        window.saveData();
-        window.closeModal();
-        renderChecklistLibrary();
-        window.showNotification('Checklist created successfully');
-    };
+        window.showNotification('Checklist created successfully', 'success');
+    }
+
+    window.saveData();
+    renderChecklistLibrary();
 }
+
+window.renderChecklistEditor = renderChecklistEditor;
+window.saveChecklistFromEditor = saveChecklistFromEditor;
 
 function attachRemoveRowListeners() {
     document.querySelectorAll('.remove-item-row').forEach(btn => {
@@ -834,206 +893,8 @@ function openEditChecklistModal(id) {
         return;
     }
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
-    const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
-    const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
-
-    // Reset save button visibility
-    modalSave.style.display = 'inline-block';
-
-    modalTitle.textContent = 'Edit Checklist';
-    modalBody.innerHTML = `
-        <form id="checklist-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Checklist Name <span style="color: var(--danger-color);">*</span></label>
-                    <input type="text" class="form-control" id="checklist-name" value="${window.UTILS.escapeHtml(checklist.name)}" required>
-                </div>
-                <div class="form-group">
-                    <label>Standard</label>
-                    <select class="form-control" id="checklist-standard">
-                        ${standards.map(s => `<option value="${s}" ${checklist.standard === s ? 'selected' : ''}>${s}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Type</label>
-                    <select class="form-control" id="checklist-type" ${checklist.type === 'global' && !canEditGlobal ? 'disabled' : ''}>
-                        <option value="custom" ${checklist.type === 'custom' ? 'selected' : ''}>Custom (Personal)</option>
-                        ${canEditGlobal ? `<option value="global" ${checklist.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Audit Type</label>
-                    <select class="form-control" id="checklist-audit-type">
-                        <option value="">-- Select --</option>
-                        ${auditTypes.map(t => `<option value="${t}" ${checklist.auditType === t ? 'selected' : ''}>${t}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Audit Scope</label>
-                    <select class="form-control" id="checklist-audit-scope">
-                        <option value="">-- Select --</option>
-                        ${auditScopes.map(s => `<option value="${s}" ${checklist.auditScope === s ? 'selected' : ''}>${s}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-
-            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h4 style="margin: 0;"><i class="fa-solid fa-list" style="margin-right: 0.5rem;"></i>Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses?.length || 0), 0) : (checklist.items?.length || 0)})</h4>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadChecklistTemplate()">
-                            <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i> Template
-                        </button>
-                        <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
-                            <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i> Import CSV
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
-                            <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Row
-                        </button>
-                    </div>
-                </div>
-
-                <div id="checklist-items-container" style="max-height: 300px; overflow-y: auto;">
-                    <table style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th style="width: 120px;">Clause #</th>
-                                <th>Requirement</th>
-                                <th style="width: 50px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="checklist-items-body">
-                            ${(() => {
-            let flatItems = [];
-            if (checklist.clauses && checklist.clauses.length > 0) {
-                checklist.clauses.forEach(main => {
-                    main.subClauses.forEach(sub => {
-                        flatItems.push({
-                            clause: sub.clause,
-                            requirement: sub.requirement
-                        });
-                    });
-                });
-            } else {
-                flatItems = (checklist.items || []).map(i => ({ clause: i.clause, requirement: i.requirement }));
-            }
-
-            return flatItems.map(item => `
-                                    <tr class="checklist-item-row">
-                                        <td><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(item.clause || '')}" style="margin: 0; width: 100%; min-width: 80px;"></td>
-                                        <td><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(item.requirement || '')}" style="margin: 0;"></td>
-                                        <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
-                                    </tr>
-                                `).join('');
-        })()}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </form>
-    `;
-
-    window.openModal();
-    setupCSVUpload();
-
-    document.getElementById('add-item-row')?.addEventListener('click', () => {
-        const tbody = document.getElementById('checklist-items-body');
-        const newRow = document.createElement('tr');
-        newRow.className = 'checklist-item-row';
-        newRow.innerHTML = `
-            <td><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0; width: 100%; min-width: 80px;"></td>
-            <td><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
-            <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
-        `;
-        tbody.appendChild(newRow);
-        attachRemoveRowListeners();
-    });
-
-    attachRemoveRowListeners();
-
-    modalSave.onclick = () => {
-        // Get form values first
-        const name = document.getElementById('checklist-name').value.trim();
-        const standard = document.getElementById('checklist-standard').value;
-        const type = document.getElementById('checklist-type').value;
-        const auditType = document.getElementById('checklist-audit-type').value;
-        const auditScope = document.getElementById('checklist-audit-scope').value;
-
-        if (!name) {
-            window.showNotification('Please enter a checklist name', 'error');
-            return;
-        }
-
-        // CRITICAL: Prevent unauthorized users from changing checklist to global or editing global checklists
-        const userRole = state.currentUser?.role;
-        const isAdmin = state.settings?.isAdmin || false;
-        const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
-        const canEditGlobal = isCertManager || isAdmin;
-
-        // Check if trying to change to global type or if checklist is already global
-        if ((type === 'global' || checklist.type === 'global') && !canEditGlobal) {
-            window.showNotification('Only Certification Managers or Admins can edit global checklists', 'error');
-            return;
-        }
-
-        const rawRows = [];
-
-        document.querySelectorAll('.checklist-item-row').forEach(row => {
-            const clauseInput = row.querySelector('.item-clause');
-            const reqInput = row.querySelector('.item-requirement');
-            if (!clauseInput || !reqInput) return;
-
-            const clause = clauseInput.value.trim();
-            const requirement = reqInput.value.trim();
-
-            if (clause || requirement) {
-                // Auto-extract main clause from clause number (e.g., "4.1" → "4")
-                const clauseParts = clause.split('.');
-                const mClause = clauseParts[0] || '';
-                const mTitle = getClauseTitleFromNumber(mClause);
-                rawRows.push({ mClause, mTitle, clause, requirement });
-            }
-        });
-
-        checklist.name = name;
-        checklist.standard = standard;
-        checklist.type = type;
-        checklist.auditType = auditType;
-        checklist.auditScope = auditScope;
-        checklist.updatedAt = new Date().toISOString().split('T')[0];
-
-        // Always build hierarchical structure from extracted main clauses
-        const clauseGroups = {};
-        rawRows.forEach(row => {
-            if (!clauseGroups[row.mClause]) {
-                clauseGroups[row.mClause] = {
-                    mainClause: row.mClause,
-                    title: row.mTitle,
-                    subClauses: []
-                };
-            }
-            if (row.clause || row.requirement) {
-                clauseGroups[row.mClause].subClauses.push({
-                    clause: row.clause,
-                    requirement: row.requirement
-                });
-            }
-        });
-        checklist.clauses = Object.values(clauseGroups);
-        delete checklist.items; // Remove old format
-        checklist.updatedAt = new Date().toISOString().split('T')[0];
-
-        window.saveData();
-        window.closeModal();
-        renderChecklistLibrary();
-        window.showNotification('Checklist updated successfully');
-    };
+    // Use full-page editor instead of modal
+    renderChecklistEditor(id);
 }
 
 function viewChecklistDetail(id) {

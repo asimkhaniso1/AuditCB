@@ -1838,3 +1838,137 @@ window.navigateToReporting = function (planId) {
 window.updateClientDetails = updateClientDetails;
 window.autoCalculateDays = autoCalculateDays;
 
+// ============================================
+// MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
+// ============================================
+
+function renderMultiSiteSamplingCalculator() {
+    const html = `
+        <div class="fade-in">
+            <h2 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-sitemap" style="margin-right: 0.5rem;"></i>
+                Multi-Site Sampling Calculator
+            </h2>
+            <div class="card" style="max-width: 800px;">
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    Calculate the required sample size for multi-site audits based on <strong>IAF MD 1:2018</strong>.
+                    This tool determines how many sites must be visited during Initial, Surveillance, and Recertification audits.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <!-- Input Section -->
+                    <div>
+                        <div class="form-group">
+                            <label>Total Number of Sites (n)</label>
+                            <input type="number" id="ms-total-sites" class="form-control" min="1" value="1" oninput="calculateSampling()">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Audit Stage</label>
+                            <select id="ms-stage" class="form-control" onchange="calculateSampling()">
+                                <option value="initial">Initial Audit (Stage 2)</option>
+                                <option value="surveillance">Surveillance Audit</option>
+                                <option value="recertification">Recertification Audit</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Risk Complexity</label>
+                            <select id="ms-risk" class="form-control" onchange="calculateSampling()">
+                                <option value="low">Low Risk (Standard Multiplier)</option>
+                                <option value="medium">Medium Risk (+25% sample)</option>
+                                <option value="high">High Risk (All Sites / Higher Sample)</option>
+                            </select>
+                            <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                Based on complexity, processes, and past performance.
+                            </small>
+                        </div>
+                        
+                         <div class="form-group">
+                            <label>Central Function</label>
+                            <div style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fa-solid fa-check-circle" style="color: var(--success-color);"></i>
+                                <span style="font-size: 0.9rem;">Central Function is ALWAYS audited (1 site).</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Result Section -->
+                    <div style="background: #f8fafc; padding: 2rem; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <h4 style="margin: 0 0 1rem 0; color: var(--text-secondary);">Required Sample Size</h4>
+                        
+                        <div id="ms-result" style="font-size: 4rem; font-weight: 800; color: var(--primary-color); line-height: 1;">0</div>
+                        <div style="font-size: 1.1rem; color: var(--text-primary); margin-top: 0.5rem; font-weight: 500;">Sites to Visit</div>
+                        
+                        <div id="ms-formula" style="margin-top: 1.5rem; font-family: monospace; background: rgba(0,0,0,0.05); padding: 0.5rem 1rem; border-radius: 4px; color: var(--text-secondary);">
+                            y = √n
+                        </div>
+                        
+                         <div style="margin-top: 2rem; text-align: left; width: 100%;">
+                            <p style="margin: 0.5rem 0; font-size: 0.9rem;">
+                                <i class="fa-solid fa-building"></i> <strong>Central Function:</strong> 1
+                            </p>
+                             <p style="margin: 0.5rem 0; font-size: 0.9rem;">
+                                <i class="fa-solid fa-network-wired"></i> <strong>Sampled Sites:</strong> <span id="ms-sampled-count">0</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning" style="margin-top: 2rem;">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <strong>Note:</strong> This calculation assumes all sites have similar processes and operate under a single management system. If sites conduct significantly different activities, sampling may not be permitted.
+                </div>
+            </div>
+        </div>
+    `;
+
+    window.contentArea.innerHTML = html;
+
+    // Initial Calc
+    calculateSampling();
+}
+
+window.calculateSampling = function () {
+    const n = parseInt(document.getElementById('ms-total-sites').value) || 0;
+    const stage = document.getElementById('ms-stage').value;
+    const risk = document.getElementById('ms-risk').value;
+
+    if (n < 1) {
+        document.getElementById('ms-result').innerText = '0';
+        return;
+    }
+
+    let y = 0;
+    let formula = '';
+
+    if (stage === 'initial') {
+        y = Math.sqrt(n);
+        formula = 'y = √n';
+    } else if (stage === 'surveillance') {
+        y = 0.6 * Math.sqrt(n);
+        formula = 'y = 0.6 × √n';
+    } else if (stage === 'recertification') {
+        y = 0.8 * Math.sqrt(n);
+        formula = 'y = 0.8 × √n';
+    }
+
+    if (risk === 'medium') {
+        y = y * 1.25;
+        formula += ' × 1.25 (Risk)';
+    } else if (risk === 'high') {
+        y = y * 1.5;
+        formula += ' × 1.5 (Risk)';
+    }
+
+    let result = Math.ceil(y);
+    if (result > n) result = n;
+    if (result < 1) result = 1;
+
+    document.getElementById('ms-result').innerText = result;
+    document.getElementById('ms-formula').innerText = formula;
+    document.getElementById('ms-sampled-count').innerText = Math.max(0, result - 1);
+};
+
+window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
+

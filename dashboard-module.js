@@ -322,18 +322,43 @@ function renderAuditTrendsChart() {
     const ctx = document.getElementById('auditTrendsChart');
     if (!ctx) return;
 
-    // Generate last 6 months data
+    // Initialize arrays for last 6 months
     const months = [];
-    const completed = [];
-    const planned = [];
+    const completed = new Array(6).fill(0);
+    const planned = new Array(6).fill(0);
+    const today = new Date();
 
+    // Generate month labels (e.g., "Jan", "Feb")
     for (let i = 5; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        months.push(date.toLocaleDateString('en-US', { month: 'short' }));
-        completed.push(Math.floor(Math.random() * 10) + 5);
-        planned.push(Math.floor(Math.random() * 8) + 3);
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        months.push(d.toLocaleDateString('en-US', { month: 'short' }));
     }
+
+    // Process Audit Plans
+    const plans = window.state.auditPlans || [];
+    plans.forEach(plan => {
+        if (!plan.date) return;
+
+        const planDate = new Date(plan.date);
+
+        // Calculate month difference from today
+        // This logic handles year boundaries correctly (e.g. Dec 2025 vs Jan 2026)
+        const monthDiff = (today.getFullYear() - planDate.getFullYear()) * 12 + (today.getMonth() - planDate.getMonth());
+
+        // We are interested in monthDiff 0 to 5 (0 is current month, 5 is 5 months ago)
+        // The arrays are ordered [5 months ago, ..., current month]
+        // So index = 5 - monthDiff
+        if (monthDiff >= 0 && monthDiff <= 5) {
+            const index = 5 - monthDiff;
+
+            if (plan.status === 'Completed' || plan.status === 'Closed') {
+                completed[index]++;
+            } else if (plan.status !== 'Cancelled') {
+                // Count everything else (Planned, Scheduled, In Progress) as "Planned"
+                planned[index]++;
+            }
+        }
+    });
 
     new Chart(ctx, {
         type: 'line',
@@ -358,16 +383,27 @@ function renderAuditTrendsChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            onClick: (e) => window.renderModule('audit-programs'),
+            onClick: (e) => window.renderModule('audit-planning'), // Corrected module name if needed, assuming 'audit-planning' maps to something valid
             onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
             plugins: {
                 legend: {
                     position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function (context) {
+                            return context.raw === 0 ? ' No audits' : '';
+                        }
+                    }
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
                 }
             }
         }
