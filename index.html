@@ -127,6 +127,14 @@
                         title="Multi-Site Sampling Calculator (IAF MD 1)">
                         <i class="fa-solid fa-sitemap"></i>
                     </button>
+                    <!-- Notification Bell -->
+                    <button id="notification-bell" class="btn btn-icon" onclick="toggleNotificationPanel()"
+                        style="border: none; background: transparent; color: var(--text-secondary); font-size: 1.1rem; padding: 0.5rem; cursor: pointer; position: relative;"
+                        title="Notifications">
+                        <i class="fa-solid fa-bell"></i>
+                        <span id="notification-badge"
+                            style="display: none; position: absolute; top: 2px; right: 2px; background: #ef4444; color: white; font-size: 0.65rem; font-weight: bold; padding: 2px 5px; border-radius: 10px; min-width: 16px; text-align: center;">0</span>
+                    </button>
                     <div class="user-profile">
                         <span>Admin User</span>
                         <div class="avatar"><i class="fa-solid fa-user"></i></div>
@@ -232,6 +240,7 @@
     <script src="record-retention-module.js" defer></script>
     <script src="ncr-capa-module.js" defer></script>
     <script src="settings-module.js" defer></script>
+    <script src="notifications-module.js" defer></script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </body>
