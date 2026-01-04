@@ -783,7 +783,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     checkbox.addEventListener('change', function (e) {
                         e.stopPropagation();
                         const sectionId = this.getAttribute('data-section-id');
-                        console.log('Checkbox clicked for section:', sectionId);
+                        window.Logger.debug('Execution', 'Checkbox clicked for section:', sectionId);
                         window.toggleSectionSelection(sectionId, this);
                     });
                 });
@@ -1166,10 +1166,10 @@ window.toggleAccordion = function (sectionId) {
 };
 
 window.toggleSectionSelection = function (sectionId, checkbox) {
-    console.log('toggleSectionSelection called for:', sectionId);
+    window.Logger.debug('Execution', 'toggleSectionSelection called for:', sectionId);
     const section = document.getElementById(sectionId);
     if (!section) {
-        console.error('Section not found:', sectionId);
+        window.Logger.error('Execution', 'Section not found: ' + sectionId);
         return;
     }
 
@@ -1177,12 +1177,12 @@ window.toggleSectionSelection = function (sectionId, checkbox) {
     const box = checkbox || document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
     const isChecked = box ? box.checked : false;
 
-    console.log('Checkbox is checked:', isChecked);
+    window.Logger.debug('Execution', 'Checkbox is checked:', isChecked);
 
     // Toggle items in this section
     let count = 0;
     const items = section.querySelectorAll('.checklist-item');
-    console.log('Found items:', items.length);
+    window.Logger.debug('Execution', 'Found items:', items.length);
     items.forEach(item => {
         if (isChecked) {
             item.classList.add('selected-item');
@@ -1201,11 +1201,11 @@ window.toggleSectionSelection = function (sectionId, checkbox) {
 };
 
 window.setChecklistStatus = function (uniqueId, status) {
-    console.log('setChecklistStatus called:', uniqueId, status);
+    window.Logger.debug('Execution', 'setChecklistStatus called:', { uniqueId, status });
 
     const row = document.getElementById('row-' + uniqueId);
     if (!row) {
-        console.error('Row not found:', 'row-' + uniqueId);
+        window.Logger.error('Execution', 'Row not found: row-' + uniqueId);
         return;
     }
 
@@ -1222,17 +1222,17 @@ window.setChecklistStatus = function (uniqueId, status) {
     // Show/Hide NCR Panel
     const panelId = 'ncr-panel-' + uniqueId;
     const panel = document.getElementById(panelId);
-    console.log('Looking for panel:', panelId, 'Found:', !!panel);
+    window.Logger.debug('Execution', 'Looking for panel:', { panelId, found: !!panel });
 
     if (panel) {
         if (status === window.CONSTANTS.STATUS.NC) {
             panel.style.display = 'block';
-            console.log('NCR Panel shown for:', uniqueId);
+            window.Logger.debug('Execution', 'NCR Panel shown for:', uniqueId);
         } else {
             panel.style.display = 'none';
         }
     } else {
-        console.error('NCR Panel not found:', panelId);
+        window.Logger.error('Execution', 'NCR Panel not found: ' + panelId);
     }
 
     // Update hidden input
@@ -1413,18 +1413,18 @@ window.filterChecklistItems = function (filterType) {
 
 // Bulk update status - prioritizes selected items, falls back to filtered items
 window.bulkUpdateStatus = function (reportId, status) {
-    console.log('bulkUpdateStatus called:', reportId, status);
+    window.Logger.debug('Execution', 'bulkUpdateStatus called:', { reportId, status });
 
     // Check if any items are selected via checkboxes
     let targetItems = document.querySelectorAll('.checklist-item.selected-item');
     let useSelection = targetItems.length > 0;
 
-    console.log('Selected items:', targetItems.length);
+    window.Logger.debug('Execution', 'Selected items:', targetItems.length);
 
     // If no items selected, fall back to filtered items
     if (!useSelection) {
         targetItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
-        console.log('Using filtered items:', targetItems.length);
+        window.Logger.debug('Execution', 'Using filtered items:', targetItems.length);
     }
 
     if (targetItems.length === 0) {
@@ -1432,15 +1432,15 @@ window.bulkUpdateStatus = function (reportId, status) {
         return;
     }
 
-    console.log('Bulk updating', targetItems.length, 'items to status:', status);
+    window.Logger.debug('Execution', `Bulk updating ${targetItems.length} items to status: ${status}`);
     let updatedCount = 0;
     targetItems.forEach(item => {
         const uniqueId = item.id.replace('row-', '');
-        console.log('Updating item:', uniqueId, 'to status:', status);
+        window.Logger.debug('Execution', 'Updating item:', { uniqueId, status });
         window.setChecklistStatus(uniqueId, status);
         updatedCount++;
     });
-    console.log('Updated', updatedCount, 'items');
+    window.Logger.debug('Execution', 'Updated items count:', updatedCount);
 
     // Clear selections if items were selected
     if (useSelection) {
@@ -1456,9 +1456,9 @@ window.bulkUpdateStatus = function (reportId, status) {
     const menu = document.getElementById(`bulk-menu-${reportId}`);
     if (menu) {
         menu.classList.add('hidden');
-        console.log('Menu closed');
+        window.Logger.debug('Execution', 'Menu closed');
     } else {
-        console.error('Menu not found:', `bulk-menu-${reportId}`);
+        window.Logger.error('Execution', 'Menu not found: bulk-menu-' + reportId);
     }
 
     window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
@@ -1571,7 +1571,7 @@ window.startDictation = function (uniqueId) {
     };
 
     recognition.onerror = function (event) {
-        console.error('Speech recognition error', event.error);
+        window.Logger.error('Execution', 'Speech recognition error', event.error);
         if (event.error !== 'no-speech') {
             window.showNotification('Error recording audio: ' + event.error, 'error');
         }

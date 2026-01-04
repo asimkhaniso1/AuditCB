@@ -2066,6 +2066,208 @@ function saveSamplingToPlan() {
 
 window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
 
+window.openMultiSiteSamplingCalculatorModal = function () {
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    // Hide standard save button as the calculator has its own interactions
+    if (modalSave) modalSave.style.display = 'none';
+
+    modalTitle.innerHTML = '<i class="fa-solid fa-calculator" style="margin-right:0.5rem"></i>Multi-Site Sampling (IAF MD 1)';
+
+    // Helper to count sites from the planning form if available
+    let totalSitesDefault = 10;
+    const sitesContainer = document.getElementById('site-checkboxes');
+    if (sitesContainer) {
+        // Count checkboxes if rendered
+        const count = sitesContainer.querySelectorAll('input[type="checkbox"]').length;
+        if (count > 0) totalSitesDefault = count;
+    }
+
+    modalBody.innerHTML = `
+        <div style="padding: 0 0.5rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
+                Calculate minimum site sampling requirements for multi-site certification (IAF MD 1:2018).
+            </p>
+
+            <form id="modal-multisite-form" style="margin-bottom: 1.5rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Total Sites <span style="color: var(--danger-color);">*</span></label>
+                        <input type="number" id="modal-total-sites" class="form-control" min="2" value="${totalSitesDefault}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Risk Level <span style="color: var(--danger-color);">*</span></label>
+                        <select id="modal-site-risk" class="form-control">
+                            <option value="Low">Low (0.8x)</option>
+                            <option value="Medium" selected>Medium (1.0x)</option>
+                            <option value="High">High (1.2x)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Any NCRs?</label>
+                        <select id="modal-sites-with-ncrs" class="form-control">
+                            <option value="false" selected>No open NCRs</option>
+                            <option value="true">Yes (+20%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Complex Processes?</label>
+                        <select id="modal-complex-processes" class="form-control">
+                            <option value="false" selected>No</option>
+                            <option value="true">Yes (+10%)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                     <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Mandatory Inclusions</label>
+                     <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" id="modal-include-hq" checked> HQ
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" id="modal-include-special"> Special Proc.
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" id="modal-include-new"> New Sites
+                        </label>
+                     </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem; width: 100%;">
+                    Calculate Sample Size
+                </button>
+            </form>
+
+            <div id="modal-calc-results" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 1.5rem; text-align: center;">
+                <h3 style="margin: 0 0 0.5rem 0; color: #1e40af;">Result: Audit <span id="modal-result-count" style="font-size: 1.5rem; font-weight: 800;">0</span> Sites</h3>
+                <p id="modal-result-text" style="color: #1e3a8a; font-size: 0.9rem; margin-bottom: 1rem;"></p>
+                
+                <hr style="border-top: 1px solid #bfdbfe; opacity: 0.5; margin: 1rem 0;">
+                
+                <div style="text-align: left; font-size: 0.85rem; color: #3b82f6; margin-bottom: 1rem;">
+                    <strong>Calculation:</strong> <span id="modal-calc-details"></span>
+                </div>
+
+                <div style="display:flex; gap: 1rem; justify-content: center;">
+                    <button class="btn btn-sm btn-primary" onclick="window.applySamplingToPlan()">
+                        <i class="fa-solid fa-check" style="margin-right: 0.25rem;"></i> Apply to Plan
+                    </button>
+                    ${sitesContainer ? `
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.randomlySelectSites()">
+                        <i class="fa-solid fa-shuffle" style="margin-right: 0.25rem;"></i> Select Randomly
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    window.openModal();
+
+    // Event Listener for Calculation
+    setTimeout(() => {
+        const form = document.getElementById('modal-multisite-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const totalSites = parseInt(document.getElementById('modal-total-sites').value);
+                const riskLevel = document.getElementById('modal-site-risk').value;
+                const hasNCRs = document.getElementById('modal-sites-with-ncrs').value === 'true';
+                const hasComplex = document.getElementById('modal-complex-processes').value === 'true';
+
+                // Mandatory count
+                let mandatory = 0;
+                if (document.getElementById('modal-include-hq').checked) mandatory++;
+                if (document.getElementById('modal-include-special').checked) mandatory++;
+                if (document.getElementById('modal-include-new').checked) mandatory++;
+
+                // Use the existing calculation function
+                const results = calculateMultiSiteSample(totalSites, riskLevel, hasNCRs, hasComplex);
+
+                // Final Check
+                const finalCount = Math.max(results.adjustedSample, mandatory);
+
+                // Update UI
+                document.getElementById('modal-result-count').textContent = finalCount;
+                document.getElementById('modal-result-text').textContent = `Targeting ${Math.round((finalCount / totalSites) * 100)}% coverage of ${totalSites} total sites.`;
+
+                document.getElementById('modal-calc-details').textContent =
+                    `√${totalSites}=${results.baseSample} (Base) × Risk/Factors → Adjusted to ${results.adjustedSample} (Ensure ≥${mandatory} mandatory)`;
+
+                document.getElementById('modal-calc-results').style.display = 'block';
+
+                // Store result globally for application
+                window.lastCalculatedSample = finalCount;
+            });
+        }
+    }, 100);
+}
+
+window.applySamplingToPlan = function () {
+    if (!window.lastCalculatedSample) return;
+
+    // Logic to update the plan form
+    // 1. Update the "Sites" input if it exists directly (readonly usually)
+    // 2. Or just show a notification that the user needs to select that many sites.
+
+    // If we have access to the checkbox container:
+    const checkboxes = document.querySelectorAll('.site-checkbox');
+    const checked = document.querySelectorAll('.site-checkbox:checked');
+
+    if (checkboxes.length > 0) {
+        if (checked.length !== window.lastCalculatedSample) {
+            window.showNotification(`Please manually select ${window.lastCalculatedSample} sites from the list (currently corresponding to calculation).`, 'info');
+        } else {
+            window.showNotification(`Target sample size confirms current selection (${window.lastCalculatedSample} sites).`, 'success');
+        }
+    } else {
+        window.showNotification(`Calculation complete: You should audit ${window.lastCalculatedSample} sites.`, 'info');
+    }
+
+    window.closeModal();
+};
+
+window.randomlySelectSites = function () {
+    if (!window.lastCalculatedSample) return;
+
+    const checkboxes = Array.from(document.querySelectorAll('.site-checkbox'));
+    if (checkboxes.length === 0) return;
+
+    // Clear current
+    checkboxes.forEach(cb => cb.checked = false);
+
+    // Always select HQ if it exists (heuristic: Name contains HQ or Head)
+    let selectedCount = 0;
+    const hqIndex = checkboxes.findIndex(cb => cb.dataset.name.toLowerCase().includes('hq') || cb.dataset.name.toLowerCase().includes('head'));
+
+    const indicesToSelect = new Set();
+
+    if (hqIndex !== -1) {
+        indicesToSelect.add(hqIndex);
+        selectedCount++;
+    }
+
+    // Randomly select remaining
+    while (indicesToSelect.size < Math.min(window.lastCalculatedSample, checkboxes.length)) {
+        const r = Math.floor(Math.random() * checkboxes.length);
+        indicesToSelect.add(r);
+    }
+
+    // Apply
+    indicesToSelect.forEach(i => checkboxes[i].checked = true);
+
+    // Update dependencies
+    if (typeof window.autoCalculateDays === 'function') window.autoCalculateDays();
+    if (document.getElementById('plan-sites')) document.getElementById('plan-sites').value = indicesToSelect.size;
+
+    window.showNotification(`Randomly selected ${indicesToSelect.size} sites per sampling requirement.`, 'success');
+    window.closeModal();
+}
+
 function openAddAuditorModal() {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');

@@ -774,6 +774,11 @@ function getVisibleClients() {
 
     if (!user) return allClients; // No user = show all (demo mode)
 
+    // Special Case: Demo User sees ALL clients
+    if (user.name === 'Demo User') {
+        return allClients;
+    }
+
     // Roles that see ALL clients (management roles)
     const fullAccessRoles = ['Admin', 'Certification Manager'];
 
@@ -793,7 +798,7 @@ function getVisibleClients() {
 
         if (!auditor) {
             // No matching auditor profile found
-            console.warn('No auditor profile found for user:', user.name, 'with role:', user.role);
+            window.Logger.warn('Core', `No auditor profile found for user: ${user.name} with role: ${user.role}`);
             return []; // In production, auditors with no profile see nothing
         }
 
@@ -801,12 +806,12 @@ function getVisibleClients() {
             .filter(a => a.auditorId === auditor.id)
             .map(a => a.clientId);
 
-        console.log(`[RoleFilter] ${user.role} "${user.name}" has ${assignedClientIds.length} assigned clients`);
+        window.Logger.debug('RoleFilter', `${user.role} "${user.name}" has ${assignedClientIds.length} assigned clients`);
         return allClients.filter(c => assignedClientIds.includes(c.id));
     }
 
     // Unknown role - default to seeing nothing for security
-    console.warn('Unknown role:', user.role);
+    window.Logger.warn('Core', 'Unknown role: ' + user.role);
     return [];
 }
 
@@ -824,7 +829,7 @@ function getVisiblePlans() {
     if (!user) return allPlans;
 
     // Admin and Cert Manager see all
-    if (user.role === 'Admin' || user.role === 'Certification Manager') {
+    if (user.role === 'Admin' || user.role === 'Certification Manager' || user.name === 'Demo User') {
         return allPlans;
     }
 
@@ -867,7 +872,7 @@ function getVisibleReports() {
     if (!user) return allReports;
 
     // Admin and Cert Manager see all
-    if (user.role === 'Admin' || user.role === 'Certification Manager') {
+    if (user.role === 'Admin' || user.role === 'Certification Manager' || user.name === 'Demo User') {
         return allReports;
     }
 
@@ -994,7 +999,7 @@ function loadState() {
                     };
                 }
             } else {
-                console.log(`Version mismatch (Store: ${data.version}, App: ${DATA_VERSION}). Resetting to defaults.`);
+                window.Logger.warn('Core', `Version mismatch (Store: ${data.version}, App: ${DATA_VERSION}). Resetting to defaults.`);
                 // Do not load saved data, keep strictly default mock data
                 // We'll save the new default state naturally on next edit
             }
@@ -1071,7 +1076,7 @@ function migrateChecklistsToHierarchy() {
     defaultHierarchicalChecklists.forEach(defaultChecklist => {
         const exists = state.checklists.find(c => c.id === defaultChecklist.id);
         if (!exists) {
-            console.log('Restoring missing default checklist:', defaultChecklist.name);
+            window.Logger.info('Core', 'Restoring missing default checklist: ' + defaultChecklist.name);
             state.checklists.push(defaultChecklist);
             needsUpdate = true;
         }
@@ -1079,7 +1084,7 @@ function migrateChecklistsToHierarchy() {
 
     if (needsUpdate) {
         saveState();
-        console.log('Checklists migrated to hierarchical format');
+        window.Logger.info('Core', 'Checklists migrated to hierarchical format');
     }
 }
 

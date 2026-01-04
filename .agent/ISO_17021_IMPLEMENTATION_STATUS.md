@@ -21,70 +21,30 @@ The following functions have been added to the end of `certifications-module.js`
 
 ### 2. Public Directory Tab Button
 
-Added to line 102 of `certifications-module.js`:
+Added to `certifications-module.js`:
 ```html
 <button class="tab-btn" onclick="switchCertTab(this, 'public-directory')">
     <i class="fa-solid fa-globe" style="margin-right: 0.5rem;"></i>Public Directory
 </button>
 ```
 
----
+### 3. Public Directory Tab HTML Content
 
-## Manual Integration Required
-
-### Public Directory Tab HTML Content
-
-**Location:** `certifications-module.js`, insert after line 210 (before `</div>` that closes the suspended-certs tab)
-
-**File Reference:** `c:\Users\Administrator\Documents\AuditCB\.agent\public-directory-tab.html`
-
-**Instructions:**
-1. Open `certifications-module.js`
-2. Find line 210: `             </div>` (this closes the `suspended-certs` div)
-3. After this line and BEFORE the `</div>` on line 211, insert the content from `public-directory-tab.html`
-
-**Expected Result:**
-```javascript
-             </div>  // Line 210 - closes suspended-certs
-             
-             <!-- Tab Content: Public Directory (ISO 17021 Clause 9.3) -->
-             <div id="public-directory" class="cert-tab-content" style="display: none;">
-                 ... (content from public-directory-tab.html) ...
-             </div>
-         </div>  // Line 211 - closes main container
-    `;
-}
-```
+The HTML content for the Public Directory tab has been successfully integrated into `certifications-module.js`.
 
 ---
 
-## Testing the Public Directory
+### 4. Multi-Site Sampling Calculator (advanced-modules.js)
 
-Once the HTML is inserted:
+Implemented the IAF MD 1 Sampling Calculator:
+- **Location:** `advanced-modules.js` (modal logic) and `planning-module.js` (button integration)
+- **Features:** 
+    - Calculates sample size based on Total Sites, Risk Level, NCRs, and Complexity.
+    - Enforces mandatory sites (HQ, Special Processes, New Sites).
+    - Allows random selection of sites from the Audit Plan form.
+    - Allows applying the calculated target count to the form.
 
-1. Navigate to **Certifications** module
-2. Click the **Public Directory** tab (globe icon)
-3. Verify the table displays all active certificates
-4. Test **Privacy Controls**:
-   - Uncheck "Client Name" → column should hide
-   - Uncheck "Active Only" → should show suspended/withdrawn certs
-5. Test **Export CSV**:
-   - Click "Export CSV" button
-   - Verify CSV file downloads with correct data
-6. Test **Generate Embed**:
-   - Click "Generate Embed" button
-   - Verify modal shows HTML code
-   - Click "Copy to Clipboard" and verify it copies
-
----
-
-## Next Steps
-
-### Multi-Site Sampling Calculator
-
-This will be added to `advanced-modules.js` after the Man-Day Calculator.
-
-**IAF MD 1 Formula:**
+**IAF MD 1 Formula Implemented:**
 ```
 Sample Size = √n (rounded up)
 
@@ -97,17 +57,28 @@ Minimum: 25% of total sites
 Mandatory sites: HQ, special processes, sites with NCRs
 ```
 
-**Implementation Plan:**
-1. Add `renderMultiSiteSamplingCalculator()` function
-2. Add button in Planning module to open calculator
-3. Integrate results with audit plan site selection
-
 ---
 
 ## Files Modified
 
 | File | Status | Changes |
 |------|--------|---------|
-| `certifications-module.js` | ✅ Partial | Tab button added, functions added, HTML pending manual insert |
-| `.agent/public-directory-tab.html` | ✅ Created | HTML snippet for manual integration |
-| `advanced-modules.js` | ⏳ Pending | Multi-Site Sampling Calculator |
+| `certifications-module.js` | ✅ Complete | Public Directory tab, functions, and HTML integrated |
+| `advanced-modules.js` | ✅ Complete | Multi-Site Sampling Calculator modal logic added |
+| `planning-module.js` | ✅ Complete | Added "Sampling" button to create audit plan form |
+
+---
+
+## Testing
+
+### Public Directory
+1. Navigate to **Certifications**.
+2. Click **Public Directory** tab.
+3. Verify table, privacy controls, export, and embed functions.
+
+### Multi-Site Sampling
+1. Create a new **Audit Plan**.
+2. In the "Audit Site(s)" section, click the **Sampling** button.
+3. Enter site details in the modal.
+4. Click **Calculate Sample Size**.
+5. Use **Apply to Plan** or **Select Randomly** to update the plan form.

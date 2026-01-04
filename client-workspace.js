@@ -391,7 +391,7 @@ function renderClientOverview(client) {
 
             <!-- Quick Actions Bar -->
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <button class="btn btn-primary" onclick="window.openCreatePlanModal('${window.UTILS.escapeHtml(client.name).replace(/'/g, "\\'")}')">
+                <button class="btn btn-primary" onclick="window.renderCreateAuditPlanForm('${window.UTILS.escapeHtml(client.name).replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
                 </button>
                 <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/execution'">
@@ -639,7 +639,7 @@ function renderAuditCycleTimeline(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No certification cycle started yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openCreatePlanModal('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.renderCreateAuditPlanForm('${client.name}')">
                     Start Stage 1 Audit
                 </button>
             </div>
@@ -730,7 +730,7 @@ function renderClientPlans(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-clipboard-list" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit plans for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openCreatePlanModal('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.renderCreateAuditPlanForm('${client.name}')">
                     Create First Audit Plan
                 </button>
             </div>
@@ -766,7 +766,7 @@ function renderClientPlans(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Plans</h3>
-                    <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
+                    <button class="btn btn-sm btn-primary" onclick="window.renderCreateAuditPlanForm('${client.name}')">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
                     </button>
                 </div>
@@ -817,7 +817,7 @@ function renderClientExecution(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-tasks" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit execution records for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openCreatePlanModal('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.renderCreateAuditPlanForm('${client.name}')">
                     Start First Audit
                 </button>
             </div>
@@ -853,7 +853,7 @@ function renderClientExecution(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Execution & Reports</h3>
-                    <button class="btn btn-sm btn-primary" onclick="window.openCreatePlanModal('${client.name}')">
+                    <button class="btn btn-sm btn-primary" onclick="window.renderCreateAuditPlanForm('${client.name}')">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Audit
                     </button>
                 </div>

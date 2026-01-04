@@ -1,107 +1,63 @@
-// ============================================
-// LOGGER UTILITY MODULE
-// ============================================
-// Centralized logging with production safety
+/**
+ * AuditCB360 Logger Utility
+ * Handles application logging with debug mode support and log levels.
+ * Replaces direct console.log calls to prevent info leakage in production.
+ */
 
-const Logger = {
-    // Debug mode - set to false in production
-    DEBUG_MODE: true, // TODO: Set to false for production deployment
+window.DEBUG_MODE = true; // Set to false in production
 
+window.Logger = {
     /**
-     * Debug logging - only shows in development
+     * Log debug information (only if DEBUG_MODE is true)
+     * @param {string} module - The module name (e.g., 'Planning')
+     * @param {string} message - The message to log
+     * @param {any} data - Optional data to log
      */
-    debug: function (message, ...args) {
-        if (this.DEBUG_MODE) {
-            console.log('[DEBUG]', message, ...args);
+    debug: (module, message, data = null) => {
+        if (window.DEBUG_MODE) {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = `[${timestamp}] [DEBUG] [${module}]`;
+            if (data) {
+                console.log(`${prefix} ${message}`, data);
+            } else {
+                console.log(`${prefix} ${message}`);
+            }
         }
     },
 
     /**
-     * Info logging - general information
+     * Log informational messages
+     * @param {string} module - The module name
+     * @param {string} message - The message
      */
-    info: function (message, ...args) {
-        if (this.DEBUG_MODE) {
-            console.info('[INFO]', message, ...args);
-        }
+    info: (module, message) => {
+        const timestamp = new Date().toLocaleTimeString();
+        console.info(`[${timestamp}] [INFO] [${module}] ${message}`);
     },
 
     /**
-     * Warning logging - always shown
+     * Log warnings
+     * @param {string} module - The module name
+     * @param {string} message - The warning message
      */
-    warn: function (message, ...args) {
-        console.warn('[WARN]', message, ...args);
+    warn: (module, message) => {
+        const timestamp = new Date().toLocaleTimeString();
+        console.warn(`[${timestamp}] [WARN] [${module}] ${message}`);
     },
 
     /**
-     * Error logging - always shown
+     * Log errors
+     * @param {string} module - The module name
+     * @param {string} message - The error message
+     * @param {Error|any} error - The error object
      */
-    error: function (message, ...args) {
-        console.error('[ERROR]', message, ...args);
+    error: (module, message, error = null) => {
+        const timestamp = new Date().toLocaleTimeString();
+        console.error(`[${timestamp}] [ERROR] [${module}] ${message}`, error || '');
 
-        // In production, could send to error tracking service
-        if (!this.DEBUG_MODE) {
-            this.reportToMonitoring(message, args);
-        }
-    },
-
-    /**
-     * Report errors to monitoring service (placeholder)
-     */
-    reportToMonitoring: function (message, args) {
-        // TODO: Integrate with error monitoring service (Sentry, LogRocket, etc.)
-        // Example:
-        // Sentry.captureException(new Error(message), { extra: args });
-    },
-
-    /**
-     * Performance timing
-     */
-    time: function (label) {
-        if (this.DEBUG_MODE) {
-            console.time(label);
-        }
-    },
-
-    timeEnd: function (label) {
-        if (this.DEBUG_MODE) {
-            console.timeEnd(label);
-        }
-    },
-
-    /**
-     * Group logging
-     */
-    group: function (label) {
-        if (this.DEBUG_MODE) {
-            console.group(label);
-        }
-    },
-
-    groupEnd: function () {
-        if (this.DEBUG_MODE) {
-            console.groupEnd();
-        }
-    },
-
-    /**
-     * Table logging for arrays/objects
-     */
-    table: function (data) {
-        if (this.DEBUG_MODE) {
-            console.table(data);
+        // Optionally integrate with ErrorHandler if available
+        if (window.ErrorHandler && typeof window.ErrorHandler.log === 'function') {
+            window.ErrorHandler.log(error, module);
         }
     }
 };
-
-// Export to window
-window.Logger = Logger;
-
-// Production mode detection
-if (window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1' &&
-    !window.location.hostname.includes('192.168')) {
-    Logger.DEBUG_MODE = false;
-    Logger.info('Logger initialized in PRODUCTION mode - debug logs disabled');
-} else {
-    Logger.info('Logger initialized in DEVELOPMENT mode - all logs enabled');
-}

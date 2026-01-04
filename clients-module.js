@@ -2583,23 +2583,16 @@ window.initiateAuditPlanFromClient = function (clientId) {
 
     if (!clientName) return;
 
-    // Wait for the module to load, then open the create plan modal with client pre-selected
+    // Use a short timeout to ensure the planning module scripts/DOM are ready if needed,
+    // though typically renderModule is synchronous for the shell.
+    // We then render the create form directly.
     setTimeout(() => {
-        if (typeof window.openCreatePlanModal === 'function') {
-            window.openCreatePlanModal();
-
-            // Pre-select the client after modal opens
-            setTimeout(() => {
-                const clientSelect = document.getElementById('plan-client');
-                if (clientSelect) {
-                    clientSelect.value = clientName;
-                    // Trigger change event to populate client details
-                    const event = new Event('change');
-                    clientSelect.dispatchEvent(event);
-                }
-            }, 100);
+        if (typeof window.renderCreateAuditPlanForm === 'function') {
+            window.renderCreateAuditPlanForm(clientName);
+        } else {
+            console.error('renderCreateAuditPlanForm function not found');
         }
-    }, 200);
+    }, 100);
 };
 
 // Department Management Functions

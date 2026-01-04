@@ -145,7 +145,7 @@ function renderAuditPlanningEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Event listeners
-    document.getElementById('btn-create-plan')?.addEventListener('click', openCreatePlanModal);
+    document.getElementById('btn-create-plan')?.addEventListener('click', renderCreateAuditPlanForm);
 
     document.getElementById('plan-search')?.addEventListener('input', (e) => {
         state.planningSearchTerm = e.target.value;
@@ -182,200 +182,226 @@ function renderAuditPlanningEnhanced() {
 let currentPlanStep = 1;
 window.editingPlanId = null;
 
-function openCreatePlanModal() {
+function renderCreateAuditPlanForm(preSelectedClientName = null) {
     window.editingPlanId = null; // Reset edit mode
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
 
-    modalTitle.textContent = 'Create Audit Plan - Step 1/2';
+    const html = `
+        <div class="fade-in">
+             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <h2 id="plan-form-title" style="margin: 0;">Create Audit Plan - Step 1/2</h2>
+                </div>
+            </div>
 
-    // Inject Wizard HTML
-    modalBody.innerHTML = `
-        <!-- Wizard Progress -->
-        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-            <div id="step-indicator-1" style="color: var(--primary-color); font-weight: bold; font-size: 1.1rem;">1. Plan Details</div>
-            <div style="color: var(--text-secondary);"><i class="fa-solid fa-chevron-right"></i></div>
-            <div id="step-indicator-2" style="color: var(--text-secondary); font-size: 1.1rem;">2. Audit Agenda</div>
-        </div>
+            <!-- Wizard Progress -->
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                <div id="step-indicator-1" style="color: var(--primary-color); font-weight: bold; font-size: 1.1rem;">1. Plan Details</div>
+                <div style="color: var(--text-secondary);"><i class="fa-solid fa-chevron-right"></i></div>
+                <div id="step-indicator-2" style="color: var(--text-secondary); font-size: 1.1rem;">2. Audit Agenda</div>
+            </div>
 
-        <!-- Step 1: Basic Details -->
-        <div id="step-1-content">
-            <form id="plan-form">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                    <!-- Client Selection -->
-                    <div class="form-group">
-                        <label>Client <span style="color: var(--danger-color);">*</span></label>
-                        <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)" ${window.state.activeClientId ? 'disabled' : ''}>
-                            <option value="">-- Select Client --</option>
-                            ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name} (${c.industry || 'N/A'})</option>`).join('')}
-                        </select>
-                    </div>
+            <!-- Step 1: Basic Details -->
+            <div id="step-1-content">
+                <form id="plan-form">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <!-- Client Selection -->
+                        <div class="form-group">
+                            <label>Client <span style="color: var(--danger-color);">*</span></label>
+                            <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)" ${window.state.activeClientId ? 'disabled' : ''}>
+                                <option value="">-- Select Client --</option>
+                                ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name} (${c.industry || 'N/A'})</option>`).join('')}
+                            </select>
+                        </div>
 
-                    <!-- Standard -->
-                    <div class="form-group">
-                        <label>Audit Standard(s)</label>
-                        <select class="form-control" id="plan-standard" multiple style="height: 120px;">
-                            ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+                        <!-- Standard -->
+                        <div class="form-group">
+                            <label>Audit Standard(s)</label>
+                            <select class="form-control" id="plan-standard" multiple style="height: 120px;">
+                                ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
         `<option value="${std}">${std}</option>`).join('')}
-                        </select>
-                        <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
-                    </div>
+                            </select>
+                            <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
+                        </div>
 
-                    <!-- Client Info & Sites (Collapsible/Dynamic) -->
-                    <div id="client-info-panel" style="grid-column: 1 / -1; display: none; background: #f0f9ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bae6fd;"></div>
-                    
-                    <div class="form-group" id="site-selection-group" style="grid-column: 1 / -1; display: none;">
-                        <label><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Site(s) (Scope)</label>
-                        <div id="site-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); background: white;"></div>
-                    </div>
+                        <!-- Client Info & Sites (Collapsible/Dynamic) -->
+                        <div id="client-info-panel" style="grid-column: 1 / -1; display: none; background: #f0f9ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bae6fd;"></div>
+                        
+                        <div class="form-group" id="site-selection-group" style="grid-column: 1 / -1; display: none;">
+                            <label><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Site(s) (Scope)</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <small style="color: var(--text-secondary);">Select sites to be audited in this plan</small>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.openMultiSiteSamplingCalculatorModal()" title="Calculate sample size per IAF MD 1">
+                                    <i class="fa-solid fa-calculator" style="margin-right: 0.25rem;"></i>Sampling
+                                </button>
+                            </div>
+                            <div id="site-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); background: white;"></div>
+                        </div>
 
-                    <!-- Audit Type & Date -->
-                    <div class="form-group">
-                        <label>Audit Type</label>
-                        <select class="form-control" id="plan-type">
-                            ${window.CONSTANTS.AUDIT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Planned Date</label>
-                        <input type="date" class="form-control" id="plan-date" required>
-                    </div>
-                </div>
-
-                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-
-                <!-- Man-Day Calc -->
-                <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                     <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: var(--primary-color);">
-                        <i class="fa-solid fa-calculator"></i> Audit Duration
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
-                         <div class="form-group"><label style="font-size:0.8rem">Employees</label><input type="number" class="form-control" id="plan-employees" readonly placeholder="0"></div>
-                         <div class="form-group"><label style="font-size:0.8rem">Sites</label><input type="number" class="form-control" id="plan-sites" readonly placeholder="0"></div>
-                         <div class="form-group"><label style="font-size:0.8rem">Risk</label><select class="form-control" id="plan-risk"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
-                    </div>
-                    <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1rem;" onclick="autoCalculateDays()" disabled>Calculate Man-Days</button>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div class="form-group"><label>Total Days</label><input type="number" class="form-control" id="plan-mandays" step="0.5"></div>
-                        <div class="form-group"><label>On-Site Days</label><input type="number" class="form-control" id="plan-onsite-days" step="0.5"></div>
-                    </div>
-                </div>
-
-                <!-- Auditor Selection -->
-                <div class="form-group">
-                    <label>Lead Auditor</label>
-                    <select class="form-control" id="plan-lead-auditor">
-                        <option value="">-- Select Lead Auditor --</option>
-                        ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Team Members</label>
-                    <select class="form-control" id="plan-team" multiple style="height: 100px;">
-                        ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
-                    </select>
-                </div>
-                
-                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-                
-                <!-- ISO 17021-1 Compliance Section -->
-                <div style="background: #eff6ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bfdbfe; margin-bottom: 1rem;">
-                    <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #1d4ed8;">
-                        <i class="fa-solid fa-shield-halved"></i> ISO 17021-1 Compliance
-                    </h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group" style="margin: 0;">
+                        <!-- Audit Type & Date -->
+                        <div class="form-group">
                             <label>Audit Type</label>
-                            <select class="form-control" id="plan-audit-type">
-                                <option value="Stage 1">Stage 1 (Documentation Review)</option>
-                                <option value="Stage 2" selected>Stage 2 (Implementation Audit)</option>
-                                <option value="Surveillance">Surveillance Audit</option>
-                                <option value="Recertification">Recertification Audit</option>
-                                <option value="Special">Special/Follow-up Audit</option>
+                            <select class="form-control" id="plan-type">
+                                ${window.CONSTANTS.AUDIT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Planned Date</label>
+                            <input type="date" class="form-control" id="plan-date" required>
+                        </div>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+
+                    <!-- Man-Day Calc -->
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                         <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: var(--primary-color);">
+                            <i class="fa-solid fa-calculator"></i> Audit Duration
+                        </h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                             <div class="form-group"><label style="font-size:0.8rem">Employees</label><input type="number" class="form-control" id="plan-employees" readonly placeholder="0"></div>
+                             <div class="form-group"><label style="font-size:0.8rem">Sites</label><input type="number" class="form-control" id="plan-sites" readonly placeholder="0"></div>
+                             <div class="form-group"><label style="font-size:0.8rem">Risk</label><select class="form-control" id="plan-risk"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
+                        </div>
+                        <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1rem;" onclick="autoCalculateDays()" disabled>Calculate Man-Days</button>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group"><label>Total Days</label><input type="number" class="form-control" id="plan-mandays" step="0.5"></div>
+                            <div class="form-group"><label>On-Site Days</label><input type="number" class="form-control" id="plan-onsite-days" step="0.5"></div>
+                        </div>
+                    </div>
+
+                    <!-- Auditor Selection -->
+                    <div class="form-group">
+                        <label>Lead Auditor</label>
+                        <select class="form-control" id="plan-lead-auditor">
+                            <option value="">-- Select Lead Auditor --</option>
+                            ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Team Members</label>
+                        <select class="form-control" id="plan-team" multiple style="height: 100px;">
+                            ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    
+                    <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+                    
+                    <!-- ISO 17021-1 Compliance Section -->
+                    <div style="background: #eff6ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bfdbfe; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #1d4ed8;">
+                            <i class="fa-solid fa-shield-halved"></i> ISO 17021-1 Compliance
+                        </h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group" style="margin: 0;">
+                                <label>Audit Type</label>
+                                <select class="form-control" id="plan-audit-type">
+                                    <option value="Stage 1">Stage 1 (Documentation Review)</option>
+                                    <option value="Stage 2" selected>Stage 2 (Implementation Audit)</option>
+                                    <option value="Surveillance">Surveillance Audit</option>
+                                    <option value="Recertification">Recertification Audit</option>
+                                    <option value="Special">Special/Follow-up Audit</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label>Audit Method</label>
+                                <select class="form-control" id="plan-audit-method">
+                                    <option value="On-site" selected>On-site</option>
+                                    <option value="Remote">Remote (ICT-based)</option>
+                                    <option value="Hybrid">Hybrid (On-site + Remote)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin: 0 0 1rem 0;">
+                            <label>Impartiality Assessment <span style="color: #dc2626;">*</span></label>
+                            <select class="form-control" id="plan-impartiality-risk">
+                                <option value="None" selected>No risk identified</option>
+                                <option value="Low">Low risk - Mitigated</option>
+                                <option value="Medium">Medium risk - Requires monitoring</option>
+                                <option value="High">High risk - Not recommended</option>
                             </select>
                         </div>
                         <div class="form-group" style="margin: 0;">
-                            <label>Audit Method</label>
-                            <select class="form-control" id="plan-audit-method">
-                                <option value="On-site" selected>On-site</option>
-                                <option value="Remote">Remote (ICT-based)</option>
-                                <option value="Hybrid">Hybrid (On-site + Remote)</option>
-                            </select>
+                            <label>Impartiality Notes (if any risk identified)</label>
+                            <textarea class="form-control" id="plan-impartiality-notes" rows="2" placeholder="Describe any potential conflicts of interest and mitigation actions..."></textarea>
                         </div>
                     </div>
-                    <div class="form-group" style="margin: 0 0 1rem 0;">
-                        <label>Impartiality Assessment <span style="color: #dc2626;">*</span></label>
-                        <select class="form-control" id="plan-impartiality-risk">
-                            <option value="None" selected>No risk identified</option>
-                            <option value="Low">Low risk - Mitigated</option>
-                            <option value="Medium">Medium risk - Requires monitoring</option>
-                            <option value="High">High risk - Not recommended</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin: 0;">
-                        <label>Impartiality Notes (if any risk identified)</label>
-                        <textarea class="form-control" id="plan-impartiality-notes" rows="2" placeholder="Describe any potential conflicts of interest and mitigation actions..."></textarea>
-                    </div>
-                </div>
-            </form>
-        </div>
+                </form>
+            </div>
 
-        <!-- Step 2: Agenda -->
-        <div id="step-2-content" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0; font-size: 1.1rem;">Audit Agenda / Itinerary</h3>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateAIAgenda()" id="btn-ai-generate">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate with AI
-                    </button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
-                        <i class="fa-solid fa-plus"></i> Add Row
-                    </button>
+            <!-- Step 2: Agenda -->
+            <div id="step-2-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0; font-size: 1.1rem;">Audit Agenda / Itinerary</h3>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateAIAgenda()" id="btn-ai-generate">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate with AI
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
+                            <i class="fa-solid fa-plus"></i> Add Row
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%;">
+                        <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                            <tr>
+                                <th style="width: 10%;">Day</th>
+                                <th style="width: 15%;">Time</th>
+                                <th style="width: 45%;">Activity / Clause</th>
+                                <th style="width: 15%;">Department/Auditee</th>
+                                <th style="width: 15%;">Auditor(s)</th>
+                                <th style="width: 5%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="agenda-tbody">
+                            <!-- Rows added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
+                        <i class="fa-solid fa-lightbulb"></i> Tip: Define the daily schedule for all auditors. This will be generated into the final Audit Plan document.
+                    </p>
                 </div>
             </div>
-            
-            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
-                <table style="width: 100%;">
-                    <thead style="position: sticky; top: 0; background: white; z-index: 10;">
-                        <tr>
-                            <th style="width: 10%;">Day</th>
-                            <th style="width: 15%;">Time</th>
-                            <th style="width: 45%;">Activity / Clause</th>
-                            <th style="width: 15%;">Department/Auditee</th>
-                            <th style="width: 15%;">Auditor(s)</th>
-                            <th style="width: 5%;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="agenda-tbody">
-                        <!-- Rows added dynamically -->
-                    </tbody>
-                </table>
+
+            <!-- Action Bar -->
+            <div style="background: whitesmoke; padding: 1rem; border-radius: var(--radius-md); border-top: 1px solid var(--border-color); margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                <button id="btn-plan-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="btn-plan-next" class="btn btn-primary">Next: Agenda -></button>
             </div>
-            
-            <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color);">
-                <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
-                    <i class="fa-solid fa-lightbulb"></i> Tip: Define the daily schedule for all auditors. This will be generated into the final Audit Plan document.
-                </p>
-            </div>
+
         </div>
     `;
 
-    window.openModal();
+    window.contentArea.innerHTML = html;
 
-    // Set Initial Buttons
-    modalSave.textContent = 'Next: Agenda ->';
-    modalSave.onclick = () => goToStep2();
+    // Set Initial Buttons - using new IDs
+    const btnNext = document.getElementById('btn-plan-next');
+    const btnCancel = document.getElementById('btn-plan-cancel');
 
-    modalCancel.textContent = 'Cancel';
-    modalCancel.onclick = () => window.closeModal();
+    btnNext.onclick = () => goToStep2();
+    btnCancel.onclick = () => renderAuditPlanningEnhanced();
 
     currentPlanStep = 1;
 
-    // Auto-trigger client details if pre-selected
-    if (window.state.activeClientId) {
+    // Auto-trigger client details if activeClientId needed or pre-selected
+    if (preSelectedClientName) {
+        // Use provided name
+        const clientSelect = document.getElementById('plan-client');
+        if (clientSelect) {
+            clientSelect.value = preSelectedClientName;
+            updateClientDetails(preSelectedClientName);
+            // Ensure dropdown is disabled if it's the active client context (optional enforcement)
+            // But if specific name passed, we just use it.
+        }
+    } else if (window.state.activeClientId) {
         const client = state.clients.find(c => c.id === window.state.activeClientId);
         if (client) {
             updateClientDetails(client.name);
@@ -387,12 +413,12 @@ function editAuditPlan(id) {
     const plan = state.auditPlans.find(p => p.id === id);
     if (!plan) return;
 
-    openCreatePlanModal();
+    renderCreateAuditPlanForm();
     window.editingPlanId = id; // Set global edit ID
 
     // Fill data
     setTimeout(() => {
-        document.getElementById('modal-title').textContent = 'Edit Audit Plan - Step 1/2';
+        document.getElementById('plan-form-title').textContent = 'Edit Audit Plan - Step 1/2';
         document.getElementById('plan-client').value = plan.client;
 
         // Manual standard selection
@@ -931,7 +957,7 @@ function viewAuditPlan(id) {
 
 window.printAuditChecklist = function (planId) {
     try {
-        console.log('Printing Plan ID:', planId);
+        window.Logger.debug('Planning', 'Printing Plan ID:', planId);
         const plan = state.auditPlans.find(p => p.id == planId);
         if (!plan) {
             alert("Error: Audit Plan not found for ID: " + planId);
@@ -1261,14 +1287,18 @@ function goToStep2() {
     // Icon update
     document.querySelector('#step-indicator-1').innerHTML = '1. Plan Details <i class="fa-solid fa-check-circle" style="color:var(--success-color)"></i>';
 
-    const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
+    const btnNext = document.getElementById('btn-plan-next');
+    const btnCancel = document.getElementById('btn-plan-cancel');
 
-    modalSave.textContent = 'Save Audit Plan';
-    modalSave.onclick = () => saveAuditPlan();
+    if (btnNext) {
+        btnNext.textContent = 'Save Audit Plan';
+        btnNext.onclick = () => saveAuditPlan();
+    }
 
-    modalCancel.textContent = 'Back';
-    modalCancel.onclick = () => goToStep1();
+    if (btnCancel) {
+        btnCancel.textContent = 'Back';
+        btnCancel.onclick = () => goToStep1();
+    }
 
     const tbody = document.getElementById('agenda-tbody');
     if (tbody.children.length === 0) {
@@ -1292,14 +1322,18 @@ function goToStep1() {
     document.getElementById('step-indicator-2').style.color = 'var(--text-secondary)';
     document.getElementById('step-indicator-2').style.fontWeight = 'normal';
 
-    const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
+    const btnNext = document.getElementById('btn-plan-next');
+    const btnCancel = document.getElementById('btn-plan-cancel');
 
-    modalSave.textContent = 'Next: Agenda ->';
-    modalSave.onclick = () => goToStep2();
+    if (btnNext) {
+        btnNext.textContent = 'Next: Agenda ->';
+        btnNext.onclick = () => goToStep2();
+    }
 
-    modalCancel.textContent = 'Cancel';
-    modalCancel.onclick = () => window.closeModal();
+    if (btnCancel) {
+        btnCancel.textContent = 'Cancel';
+        btnCancel.onclick = () => renderAuditPlanningEnhanced();
+    }
 
     currentPlanStep = 1;
 }
@@ -1346,7 +1380,7 @@ function deleteAgendaRow(btn) {
 
 // Export functions
 window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
-window.openCreatePlanModal = openCreatePlanModal;
+
 window.autoCalculateDays = autoCalculateDays;
 window.updateClientDetails = updateClientDetails;
 window.addAgendaRow = addAgendaRow;
@@ -1662,7 +1696,7 @@ function saveAuditPlan() {
     }
 
     window.saveData();
-    window.closeModal();
+    // window.closeModal(); // No longer modal
     renderAuditPlanningEnhanced();
     if (window.renderDashboardEnhanced) renderDashboardEnhanced();
     window.editingPlanId = null;
@@ -1735,7 +1769,7 @@ window.goToStep2 = goToStep2;
 window.goToStep1 = goToStep1;
 
 window.togglePlanningAnalytics = togglePlanningAnalytics;
-window.openCreatePlanModal = openCreatePlanModal;
+window.renderCreateAuditPlanForm = renderCreateAuditPlanForm;
 window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
 window.editAuditPlan = editAuditPlan;
 window.viewAuditPlan = viewAuditPlan;
