@@ -883,7 +883,7 @@ function getClientDesignationsHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addDesignation(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations(${client.id})">
@@ -900,7 +900,7 @@ function getClientDesignationsHTML(client) {
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteClientDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
                 `).join('')}
@@ -3053,7 +3053,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
 // ============================================
 // DESIGNATIONS CRUD FUNCTIONS
 // ============================================
-window.addDesignation = function (clientId) {
+window.addClientDesignation = function (clientId) {
     const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
     const deptOptions = (client.departments || []).map(d => `<option value="${window.UTILS.escapeHtml(d.name)}">${window.UTILS.escapeHtml(d.name)}</option>`).join('');
@@ -3072,7 +3072,7 @@ window.addDesignation = function (clientId) {
     });
 };
 
-window.deleteDesignation = function (clientId, index) {
+window.deleteClientDesignation = function (clientId, index) {
     if (!confirm('Delete this designation?')) return;
     const client = window.state.clients.find(c => c.id === clientId);
     if (client && client.designations) { client.designations.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 4); window.showNotification('Designation deleted'); }
