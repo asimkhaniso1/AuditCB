@@ -1869,6 +1869,7 @@ function renderRoleSwitcher() {
             <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Demo Role
         </label>
         <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--card-bg); color: var(--text-color); cursor: pointer;">
+            <option value="Admin" ${state.currentUser?.role === 'Admin' ? 'selected' : ''}>Admin</option>
             <option value="Auditor" ${state.currentUser?.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
             <option value="Lead Auditor" ${state.currentUser?.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
             <option value="Certification Manager" ${state.currentUser?.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>

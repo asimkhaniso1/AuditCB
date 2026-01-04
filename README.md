@@ -146,10 +146,23 @@ AuditCB/
 
 ---
 
-## 🔄 Next Steps
-1. **Backend Integration**: Replace localStorage with a real backend
-2. **User Authentication**: Secure login/Role management
-3. **Email Integration**: Real email notifications
+## 📚 Documentation
+-   **[User Guide](USER_GUIDE.md)**: Steps for Auditors.
+-   **[Admin Guide](ADMIN_GUIDE.md)**: System configuration and user management.
+-   **[Production Checklist](PRODUCTION_CHECKLIST.md)**: Deployment readiness verification.
+
+## 🚀 Deployment
+1.  **Database**: Run `supabase_schema_final.sql` in your Supabase SQL Editor.
+2.  **Hosting**: Deploy to Vercel/Netlify. The repository includes `vercel.json` for correct routing.
+3.  **Authentication**: Configure Supabase Auth in `auth-manager.js`.
+
+---
+
+## ✅ Completed Features (Phase 1-7)
+-   **Backend Integration**: Supabase (Schema Ready).
+-   **User Authentication**: Role-based Access Control (Admin, Manager, Auditor).
+-   **Email Integration**: Transactional emails (Simulated/Configured).
+-   **Offline Mode**: PWA with Background Sync.
 
 ---
 

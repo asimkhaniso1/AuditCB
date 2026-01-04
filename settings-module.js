@@ -598,10 +598,12 @@ function getOrganizationHTML() {
                     <i class="fa-solid fa-sitemap" style="margin-right: 0.5rem;"></i>
                     Organization Structure
                 </h3>
+                ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                 <button class="btn btn-primary" onclick="addDesignation()">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                     Add Designation
                 </button>
+                ` : ''}
             </div>
             
             <div class="table-container">
@@ -621,14 +623,19 @@ function getOrganizationHTML() {
                                 <td>${window.UTILS.escapeHtml(pos.department)}</td>
                                 <td>${pos.reportsTo ? window.UTILS.escapeHtml(pos.reportsTo) : '<em>Top Level</em>'}</td>
                                 <td>
+                                    ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                                     <button class="btn btn-sm btn-icon" onclick="editDesignation(${pos.id})" title="Edit">
                                         <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                     </button>
+                                    ` : ''}
+                                    ${window.state.currentUser?.role === 'Admin' ? `
                                     <button class="btn btn-sm btn-icon" onclick="deleteDesignation(${pos.id})" title="Delete">
                                         <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                     </button>
+                                    ` : ''}
+                                    ${(window.state.currentUser?.role !== 'Admin' && window.state.currentUser?.role !== 'Certification Manager') ?
+            '<span style="color:var(--text-secondary); font-size:0.8rem;">View Only</span>' : ''}
                                 </td>
-                            </tr>
                         `).join('')}
                     </tbody>
                 </table>
@@ -640,7 +647,7 @@ function getOrganizationHTML() {
 window.addDesignation = function () {
     document.getElementById('modal-title').textContent = 'Add Designation';
     document.getElementById('modal-body').innerHTML = `
-        <form id="designation-form">
+    < form id = "designation-form" >
             <div class="form-group">
                 <label>Title <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="designation-title" required>
@@ -653,7 +660,7 @@ window.addDesignation = function () {
                 <label>Reports To</label>
                 <input type="text" class="form-control" id="designation-reports">
             </div>
-        </form>
+        </form >
     `;
 
     document.getElementById('modal-save').style.display = '';
@@ -703,7 +710,7 @@ function getUsersHTML() {
     const users = window.state.users || [];
 
     return `
-        <div class="fade-in">
+    < div class="fade-in" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-users-cog" style="margin-right: 0.5rem;"></i>
@@ -730,17 +737,17 @@ function getUsersHTML() {
             <div id="users-list-container" class="table-container">
                 ${renderUsersList(users)}
             </div>
-        </div>
+        </div >
     `;
 }
 
 function renderUsersList(users) {
     if (users.length === 0) {
-        return `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No users found.</div>`;
+        return `< div style = "text-align: center; padding: 2rem; color: var(--text-secondary);" > No users found.</div > `;
     }
 
     return `
-        <table>
+    < table >
             <thead>
                 <tr>
                     <th style="width: 50px;"></th>
@@ -791,7 +798,7 @@ function renderUsersList(users) {
                     </tr>
                 `).join('')}
             </tbody>
-        </table>
+        </table >
     `;
 }
 
@@ -804,7 +811,7 @@ window.openAddUserModal = function (userId = null) {
 
     document.getElementById('modal-title').textContent = isEdit ? 'Edit User' : 'Add New User';
     document.getElementById('modal-body').innerHTML = `
-        <form id="user-form">
+    < form id = "user-form" >
             <div class="form-group">
                 <label>Full Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="user-name" value="${user.name || ''}" required>
@@ -836,8 +843,9 @@ window.openAddUserModal = function (userId = null) {
                 <input type="text" class="form-control" id="user-password" value="Welcome123!" readonly style="background: #f8fafc;">
                 <small style="color: var(--text-secondary);">Default password for new users.</small>
             </div>
-            ` : ''}
-        </form>
+            ` : ''
+        }
+        </form >
     `;
 
     document.getElementById('modal-save').onclick = () => {

@@ -68,7 +68,11 @@ const OfflineManager = {
 
             // Insert before user profile
             const profile = header.querySelector('.user-profile');
-            if (profile) header.insertBefore(indicator, profile);
+            if (profile && profile.parentNode) {
+                profile.parentNode.insertBefore(indicator, profile);
+            } else if (header) {
+                header.appendChild(indicator);
+            }
         }
 
         if (this.isOnline) {
