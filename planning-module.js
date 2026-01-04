@@ -1695,6 +1695,17 @@ function saveAuditPlan() {
         window.showNotification('Audit Plan created successfully', 'success');
     }
 
+    // Send Assignment Emails
+    if (window.EmailService && window.state.auditors) {
+        const teamMembers = [leadAuditor, ...team].filter(Boolean);
+        teamMembers.forEach(name => {
+            const auditor = window.state.auditors.find(a => a.name === name);
+            if (auditor && auditor.email) {
+                window.EmailService.sendAssignment(auditor.email, clientName, date);
+            }
+        });
+    }
+
     window.saveData();
     // window.closeModal(); // No longer modal
     renderAuditPlanningEnhanced();

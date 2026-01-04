@@ -1013,6 +1013,12 @@ window.inviteUser = async function () {
         window.state.users.push(newUser);
         window.saveData();
 
+        // Send Email Invite (if not using Supabase or as notification)
+        if (window.EmailService) {
+            const tempPass = Math.random().toString(36).slice(-8);
+            window.EmailService.sendInvite(newUser, tempPass);
+        }
+
         window.closeModal();
         document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
         window.showNotification(`Invitation sent to ${email}`, 'success');
