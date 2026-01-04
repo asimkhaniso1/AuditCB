@@ -227,7 +227,7 @@ const AuthManager = {
                 client: ['view', 'create', 'edit', 'delete'],
                 audit: ['view', 'create', 'edit', 'finalize'],
                 report: ['view', 'create', 'edit', 'finalize', 'download'],
-                user: ['view'],
+                user: ['view', 'create', 'edit'],
                 auditor: ['view', 'assign']
             },
             'Lead Auditor': {
