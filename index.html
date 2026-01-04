@@ -23,6 +23,7 @@
     <meta name="description"
         content="Manage ISO Certification Body operations including clients, auditors, audits, and certification decisions.">
     <link rel="stylesheet" href="styles.css?v=5">
+    <link rel="preload" href="styles.css?v=5" as="style">
     <link rel="stylesheet" href="required-fields.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -145,8 +146,27 @@
             </header>
 
             <div id="content-area" role="main">
-                <!-- Dynamic Content Loaded Here -->
+                <!-- Initial Loading State -->
+                <div id="app-loader"
+                    style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; color: var(--text-secondary);">
+                    <div
+                        style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem;">
+                    </div>
+                    <div>Loading AuditCB360...</div>
+                </div>
             </div>
+
+            <style>
+                @keyframes spin {
+                    0% {
+                        transform: rotate(0deg);
+                    }
+
+                    100% {
+                        transform: rotate(360deg);
+                    }
+                }
+            </style>
         </main>
 
         <aside class="client-sidebar" id="client-sidebar">
