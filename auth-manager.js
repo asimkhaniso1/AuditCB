@@ -118,6 +118,21 @@ const AuthManager = {
             return null;
         }
 
+        // Check if user exists in state.users and verify account status
+        const stateUser = (window.state.users || []).find(u => u.email === user.email);
+        if (stateUser) {
+            if (stateUser.status === 'Pending') {
+                Logger.warn('Login failed: Account pending approval');
+                window.showNotification('Your account is pending admin approval. Please contact an administrator.', 'warning');
+                return null;
+            }
+            if (stateUser.status === 'Inactive') {
+                Logger.warn('Login failed: Account inactive');
+                window.showNotification('Your account has been deactivated. Please contact an administrator.', 'warning');
+                return null;
+            }
+        }
+
         // Create session
         const session = {
             user: {

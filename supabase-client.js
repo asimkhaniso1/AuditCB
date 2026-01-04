@@ -560,6 +560,165 @@ const SupabaseClient = {
                 return [];
             }
         }
+    },
+
+    // ============================================
+    // USER PROFILE SYNC METHODS
+    // ============================================
+
+    /**
+     * Upsert a user profile to Supabase
+     */
+    async upsertUserProfile(user) {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized for user sync');
+            return null;
+        }
+
+        try {
+            const profileData = {
+                id: user.id || crypto.randomUUID(),
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                status: user.status || 'Active',
+                avatar: user.avatar || null,
+                updated_at: new Date().toISOString()
+            };
+
+            const { data, error } = await this.client
+                .from('profiles')
+                .upsert(profileData, { onConflict: 'email' })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            Logger.info('User profile synced:', user.email);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to upsert user profile:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch all user profiles from Supabase
+     */
+    async fetchUserProfiles() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return [];
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('profiles')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+
+            Logger.info('Fetched user profiles:', data?.length || 0);
+            return data || [];
+        } catch (error) {
+            Logger.error('Failed to fetch user profiles:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Sync all local users to Supabase
+     */
+    async syncUsersToSupabase(users) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        const results = { success: 0, failed: 0, errors: [] };
+
+        for (const user of users) {
+            try {
+                await this.upsertUserProfile(user);
+                results.success++;
+            } catch (error) {
+                results.failed++;
+                results.errors.push({ email: user.email, error: error.message });
+            }
+        }
+
+        Logger.info(`User sync complete: ${results.success} synced, ${results.failed} failed`);
+        return results;
+    },
+
+    /**
+     * Pull users from Supabase and merge with local
+     */
+    async syncUsersFromSupabase() {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        const profiles = await this.fetchUserProfiles();
+
+        if (!profiles.length) {
+            return { added: 0, updated: 0 };
+        }
+
+        const localUsers = window.state.users || [];
+        let added = 0, updated = 0;
+
+        profiles.forEach(profile => {
+            const existing = localUsers.find(u => u.email === profile.email);
+            if (existing) {
+                // Update existing
+                existing.name = profile.name;
+                existing.role = profile.role;
+                existing.status = profile.status;
+                existing.avatar = profile.avatar;
+                updated++;
+            } else {
+                // Add new
+                localUsers.push({
+                    id: profile.id,
+                    email: profile.email,
+                    name: profile.name,
+                    role: profile.role,
+                    status: profile.status || 'Active',
+                    avatar: profile.avatar
+                });
+                added++;
+            }
+        });
+
+        window.state.users = localUsers;
+        window.saveData();
+
+        Logger.info(`Synced from Supabase: ${added} added, ${updated} updated`);
+        return { added, updated };
+    },
+
+    /**
+     * Send password reset email via Supabase Auth
+     */
+    async sendPasswordResetEmail(email) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { data, error } = await this.client.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/#reset-password'
+            });
+
+            if (error) throw error;
+
+            Logger.info('Password reset email sent to:', email);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to send password reset email:', error);
+            throw error;
+        }
     }
 
 };

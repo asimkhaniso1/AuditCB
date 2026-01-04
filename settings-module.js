@@ -169,7 +169,6 @@ function getSettingsSubTabs(mainTab) {
         ],
         'organization': [
             { id: 'structure', label: 'Structure', icon: 'fa-sitemap' },
-            { id: 'users', label: 'Users', icon: 'fa-users-cog' },
             { id: 'permissions', label: 'Permissions', icon: 'fa-user-shield' }
         ],
         'policies': [
@@ -178,6 +177,7 @@ function getSettingsSubTabs(mainTab) {
             { id: 'retention', label: 'Retention', icon: 'fa-archive' }
         ],
         'system': [
+            { id: 'users', label: 'User Management', icon: 'fa-users-cog' },
             { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
             { id: 'data', label: 'Data Management', icon: 'fa-database' },
             { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-brain' }
@@ -205,7 +205,6 @@ function getSettingsContent(mainTab, subTab) {
         },
         'organization': {
             'structure': () => getOrganizationHTML(),
-            'users': () => getUsersHTML(),
             'permissions': () => getPermissionsHTML()
         },
         'policies': {
@@ -214,6 +213,7 @@ function getSettingsContent(mainTab, subTab) {
             'retention': () => getRetentionHTML()
         },
         'system': {
+            'users': () => getUsersHTML(),
             'defaults': () => getDefaultsHTML(),
             'data': () => {
                 setTimeout(() => {
@@ -252,9 +252,9 @@ window.switchSettingsMainTab = function (mainTab, btnElement) {
     // Set default sub-tab for the main tab
     const defaultSubTabs = {
         'cb-profile': 'profile',
-        'organization': 'users', // Default to users tab for convenience
+        'organization': 'structure',
         'policies': 'quality',
-        'system': 'defaults'
+        'system': 'users' // Default to users for admin access
     };
     window.state.settingsSubTab = defaultSubTabs[mainTab] || 'profile';
 
@@ -702,17 +702,27 @@ function getUsersHTML() {
 
     return `
         <div class="fade-in">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h3 style="color: var(--primary-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-users-cog" style="margin-right: 0.5rem;"></i>
                     User Management
                 </h3>
-                ${window.AuthManager?.canPerform('create', 'user') ? `
-                <button class="btn btn-primary" onclick="openAddUserModal()">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
-                    Add User
-                </button>
-                ` : ''}
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    ${window.AuthManager?.canPerform('create', 'user') ? `
+                    <button class="btn btn-outline-secondary btn-sm" onclick="syncUsersFromCloud()" title="Pull users from Supabase">
+                        <i class="fa-solid fa-cloud-arrow-down" style="margin-right: 0.25rem;"></i>Sync from Cloud
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="syncUsersToCloud()" title="Push users to Supabase">
+                        <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.25rem;"></i>Sync to Cloud
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="openInviteUserModal()">
+                        <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i>Invite User
+                    </button>
+                    <button class="btn btn-primary" onclick="openAddUserModal()">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add User
+                    </button>
+                    ` : ''}
+                </div>
             </div>
             
             <div id="users-list-container" class="table-container">
@@ -750,11 +760,16 @@ function renderUsersList(users) {
                         <td>${window.UTILS.escapeHtml(user.email)}</td>
                         <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(user.role)}</span></td>
                         <td>
-                            <span class="badge" style="background: ${user.status === 'Active' ? '#dcfce7' : '#f1f5f9'}; color: ${user.status === 'Active' ? '#166534' : '#64748b'};">
+                            <span class="badge" style="background: ${user.status === 'Active' ? '#dcfce7' : user.status === 'Pending' ? '#fef3c7' : '#f1f5f9'}; color: ${user.status === 'Active' ? '#166534' : user.status === 'Pending' ? '#d97706' : '#64748b'};">
                                 ${user.status}
                             </span>
                         </td>
                         <td>
+                            ${user.status === 'Pending' && window.state.currentUser?.role === 'Admin' ? `
+                            <button class="btn btn-sm btn-success" onclick="approveUser(${user.id})" title="Approve User" style="margin-right: 0.25rem;">
+                                <i class="fa-solid fa-check"></i> Approve
+                            </button>
+                            ` : ''}
                             ${window.AuthManager?.canPerform('edit', 'user') ? `
                             <button class="btn btn-sm btn-icon" onclick="editUser(${user.id})" title="Edit">
                                 <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
@@ -763,6 +778,11 @@ function renderUsersList(users) {
                             ${window.AuthManager?.canPerform('edit', 'user') ? `
                             <button class="btn btn-sm btn-icon" onclick="toggleUserStatus(${user.id})" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
                                 <i class="fa-solid ${user.status === 'Active' ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color: ${user.status === 'Active' ? '#16a34a' : '#cbd5e1'}; font-size: 1.2rem;"></i>
+                            </button>
+                            ` : ''}
+                            ${window.AuthManager?.canPerform('edit', 'user') ? `
+                            <button class="btn btn-sm btn-icon" onclick="sendPasswordReset('${user.email}')" title="Send Password Reset">
+                                <i class="fa-solid fa-key" style="color: #f59e0b;"></i>
                             </button>
                             ` : ''}
                         </td>
@@ -794,6 +814,7 @@ window.openAddUserModal = function (userId = null) {
             </div>
             <div class="form-group">
                 <label>Role <span style="color: var(--danger-color);">*</span></label>
+                ${window.state.currentUser?.role === 'Admin' ? `
                 <select id="user-role" class="form-control" required>
                     <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
                     <option value="Certification Manager" ${user.role === 'Certification Manager' ? 'selected' : ''}>Certification Manager</option>
@@ -801,6 +822,11 @@ window.openAddUserModal = function (userId = null) {
                     <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
                     <option value="Technical Expert" ${user.role === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
                 </select>
+                ` : `
+                <input type="text" class="form-control" id="user-role-display" value="${user.role || 'Auditor'}" readonly style="background: #f1f5f9;">
+                <input type="hidden" id="user-role" value="${user.role || 'Auditor'}">
+                <small style="color: var(--text-secondary);"><i class="fa-solid fa-lock"></i> Only administrators can assign roles.</small>
+                `}
             </div>
             ${!isEdit ? `
             <div class="form-group">
@@ -882,9 +908,155 @@ window.toggleUserStatus = function (userId) {
     window.showNotification(`User ${user.status === 'Active' ? 'activated' : 'deactivated'}`, 'info');
 };
 
+// Approve pending user account (Admin only)
+window.approveUser = function (userId) {
+    if (window.state.currentUser?.role !== 'Admin') {
+        window.showNotification('Only administrators can approve user accounts', 'warning');
+        return;
+    }
+
+    const user = window.state.users.find(u => u.id === userId);
+    if (!user) return;
+
+    if (user.status !== 'Pending') {
+        window.showNotification('User is not pending approval', 'info');
+        return;
+    }
+
+    user.status = 'Active';
+    window.saveData();
+    document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+    window.showNotification(`User ${user.name} has been approved and activated`, 'success');
+};
+
+// Sync users from Supabase (Cloud -> Local)
+window.syncUsersFromCloud = async function () {
+    try {
+        if (!window.SupabaseClient?.isInitialized) {
+            window.showNotification('Supabase not configured. Go to System > Defaults to set up.', 'warning');
+            return;
+        }
+        window.showNotification('Syncing users from cloud...', 'info');
+        const result = await window.SupabaseClient.syncUsersFromSupabase();
+        window.showNotification(`Sync complete: ${result.added} added, ${result.updated} updated`, 'success');
+        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+    } catch (error) {
+        window.showNotification('Failed to sync: ' + error.message, 'error');
+    }
+};
+
+// Sync users to Supabase (Local -> Cloud)
+window.syncUsersToCloud = async function () {
+    try {
+        if (!window.SupabaseClient?.isInitialized) {
+            window.showNotification('Supabase not configured. Go to System > Defaults to set up.', 'warning');
+            return;
+        }
+        window.showNotification('Syncing users to cloud...', 'info');
+        const result = await window.SupabaseClient.syncUsersToSupabase(window.state.users || []);
+        window.showNotification(`Sync complete: ${result.success} synced, ${result.failed} failed`, 'success');
+    } catch (error) {
+        window.showNotification('Failed to sync: ' + error.message, 'error');
+    }
+};
+
+// Send password reset email
+window.sendPasswordReset = async function (email) {
+    if (!confirm(`Send password reset email to ${email}?`)) return;
+
+    try {
+        if (!window.SupabaseClient?.isInitialized) {
+            // Mock/Demo mode
+            window.showNotification(`Password reset email sent to ${email} (Demo Mode)`, 'success');
+            return;
+        }
+        await window.SupabaseClient.sendPasswordResetEmail(email);
+        window.showNotification(`Password reset email sent to ${email}`, 'success');
+    } catch (error) {
+        window.showNotification('Failed to send reset email: ' + error.message, 'error');
+    }
+};
+
+// Invite user (create with email invitation)
+window.inviteUser = async function () {
+    const email = document.getElementById('invite-email')?.value?.trim();
+    const role = document.getElementById('invite-role')?.value || 'Auditor';
+
+    if (!email) {
+        window.showNotification('Please enter an email address', 'warning');
+        return;
+    }
+
+    // Check if user already exists
+    if (window.state.users.some(u => u.email === email)) {
+        window.showNotification('User with this email already exists', 'warning');
+        return;
+    }
+
+    try {
+        if (window.SupabaseClient?.isInitialized) {
+            // Send Supabase invite (magic link)
+            await window.SupabaseClient.client.auth.admin.inviteUserByEmail(email);
+        }
+
+        // Add to local users as pending
+        const newUser = {
+            id: Date.now(),
+            name: email.split('@')[0],
+            email: email,
+            role: role,
+            status: 'Pending',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`
+        };
+        window.state.users.push(newUser);
+        window.saveData();
+
+        window.closeModal();
+        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+        window.showNotification(`Invitation sent to ${email}`, 'success');
+    } catch (error) {
+        window.showNotification('Failed to invite user: ' + error.message, 'error');
+    }
+};
+
+// Open invite user modal
+window.openInviteUserModal = function () {
+    document.getElementById('modal-title').textContent = 'Invite User';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="invite-form" onsubmit="event.preventDefault(); inviteUser();">
+            <div class="form-group">
+                <label>Email Address <span style="color: var(--danger-color);">*</span></label>
+                <input type="email" class="form-control" id="invite-email" placeholder="user@example.com" required>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select class="form-control" id="invite-role">
+                    <option value="Auditor">Auditor</option>
+                    <option value="Lead Auditor">Lead Auditor</option>
+                    <option value="Technical Expert">Technical Expert</option>
+                    <option value="Certification Manager">Certification Manager</option>
+                    <option value="Admin">Admin</option>
+                </select>
+            </div>
+            <div class="alert alert-info" style="margin-top: 1rem;">
+                <i class="fa-solid fa-info-circle"></i>
+                An invitation email will be sent to the user to set up their account.
+            </div>
+        </form>
+    `;
+    document.getElementById('modal-footer').innerHTML = `
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="inviteUser()">
+            <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i>Send Invitation
+        </button>
+    `;
+    window.openModal();
+};
+
 // ============================================
 // TAB 4: ROLE PERMISSIONS
 // ============================================
+
 
 function getPermissionsHTML() {
     const permissions = window.state.rolePermissions;
