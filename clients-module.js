@@ -4043,33 +4043,40 @@ window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
 
 // Update Template Download for Simplified Bulk Clients
 window.downloadImportTemplate = function () {
-    // Check if XLSX library is available
-    if (typeof XLSX === 'undefined' || typeof XLSX.book_new !== 'function') {
-        console.warn('XLSX library not available, falling back to CSV download');
-        downloadTemplateAsCSV();
-        return;
-    }
+    // Use CSV format for reliable downloads across all browsers
+    const headers = ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"];
+    const row1 = ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"];
+    const row2 = ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15", "ISO 27001:2022", "Alice Tech", "alice@techsol.com", "789 Tech Blvd", "San Francisco", "USA"];
 
-    try {
-        // 1. Define Simplified Sheet Data
-        const clientsData = [
-            ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"],
-            ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"],
-            ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15", "ISO 27001:2022", "Alice Tech", "alice@techsol.com", "789 Tech Blvd", "San Francisco", "USA"]
-        ];
+    const csvContent = [headers, row1, row2]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
 
-        // 2. Create Workbook
-        const wb = XLSX.book_new();
-        const wsClients = XLSX.aoa_to_sheet(clientsData);
-        XLSX.book_append_sheet(wb, wsClients, "Clients");
+    // Add BOM for Excel compatibility
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
 
-        // 3. Download
-        XLSX.writeFile(wb, "AuditCB_Client_Import_Template.xlsx");
-    } catch (error) {
-        console.error('Error creating Excel file:', error);
-        window.showNotification('Excel generation failed. Downloading CSV instead.', 'warning');
-        downloadTemplateAsCSV();
-    }
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'AuditCB_Client_Import_Template.csv');
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+
+    // Trigger download
+    setTimeout(() => {
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up blob URL after a delay
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+        }, 100);
+    }, 10);
+
+    window.showNotification('Template downloaded as CSV (opens in Excel)', 'success');
 };
 
 // Fallback: Download template as CSV
