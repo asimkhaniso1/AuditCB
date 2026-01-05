@@ -1912,24 +1912,93 @@ function renderRoleSwitcher() {
             </button>
         `;
     } else {
-        // Show Demo Role switcher for demo/testing mode
+        // Show Login Button for production
         switcher.innerHTML = `
-            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">
-                <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Demo Role
-            </label>
-            <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--card-bg); color: var(--text-color); cursor: pointer; margin-bottom: 0.5rem;">
-                <option value="Admin" ${state.currentUser?.role === 'Admin' ? 'selected' : ''}>Admin</option>
-                <option value="Auditor" ${state.currentUser?.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-                <option value="Lead Auditor" ${state.currentUser?.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
-                <option value="Certification Manager" ${state.currentUser?.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>
-            </select>
-            <button onclick="window.exitDemoMode()" class="btn btn-sm btn-outline-primary" style="width: 100%; font-size: 0.8rem;">
-                <i class="fa-solid fa-sign-in-alt" style="margin-right: 0.5rem;"></i>Login as Admin
-            </button>
+            <div style="padding: 0.5rem 0;">
+                <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem;">Please login to access the system.</p>
+                <button onclick="window.renderLoginModal()" class="btn btn-sm btn-primary" style="width: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> Login
+                </button>
+            </div>
         `;
     }
     sidebar.appendChild(switcher);
 }
+
+// Render Login Modal
+window.renderLoginModal = function () {
+    const modalHtml = `
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="width: 64px; height: 64px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 1.75rem;">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h3 style="margin: 0; color: #1e293b;">Admin Login</h3>
+            <p style="color: #64748b; margin-top: 0.5rem;">Secure Access Portal</p>
+        </div>
+        <form onsubmit="event.preventDefault(); window.loginUser(this);">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" placeholder="admin@auditcb.com" required>
+            </div>
+             <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label>Password</label>
+                <input type="password" name="password" class="form-control" placeholder="••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1rem;">
+                Sign In
+            </button>
+        </form>
+    `;
+
+    // Use existing modal infrastructure if available, or simple sweetalert/custom
+    // Assuming simple-modal structure exists in index.html (modal-container)
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalFooter = document.getElementById('modal-footer'); // Usually has buttons
+
+    if (modalTitle && modalBody) {
+        modalTitle.textContent = '';
+        modalBody.innerHTML = modalHtml;
+        if (modalFooter) modalFooter.style.display = 'none'; // Hide default buttons
+        window.openModal();
+    } else {
+        // Fallback
+        alert('Login Modal Error: UI not found');
+    }
+};
+
+// Handle Login Logic
+window.loginUser = function (form) {
+    const email = form.email.value;
+    const password = form.password.value;
+
+    // 1. Check against local users (Admin)
+    const users = window.state.users || [];
+    // Ensure default admin exists if list is empty (fallback)
+    if (users.length === 0) {
+        users.push({
+            id: 1,
+            name: 'System Admin',
+            email: 'admin@auditcb.com',
+            role: 'Admin',
+            password: 'admin' // Simple plain text for prototype
+        });
+        window.state.users = users;
+    }
+
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+
+    if (user) {
+        window.state.currentUser = user;
+        window.saveData();
+        window.showNotification('Login Successful', 'success');
+        window.closeModal();
+        window.renderRoleSwitcher(); // Re-render sidebar
+        window.location.reload(); // Reload to apply full permissions
+    } else {
+        window.showNotification('Invalid email or password', 'error');
+    }
+};
 
 // Exit demo mode and set as real Admin user
 window.exitDemoMode = function () {
