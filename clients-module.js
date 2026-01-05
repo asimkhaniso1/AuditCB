@@ -4082,15 +4082,29 @@ function downloadTemplateAsCSV() {
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Add BOM for Excel compatibility
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+
+    // Create download link
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'AuditCB_Client_Import_Template.csv';
-    link.style.display = 'none';
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'AuditCB_Client_Import_Template.csv');
+    link.style.visibility = 'hidden';
+
     document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+
+    // Trigger download with a small delay to ensure DOM is ready
+    setTimeout(() => {
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up blob URL after a delay
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+        }, 100);
+    }, 10);
 
     window.showNotification('Template downloaded as CSV (open in Excel)', 'success');
 }
