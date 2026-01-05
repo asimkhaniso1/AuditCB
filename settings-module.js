@@ -364,7 +364,7 @@ function getCBProfileHTML() {
                             <small style="color: var(--text-secondary);">Max 2MB, PNG/JPG/SVG</small>
                         </div>
                     </div>
-                    <div style="width: 150px; height: 150px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
+                    <div id="cb-logo-preview-container" style="width: 150px; height: 150px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8fafc;">
                         ${settings.logoUrl ? `<img src="${settings.logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;">` : '<i class="fa-solid fa-image" style="font-size: 3rem; color: var(--text-secondary);"></i>'}
                     </div>
                 </div>
@@ -466,6 +466,33 @@ window.saveCBProfile = function () {
     } catch (error) {
         console.error('Error saving CB Profile:', error);
         window.showNotification('An unexpected error occurred. Please refresh the page.', 'error');
+    }
+};
+
+window.handleLogoUpload = function (input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 2 * 1024 * 1024) {
+            window.showNotification('File is too large. Max size is 2MB.', 'error');
+            input.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const dataUrl = e.target.result;
+
+            // Update URL input (which is used by saveCBProfile)
+            const urlInput = document.getElementById('cb-logo');
+            if (urlInput) urlInput.value = dataUrl;
+
+            // Update Preview
+            const container = document.getElementById('cb-logo-preview-container');
+            if (container) {
+                container.innerHTML = `<img src="${dataUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
+            }
+        };
+        reader.readAsDataURL(file);
     }
 };
 
