@@ -141,6 +141,9 @@ function renderSettings() {
                     <button class="tab-btn ${window.state.settingsMainTab === 'policies' ? 'active' : ''}" onclick="switchSettingsMainTab('policies', this)">
                         <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Policies
                     </button>
+                    <button class="tab-btn ${window.state.settingsMainTab === 'users' ? 'active' : ''}" onclick="switchSettingsMainTab('users', this)">
+                        <i class="fa-solid fa-users-cog" style="margin-right: 0.5rem;"></i>Users
+                    </button>
                     <button class="tab-btn ${window.state.settingsMainTab === 'system' ? 'active' : ''}" onclick="switchSettingsMainTab('system', this)">
                         <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>System
                     </button>
@@ -177,8 +180,10 @@ function getSettingsSubTabs(mainTab) {
             { id: 'cbpolicies', label: 'CB Policies', icon: 'fa-gavel' },
             { id: 'retention', label: 'Retention', icon: 'fa-archive' }
         ],
+        'users': [
+            { id: 'management', label: 'User Management', icon: 'fa-users-cog' }
+        ],
         'system': [
-            { id: 'users', label: 'User Management', icon: 'fa-users-cog' },
             { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
             { id: 'data', label: 'Data Management', icon: 'fa-database' },
             { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-brain' },
@@ -215,8 +220,10 @@ function getSettingsContent(mainTab, subTab) {
             'cbpolicies': () => getCBPoliciesHTML(),
             'retention': () => getRetentionHTML()
         },
+        'users': {
+            'management': () => getUsersHTML()
+        },
         'system': {
-            'users': () => getUsersHTML(),
             'defaults': () => getDefaultsHTML(),
             'data': () => {
                 setTimeout(() => {
@@ -1098,12 +1105,11 @@ window.openInviteUserModal = function () {
             </div>
         </form>
     `;
-    document.getElementById('modal-footer').innerHTML = `
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="inviteUser()">
-            <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i>Send Invitation
-        </button>
-    `;
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').textContent = 'Send Invitation';
+    document.getElementById('modal-save').onclick = () => {
+        window.inviteUser();
+    };
     window.openModal();
 };
 
