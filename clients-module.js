@@ -4140,19 +4140,80 @@ function downloadTemplateAsCSV() {
     window.showNotification('Template downloaded as CSV (open in Excel)', 'success');
 }
 
-// Update Import Logic for Simplified Bulk Clients
+// Update Import Logic for Simplified Bulk Clients (supports CSV and Excel)
 window.importClientsFromExcel = function (file) {
     window.showNotification('Reading file...', 'info');
     const reader = new FileReader();
+
+    // Check if it's a CSV file
+    const isCSV = file.name.toLowerCase().endsWith('.csv');
+
     reader.onload = function (e) {
         try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+            let clientsRaw = [];
 
-            // Validate Sheets
-            if (!workbook.Sheets['Clients']) throw new Error("Missing 'Clients' sheet");
+            if (isCSV) {
+                // Parse CSV file properly from ArrayBuffer
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(new Uint8Array(e.target.result));
 
-            const clientsRaw = XLSX.utils.sheet_to_json(workbook.Sheets['Clients']);
+                // Simple CSV Parser handling quotes
+                const parseCSVLine = (line) => {
+                    const result = [];
+                    let start = 0;
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        if (line[i] === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (line[i] === ',' && !inQuotes) {
+                            let field = line.substring(start, i).trim();
+                            // Remove surrounding quotes and handle escaped quotes
+                            if (field.startsWith('"') && field.endsWith('"')) {
+                                field = field.slice(1, -1).replace(/""/g, '"');
+                            }
+                            result.push(field);
+                            start = i + 1;
+                        }
+                    }
+                    // Last field
+                    let field = line.substring(start).trim();
+                    if (field.startsWith('"') && field.endsWith('"')) {
+                        field = field.slice(1, -1).replace(/""/g, '"');
+                    }
+                    result.push(field);
+                    return result;
+                };
+
+                const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+                if (lines.length < 2) {
+                    throw new Error('CSV file is empty or has no data rows');
+                }
+
+                // Parse header
+                const headers = parseCSVLine(lines[0]);
+
+                // Parse data rows
+                for (let i = 1; i < lines.length; i++) {
+                    const values = parseCSVLine(lines[i]);
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        // Clean header name (remove BOM if present)
+                        const cleanHeader = header.replace(/^\ufeff/, '').trim();
+                        row[cleanHeader] = values[index] || '';
+                    });
+                    clientsRaw.push(row);
+                }
+            } else {
+                // Parse Excel file
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                // Validate Sheets
+                if (!workbook.Sheets['Clients']) throw new Error("Missing 'Clients' sheet");
+
+                clientsRaw = XLSX.utils.sheet_to_json(workbook.Sheets['Clients']);
+            }
 
             let importedCount = 0;
             let updatedCount = 0;
