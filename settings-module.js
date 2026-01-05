@@ -141,6 +141,9 @@ function renderSettings() {
                     <button class="tab-btn ${window.state.settingsMainTab === 'policies' ? 'active' : ''}" onclick="switchSettingsMainTab('policies', this)">
                         <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Policies
                     </button>
+                    <button class="tab-btn ${window.state.settingsMainTab === 'knowledge' ? 'active' : ''}" onclick="switchSettingsMainTab('knowledge', this)">
+                        <i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>Knowledge Base
+                    </button>
                     <button class="tab-btn ${window.state.settingsMainTab === 'users' ? 'active' : ''}" onclick="switchSettingsMainTab('users', this)">
                         <i class="fa-solid fa-users-cog" style="margin-right: 0.5rem;"></i>Users
                     </button>
@@ -183,10 +186,13 @@ function getSettingsSubTabs(mainTab) {
         'users': [
             { id: 'management', label: 'User Management', icon: 'fa-users-cog' }
         ],
+        'knowledge': [
+            { id: 'kb', label: 'Knowledge Base', icon: 'fa-brain' }
+        ],
         'system': [
             { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
             { id: 'data', label: 'Data Management', icon: 'fa-database' },
-            { id: 'knowledge', label: 'Knowledge Base', icon: 'fa-brain' },
+            { id: 'usage', label: 'Usage Analytics', icon: 'fa-chart-line' },
             { id: 'activity-log', label: 'Activity Log', icon: 'fa-history' }
         ]
     };
@@ -223,6 +229,9 @@ function getSettingsContent(mainTab, subTab) {
         'users': {
             'management': () => getUsersHTML()
         },
+        'knowledge': {
+            'kb': () => getKnowledgeBaseHTML()
+        },
         'system': {
             'defaults': () => getDefaultsHTML(),
             'data': () => {
@@ -236,7 +245,7 @@ function getSettingsContent(mainTab, subTab) {
                 }, 50);
                 return '<div id="admin-data-management"></div>';
             },
-            'knowledge': () => getKnowledgeBaseHTML(),
+            'usage': () => getUsageAnalyticsHTML(),
             'activity-log': () => getActivityLogHTML()
         }
     };
@@ -3999,3 +4008,206 @@ This only removes future access to new client data.`;
         window.showNotification('Assignment removed. Historical audit records retained.', 'success');
     }
 };
+
+// ============================================
+// USAGE ANALYTICS TAB - API COST MONITORING
+// ============================================
+
+function getUsageAnalyticsHTML() {
+    // Get usage data from tracker
+    const tracker = window.APIUsageTracker;
+    if (!tracker) {
+        return `
+            <div class="fade-in">
+                <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                    <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
+                    Usage Analytics
+                </h3>
+                <div class="alert alert-warning">
+                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                    API Usage Tracker module not loaded. Please refresh the page.
+                </div>
+            </div>
+        `;
+    }
+
+    const summary = tracker.getSummary();
+    const todayUsage = tracker.getUsageByPeriod('today');
+    const monthUsage = tracker.getUsageByPeriod('month');
+    const features = Object.entries(summary.byFeature || {});
+
+    return `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
+                    <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
+                    API Usage Analytics
+                </h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.APIUsageTracker.exportData()">
+                        <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Export
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="resetUsageData()">
+                        <i class="fa-solid fa-trash" style="margin-right: 0.25rem;"></i>Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pricing Info Banner -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <i class="fa-solid fa-circle-info" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>Gemini 1.5 Flash Pricing</strong>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">
+                            Input: $0.075/1M tokens • Output: $0.30/1M tokens
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Total Calls -->
+                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">
+                        ${summary.totalCalls}
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Total API Calls</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                        Today: ${todayUsage.calls}
+                    </div>
+                </div>
+
+                <!-- Total Tokens -->
+                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #7c3aed;">
+                        ${tracker.formatTokens(summary.totalTokens)}
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Total Tokens</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                        In: ${tracker.formatTokens(summary.totalInputTokens)} / Out: ${tracker.formatTokens(summary.totalOutputTokens)}
+                    </div>
+                </div>
+
+                <!-- Estimated Cost -->
+                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #059669;">
+                        ${tracker.formatCost(summary.totalEstimatedCost)}
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Total Est. Cost</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                        This Month: ${tracker.formatCost(monthUsage.cost)}
+                    </div>
+                </div>
+
+                <!-- Tracking Since -->
+                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
+                    <div style="font-size: 1.25rem; font-weight: bold; color: #374151;">
+                        ${summary.createdAt ? new Date(summary.createdAt).toLocaleDateString() : 'N/A'}
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Tracking Since</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                        ${summary.createdAt ? Math.ceil((new Date() - new Date(summary.createdAt)) / (1000 * 60 * 60 * 24)) : 0} days
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage by Feature -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                <h4 style="margin: 0 0 1rem 0; color: #374151;">
+                    <i class="fa-solid fa-layer-group" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                    Usage by Feature
+                </h4>
+                ${features.length > 0 ? `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th style="text-align: center;">Calls</th>
+                                    <th style="text-align: center;">Input Tokens</th>
+                                    <th style="text-align: center;">Output Tokens</th>
+                                    <th style="text-align: right;">Est. Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${features.map(([feature, data]) => `
+                                    <tr>
+                                        <td>
+                                            <span class="badge" style="background: #e0f2fe; color: #0284c7;">
+                                                ${tracker.getFeatureDisplayName(feature)}
+                                            </span>
+                                        </td>
+                                        <td style="text-align: center; font-weight: bold;">${data.calls}</td>
+                                        <td style="text-align: center;">${tracker.formatTokens(data.inputTokens)}</td>
+                                        <td style="text-align: center;">${tracker.formatTokens(data.outputTokens)}</td>
+                                        <td style="text-align: right; color: #059669; font-weight: bold;">${tracker.formatCost(data.cost)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background: #f8fafc; font-weight: bold;">
+                                    <td>Total</td>
+                                    <td style="text-align: center;">${summary.totalCalls}</td>
+                                    <td style="text-align: center;">${tracker.formatTokens(summary.totalInputTokens)}</td>
+                                    <td style="text-align: center;">${tracker.formatTokens(summary.totalOutputTokens)}</td>
+                                    <td style="text-align: right; color: #059669;">${tracker.formatCost(summary.totalEstimatedCost)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                ` : `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                        <i class="fa-solid fa-chart-pie" style="font-size: 2rem; margin-bottom: 1rem; color: #cbd5e1;"></i>
+                        <p style="margin: 0;">No API usage recorded yet.</p>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem;">Use AI features like Agenda Generation or NCR Analysis to start tracking.</p>
+                    </div>
+                `}
+            </div>
+
+            <!-- Cost Projection -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color);">
+                <h4 style="margin: 0 0 1rem 0; color: #374151;">
+                    <i class="fa-solid fa-calculator" style="margin-right: 0.5rem; color: #7c3aed;"></i>
+                    Monthly Cost Projection
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                    ${[50, 100, 200, 500].map(audits => {
+        // Estimate ~3.5 API calls per audit, ~3000 tokens per call
+        const estimatedCalls = audits * 3.5;
+        const estimatedTokens = estimatedCalls * 3000;
+        const inputCost = (estimatedTokens * 0.6 / 1000000) * 0.075;
+        const outputCost = (estimatedTokens * 0.4 / 1000000) * 0.30;
+        const totalCost = inputCost + outputCost;
+        return `
+                            <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #374151;">${audits}</div>
+                                <div style="font-size: 0.8rem; color: #6b7280;">audits/month</div>
+                                <div style="font-size: 1.1rem; font-weight: bold; color: #059669; margin-top: 0.5rem;">
+                                    ~${tracker.formatCost(totalCost)}
+                                </div>
+                            </div>
+                        `;
+    }).join('')}
+                </div>
+                <p style="margin: 1rem 0 0 0; font-size: 0.8rem; color: #6b7280; text-align: center;">
+                    * Projections based on average of 3.5 AI calls per audit with ~3,000 tokens each
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+// Reset usage data with confirmation
+window.resetUsageData = function () {
+    if (confirm('Are you sure you want to reset all API usage data? This action cannot be undone.')) {
+        if (window.APIUsageTracker) {
+            window.APIUsageTracker.resetUsageData();
+            window.showNotification('Usage data reset successfully', 'success');
+            // Refresh the tab
+            switchSettingsSubTab('system', 'usage');
+        }
+    }
+};
+

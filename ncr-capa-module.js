@@ -1269,6 +1269,17 @@ Generate only the finding description, no headers or labels.`;
         const data = await response.json();
         const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+        // Log API usage
+        if (window.APIUsageTracker) {
+            const usage = data.usage || {};
+            window.APIUsageTracker.logUsage({
+                feature: 'ncr-analysis',
+                inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
+                outputTokens: usage.candidatesTokenCount || window.APIUsageTracker.estimateTokens(generatedText),
+                success: true
+            });
+        }
+
         if (generatedText) {
             descField.value = generatedText.trim();
             window.showNotification('Finding generated - please review and edit as needed', 'success');
@@ -1339,6 +1350,17 @@ Generate only the finding description, no headers or labels.`;
 
         const data = await response.json();
         const generatedText = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        // Log API usage
+        if (window.APIUsageTracker) {
+            const usage = data.usage || {};
+            window.APIUsageTracker.logUsage({
+                feature: 'ncr-analysis',
+                inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
+                outputTokens: usage.candidatesTokenCount || window.APIUsageTracker.estimateTokens(generatedText),
+                success: true
+            });
+        }
 
         if (generatedText) {
             descField.value = generatedText.trim();
