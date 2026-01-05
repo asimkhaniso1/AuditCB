@@ -329,14 +329,19 @@ function renderDashboardEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Render Charts
-    setTimeout(() => {
+    // Render Charts (Staggered to prevent blocking main thread)
+    requestAnimationFrame(() => {
         renderAuditTrendsChart();
         renderNCRDistributionChart(majorNCRs, minorNCRs);
-        renderIndustryChart(industryStats);
-        renderStandardsChart(standardStats);
-        renderNCRTrendsChart();
-        renderClientGrowthChart();
-    }, 100);
+
+        // Defer lower priority charts
+        setTimeout(() => {
+            renderIndustryChart(industryStats);
+            renderStandardsChart(standardStats);
+            renderNCRTrendsChart();
+            renderClientGrowthChart();
+        }, 100);
+    });
 }
 
 function renderAuditTrendsChart() {
