@@ -1433,11 +1433,15 @@ window.renderAddClient = function () {
                         </div>
 
                         <div class="form-group">
-                            <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector <span class="text-danger">*</span></label>
-                            <select class="form-control" id="client-industry" style="background-image: none;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector</label>
+                            <select class="form-control" id="client-industry" style="background-image: none;" onchange="window.handleIndustryChange(this)">
                                 <option value="">Select Industry...</option>
                                 ${['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'].map(i => `<option>${i}</option>`).join('')}
+                                <option value="Other">Other (Please Specify)</option>
                             </select>
+                            <div id="industry-other-container" style="display: none; margin-top: 0.75rem;">
+                                <input type="text" class="form-control" id="client-industry-custom" placeholder="Enter custom sector...">
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -1685,7 +1689,9 @@ window.saveNewClient = function () {
         name: cleanData.name,
         standard: standard,
         nextAudit: cleanData.nextAudit,
-        industry: document.getElementById('client-industry').value,
+        industry: document.getElementById('client-industry').value === 'Other' ?
+            document.getElementById('client-industry-custom').value :
+            document.getElementById('client-industry').value,
         status: 'Active',
         website: Sanitizer.sanitizeURL(cleanData.website),
         contacts: contacts,
@@ -1769,11 +1775,15 @@ window.renderEditClient = function (clientId) {
                         </div>
 
                         <div class="form-group">
-                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector <span class="text-danger">*</span></label>
-                            <select class="form-control" id="client-industry" style="background-image: none;">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector</label>
+                            <select class="form-control" id="client-industry" style="background-image: none;" onchange="window.handleIndustryChange(this)">
                                 <option value="">Select Industry...</option>
                                 ${['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'].map(i => `<option ${client.industry === i ? 'selected' : ''}>${i}</option>`).join('')}
+                                <option value="Other" ${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? 'selected' : ''}>Other (Please Specify)</option>
                             </select>
+                            <div id="industry-other-container" style="display: ${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? 'block' : 'none'}; margin-top: 0.75rem;">
+                                <input type="text" class="form-control" id="client-industry-custom" value="${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? client.industry : ''}" placeholder="Enter custom sector...">
+                            </div>
                         </div>
                         
                          <div class="form-group">
@@ -2009,7 +2019,9 @@ window.saveAuditClient = function (clientId) {
     // Update basic info
     client.name = cleanData.name;
     client.standard = checkedStandards.join(', ');
-    client.industry = document.getElementById('client-industry').value;
+    client.industry = document.getElementById('client-industry').value === 'Other' ?
+        document.getElementById('client-industry-custom').value :
+        document.getElementById('client-industry').value;
     client.status = document.getElementById('client-status').value;
     client.website = Sanitizer.sanitizeURL(cleanData.website);
     client.employees = parseInt(cleanData.employees) || 0;
@@ -2053,6 +2065,16 @@ window.saveAuditClient = function (clientId) {
 
     // Return to list
     renderClientsEnhanced();
+};
+
+window.handleIndustryChange = function (select) {
+    const customContainer = document.getElementById('industry-other-container');
+    if (customContainer) {
+        customContainer.style.display = select.value === 'Other' ? 'block' : 'none';
+        if (select.value === 'Other') {
+            document.getElementById('client-industry-custom')?.focus();
+        }
+    }
 };
 
 // Add Contact Person Modal
@@ -4019,90 +4041,25 @@ window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
 };
 
 
-// Update Template Download for New Column
+// Update Template Download for Simplified Bulk Clients
 window.downloadImportTemplate = function () {
-    // 1. Define Sheets Data (Headers + Sample)
+    // 1. Define Simplified Sheet Data
     const clientsData = [
-        ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date"],
-        ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01"],
-        ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15"]
-    ];
-
-    const certsData = [
-        ["Client Name", "Standard", "Scope", "Status", "Certificate No", "Applicable Sites", "Initial Date", "Current Issue", "Expiry Date", "Revision No"],
-        ["Sample Corp", "ISO 9001:2015", "Design and Manuf. of Widgets", "Active", "CERT-001", "Head Office", "2020-01-01", "2023-01-01", "2026-01-01", "01"],
-        ["Tech Solutions Inc", "ISO 27001:2022", "Information Security Management System", "Active", "CERT-002", "HQ", "2021-05-10", "2024-05-10", "2027-05-09", "00"]
-    ];
-
-    const sitesData = [
-        ["Client Name", "Site Name", "Address", "City", "Country", "Employees", "Shift Work", "Standards"],
-        ["Sample Corp", "Head Office", "123 Main St", "New York", "USA", "80", "No", "ISO 9001:2015"],
-        ["Sample Corp", "Factory", "456 Ind Park", "Chicago", "USA", "20", "Yes", "ISO 9001:2015"],
-        ["Tech Solutions Inc", "HQ", "789 Tech Blvd", "San Francisco", "USA", "50", "No", "ISO 27001:2022"]
-    ];
-
-    const contactsData = [
-        ["Client Name", "Full Name", "Designation", "Department", "Email", "Phone", "Role"],
-        ["Sample Corp", "John Doe", "Quality Manager", "Quality", "john@sample.com", "555-0100", "Mgmt Rep"],
-        ["Sample Corp", "Jane Smith", "Director", "Management", "jane@sample.com", "555-0101", "Director"],
-        ["Tech Solutions Inc", "Alice Tech", "CTO", "Engineering", "alice@techsol.com", "555-9999", "Security Lead"]
-    ];
-
-    const deptsData = [
-        ["Client Name", "Department Name", "Risk Level"],
-        ["Sample Corp", "HR", "Low"],
-        ["Sample Corp", "Production", "High"],
-        ["Tech Solutions Inc", "Development", "High"],
-        ["Tech Solutions Inc", "Support", "Medium"]
-    ];
-
-    const desigData = [
-        ["Client Name", "Designation"],
-        ["Sample Corp", "Manager"],
-        ["Sample Corp", "Supervisor"],
-        ["Tech Solutions Inc", "Developer"],
-        ["Tech Solutions Inc", "Analyst"]
-    ];
-
-    const goodsData = [
-        ["Client Name", "Name", "Category", "Description"],
-        ["Sample Corp", "Widget A", "Product", "Main product line"],
-        ["Tech Solutions Inc", "Cloud Hosting", "Service", "Managed hosting services"]
-    ];
-
-    const processData = [
-        ["Client Name", "Process Name", "Category", "Owner"],
-        ["Sample Corp", "Procurement", "Support", "Purchasing Manager"],
-        ["Sample Corp", "Sales", "Core", "Sales Director"],
-        ["Tech Solutions Inc", "Software Dev", "Core", "VP Engineering"],
-        ["Tech Solutions Inc", "Incident Mgmt", "Core", "Ops Manager"]
+        ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"],
+        ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"],
+        ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15", "ISO 27001:2022", "Alice Tech", "alice@techsol.com", "789 Tech Blvd", "San Francisco", "USA"]
     ];
 
     // 2. Create Workbook
-    const wb = XLSX.utils.book_new();
-    const wsClients = XLSX.utils.aoa_to_sheet(clientsData);
-    const wsCerts = XLSX.utils.aoa_to_sheet(certsData);
-    const wsSites = XLSX.utils.aoa_to_sheet(sitesData);
-    const wsContacts = XLSX.utils.aoa_to_sheet(contactsData);
-    const wsDepts = XLSX.utils.aoa_to_sheet(deptsData);
-    const wsDesig = XLSX.utils.aoa_to_sheet(desigData);
-    const wsGoods = XLSX.utils.aoa_to_sheet(goodsData);
-    const wsProcs = XLSX.utils.aoa_to_sheet(processData);
-
-    XLSX.utils.book_append_sheet(wb, wsClients, "Clients");
-    XLSX.utils.book_append_sheet(wb, wsCerts, "Certificates");
-    XLSX.utils.book_append_sheet(wb, wsSites, "Sites");
-    XLSX.utils.book_append_sheet(wb, wsContacts, "Contacts");
-    XLSX.utils.book_append_sheet(wb, wsDepts, "Departments");
-    XLSX.utils.book_append_sheet(wb, wsDesig, "Designations");
-    XLSX.utils.book_append_sheet(wb, wsGoods, "GoodsServices");
-    XLSX.utils.book_append_sheet(wb, wsProcs, "KeyProcesses");
+    const wb = XLSX.book_new();
+    const wsClients = XLSX.aoa_to_sheet(clientsData);
+    XLSX.book_append_sheet(wb, wsClients, "Clients");
 
     // 3. Download
-    XLSX.writeFile(wb, 'AuditCB_Global_Import_Template.xlsx');
+    XLSX.writeFile(wb, "AuditCB_Client_Import_Template.xlsx");
 };
 
-// Update Import Logic for 'Applicable Sites'
+// Update Import Logic for Simplified Bulk Clients
 window.importClientsFromExcel = function (file) {
     window.showNotification('Reading file...', 'info');
     const reader = new FileReader();
@@ -4115,13 +4072,6 @@ window.importClientsFromExcel = function (file) {
             if (!workbook.Sheets['Clients']) throw new Error("Missing 'Clients' sheet");
 
             const clientsRaw = XLSX.utils.sheet_to_json(workbook.Sheets['Clients']);
-            const certsRaw = workbook.Sheets['Certificates'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Certificates']) : [];
-            const sitesRaw = workbook.Sheets['Sites'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Sites']) : [];
-            const contactsRaw = workbook.Sheets['Contacts'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Contacts']) : [];
-            const deptsRaw = workbook.Sheets['Departments'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Departments']) : [];
-            const desigRaw = workbook.Sheets['Designations'] ? XLSX.utils.sheet_to_json(workbook.Sheets['Designations']) : [];
-            const goodsRaw = workbook.Sheets['GoodsServices'] ? XLSX.utils.sheet_to_json(workbook.Sheets['GoodsServices']) : [];
-            const procsRaw = workbook.Sheets['KeyProcesses'] ? XLSX.utils.sheet_to_json(workbook.Sheets['KeyProcesses']) : [];
 
             let importedCount = 0;
             let updatedCount = 0;
@@ -4131,105 +4081,62 @@ window.importClientsFromExcel = function (file) {
                 if (!name) return;
 
                 // Check existing
-                let client = window.window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+                let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+
                 if (client) {
                     updatedCount++;
                 } else {
                     client = {
-                        id: Date.now() + Math.floor(Math.random() * 1000), // Random ID
+                        id: Date.now() + Math.floor(Math.random() * 1000),
                         name: window.Sanitizer.sanitizeText(name),
-                        certificates: [],
-                        sites: [],
+                        status: 'Active',
                         contacts: [],
-                        departments: [],
-                        designations: [],
-                        goodsServices: [],
-                        keyProcesses: []
+                        sites: [],
+                        certificates: []
                     };
-                    window.window.state.clients.push(client);
+                    window.state.clients.push(client);
                     importedCount++;
                 }
 
-                // Update Basic Fields
+                // Update Basic Fields from Simplified Template
                 client.status = window.Sanitizer.sanitizeText(row['Status'] || 'Active');
                 client.industry = window.Sanitizer.sanitizeText(row['Industry'] || '');
                 client.employees = parseInt(row['Employee Count']) || 0;
-                client.website = window.Sanitizer.sanitizeText(row['Website'] || '');
+                client.website = window.Sanitizer.sanitizeURL(row['Website'] || '');
                 client.nextAudit = row['Next Audit Date'] || '';
+                client.standard = window.Sanitizer.sanitizeText(row['Applicable Standards'] || '');
 
-                // Helper
-                const clean = (val) => val ? String(val).trim() : '';
-
-                // Process Linked Certificates
-                const clientCerts = certsRaw.filter(c => c['Client Name'] === name);
-                client.certificates = clientCerts.map(c => ({
-                    standard: window.Sanitizer.sanitizeText(c['Standard']),
-                    scope: window.Sanitizer.sanitizeText(c['Scope']),
-                    status: window.Sanitizer.sanitizeText(c['Status']),
-                    certificateNo: window.Sanitizer.sanitizeText(c['Certificate No']),
-                    applicableSites: window.Sanitizer.sanitizeText(c['Applicable Sites'] || ''),
-                    initialDate: c['Initial Date'],
-                    currentIssue: c['Current Issue'],
-                    expiryDate: c['Expiry Date'],
-                    revision: window.Sanitizer.sanitizeText(c['Revision No'] || '00')
-                }));
-
-                // Backward Compatibility: derived fields
-                if (client.certificates.length > 0) {
-                    client.standard = client.certificates.map(c => c.standard).join(', ');
-                    client.scope = client.certificates[0].scope; // Primary scope
+                // Update Contact
+                if (row['Contact Name']) {
+                    const contact = {
+                        name: window.Sanitizer.sanitizeText(row['Contact Name']),
+                        email: window.Sanitizer.sanitizeText(row['Contact Email'] || ''),
+                        designation: 'Primary Contact'
+                    };
+                    // Simplified: Replace first contact if it exists, otherwise add
+                    if (client.contacts && client.contacts.length > 0) {
+                        client.contacts[0] = { ...client.contacts[0], ...contact };
+                    } else {
+                        client.contacts = [contact];
+                    }
                 }
 
-                // Process Linked Sites
-                const clientSites = sitesRaw.filter(s => s['Client Name'] === name);
-                client.sites = clientSites.map(s => ({
-                    name: window.Sanitizer.sanitizeText(s['Site Name']),
-                    address: window.Sanitizer.sanitizeText(s['Address']),
-                    city: window.Sanitizer.sanitizeText(s['City']),
-                    country: window.Sanitizer.sanitizeText(s['Country']),
-                    employees: parseInt(s['Employees']) || 0,
-                    shift: window.Sanitizer.sanitizeText(s['Shift Work'] || 'No'),
-                    standards: window.Sanitizer.sanitizeText(s['Standards'] || '')
-                }));
-
-                // Process Linked Contacts
-                const clientContacts = contactsRaw.filter(c => c['Client Name'] === name);
-                client.contacts = clientContacts.map(c => ({
-                    name: window.Sanitizer.sanitizeText(c['Full Name']),
-                    designation: window.Sanitizer.sanitizeText(c['Designation']),
-                    department: window.Sanitizer.sanitizeText(c['Department'] || ''),
-                    email: window.Sanitizer.sanitizeText(c['Email']),
-                    phone: window.Sanitizer.sanitizeText(c['Phone'] || ''),
-                    role: window.Sanitizer.sanitizeText(c['Role'] || '')
-                }));
-
-                // Process Departments
-                const clientDepts = deptsRaw.filter(d => d['Client Name'] === name);
-                client.departments = clientDepts.map(d => ({
-                    name: clean(d['Department Name']),
-                    risk: clean(d['Risk Level']) || 'Medium',
-                    head: ''
-                }));
-
-                // Process Designations
-                const clientDesig = desigRaw.filter(d => d['Client Name'] === name);
-                client.designations = clientDesig.map(d => clean(d['Designation']));
-
-                // Process Goods/Services
-                const clientGoods = goodsRaw.filter(g => g['Client Name'] === name);
-                client.goodsServices = clientGoods.map(g => ({
-                    name: clean(g['Name']),
-                    category: clean(g['Category']),
-                    description: clean(g['Description'])
-                }));
-
-                // Process Key Processes
-                const clientProcs = procsRaw.filter(p => p['Client Name'] === name);
-                client.keyProcesses = clientProcs.map(p => ({
-                    name: clean(p['Process Name']),
-                    category: clean(p['Category']),
-                    owner: clean(p['Owner'])
-                }));
+                // Update Site (Head Office)
+                if (row['Address'] || row['City'] || row['Country']) {
+                    const site = {
+                        name: 'Head Office',
+                        address: window.Sanitizer.sanitizeText(row['Address'] || ''),
+                        city: window.Sanitizer.sanitizeText(row['City'] || ''),
+                        country: window.Sanitizer.sanitizeText(row['Country'] || ''),
+                        standards: client.standard
+                    };
+                    // Simplified: Replace first site if it exists, otherwise add
+                    if (client.sites && client.sites.length > 0) {
+                        client.sites[0] = { ...client.sites[0], ...site };
+                    } else {
+                        client.sites = [site];
+                    }
+                }
             });
 
             window.saveData();

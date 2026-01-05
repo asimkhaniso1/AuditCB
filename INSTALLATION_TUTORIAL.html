@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditCB360 - Installation & Onboarding Tutorial</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .qr-section {
+            background: #f8fafc;
+            padding: 2rem;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .qr-container {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .qr-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+
+        .qr-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .qr-placeholder {
+            width: 200px;
+            height: 200px;
+            background: white;
+            border: 3px solid #3b82f6;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #64748b;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .qr-card h3 {
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .qr-card p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .content {
+            padding: 2rem;
+        }
+
+        .section {
+            margin-bottom: 2.5rem;
+        }
+
+        .section h2 {
+            color: #1e293b;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section h3 {
+            color: #475569;
+            font-size: 1.3rem;
+            margin: 1.5rem 0 1rem 0;
+            padding-left: 1rem;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .steps {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .step {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s;
+        }
+
+        .step:hover {
+            background: #eff6ff;
+            transform: translateX(5px);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .step h4 {
+            color: #1e293b;
+            font-size: 1.1rem;
+        }
+
+        .step p {
+            color: #64748b;
+            line-height: 1.6;
+            padding-left: 3.5rem;
+        }
+
+        .platform-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .platform-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .platform-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
+        }
+
+        .platform-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .benefits {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+        }
+
+        .benefits h3 {
+            color: white;
+            border-left-color: white;
+            margin-top: 0;
+        }
+
+        .benefits ul {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .benefits li {
+            padding: 0.75rem 0;
+            padding-left: 2rem;
+            position: relative;
+        }
+
+        .benefits li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .troubleshooting {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .troubleshooting h4 {
+            color: #92400e;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .footer {
+            background: #1e293b;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 AuditCB360</h1>
+            <p>Installation & Onboarding Tutorial</p>
+        </div>
+
+        <div class="qr-section">
+            <h2 style="color: #1e293b; margin-bottom: 1rem;">Quick Install - Scan QR Code</h2>
+            <div class="qr-container">
+                <div class="qr-card">
+                    <div class="qr-placeholder">
+                        QR Code for:<br>
+                        <strong>https://audit-cb.isoxpert.com</strong><br>
+                        (Generate using qr-code-generator.com)
+                    </div>
+                    <h3>Primary URL</h3>
+                    <p>audit-cb.isoxpert.com</p>
+                </div>
+                <div class="qr-card">
+                    <div class="qr-placeholder">
+                        QR Code for:<br>
+                        <strong>https://audit-cb.vercel.app</strong><br>
+                        (Generate using qr-code-generator.com)
+                    </div>
+                    <h3>Backup URL</h3>
+                    <p>audit-cb.vercel.app</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>📖 Installation Guide</h2>
+
+                <h3>🤖 For Android Devices (Chrome/Edge)</h3>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <h4>Open the App URL</h4>
+                        </div>
+                        <p>Navigate to <strong>https://audit-cb.isoxpert.com</strong> in Chrome or Edge browser. Wait
+                            for the page to fully load.</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <h4>Access Browser Menu</h4>
+                        </div>
+                        <p>Tap the three-dot menu icon <strong>(⋮)</strong> in the top-right corner of your browser.</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <h4>Install the App</h4>
+                        </div>
+                        <p>Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong> from the menu.
+                            Confirm when prompted.</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">4</div>
+                            <h4>Launch from Home Screen</h4>
+                        </div>
+                        <p>Find the AuditCB360 icon on your home screen. Tap to launch the app in full-screen mode!</p>
+                    </div>
+                </div>
+
+                <h3>🍎 For iOS Devices (Safari)</h3>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <h4>Open in Safari</h4>
+                        </div>
+                        <p>Navigate to <strong>https://audit-cb.isoxpert.com</strong> using Safari browser (not Chrome).
+                            Ensure the page loads completely.</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <h4>Access Share Menu</h4>
+                        </div>
+                        <p>Tap the <strong>Share button</strong> (square with up arrow) at the bottom or top of Safari.
+                        </p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <h4>Add to Home Screen</h4>
+                        </div>
+                        <p>Scroll down and select <strong>"Add to Home Screen"</strong>. You can customize the name if
+                            desired.</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">4</div>
+                            <h4>Confirm Installation</h4>
+                        </div>
+                        <p>Tap <strong>"Add"</strong> in the top-right. The app icon will appear on your home screen.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="benefits">
+                <h3>✨ Benefits of Installing AuditCB360</h3>
+                <ul>
+                    <li><strong>⚡ Lightning-Fast Performance</strong> - Instant loading, no browser overhead</li>
+                    <li><strong>📱 Native App Experience</strong> - Full-screen mode, no browser bars</li>
+                    <li><strong>🔌 Full Offline Access</strong> - Conduct audits anywhere, even without internet</li>
+                    <li><strong>🔄 Automatic Sync</strong> - Changes sync seamlessly when you're back online</li>
+                    <li><strong>🔔 Push Notifications</strong> - Get audit reminders and updates</li>
+                    <li><strong>🏠 Home Screen Access</strong> - Launch instantly like any other app</li>
+                    <li><strong>💾 Data Security</strong> - Encrypted local storage for sensitive audit data</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>🎯 Using AuditCB360 Offline</h2>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <h4>Before Going to the Field</h4>
+                    </div>
+                    <p>While connected to WiFi/data, open the app and let it sync. All your clients, checklists, and
+                        reports will be cached locally.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h4>During the Audit (Offline)</h4>
+                    </div>
+                    <p>You can perform ALL audit functions: complete checklists, create NCRs, add comments, attach
+                        photos. Everything saves to your device. Look for the "OFFLINE" indicator in the header.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <h4>After Returning Online</h4>
+                    </div>
+                    <p>The app automatically detects your connection and syncs all changes to the cloud. You'll see
+                        "Syncing data..." followed by "All changes synced successfully".</p>
+                </div>
+            </div>
+
+            <div class="troubleshooting">
+                <h4>⚠️ Troubleshooting</h4>
+                <p><strong>Can't find "Install app" option?</strong></p>
+                <ul style="margin: 0.5rem 0 1rem 1.5rem;">
+                    <li>Ensure you're using HTTPS URL (not localhost)</li>
+                    <li>Try refreshing the page (pull down to refresh)</li>
+                    <li>Clear browser cache and try again</li>
+                </ul>
+
+                <p><strong>Offline mode not working?</strong></p>
+                <ul style="margin: 0.5rem 0 1rem 1.5rem;">
+                    <li>Open the app once while online to cache data</li>
+                    <li>Check if "Service Worker" is active (DevTools)</li>
+                    <li>Reinstall the app if issues persist</li>
+                </ul>
+
+                <p><strong>Changes not syncing?</strong></p>
+                <ul style="margin: 0.5rem 0 1rem 1.5rem;">
+                    <li>Ensure stable internet connection</li>
+                    <li>Wait a few seconds for sync to complete</li>
+                    <li>Check for sync confirmation notification</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Need Help? Contact IT Support</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                📧 <a href="mailto:support@auditcb.com">support@auditcb.com</a> |
+                📞 +1-800-AUDIT-CB
+            </p>
+            <p style="margin-top: 1rem; opacity: 0.7; font-size: 0.85rem;">
+                © 2024 AuditCB360. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

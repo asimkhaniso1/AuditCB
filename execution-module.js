@@ -1365,6 +1365,15 @@ window.saveChecklist = function (reportId) {
     report.checklistProgress = checklistData;
     window.saveData();
 
+    // Queue for offline sync
+    if (window.OfflineManager) {
+        window.OfflineManager.queueAction('SAVE_CHECKLIST', {
+            reportId: reportId,
+            client: report.client,
+            checklistProgress: checklistData
+        });
+    }
+
     // Show save indicator
     const indicator = document.getElementById('save-indicator');
     if (indicator) {
@@ -1744,6 +1753,15 @@ function createNCR(reportId) {
         report.findings = report.ncrs.length;
 
         window.saveData();
+
+        // Queue NCR for offline sync
+        if (window.OfflineManager) {
+            window.OfflineManager.queueAction('CREATE_NCR', {
+                reportId: reportId,
+                client: report.client,
+                ncr: report.ncrs[report.ncrs.length - 1]
+            });
+        }
         window.closeModal();
         renderExecutionDetail(reportId);
         window.showNotification('NCR created successfully with evidence', 'success');
@@ -1846,6 +1864,17 @@ window.saveMeetingRecords = function (reportId) {
     };
 
     window.saveData();
+
+    // Queue meeting records for offline sync
+    if (window.OfflineManager) {
+        window.OfflineManager.queueAction('SAVE_MEETINGS', {
+            reportId: reportId,
+            client: report.client,
+            openingMeeting: report.openingMeeting,
+            closingMeeting: report.closingMeeting
+        });
+    }
+
     window.showNotification('Meeting records saved successfully', 'success');
 };
 

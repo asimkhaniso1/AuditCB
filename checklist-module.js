@@ -859,6 +859,18 @@ function saveChecklistFromEditor(checklistId) {
     }
 
     window.saveData();
+
+    // Queue checklist template for offline sync
+    if (window.OfflineManager) {
+        const checklistIdToQueue = isEdit ? checklistId : state.checklists[state.checklists.length - 1].id;
+        window.OfflineManager.queueAction('SAVE_CHECKLIST_TEMPLATE', {
+            checklistId: checklistIdToQueue,
+            name: name,
+            standard: standard,
+            clauses: Object.values(clauseGroups)
+        });
+    }
+
     renderChecklistLibrary();
 }
 
