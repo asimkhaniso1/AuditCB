@@ -1866,35 +1866,101 @@ async function lazyLoadModal(modulePath, functionName) {
 }
 
 // Initial Render
-// Role Switcher for Demo - positioned at bottom of left sidebar
+// User Profile / Role Switcher - positioned at bottom of left sidebar
 function renderRoleSwitcher() {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
+
+    // Remove existing container if present
+    const existing = document.getElementById('role-switcher-container');
+    if (existing) existing.remove();
 
     // Initialize currentUser if it doesn't exist
     if (!state.currentUser) {
         state.currentUser = {
             name: 'Demo User',
-            role: 'Lead Auditor'
+            role: 'Admin',
+            isDemo: true
         };
     }
 
     const switcher = document.createElement('div');
     switcher.id = 'role-switcher-container';
     switcher.style.cssText = 'padding: 1rem; border-top: 1px solid var(--border-color); margin-top: auto;';
-    switcher.innerHTML = `
-        <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">
-            <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Demo Role
-        </label>
-        <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--card-bg); color: var(--text-color); cursor: pointer;">
-            <option value="Admin" ${state.currentUser?.role === 'Admin' ? 'selected' : ''}>Admin</option>
-            <option value="Auditor" ${state.currentUser?.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-            <option value="Lead Auditor" ${state.currentUser?.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
-            <option value="Certification Manager" ${state.currentUser?.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>
-        </select>
-    `;
+
+    // Check if this is a real authenticated user (from Supabase)
+    const isRealUser = state.currentUser && !state.currentUser.isDemo && state.currentUser.email;
+
+    if (isRealUser) {
+        // Show user profile with logout button for authenticated users
+        switcher.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                    ${state.currentUser.name ? state.currentUser.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${window.UTILS?.escapeHtml(state.currentUser.name) || 'User'}
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                        ${window.UTILS?.escapeHtml(state.currentUser.role) || 'Role'}
+                    </div>
+                </div>
+            </div>
+            <button onclick="window.logoutUser()" class="btn btn-sm" style="width: 100%; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;">
+                <i class="fa-solid fa-sign-out-alt" style="margin-right: 0.5rem;"></i>Logout
+            </button>
+        `;
+    } else {
+        // Show Demo Role switcher for demo/testing mode
+        switcher.innerHTML = `
+            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">
+                <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Demo Role
+            </label>
+            <select id="role-switcher" onchange="window.switchUserRole(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--card-bg); color: var(--text-color); cursor: pointer; margin-bottom: 0.5rem;">
+                <option value="Admin" ${state.currentUser?.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                <option value="Auditor" ${state.currentUser?.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                <option value="Lead Auditor" ${state.currentUser?.role === 'Lead Auditor' ? 'selected' : ''}>Lead Auditor</option>
+                <option value="Certification Manager" ${state.currentUser?.role === 'Certification Manager' ? 'selected' : ''}>Cert Manager</option>
+            </select>
+            <button onclick="window.exitDemoMode()" class="btn btn-sm btn-outline-primary" style="width: 100%; font-size: 0.8rem;">
+                <i class="fa-solid fa-sign-in-alt" style="margin-right: 0.5rem;"></i>Login as Admin
+            </button>
+        `;
+    }
     sidebar.appendChild(switcher);
 }
+
+// Exit demo mode and set as real Admin user
+window.exitDemoMode = function () {
+    state.currentUser = {
+        name: 'Admin User',
+        email: 'admin@auditcb360.com',
+        role: 'Admin',
+        isDemo: false
+    };
+    saveState();
+    renderRoleSwitcher();
+    updateNavigationForRole('Admin');
+    window.showNotification('Logged in as Admin. Demo mode disabled.', 'success');
+    handleRouteChange();
+};
+
+// Logout user
+window.logoutUser = function () {
+    if (confirm('Are you sure you want to logout?')) {
+        state.currentUser = {
+            name: 'Demo User',
+            role: 'Admin',
+            isDemo: true
+        };
+        saveState();
+        renderRoleSwitcher();
+        updateNavigationForRole('Admin');
+        window.showNotification('Logged out successfully', 'success');
+        window.location.hash = 'dashboard';
+    }
+};
 
 window.switchUserRole = function (role) {
     if (!state.currentUser) {
