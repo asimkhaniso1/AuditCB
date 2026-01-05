@@ -1915,12 +1915,8 @@ function renderRoleSwitcher() {
     const isRealUser = state.currentUser && !state.currentUser.isDemo && state.currentUser.email;
 
     if (isRealUser) {
-        // Show simple logout button for authenticated users (profile is in header)
-        switcher.innerHTML = `
-            <button onclick="window.logoutUser()" class="btn btn-sm" style="width: 100%; background: rgba(220, 38, 38, 0.1); color: #f87171; border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 8px;">
-                <i class="fa-solid fa-sign-out-alt" style="margin-right: 0.5rem;"></i>Logout
-            </button>
-        `;
+        // User is logged in - don't render anything in sidebar (profile/logout is in header)
+        return;
     } else {
         // Show Login Button for production
         switcher.innerHTML = `
