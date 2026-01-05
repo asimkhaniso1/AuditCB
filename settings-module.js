@@ -863,8 +863,8 @@ window.openAddUserModal = function (userId = null) {
             </div>
             <div class="form-group">
                 <label>Email Address <span style="color: var(--danger-color);">*</span></label>
-                <input type="email" class="form-control" id="user-email" value="${user.email || ''}" required ${isEdit ? 'disabled' : ''}>
-                ${isEdit ? '<small style="color: var(--text-secondary);">Email cannot be changed.</small>' : ''}
+                <input type="email" class="form-control" id="user-email" value="${user.email || ''}" required ${isEdit && window.state.currentUser?.role !== 'Admin' ? 'disabled' : ''}>
+                ${isEdit && window.state.currentUser?.role !== 'Admin' ? '<small style="color: var(--text-secondary);">Email cannot be changed. Contact an Admin.</small>' : ''}
             </div>
             <div class="form-group">
                 <label>Role <span style="color: var(--danger-color);">*</span></label>
@@ -916,6 +916,10 @@ window.saveUser = function (userId) {
         if (user) {
             user.name = name;
             user.role = role;
+            // Admin can update email
+            if (window.state.currentUser?.role === 'Admin' && email) {
+                user.email = email;
+            }
             if (!user.avatar) {
                 user.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
             }
