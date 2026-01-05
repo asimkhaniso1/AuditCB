@@ -1,0 +1,12 @@
+{
+    "name": "auditcb360",
+    "version": "1.0.0",
+    "description": "AuditCB360 Certification System",
+    "scripts": {
+        "start": "http-server -p 8080"
+    },
+    "engines": {
+        "node": "20.x"
+    },
+    "dependencies": {}
+}
