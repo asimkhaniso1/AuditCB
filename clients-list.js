@@ -41,10 +41,16 @@ function renderClientsEnhanced() {
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
             <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
             <td>
+                <div style="display: flex; gap: 4px; align-items: center;">
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="Edit"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
-                <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
+                ${(window.state.currentUser.role === 'Admin') ? `
+                <button class="btn btn-sm" onclick="event.stopPropagation(); window.archiveClient(${client.id})" style="color: #f59e0b;" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
+                <button class="btn btn-sm" onclick="event.stopPropagation(); window.deleteClient(${client.id})" style="color: #ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                ` : ''}
+                <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="View"><i class="fa-solid fa-eye"></i></button>
+                </div>
             </td>
         </tr>
     `).join('');

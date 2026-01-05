@@ -4780,3 +4780,90 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
         window.showNotification(`${auditor.name} removed from ${client.name}. Historical records retained.`, 'success');
     }
 };
+
+// ============================================
+// CLIENT DELETION & ARCHIVING
+// ============================================
+
+window.deleteClient = function (clientId) {
+    const clientIndex = window.state.clients.findIndex(c => c.id == clientId);
+    if (clientIndex === -1) return;
+
+    const client = window.state.clients[clientIndex];
+
+    // Strict Warning for cascading deletion
+    if (!confirm(`WARNING: This will permanently delete the client '${client.name}' and ALL associated linked records (Audit Programs, Plans, Reports, etc.).\n\nThis action cannot be undone.\n\nAre you sure you want to proceed?`)) {
+        return;
+    }
+
+    try {
+        // Cascading Delete Logic
+        const clientName = client.name;
+        let deleteStats = { programs: 0, plans: 0, reports: 0, decisions: 0 };
+
+        // 1. Audit Programs
+        if (window.state.auditPrograms) {
+            const initialPrograms = window.state.auditPrograms.length;
+            window.state.auditPrograms = window.state.auditPrograms.filter(p => p.client !== clientName);
+            deleteStats.programs = initialPrograms - window.state.auditPrograms.length;
+        }
+
+        // 2. Audit Plans
+        if (window.state.auditPlans) {
+            const initialPlans = window.state.auditPlans.length;
+            window.state.auditPlans = window.state.auditPlans.filter(p => p.client !== clientName);
+            deleteStats.plans = initialPlans - window.state.auditPlans.length;
+        }
+
+        // 3. Audit Reports
+        if (window.state.auditReports) {
+            const initialReports = window.state.auditReports.length;
+            window.state.auditReports = window.state.auditReports.filter(r => r.client !== clientName);
+            deleteStats.reports = initialReports - window.state.auditReports.length;
+        }
+
+        // 4. Certification Decisions
+        if (window.state.certificationDecisions) {
+            const initialDecisions = window.state.certificationDecisions.length;
+            window.state.certificationDecisions = window.state.certificationDecisions.filter(d => d.client !== clientName);
+            deleteStats.decisions = initialDecisions - window.state.certificationDecisions.length;
+        }
+
+        // 5. Delete Client
+        window.state.clients.splice(clientIndex, 1);
+
+        window.saveData();
+
+        console.log('[deleteClient] Deletion Stats:', deleteStats);
+        window.showNotification(`Client '${clientName}' deleted. (Removed: ${deleteStats.programs} Programs, ${deleteStats.plans} Plans, ${deleteStats.reports} Reports)`, 'success');
+
+        // Refresh UI
+        if (typeof renderClientsEnhanced === 'function') {
+            renderClientsEnhanced();
+        } else if (typeof renderClients === 'function') {
+            renderClients();
+        }
+    } catch (e) {
+        console.error('Delete client failed:', e);
+        window.showNotification('Failed to delete client: ' + e.message, 'error');
+    }
+};
+
+window.archiveClient = function (clientId) {
+    const client = window.state.clients.find(c => c.id == clientId);
+    if (!client) return;
+
+    if (!confirm(`Are you sure you want to archive client '${client.name}'? The client will be hidden from active lists but data is preserved.`)) {
+        return;
+    }
+
+    client.status = 'Archived';
+    window.saveData();
+    window.showNotification(`Client '${client.name}' archived successfully.`, 'info');
+
+    if (typeof renderClientsEnhanced === 'function') {
+        renderClientsEnhanced();
+    } else if (typeof renderClients === 'function') {
+        renderClients();
+    }
+};
