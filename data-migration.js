@@ -320,6 +320,9 @@ const DataMigration = {
      * @param {object} options - Options { keepCBSettings: boolean }
      */
     restoreDemoData: function (options = { keepCBSettings: true }) {
+        // DEBUG: Alert to confirm click
+        alert('DEBUG: Restore Demo Data Clicked');
+
         if (!confirm('This will restore demo data. All current data will be RESET to factory defaults. Continue?')) {
             return;
         }
@@ -347,6 +350,9 @@ const DataMigration = {
 
     // Handler wrapper to read checkbox values safely
     handleClearData: function () {
+        // DEBUG: Alert to confirm click
+        alert('DEBUG: Clear Data Clicked');
+
         try {
             const keepChecklistsEl = document.getElementById('keep-checklists');
             const keepAdminEl = document.getElementById('keep-admin');
