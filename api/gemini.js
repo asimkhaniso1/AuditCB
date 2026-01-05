@@ -52,10 +52,22 @@ export default async function handler(req, res) {
             throw new Error(data.error?.message || 'Gemini API replied with an error');
         }
 
-        return res.status(200).json(data);
+        // Extract usage metadata if available
+        const usageMetadata = data.usageMetadata || {
+            promptTokenCount: 0,
+            candidatesTokenCount: 0,
+            totalTokenCount: 0
+        };
+
+        // Return data with usage metadata at top level for easy access
+        return res.status(200).json({
+            ...data,
+            usage: usageMetadata
+        });
 
     } catch (error) {
         console.error('Gemini Proxy Error:', error);
         return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }
+

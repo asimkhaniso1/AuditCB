@@ -66,10 +66,31 @@ Example:
 
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
+                // Log failed API call
+                if (window.APIUsageTracker) {
+                    window.APIUsageTracker.logUsage({
+                        feature: 'agenda-generation',
+                        inputTokens: window.APIUsageTracker.estimateTokens(prompt),
+                        outputTokens: 0,
+                        success: false
+                    });
+                }
                 throw new Error(data.error || 'AI Service Unavailable (Server Proxy)');
             }
 
             const data = await response.json();
+
+            // Log successful API call with actual token usage
+            if (window.APIUsageTracker) {
+                const usage = data.usage || {};
+                window.APIUsageTracker.logUsage({
+                    feature: 'agenda-generation',
+                    inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
+                    outputTokens: usage.candidatesTokenCount || 0,
+                    success: true
+                });
+            }
+
             return AI_SERVICE.extractTextFromResponse(data);
         } catch (error) {
             console.error('Proxy API Error:', error);
