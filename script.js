@@ -2070,19 +2070,133 @@ window.updateNavigationForRole = updateNavigationForRole;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if user is logged in (not demo mode)
+    const isLoggedIn = state.currentUser && !state.currentUser.isDemo && state.currentUser.email;
+
+    if (!isLoggedIn) {
+        // Show fullscreen login overlay
+        showLoginOverlay();
+        return; // Don't proceed with app initialization
+    }
+
+    // User is logged in - proceed normally
     renderRoleSwitcher();
-    updateCBLogoDisplay(); // Update CB logo in sidebar
-    // Update navigation visibility based on initial role
+    updateCBLogoDisplay();
     if (state.currentUser?.role) {
         updateNavigationForRole(state.currentUser.role);
     }
-    // Use hash for initial route or default to dashboard
     if (window.location.hash) {
         handleRouteChange();
     } else {
         window.location.hash = 'dashboard';
     }
 });
+
+// Fullscreen Login Overlay
+function showLoginOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'login-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e1b4b 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    overlay.innerHTML = `
+        <div style="background: white; border-radius: 16px; padding: 3rem; width: 400px; max-width: 90vw; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2rem; box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h2 style="margin: 0; color: #1e293b; font-size: 1.75rem; font-weight: 700;">AuditCB360</h2>
+                <p style="color: #64748b; margin-top: 0.5rem;">ISO Certification Body Management</p>
+            </div>
+            
+            <form id="login-form" onsubmit="event.preventDefault(); window.handleLoginSubmit(this);">
+                <div style="margin-bottom: 1.25rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.9rem;">Email Address</label>
+                    <input type="email" name="email" placeholder="info@companycertification.com" required 
+                        style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; transition: all 0.2s; box-sizing: border-box;"
+                        onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)';"
+                        onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none';">
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.9rem;">Password</label>
+                    <input type="password" name="password" placeholder="••••••••" required
+                        style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; transition: all 0.2s; box-sizing: border-box;"
+                        onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)';"
+                        onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none';">
+                </div>
+                
+                <button type="submit" style="width: 100%; padding: 1rem; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);"
+                    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 10px -1px rgba(37, 99, 235, 0.4)';"
+                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px -1px rgba(37, 99, 235, 0.3)';">
+                    <i class="fa-solid fa-right-to-bracket" style="margin-right: 0.5rem;"></i>
+                    Sign In
+                </button>
+            </form>
+            
+            <p style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 2rem;">
+                Secure access for authorized personnel only
+            </p>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+// Handle Login Form Submission
+window.handleLoginSubmit = function (form) {
+    const email = form.email.value;
+    const password = form.password.value;
+
+    // Ensure default admin exists
+    if (!window.state.users || window.state.users.length === 0) {
+        window.state.users = [{
+            id: 1,
+            name: 'System Admin',
+            email: 'info@companycertification.com',
+            role: 'Admin',
+            password: 'admin'
+        }];
+    }
+
+    const user = window.state.users.find(u =>
+        u.email.toLowerCase() === email.toLowerCase() && u.password === password
+    );
+
+    if (user) {
+        // Login successful
+        window.state.currentUser = {
+            ...user,
+            isDemo: false
+        };
+        window.saveData();
+
+        // Remove overlay and initialize app
+        const overlay = document.getElementById('login-overlay');
+        if (overlay) overlay.remove();
+
+        // Initialize the app
+        renderRoleSwitcher();
+        updateCBLogoDisplay();
+        updateNavigationForRole(user.role);
+        window.location.hash = 'dashboard';
+        handleRouteChange();
+
+        window.showNotification(`Welcome, ${user.name}!`, 'success');
+    } else {
+        window.showNotification('Invalid email or password', 'error');
+    }
+};
 
 // Update CB Logo in Sidebar Header
 function updateCBLogoDisplay() {
