@@ -2251,3 +2251,50 @@ window.toggleNavGroup = function (header) {
         arrow.classList.add('fa-chevron-down');
     }
 };
+
+// Toggle User Dropdown Menu in Header
+window.toggleUserMenu = function () {
+    const dropdown = document.getElementById('user-dropdown-menu');
+    if (!dropdown) return;
+
+    const isVisible = dropdown.style.display !== 'none';
+    dropdown.style.display = isVisible ? 'none' : 'block';
+
+    // Update user info in dropdown
+    if (!isVisible && window.state?.currentUser) {
+        const nameEl = document.getElementById('header-user-name');
+        const infoEl = document.getElementById('dropdown-user-info');
+        if (nameEl) nameEl.textContent = window.state.currentUser.name || 'User';
+        if (infoEl) {
+            infoEl.innerHTML = `
+                <div style="font-weight: 600; color: var(--text-color);">${window.state.currentUser.name || 'User'}</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.state.currentUser.role || 'Role'}</div>
+            `;
+        }
+    }
+};
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function (e) {
+    const dropdown = document.getElementById('user-dropdown-menu');
+    const profile = document.getElementById('header-user-profile');
+    if (dropdown && profile && !profile.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
+});
+
+// Logout User
+window.logoutUser = function () {
+    if (confirm('Are you sure you want to logout?')) {
+        // Clear current user
+        window.state.currentUser = {
+            name: 'Demo User',
+            role: 'Admin',
+            isDemo: true
+        };
+        window.saveData();
+        window.showNotification('Logged out successfully', 'info');
+        // Reload to show login page
+        window.location.reload();
+    }
+};
