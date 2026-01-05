@@ -1723,25 +1723,48 @@ function renderPlaceholder(moduleName) {
     `;
 }
 
-// Notification Helper
+// Notification Helper - Theme Aware
 function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
     notification.className = 'fade-in';
-    notification.style.position = 'fixed';
-    notification.style.bottom = '20px';
-    notification.style.right = '20px';
-    notification.style.background = type === 'success' ? '#10b981' : '#ef4444';
-    notification.style.color = 'white';
-    notification.style.padding = '1rem 2rem';
-    notification.style.borderRadius = '8px';
-    notification.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-    notification.style.zIndex = '10001';
-    notification.textContent = message;
+
+    // Theme-aware colors
+    const colors = {
+        success: { bg: '#059669', border: '#10b981', icon: 'fa-check-circle' },
+        error: { bg: '#dc2626', border: '#ef4444', icon: 'fa-times-circle' },
+        warning: { bg: '#d97706', border: '#f59e0b', icon: 'fa-exclamation-triangle' },
+        info: { bg: '#2563eb', border: '#3b82f6', icon: 'fa-info-circle' }
+    };
+    const style = colors[type] || colors.success;
+
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: ${style.bg};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 0 0 1px ${style.border};
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 500;
+        max-width: 400px;
+        animation: slideInRight 0.3s ease-out;
+    `;
+
+    notification.innerHTML = `
+        <i class="fa-solid ${style.icon}" style="font-size: 1.25rem;"></i>
+        <span>${message}</span>
+    `;
 
     document.body.appendChild(notification);
 
     setTimeout(() => {
-        notification.remove();
+        notification.style.animation = 'fadeOut 0.3s ease-out forwards';
+        setTimeout(() => notification.remove(), 300);
     }, 3000);
 }
 
@@ -1892,22 +1915,9 @@ function renderRoleSwitcher() {
     const isRealUser = state.currentUser && !state.currentUser.isDemo && state.currentUser.email;
 
     if (isRealUser) {
-        // Show user profile with logout button for authenticated users
+        // Show simple logout button for authenticated users (profile is in header)
         switcher.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
-                <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">
-                    ${state.currentUser.name ? state.currentUser.name.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div style="flex: 1; overflow: hidden;">
-                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        ${window.UTILS?.escapeHtml(state.currentUser.name) || 'User'}
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                        ${window.UTILS?.escapeHtml(state.currentUser.role) || 'Role'}
-                    </div>
-                </div>
-            </div>
-            <button onclick="window.logoutUser()" class="btn btn-sm" style="width: 100%; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;">
+            <button onclick="window.logoutUser()" class="btn btn-sm" style="width: 100%; background: rgba(220, 38, 38, 0.1); color: #f87171; border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 8px;">
                 <i class="fa-solid fa-sign-out-alt" style="margin-right: 0.5rem;"></i>Logout
             </button>
         `;
