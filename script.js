@@ -1979,7 +1979,7 @@ window.loginUser = function (form) {
         users.push({
             id: 1,
             name: 'System Admin',
-            email: 'admin@auditcb.com',
+            email: 'info@companycertification.com',
             role: 'Admin',
             password: 'admin' // Simple plain text for prototype
         });
