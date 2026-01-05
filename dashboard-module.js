@@ -328,7 +328,16 @@ function renderDashboardEnhanced() {
 
     window.contentArea.innerHTML = html;
 
-    // Render Charts
+    // Destroy existing chart instances to prevent "Canvas already in use" errors
+    if (window.dashboardCharts) {
+        Object.values(window.dashboardCharts).forEach(chart => {
+            if (chart && typeof chart.destroy === 'function') {
+                chart.destroy();
+            }
+        });
+    }
+    window.dashboardCharts = {};
+
     // Render Charts (Staggered to prevent blocking main thread)
     requestAnimationFrame(() => {
         renderAuditTrendsChart();
@@ -386,7 +395,7 @@ function renderAuditTrendsChart() {
         }
     });
 
-    new Chart(ctx, {
+    window.dashboardCharts.auditTrends = new Chart(ctx, {
         type: 'line',
         data: {
             labels: months,
@@ -440,7 +449,7 @@ function renderNCRDistributionChart(major, minor) {
     const ctx = document.getElementById('ncrDistributionChart');
     if (!ctx) return;
 
-    new Chart(ctx, {
+    window.dashboardCharts.ncrDistribution = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Major NCRs', 'Minor NCRs'],
@@ -471,7 +480,7 @@ function renderIndustryChart(industryStats) {
     const labels = Object.keys(industryStats);
     const data = Object.values(industryStats);
 
-    new Chart(ctx, {
+    window.dashboardCharts.industry = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -512,7 +521,7 @@ function renderStandardsChart(standardStats) {
     const data = Object.values(standardStats);
     const colors = ['#667eea', '#11998e', '#f093fb', '#fa709a', '#fee140'];
 
-    new Chart(ctx, {
+    window.dashboardCharts.standards = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: labels,
@@ -569,7 +578,7 @@ function renderNCRTrendsChart() {
         }
     });
 
-    new Chart(ctx, {
+    window.dashboardCharts.ncrTrends = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: months,
@@ -628,7 +637,7 @@ function renderClientGrowthChart() {
         cumulativeTotal[i] = runningTotal;
     }
 
-    new Chart(ctx, {
+    window.dashboardCharts.clientGrowth = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: months,
