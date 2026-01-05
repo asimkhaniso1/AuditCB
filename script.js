@@ -774,11 +774,6 @@ function getVisibleClients() {
 
     if (!user) return allClients; // No user = show all (demo mode)
 
-    // Special Case: Demo User sees ALL clients
-    if (user.name === 'Demo User') {
-        return allClients;
-    }
-
     // Roles that see ALL clients (management roles)
     const fullAccessRoles = ['Admin', 'Certification Manager'];
 
@@ -1560,7 +1555,22 @@ async function renderModule(moduleName, syncHash = true) {
                 }
                 break;
             case 'settings':
-                if (typeof renderSettings === 'function') {
+                // Restrict Settings access to Admin and Certification Manager only
+                const settingsRole = window.state.currentUser?.role;
+                const canAccessSettings = settingsRole === 'Admin' || settingsRole === 'Certification Manager';
+
+                if (!canAccessSettings) {
+                    contentArea.innerHTML = `
+                        <div class="fade-in" style="text-align: center; padding: 3rem;">
+                            <i class="fa-solid fa-lock" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
+                            <h3>Access Restricted</h3>
+                            <p style="color: var(--text-secondary);">Settings are only accessible to Admins and Certification Managers.</p>
+                            <button class="btn btn-primary" onclick="window.location.hash = 'dashboard'">
+                                <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Return to Dashboard
+                            </button>
+                        </div>
+                    `;
+                } else if (typeof renderSettings === 'function') {
                     renderSettings();
                 } else {
                     renderPlaceholder(moduleName);
@@ -1892,15 +1902,45 @@ window.switchUserRole = function (role) {
     } else {
         state.currentUser.role = role;
     }
+
+    // Update navigation visibility based on role
+    updateNavigationForRole(role);
+
     window.showNotification(`Switched role to: ${role}`, 'info');
     // Re-render current module to reflect permissions
-    window.renderModule(state.currentModule);
+    const hash = window.location.hash.substring(1) || 'dashboard';
+    handleRouteChange();
 };
+
+// Update navigation items visibility based on user role
+function updateNavigationForRole(role) {
+    const auditorRoles = ['Auditor', 'Lead Auditor'];
+    const isAuditor = auditorRoles.includes(role);
+
+    // Hide Settings for Auditors
+    const settingsNav = document.querySelector('li[data-module="settings"]');
+    if (settingsNav) {
+        settingsNav.style.display = isAuditor ? 'none' : '';
+    }
+
+    // Hide Governance group for Auditors (optional but good for cleaner UX)
+    const governanceHeader = document.querySelector('.nav-group-header');
+    const governanceContent = governanceHeader?.nextElementSibling;
+    if (governanceHeader && governanceContent) {
+        governanceHeader.style.display = isAuditor ? 'none' : '';
+        governanceContent.style.display = isAuditor ? 'none' : '';
+    }
+}
+window.updateNavigationForRole = updateNavigationForRole;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     renderRoleSwitcher();
     updateCBLogoDisplay(); // Update CB logo in sidebar
+    // Update navigation visibility based on initial role
+    if (state.currentUser?.role) {
+        updateNavigationForRole(state.currentUser.role);
+    }
     // Use hash for initial route or default to dashboard
     if (window.location.hash) {
         handleRouteChange();
