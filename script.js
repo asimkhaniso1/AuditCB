@@ -792,27 +792,35 @@ function getVisibleClients() {
 
     // Auditors (Lead Auditor, Auditor, Technical Expert) see only assigned clients
     if (filteredRoles.includes(user.role)) {
+        // Find matching auditor profile
         const auditor = window.state.auditors.find(a =>
-            a.email === user.email || a.name === user.name
+            a.name === user.name || a.email === user.email
         );
 
         if (!auditor) {
-            // No matching auditor profile found
-            window.Logger.warn('Core', `No auditor profile found for user: ${user.name} with role: ${user.role}`);
-            return []; // In production, auditors with no profile see nothing
+            console.warn('Current user has auditor role but no matching auditor profile found.');
+            return [];
         }
 
-        const assignedClientIds = (window.state.auditorAssignments || [])
+        // Get assignments for this auditor
+        const assignments = window.state.auditorAssignments || [];
+        const assignedClientIds = assignments
             .filter(a => a.auditorId === auditor.id)
             .map(a => a.clientId);
 
-        window.Logger.debug('RoleFilter', `${user.role} "${user.name}" has ${assignedClientIds.length} assigned clients`);
-        return allClients.filter(c => assignedClientIds.includes(c.id));
+        // Filter clients based on assignments
+        return allClients.filter(client => assignedClientIds.includes(client.id));
     }
 
-    // Unknown role - default to seeing nothing for security
-    window.Logger.warn('Core', 'Unknown role: ' + user.role);
-    return [];
+    // Client Role sees ONLY their own organization
+    if (user.role === 'Client') {
+        // In a real app, user would be linked to client ID.
+        // For demo, we match by name or assume single client context if implemented?
+        // Simplistic check: if user.name matches client name or contact
+        return allClients.filter(c => c.name === user.name || c.contacts.some(contact => contact.email === user.email));
+    }
+
+    return []; // Default: no access
 }
 
 /**
