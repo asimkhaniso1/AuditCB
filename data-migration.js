@@ -320,21 +320,21 @@ const DataMigration = {
      * @param {object} options - Options { keepCBSettings: boolean }
      */
     restoreDemoData: function (options = { keepCBSettings: true }) {
-        if (!confirm('This will restore demo data. Any current data will be replaced. Continue?')) {
+        if (!confirm('This will restore demo data. All current data will be RESET to factory defaults. Continue?')) {
             return;
         }
 
         try {
-            // Preserve CB settings if requested
-            const cbSettings = options.keepCBSettings ? window.state.cbSettings : null;
-            const currentUser = window.state.currentUser;
-
-            // Force reload defaults by clearing localStorage and refreshing
-            localStorage.removeItem('auditCB360State');
+            // Note: Preserving settings is temporarily disabled to prevent state corruption
+            // as script.js requires full state initialization.
+            // Future improvement: Use sessionStorage to pass settings across reload.
 
             window.showNotification('Restoring demo data...', 'info');
 
-            // Reload page to get fresh default data
+            // Clear localStorage to force script.js to load defaults
+            localStorage.removeItem('auditCB360State');
+
+            // Force reload
             setTimeout(() => {
                 window.location.reload();
             }, 500);
@@ -345,11 +345,22 @@ const DataMigration = {
         }
     },
 
-    // Handler wrapper to read checkbox values
+    // Handler wrapper to read checkbox values safely
     handleClearData: function () {
-        const keepChecklists = document.getElementById('keep-checklists')?.checked ?? true;
-        const keepAdmin = document.getElementById('keep-admin')?.checked ?? true;
-        this.clearAllData({ keepChecklists, keepAdmin });
+        try {
+            const keepChecklistsEl = document.getElementById('keep-checklists');
+            const keepAdminEl = document.getElementById('keep-admin');
+
+            const keepChecklists = keepChecklistsEl ? keepChecklistsEl.checked : true;
+            const keepAdmin = keepAdminEl ? keepAdminEl.checked : true;
+
+            console.log('Handling Clear Data:', { keepChecklists, keepAdmin });
+            this.clearAllData({ keepChecklists, keepAdmin });
+        } catch (error) {
+            console.error('Handle clear data error:', error);
+            // Fallback default
+            this.clearAllData();
+        }
     }
 };
 
