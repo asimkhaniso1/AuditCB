@@ -74,7 +74,7 @@ const AuthManager = {
                 username: 'admin',
                 password: 'admin123', // TODO: NEVER store passwords in plain text!
                 name: 'Admin User',
-                email: 'admin@auditcb360.com',
+                email: 'admin@companycertification.com',
                 role: 'Admin',
                 permissions: ['all']
             },
@@ -83,7 +83,7 @@ const AuthManager = {
                 username: 'manager',
                 password: 'manager123',
                 name: 'Certification Manager',
-                email: 'manager@auditcb360.com',
+                email: 'manager@companycertification.com',
                 role: 'Certification Manager',
                 permissions: ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors']
             },
@@ -92,7 +92,7 @@ const AuthManager = {
                 username: 'auditor',
                 password: 'auditor123',
                 name: 'Lead Auditor',
-                email: 'auditor@auditcb360.com',
+                email: 'auditor@companycertification.com',
                 role: 'Lead Auditor',
                 permissions: ['view_assigned', 'edit_reports', 'create_ncr']
             },
@@ -101,7 +101,7 @@ const AuthManager = {
                 username: 'viewer',
                 password: 'viewer123',
                 name: 'Report Viewer',
-                email: 'viewer@auditcb360.com',
+                email: 'viewer@companycertification.com',
                 role: 'Auditor',
                 permissions: ['view_assigned']
             }

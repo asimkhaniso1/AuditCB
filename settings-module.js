@@ -9,8 +9,8 @@ if (!window.state.cbSettings) {
         cbName: 'AuditCB360 Certification Body',
         cbAddress: '123 Quality Street, ISO City, 9001',
         cbPhone: '+1-555-AUDIT',
-        cbEmail: 'info@auditcb360.com',
-        cbWebsite: 'https://auditcb360.com',
+        cbEmail: 'info@companycertification.com',
+        cbWebsite: 'https://audit.companycertification.com',
         cbTagline: 'Committed to Excellence in Certification',
         logoUrl: '',
         primaryColor: '#0284c7',
@@ -756,9 +756,9 @@ function getUsersHTML() {
     if (!window.state.users || window.state.users.length === 0) {
         // Fallback to demo users if empty
         window.state.users = [
-            { id: 1, name: 'Admin User', email: 'admin@auditcb360.com', role: 'Admin', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff' },
-            { id: 2, name: 'Cert Manager', email: 'manager@auditcb360.com', role: 'Certification Manager', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Cert+Manager&background=6b21a8&color=fff' },
-            { id: 3, name: 'Lead Auditor', email: 'auditor@auditcb360.com', role: 'Lead Auditor', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Lead+Auditor&background=0369a1&color=fff' }
+            { id: 1, name: 'Admin User', email: 'admin@companycertification.com', role: 'Admin', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff' },
+            { id: 2, name: 'Cert Manager', email: 'manager@companycertification.com', role: 'Certification Manager', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Cert+Manager&background=6b21a8&color=fff' },
+            { id: 3, name: 'Lead Auditor', email: 'auditor@companycertification.com', role: 'Lead Auditor', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Lead+Auditor&background=0369a1&color=fff' }
         ];
     }
     const users = window.state.users || [];
@@ -964,7 +964,7 @@ window.toggleUserStatus = function (userId) {
 
     if (user.id === 1 || user.role === 'Admin') {
         // Prevent disabling the main admin for safety in this demo
-        if (user.email === 'admin@auditcb360.com') {
+        if (user.email === 'admin@companycertification.com') {
             window.showNotification('Cannot disable the main Administrator', 'warning');
             return;
         }

@@ -122,7 +122,7 @@ ServiceWorker registration successful with scope: http://localhost:8080/
    - App data persisted in IndexedDB
    - Backup created automatically
 
-4. **Coming Back Online**
+Pleas4. **Coming Back Online**
    - Network monitor detects online state
    - Notification: "You are back online. Syncing data..."
    - `processSyncQueue()` automatically triggered
@@ -149,13 +149,13 @@ ServiceWorker registration successful with scope: http://localhost:8080/
 ## 📱 Mobile Installation
 
 ### **Android (Chrome)**
-1. Open Chrome → `audit-cb.isoxpert.com`
+1. Open Chrome → `audit.companycertification.com`
 2. Tap menu (⋮) → "Install app"
 3. Confirm installation
 4. Launch from home screen
 
 ### **iOS (Safari)**
-1. Open Safari → `audit-cb.isoxpert.com`
+1. Open Safari → `audit.companycertification.com`
 2. Tap Share button (□↑)
 3. "Add to Home Screen"
 4. Tap "Add"

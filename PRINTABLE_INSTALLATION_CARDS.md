@@ -16,7 +16,7 @@
 │   │              │                                  │
 │   └──────────────┘         ✓ Works offline         │
 │                            ✓ Native app feel        │
-│   audit-cb.isoxpert.com    ✓ Auto-sync             │
+│   audit.companycertification.com    ✓ Auto-sync             │
 │                                                     │
 │   🤖 Android  |  🍎 iOS                            │
 │   Works on all mobile devices                       │
@@ -34,7 +34,7 @@
 ├─────────────────────────────────────┤
 │                                     │
 │  [1] Open Chrome browser            │
-│      Go to: audit-cb.isoxpert.com   │
+│      Go to: audit.companycertification.com   │
 │                                     │
 │  [2] Tap menu (⋮)                  │
 │      Top-right corner               │
@@ -59,7 +59,7 @@
 ├─────────────────────────────────────┤
 │                                     │
 │  [1] Open Safari browser            │
-│      Go to: audit-cb.isoxpert.com   │
+│      Go to: audit.companycertification.com   │
 │                                     │
 │  [2] Tap Share button (□↑)         │
 │      At bottom of screen            │
@@ -141,7 +141,7 @@
 │                                                  │
 │  Install today for better audits tomorrow!      │
 │                                                  │
-│  [QR CODE]          audit-cb.isoxpert.com       │
+│  [QR CODE]          audit.companycertification.com       │
 │                                                  │
 └──────────────────────────────────────────────────┘
 ```
@@ -177,7 +177,7 @@ Generate QR codes using:
 - **https://www.qrcode-monkey.com/**
 
 Settings:
-- URL: `https://audit-cb.isoxpert.com`
+- URL: `https://audit.companycertification.com`
 - Size: 500x500 pixels minimum
 - Error correction: High (30%)
 - Format: PNG with transparent background

@@ -40,4 +40,4 @@ The app works offline!
 -   Look for the **OFFLINE** indicator in the header.
 
 ## 4. Support
-For technical issues, contact the System Administrator at `admin@auditcb360.com`.
+For technical issues, contact the System Administrator at `info@companycertification.com`.

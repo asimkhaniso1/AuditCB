@@ -547,7 +547,7 @@ window.viewCertificate = function (certId) {
                         </div>
                     </div>
                 </div>
-                <div class="meta-info">This certificate remains the property of AuditCB360 and must be returned upon request. Verify validity at auditcb360.com/verify</div>
+                <div class="meta-info">This certificate remains the property of AuditCB360 and must be returned upon request. Verify validity at audit.companycertification.com/verify</div>
             </div>
             <script>
                 // Auto print

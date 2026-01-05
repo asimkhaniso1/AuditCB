@@ -82,7 +82,7 @@ const state = {
             nextAudit: '2024-06-15',
             website: '',
             contacts: [
-                { name: 'Quality Manager', designation: 'Quality Manager', phone: '', email: 'quality@auditcb360.com' }
+                { name: 'Quality Manager', designation: 'Quality Manager', phone: '', email: 'quality@companycertification.com' }
             ],
             sites: [
                 { name: 'Head Office', address: 'CB Headquarters', city: '', country: '', geotag: '', employees: 10, shift: 'No' }
@@ -1935,7 +1935,7 @@ function renderRoleSwitcher() {
 window.exitDemoMode = function () {
     state.currentUser = {
         name: 'Admin User',
-        email: 'admin@auditcb360.com',
+        email: 'admin@companycertification.com',
         role: 'Admin',
         isDemo: false
     };
