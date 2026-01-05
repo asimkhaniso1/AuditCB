@@ -4052,29 +4052,53 @@ window.downloadImportTemplate = function () {
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\n');
 
+    const filename = 'AuditCB_Client_Import_Template.csv';
+
     // Add BOM for Excel compatibility
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
 
-    // Create download link
+    // Try multiple download methods for maximum compatibility
+
+    // Method 1: IE/Edge msSaveBlob
+    if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+        window.navigator.msSaveOrOpenBlob(blob, filename);
+        window.showNotification('Template downloaded as CSV', 'success');
+        return;
+    }
+
+    // Method 2: Modern browsers with download attribute
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'AuditCB_Client_Import_Template.csv');
-    link.style.visibility = 'hidden';
+
+    // Set multiple attributes for maximum compatibility
+    link.href = url;
+    link.download = filename;
+    link.setAttribute('download', filename);
+    link.type = 'text/csv';
+    link.rel = 'noopener';
+
+    // Make link invisible but keep in DOM
+    link.style.position = 'fixed';
+    link.style.top = '-9999px';
+    link.style.left = '-9999px';
 
     document.body.appendChild(link);
 
-    // Trigger download
-    setTimeout(() => {
+    // Force click with multiple methods
+    if (link.click) {
         link.click();
-        document.body.removeChild(link);
+    } else if (document.createEvent) {
+        const event = document.createEvent('MouseEvents');
+        event.initEvent('click', true, true);
+        link.dispatchEvent(event);
+    }
 
-        // Clean up blob URL after a delay
-        setTimeout(() => {
-            URL.revokeObjectURL(url);
-        }, 100);
-    }, 10);
+    // Cleanup after a delay
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, 250);
 
     window.showNotification('Template downloaded as CSV (opens in Excel)', 'success');
 };
