@@ -1,0 +1,8 @@
+{
+    "name": "auditcb-api",
+    "version": "1.0.0",
+    "description": "API functions for AuditCB360",
+    "dependencies": {
+        "nodemailer": "^6.9.8"
+    }
+}

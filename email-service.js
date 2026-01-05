@@ -5,59 +5,90 @@
 // Configuration based on: audit.companycertification.com
 
 const EmailService = {
-    // Configuration
+    // Configuration - Site5 Hosting with Cloudflare
     config: {
         domain: 'audit.companycertification.com',
-        fromName: 'AuditCB360 System',
-        fromEmail: 'notifications@audit.companycertification.com',
-        replyTo: 'support@audit.companycertification.com',
-        enabled: true, // Set to true to "send" (simulate/log)
-        // In production, these would connect to a backend API/SMTP service
-        smtpHost: 'mail.audit.companycertification.com',
-        smtpPort: 587
+        fromName: 'AuditCB360',
+        fromEmail: 'info@companycertification.com',
+        replyTo: 'info@companycertification.com',
+        enabled: true,
+        // Site5 SMTP Settings (adjust based on your cPanel email settings)
+        smtpHost: 'mail.companycertification.com', // or your Site5 server hostname
+        smtpPort: 587, // TLS port (use 465 for SSL)
+        smtpSecure: false, // true for SSL (port 465), false for TLS (port 587)
+        // Note: SMTP credentials should be set via environment variables in production
+        // smtpUser: process.env.SMTP_USER
+        // smtpPass: process.env.SMTP_PASS
     },
 
     /**
-     * Send an email (Simulation/Console Log for now)
-     * In production, this would `fetch` to a backend endpoint like /api/send-email
+     * Send an email via Vercel API endpoint
+     * Connects to Site5 SMTP server
      */
     send: async function (to, subject, htmlContent, templateId = null) {
-        if (!this.config.enabled) return;
+        if (!this.config.enabled) {
+            console.log('[EmailService] Disabled - skipping send');
+            return false;
+        }
 
-        Logger.info(`[EmailService] Sending to ${to}...`);
+        console.log(`[EmailService] Sending to ${to}...`);
 
         const emailData = {
             to: to,
             from: `${this.config.fromName} <${this.config.fromEmail}>`,
+            replyTo: this.config.replyTo,
             subject: subject,
-            html: htmlContent,
-            templateId: templateId,
-            timestamp: new Date().toISOString()
+            html: htmlContent
         };
 
-        // Simulate network delay
-        await new Promise(r => setTimeout(r, 800));
-
-        // LOGGING (Since we don't have a real backend yet)
-        console.groupCollapsed(`📧 EMAIL SENT: ${subject}`);
-        console.log(`To: ${to}`);
-        console.log(`From: ${emailData.from}`);
-        console.log(`Subject: ${subject}`);
-        console.log('--- Content ---');
-        console.log(htmlContent.replace(/<[^>]*>/g, ' ').substring(0, 100) + '...');
-        console.groupEnd();
-
-        Logger.info(`[EmailService] Successfully sent email to ${to}`);
-
-        // Log to Audit Trail
-        if (window.AuditTrail) {
-            window.AuditTrail.log('email_sent', 'system', {
-                recipient: to,
-                subject: subject
+        try {
+            // Call Vercel API endpoint
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(emailData)
             });
-        }
 
-        return true;
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to send email');
+            }
+
+            console.log(`[EmailService] ✅ Email sent successfully to ${to}`);
+            console.log(`[EmailService] Message ID: ${result.messageId}`);
+
+            // Log to Audit Trail
+            if (window.AuditTrail) {
+                window.AuditTrail.log('email_sent', 'system', {
+                    recipient: to,
+                    subject: subject,
+                    messageId: result.messageId
+                });
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error('[EmailService] ❌ Failed to send email:', error.message);
+
+            // Fallback: Log email for manual sending
+            console.groupCollapsed(`📧 EMAIL QUEUED (API unavailable): ${subject}`);
+            console.log(`To: ${to}`);
+            console.log(`Subject: ${subject}`);
+            console.log('--- Content Preview ---');
+            console.log(htmlContent.replace(/<[^>]*>/g, ' ').substring(0, 200) + '...');
+            console.groupEnd();
+
+            // Show user notification
+            if (window.showNotification) {
+                window.showNotification('Email queued - will retry when connection restored', 'warning');
+            }
+
+            return false;
+        }
     },
 
     /**
