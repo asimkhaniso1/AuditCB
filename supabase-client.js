@@ -619,7 +619,7 @@ const SupabaseClient = {
             const { data, error } = await this.client
                 .from('profiles')
                 .select('*')
-                .order('name', { ascending: true });
+                .order('full_name', { ascending: true });
 
             if (error) throw error;
 
