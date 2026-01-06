@@ -2133,7 +2133,8 @@ window.editCBSite = function (idx) {
 
     document.getElementById('modal-save').style.display = '';
     document.getElementById('modal-save').onclick = () => {
-        sites[idx] = {
+        // Update the site directly in state
+        window.state.cbSettings.cbSites[idx] = {
             name: window.Sanitizer.sanitizeText(document.getElementById('site-name').value.trim()),
             address: window.Sanitizer.sanitizeText(document.getElementById('site-address').value.trim()),
             city: window.Sanitizer.sanitizeText(document.getElementById('site-city').value.trim()),
