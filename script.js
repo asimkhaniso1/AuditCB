@@ -2086,6 +2086,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // User is logged in - proceed normally
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+        appContainer.classList.remove('auth-pending');
+        appContainer.classList.add('auth-ready');
+    }
+
     renderRoleSwitcher();
     updateCBLogoDisplay();
     if (state.currentUser?.role) {
@@ -2214,6 +2220,13 @@ window.handleLoginSubmit = async function (form) {
         // Remove overlay and initialize app
         const overlay = document.getElementById('login-overlay');
         if (overlay) overlay.remove();
+
+        // Show app container
+        const appContainer = document.getElementById('app-container');
+        if (appContainer) {
+            appContainer.classList.remove('auth-pending');
+            appContainer.classList.add('auth-ready');
+        }
 
         // Initialize the app
         renderRoleSwitcher();

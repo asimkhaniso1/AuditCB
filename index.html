@@ -51,6 +51,18 @@
             z-index: 10000 !important;
             position: relative !important;
         }
+
+        /* Hide app until login check completes */
+        .auth-pending {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .auth-ready {
+            opacity: 1;
+            pointer-events: auto;
+            transition: opacity 0.3s ease;
+        }
     </style>
 </head>
 
@@ -66,7 +78,7 @@
     <!-- Mobile overlay -->
     <div class="mobile-overlay" id="mobile-overlay"></div>
 
-    <div class="app-container">
+    <div class="app-container auth-pending" id="app-container">
         <!-- LEFT SIDEBAR: CB-Level Functions -->
         <aside class="sidebar" id="sidebar">
             <div class="logo-container" id="cb-logo-display" onclick="window.location.hash = 'dashboard'"
@@ -243,7 +255,7 @@
     <script src="safe-dom.js"></script>
 
     <!-- Load core script to initialize window.state -->
-    <script src="script.js?v=7.1&t=20260106120900"></script>
+    <script src="script.js?v=7.2&t=20260106130100"></script>
 
     <!-- Core Modules load after state is initialized -->
     <script src="constants.js"></script>
