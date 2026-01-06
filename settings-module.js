@@ -191,6 +191,7 @@ function getSettingsSubTabs(mainTab) {
         ],
         'system': [
             { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
+            { id: 'supabase', label: 'Supabase', icon: 'fa-cloud' },
             { id: 'data', label: 'Data Management', icon: 'fa-database' },
             { id: 'usage', label: 'Usage Analytics', icon: 'fa-chart-line' },
             { id: 'activity-log', label: 'Activity Log', icon: 'fa-history' }
@@ -234,6 +235,13 @@ function getSettingsContent(mainTab, subTab) {
         },
         'system': {
             'defaults': () => getDefaultsHTML(),
+            'supabase': () => {
+                // Use SupabaseConfig.showConfigUI() if available
+                if (window.SupabaseConfig && typeof window.SupabaseConfig.showConfigUI === 'function') {
+                    return window.SupabaseConfig.showConfigUI();
+                }
+                return '<div class="card"><h3><i class="fa-solid fa-cloud"></i> Supabase Configuration</h3><p>Supabase configuration module not loaded.</p></div>';
+            },
             'data': () => {
                 setTimeout(() => {
                     if (window.DataMigration && typeof window.DataMigration.renderAdminUI === 'function') {
