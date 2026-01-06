@@ -34,6 +34,11 @@ const ErrorHandler = {
      * Get user-friendly error message
      */
     getUserMessage: function (error, context) {
+        // Handle null/undefined error
+        if (!error) {
+            return `An error occurred in ${context}. Please try again.`;
+        }
+
         const errorMessages = {
             'QuotaExceededError': 'Storage is full. Please export and clear old data to continue.',
             'NetworkError': 'Connection lost. Please check your internet connection.',
@@ -46,7 +51,7 @@ const ErrorHandler = {
         };
 
         // Check for specific error types
-        if (error.name && errorMessages[error.name]) {
+        if (error?.name && errorMessages[error.name]) {
             return errorMessages[error.name];
         }
 

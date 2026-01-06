@@ -2083,8 +2083,13 @@ window.addCBSite = function () {
 };
 
 window.editCBSite = function (idx) {
-    const sites = window.state.cbSettings.cbSites || [];
+    const sites = window.state.cbSettings?.cbSites || [];
     const site = sites[idx];
+
+    if (!site) {
+        window.showNotification('Office location not found', 'error');
+        return;
+    }
 
     document.getElementById('modal-title').textContent = 'Edit Office Location';
     document.getElementById('modal-body').innerHTML = `
