@@ -938,7 +938,7 @@ let lastSaveSize = 0;
 function saveState() {
     // Debounce saves to prevent excessive localStorage writes
     clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
+    saveTimeout = setTimeout(async () => {
         try {
             const stateJSON = JSON.stringify(state);
             const sizeInMB = new Blob([stateJSON]).size / 1024 / 1024;
@@ -954,6 +954,18 @@ function saveState() {
             }
 
             localStorage.setItem('auditCB360State', stateJSON);
+
+            // Auto-sync to Supabase if configured
+            if (window.SupabaseClient?.isInitialized) {
+                try {
+                    // Sync users to Supabase (non-blocking)
+                    window.SupabaseClient.syncUsersToSupabase(state.users || []).catch(e => {
+                        console.warn('Supabase user sync failed:', e);
+                    });
+                } catch (syncError) {
+                    console.warn('Supabase sync error:', syncError);
+                }
+            }
         } catch (e) {
             console.error('Save failed:', e);
             if (e.name === 'QuotaExceededError') {

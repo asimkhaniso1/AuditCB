@@ -2061,6 +2061,10 @@ window.addCBSite = function () {
             return;
         }
 
+        // Ensure cbSettings exists
+        if (!window.state.cbSettings) {
+            window.state.cbSettings = {};
+        }
         if (!window.state.cbSettings.cbSites) {
             window.state.cbSettings.cbSites = [];
         }
@@ -2083,7 +2087,15 @@ window.addCBSite = function () {
 };
 
 window.editCBSite = function (idx) {
-    const sites = window.state.cbSettings?.cbSites || [];
+    // Ensure cbSettings exists
+    if (!window.state.cbSettings) {
+        window.state.cbSettings = { cbSites: [] };
+    }
+    if (!window.state.cbSettings.cbSites) {
+        window.state.cbSettings.cbSites = [];
+    }
+
+    const sites = window.state.cbSettings.cbSites;
     const site = sites[idx];
 
     if (!site) {
