@@ -4043,10 +4043,10 @@ window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
 
 // Update Template Download for Simplified Bulk Clients
 window.downloadImportTemplate = function () {
-    // Use CSV format for reliable downloads across all browsers
-    const headers = ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"];
-    const row1 = ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"];
-    const row2 = ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15", "ISO 27001:2022", "Alice Tech", "alice@techsol.com", "789 Tech Blvd", "San Francisco", "USA"];
+    // Simplified template with only 6 essential fields
+    const headers = ["Name", "Industry", "Standard", "Contact Person", "Email", "Phone"];
+    const row1 = ["Tech Solutions Ltd", "Information Technology", "ISO 9001", "John Doe", "john@techsolutions.com", "+1234567890"];
+    const row2 = ["Global Manufacturing Inc", "Manufacturing", "ISO 9001:2015", "Jane Smith", "jane@globalmanuf.com", "+1987654321"];
 
     const csvContent = [headers, row1, row2]
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
@@ -4219,7 +4219,8 @@ window.importClientsFromExcel = function (file) {
             let updatedCount = 0;
 
             clientsRaw.forEach(row => {
-                const name = row['Client Name'];
+                // Support both old and new template formats
+                const name = row['Name'] || row['Client Name'];
                 if (!name) return;
 
                 // Check existing
@@ -4231,7 +4232,7 @@ window.importClientsFromExcel = function (file) {
                     client = {
                         id: Date.now() + Math.floor(Math.random() * 1000),
                         name: window.Sanitizer.sanitizeText(name),
-                        status: 'Active',
+                        status: 'Active', // Default status
                         contacts: [],
                         sites: [],
                         certificates: []
@@ -4240,13 +4241,37 @@ window.importClientsFromExcel = function (file) {
                     importedCount++;
                 }
 
-                // Update Basic Fields from Simplified Template
-                client.status = window.Sanitizer.sanitizeText(row['Status'] || 'Active');
-                client.industry = window.Sanitizer.sanitizeText(row['Industry'] || '');
-                client.employees = parseInt(row['Employee Count']) || 0;
-                client.website = window.Sanitizer.sanitizeURL(row['Website'] || '');
-                client.nextAudit = row['Next Audit Date'] || '';
-                client.standard = window.Sanitizer.sanitizeText(row['Applicable Standards'] || '');
+                // Update fields from simplified template (6 fields)
+                client.industry = window.Sanitizer.sanitizeText(row['Industry'] || client.industry || '');
+                client.standard = window.Sanitizer.sanitizeText(row['Standard'] || row['Applicable Standards'] || client.standard || '');
+
+                // Handle contact information
+                const contactPerson = row['Contact Person'] || row['Contact Name'];
+                const contactEmail = row['Email'] || row['Contact Email'];
+                const contactPhone = row['Phone'];
+
+                if (contactPerson || contactEmail || contactPhone) {
+                    // Update or create primary contact
+                    if (!client.contacts || client.contacts.length === 0) {
+                        client.contacts = [{
+                            name: window.Sanitizer.sanitizeText(contactPerson || ''),
+                            email: window.Sanitizer.sanitizeEmail(contactEmail || ''),
+                            phone: window.Sanitizer.sanitizeText(contactPhone || ''),
+                            role: 'Primary Contact'
+                        }];
+                    } else {
+                        // Update existing primary contact
+                        client.contacts[0].name = window.Sanitizer.sanitizeText(contactPerson || client.contacts[0].name);
+                        client.contacts[0].email = window.Sanitizer.sanitizeEmail(contactEmail || client.contacts[0].email);
+                        client.contacts[0].phone = window.Sanitizer.sanitizeText(contactPhone || client.contacts[0].phone);
+                    }
+                }
+
+                // Backward compatibility with old template fields
+                if (row['Status']) client.status = window.Sanitizer.sanitizeText(row['Status']);
+                if (row['Employee Count']) client.employees = parseInt(row['Employee Count']) || 0;
+                if (row['Website']) client.website = window.Sanitizer.sanitizeURL(row['Website']);
+                if (row['Next Audit Date']) client.nextAudit = row['Next Audit Date'];
 
                 // Update Contact
                 if (row['Contact Name']) {
