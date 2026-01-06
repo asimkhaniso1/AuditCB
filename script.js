@@ -2247,6 +2247,21 @@ window.handleLoginSubmit = async function (form) {
         window.location.hash = 'dashboard';
         handleRouteChange();
 
+        // Auto-sync from Supabase if configured
+        if (window.SupabaseClient?.isInitialized) {
+            try {
+                window.SupabaseClient.syncUsersFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase sync failed:', err);
+                });
+            } catch (e) {
+                console.warn('Supabase sync error:', e);
+            }
+        }
+
         window.showNotification(`Welcome, ${user.name}!`, 'success');
     } else {
         window.showNotification('Invalid email or password', 'error');
