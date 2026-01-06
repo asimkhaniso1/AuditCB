@@ -958,9 +958,17 @@ function saveState() {
             // Auto-sync to Supabase if configured
             if (window.SupabaseClient?.isInitialized) {
                 try {
-                    // Sync users to Supabase (non-blocking)
+                    // Sync all data types to Supabase (non-blocking)
                     window.SupabaseClient.syncUsersToSupabase(state.users || []).catch(e => {
                         console.warn('Supabase user sync failed:', e);
+                    });
+
+                    window.SupabaseClient.syncClientsToSupabase(state.clients || []).catch(e => {
+                        console.warn('Supabase client sync failed:', e);
+                    });
+
+                    window.SupabaseClient.syncAuditorsToSupabase(state.auditors || []).catch(e => {
+                        console.warn('Supabase auditor sync failed:', e);
                     });
                 } catch (syncError) {
                     console.warn('Supabase sync error:', syncError);

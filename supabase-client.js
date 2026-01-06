@@ -722,6 +722,70 @@ const SupabaseClient = {
             Logger.error('Failed to send password reset email:', error);
             throw error;
         }
+    },
+
+    /**
+     * Sync clients to Supabase
+     */
+    async syncClientsToSupabase(clients) {
+        if (!this.isInitialized || !clients?.length) return;
+
+        try {
+            for (const client of clients) {
+                const clientData = {
+                    id: client.id,
+                    name: client.name,
+                    standard: client.standard,
+                    status: client.status,
+                    type: client.type,
+                    website: client.website || null,
+                    employees: client.employees || 0,
+                    shifts: client.shifts || 'No',
+                    industry: client.industry || null,
+                    contacts: client.contacts || [],
+                    sites: client.sites || [],
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('clients')
+                    .upsert(clientData, { onConflict: 'id' });
+            }
+            Logger.info(`Synced ${clients.length} clients to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync clients:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sync auditors to Supabase
+     */
+    async syncAuditorsToSupabase(auditors) {
+        if (!this.isInitialized || !auditors?.length) return;
+
+        try {
+            for (const auditor of auditors) {
+                const auditorData = {
+                    id: auditor.id,
+                    name: auditor.name,
+                    role: auditor.role,
+                    email: auditor.email || null,
+                    phone: auditor.phone || null,
+                    location: auditor.location || null,
+                    experience: auditor.experience || 0,
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('auditors')
+                    .upsert(auditorData, { onConflict: 'id' });
+            }
+            Logger.info(`Synced ${auditors.length} auditors to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync auditors:', error);
+            throw error;
+        }
     }
 
 };
