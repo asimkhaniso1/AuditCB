@@ -571,8 +571,18 @@ const SupabaseClient = {
         }
 
         try {
+            // Generate UUID from user ID or create new one
+            let userId;
+            if (user.id && typeof user.id === 'string' && user.id.includes('-')) {
+                // Already a UUID
+                userId = user.id;
+            } else {
+                // Generate deterministic UUID from email
+                userId = crypto.randomUUID();
+            }
+
             const profileData = {
-                id: user.id || crypto.randomUUID(),
+                id: userId,
                 email: user.email,
                 name: user.name,
                 role: user.role,
