@@ -2160,7 +2160,7 @@ function showLoginOverlay() {
 }
 
 // Handle Login Form Submission
-window.handleLoginSubmit = function (form) {
+window.handleLoginSubmit = async function (form) {
     const email = form.email.value;
     const password = form.password.value;
 
@@ -2171,13 +2171,37 @@ window.handleLoginSubmit = function (form) {
             name: 'System Admin',
             email: 'info@companycertification.com',
             role: 'Admin',
-            password: 'admin'
+            password: 'admin' // Will be migrated on first login
         }];
     }
 
-    const user = window.state.users.find(u =>
-        u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
+    let user = null;
+
+    // Try to find and verify user
+    for (const u of window.state.users) {
+        if (u.email.toLowerCase() === email.toLowerCase()) {
+            // Check if user has hashed password
+            if (u.password_hash) {
+                // Verify against hash
+                const isValid = await window.PasswordUtils.verifyPassword(password, u.password_hash);
+                if (isValid) {
+                    user = u;
+                    break;
+                }
+            } else if (u.password) {
+                // Legacy plain text password - migrate it
+                if (u.password === password) {
+                    user = u;
+                    // Migrate to hashed password
+                    u.password_hash = await window.PasswordUtils.hashPassword(password);
+                    delete u.password; // Remove plain text
+                    window.saveData();
+                    console.log(`Migrated password for user: ${u.email}`);
+                    break;
+                }
+            }
+        }
+    }
 
     if (user) {
         // Login successful
