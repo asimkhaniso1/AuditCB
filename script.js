@@ -2318,17 +2318,20 @@ window.logoutUser = function () {
     console.log('[DEBUG] logoutUser called');
     if (confirm('Are you sure you want to logout?')) {
         console.log('[DEBUG] User confirmed logout');
-        // Clear current user
-        window.state.currentUser = {
-            name: 'Demo User',
-            role: 'Admin',
-            isDemo: true
-        };
+
+        // Clear current user completely
+        window.state.currentUser = null;
         window.saveData();
+
+        // Close dropdown
+        const dropdown = document.getElementById('user-dropdown-menu');
+        if (dropdown) dropdown.style.display = 'none';
+
+        // Show login overlay
+        showLoginOverlay();
+
         window.showNotification('Logged out successfully', 'info');
-        console.log('[DEBUG] Reloading page...');
-        // Reload to show login page
-        window.location.reload();
+        console.log('[DEBUG] Login overlay shown');
     } else {
         console.log('[DEBUG] User cancelled logout');
     }
