@@ -2,6 +2,7 @@
 // SUPABASE CONFIGURATION MODULE
 // ============================================
 // Centralized Supabase configuration management
+// Version: 2.0 - Permanent credentials configured
 
 const SupabaseConfig = {
 
