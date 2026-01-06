@@ -13,16 +13,11 @@ const SupabaseClient = {
      */
     init: function () {
         try {
-            // Get Supabase credentials from settings or environment
-            const supabaseUrl = window.state?.settings?.supabaseUrl ||
-                localStorage.getItem('supabase_url') ||
-                'YOUR_SUPABASE_URL'; // TODO: Set this in settings
+            // Get Supabase credentials from SupabaseConfig module
+            const supabaseUrl = window.SupabaseConfig?.getUrl();
+            const supabaseKey = window.SupabaseConfig?.getAnonKey();
 
-            const supabaseKey = window.state?.settings?.supabaseAnonKey ||
-                localStorage.getItem('supabase_anon_key') ||
-                'YOUR_SUPABASE_ANON_KEY'; // TODO: Set this in settings
-
-            if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseKey === 'YOUR_SUPABASE_ANON_KEY') {
+            if (!supabaseUrl || !supabaseKey) {
                 Logger.warn('Supabase credentials not configured. Using localStorage fallback.');
                 this.isInitialized = false;
                 return false;
