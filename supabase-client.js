@@ -786,6 +786,100 @@ const SupabaseClient = {
             Logger.error('Failed to sync auditors:', error);
             throw error;
         }
+    },
+
+    /**
+     * Fetch clients from Supabase and merge with local state
+     */
+    async syncClientsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('clients')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localClients = window.state.clients || [];
+            let added = 0, updated = 0;
+
+            data.forEach(client => {
+                const existing = localClients.find(c => c.id === client.id);
+                if (existing) {
+                    // Update existing
+                    Object.assign(existing, client);
+                    updated++;
+                } else {
+                    // Add new
+                    localClients.push(client);
+                    added++;
+                }
+            });
+
+            window.state.clients = localClients;
+            window.saveState();
+            Logger.info(`Synced clients from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch clients from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Fetch auditors from Supabase and merge with local state
+     */
+    async syncAuditorsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('auditors')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localAuditors = window.state.auditors || [];
+            let added = 0, updated = 0;
+
+            data.forEach(auditor => {
+                const existing = localAuditors.find(a => a.id === auditor.id);
+                if (existing) {
+                    // Update existing
+                    Object.assign(existing, auditor);
+                    updated++;
+                } else {
+                    // Add new
+                    localAuditors.push(auditor);
+                    added++;
+                }
+            });
+
+            window.state.auditors = localAuditors;
+            window.saveState();
+            Logger.info(`Synced auditors from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch auditors from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
     }
 
 };

@@ -2266,12 +2266,31 @@ window.handleLoginSubmit = async function (form) {
         // Auto-sync from Supabase if configured
         if (window.SupabaseClient?.isInitialized) {
             try {
+                // Sync users from Supabase
                 window.SupabaseClient.syncUsersFromSupabase().then(result => {
                     if (result.added > 0 || result.updated > 0) {
-                        console.log(`Synced from Supabase: ${result.added} added, ${result.updated} updated`);
+                        console.log(`Synced users from Supabase: ${result.added} added, ${result.updated} updated`);
                     }
                 }).catch(err => {
-                    console.warn('Supabase sync failed:', err);
+                    console.warn('Supabase user sync failed:', err);
+                });
+
+                // Sync clients from Supabase
+                window.SupabaseClient.syncClientsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced clients from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase client sync failed:', err);
+                });
+
+                // Sync auditors from Supabase
+                window.SupabaseClient.syncAuditorsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced auditors from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase auditor sync failed:', err);
                 });
             } catch (e) {
                 console.warn('Supabase sync error:', e);
