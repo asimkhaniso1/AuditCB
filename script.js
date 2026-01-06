@@ -2168,6 +2168,14 @@ function showLoginOverlay() {
                 </button>
             </form>
             
+            <div style="text-align: center; margin-top: 1rem;">
+                <a href="#" onclick="event.preventDefault(); window.showForgotPassword();" 
+                   style="color: #3b82f6; text-decoration: none; font-size: 0.9rem; font-weight: 500;">
+                    <i class="fa-solid fa-key" style="margin-right: 0.25rem;"></i>
+                    Forgot Password?
+                </a>
+            </div>
+            
             <p style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 2rem;">
                 Secure access for authorized personnel only
             </p>
@@ -2267,6 +2275,55 @@ window.handleLoginSubmit = async function (form) {
         window.showNotification('Invalid email or password', 'error');
     }
 };
+
+// Show Forgot Password Dialog
+window.showForgotPassword = function () {
+    const email = prompt('Enter your email address to reset your password:');
+
+    if (!email) return;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        window.showNotification('Please enter a valid email address', 'error');
+        return;
+    }
+
+    // Check if user exists
+    const user = window.state.users?.find(u => u.email === email);
+    if (!user) {
+        window.showNotification('No account found with that email address', 'error');
+        return;
+    }
+
+    // If Supabase is configured, use Supabase password reset
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.sendPasswordResetEmail(email)
+            .then(() => {
+                window.showNotification('Password reset email sent! Check your inbox.', 'success');
+            })
+            .catch(err => {
+                console.error('Password reset failed:', err);
+                window.showNotification('Failed to send reset email. Please contact admin.', 'error');
+            });
+    } else {
+        // Local mode - show password to admin
+        if (confirm(`Local mode: Contact your administrator.\n\nAdmin: Would you like to reset this user's password?`)) {
+            const newPassword = prompt('Enter new password for ' + email + ':');
+            if (newPassword && newPassword.length >= 6) {
+                window.PasswordUtils.hashPassword(newPassword).then(hash => {
+                    user.password_hash = hash;
+                    delete user.password;
+                    window.saveData();
+                    window.showNotification('Password reset successfully!', 'success');
+                });
+            } else {
+                window.showNotification('Password must be at least 6 characters', 'error');
+            }
+        }
+    }
+};
+
 
 // Update CB Logo in Sidebar Header
 function updateCBLogoDisplay() {
