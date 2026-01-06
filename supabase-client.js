@@ -584,10 +584,9 @@ const SupabaseClient = {
             const profileData = {
                 id: userId,
                 email: user.email,
-                name: user.name,
+                full_name: user.name,
                 role: user.role,
-                status: user.status || 'Active',
-                avatar: user.avatar || null,
+                avatar_url: user.avatar || null,
                 updated_at: new Date().toISOString()
             };
 
@@ -677,20 +676,19 @@ const SupabaseClient = {
             const existing = localUsers.find(u => u.email === profile.email);
             if (existing) {
                 // Update existing
-                existing.name = profile.name;
+                existing.name = profile.full_name;
                 existing.role = profile.role;
-                existing.status = profile.status;
-                existing.avatar = profile.avatar;
+                existing.avatar = profile.avatar_url;
                 updated++;
             } else {
                 // Add new
                 localUsers.push({
                     id: profile.id,
                     email: profile.email,
-                    name: profile.name,
+                    name: profile.full_name,
                     role: profile.role,
-                    status: profile.status || 'Active',
-                    avatar: profile.avatar
+                    status: 'Active',
+                    avatar: profile.avatar_url
                 });
                 added++;
             }
