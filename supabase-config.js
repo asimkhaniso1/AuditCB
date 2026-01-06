@@ -5,6 +5,10 @@
 
 const SupabaseConfig = {
 
+    // Default Supabase credentials (permanent configuration)
+    _defaultUrl: 'https://dfzisgfpstrsyncfsxyb.supabase.co',
+    _defaultAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmemlzZ2Zwc3Ryc3luY2ZzeHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxODIyNDYsImV4cCI6MjA4Mjc1ODI0Nn0.TTbauCS-CscAeYGlgACJqDcagt_gf3YQSC0w80IgjIo',
+
     /**
      * Get Supabase URL
      */
@@ -25,7 +29,8 @@ const SupabaseConfig = {
             return window.state.settings.supabaseUrl;
         }
 
-        return null;
+        // Use default (permanent configuration)
+        return this._defaultUrl;
     },
 
     /**
@@ -49,7 +54,8 @@ const SupabaseConfig = {
             return window.state.settings.supabaseAnonKey;
         }
 
-        return null;
+        // Use default (permanent configuration)
+        return this._defaultAnonKey;
     },
 
     /**
