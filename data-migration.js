@@ -292,11 +292,11 @@ const DataMigration = {
                                 </label>
                             </div>
 
-                            <button class="btn btn-danger" onclick="DataMigration.handleClearData()">
+                            <button class="btn btn-danger" onclick="window.DataMigration.handleClearData()">
                                 <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i> Clear Local Data
                             </button>
                             
-                            <button class="btn btn-secondary" onclick="DataMigration.restoreDemoData()" style="margin-left: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="window.DataMigration.restoreDemoData()" style="margin-left: 0.5rem;">
                                 <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Restore Demo Data
                             </button>
                         </div>
