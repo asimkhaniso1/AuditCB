@@ -399,11 +399,11 @@ function getCBProfileHTML() {
                                     <td>${window.UTILS.escapeHtml(site.country || '')}</td>
                                     <td>${window.UTILS.escapeHtml(site.phone || '')}</td>
                                     <td>
-                                        <button type="button" class="btn btn-sm btn-icon" onclick="editCBSite(${idx})" title="Edit">
+                                        <button type="button" class="btn btn-sm btn-icon" onclick="window.editCBSite(${idx})" title="Edit">
                                             <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                         </button>
                                         ${sites.length > 1 ? `
-                                            <button type="button" class="btn btn-sm btn-icon" onclick="deleteCBSite(${idx})" title="Delete">
+                                            <button type="button" class="btn btn-sm btn-icon" onclick="window.deleteCBSite(${idx})" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         ` : ''}
@@ -413,7 +413,7 @@ function getCBProfileHTML() {
                         </tbody>
                     </table>
                 </div>
-                <button type="button" class="btn btn-secondary" onclick="addCBSite()" style="margin-top: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="window.addCBSite()" style="margin-top: 0.5rem;">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                     Add Office Location
                 </button>
