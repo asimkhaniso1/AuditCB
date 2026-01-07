@@ -978,12 +978,29 @@ const SupabaseClient = {
             let added = 0, updated = 0;
 
             data.forEach(plan => {
+                // Map snake_case DB fields to camelCase app fields
+                const mappedPlan = {
+                    id: plan.id,
+                    clientId: plan.client_id,
+                    date: plan.date,
+                    status: plan.status,
+                    auditType: plan.audit_type,
+                    standard: plan.standard,
+                    scope: plan.scope,
+                    manDays: plan.man_days,
+                    selectedChecklists: plan.selected_checklists || [],
+                    startDate: plan.start_date,
+                    endDate: plan.end_date,
+                    leadAuditor: plan.lead_auditor,
+                    auditTeam: plan.audit_team || []
+                };
+
                 const existing = localPlans.find(p => p.id === plan.id);
                 if (existing) {
-                    Object.assign(existing, plan);
+                    Object.assign(existing, mappedPlan);
                     updated++;
                 } else {
-                    localPlans.push(plan);
+                    localPlans.push(mappedPlan);
                     added++;
                 }
             });
@@ -1023,12 +1040,29 @@ const SupabaseClient = {
             let added = 0, updated = 0;
 
             data.forEach(report => {
+                // Map snake_case DB fields to camelCase app fields
+                const mappedReport = {
+                    id: report.id,
+                    clientId: report.client_id,
+                    date: report.date,
+                    scope: report.scope,
+                    standard: report.standard,
+                    auditType: report.audit_type,
+                    leadAuditor: report.lead_auditor,
+                    summary: report.summary,
+                    conclusion: report.conclusion,
+                    ncrs: report.ncrs || [],
+                    findings: report.findings,
+                    createdAt: report.created_at,
+                    updatedAt: report.updated_at
+                };
+
                 const existing = localReports.find(r => r.id === report.id);
                 if (existing) {
-                    Object.assign(existing, report);
+                    Object.assign(existing, mappedReport);
                     updated++;
                 } else {
-                    localReports.push(report);
+                    localReports.push(mappedReport);
                     added++;
                 }
             });
