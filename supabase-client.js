@@ -880,6 +880,158 @@ const SupabaseClient = {
             Logger.error('Failed to fetch auditors from Supabase:', error);
             return { added: 0, updated: 0 };
         }
+    },
+
+    /**
+     * Sync audit plans to Supabase
+     */
+    async syncAuditPlansToSupabase(auditPlans) {
+        if (!this.isInitialized || !auditPlans?.length) return;
+
+        try {
+            for (const plan of auditPlans) {
+                const planData = {
+                    id: plan.id,
+                    client: plan.client,
+                    standard: plan.standard,
+                    date: plan.date,
+                    cost: plan.cost || 0,
+                    auditors: plan.auditors || [],
+                    status: plan.status || 'Planned',
+                    objectives: plan.objectives || null,
+                    scope: plan.scope || null,
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('audit_plans')
+                    .upsert(planData, { onConflict: 'id' });
+            }
+            Logger.info(`Synced ${auditPlans.length} audit plans to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync audit plans:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sync audit reports to Supabase
+     */
+    async syncAuditReportsToSupabase(auditReports) {
+        if (!this.isInitialized || !auditReports?.length) return;
+
+        try {
+            for (const report of auditReports) {
+                const reportData = {
+                    id: report.id,
+                    client: report.client,
+                    date: report.date,
+                    status: report.status || 'Draft',
+                    findings: report.findings || 0,
+                    conclusion: report.conclusion || null,
+                    recommendation: report.recommendation || null,
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('audit_reports')
+                    .upsert(reportData, { onConflict: 'id' });
+            }
+            Logger.info(`Synced ${auditReports.length} audit reports to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync audit reports:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch audit plans from Supabase
+     */
+    async syncAuditPlansFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('audit_plans')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localPlans = window.state.auditPlans || [];
+            let added = 0, updated = 0;
+
+            data.forEach(plan => {
+                const existing = localPlans.find(p => p.id === plan.id);
+                if (existing) {
+                    Object.assign(existing, plan);
+                    updated++;
+                } else {
+                    localPlans.push(plan);
+                    added++;
+                }
+            });
+
+            window.state.auditPlans = localPlans;
+            window.saveState();
+            Logger.info(`Synced audit plans from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch audit plans from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Fetch audit reports from Supabase
+     */
+    async syncAuditReportsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('audit_reports')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localReports = window.state.auditReports || [];
+            let added = 0, updated = 0;
+
+            data.forEach(report => {
+                const existing = localReports.find(r => r.id === report.id);
+                if (existing) {
+                    Object.assign(existing, report);
+                    updated++;
+                } else {
+                    localReports.push(report);
+                    added++;
+                }
+            });
+
+            window.state.auditReports = localReports;
+            window.saveState();
+            Logger.info(`Synced audit reports from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch audit reports from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
     }
 
 };
