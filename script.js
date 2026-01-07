@@ -2213,40 +2213,58 @@ window.handleLoginSubmit = async function (form) {
     const email = form.email.value;
     const password = form.password.value;
 
-    // Ensure default admin exists
-    if (!window.state.users || window.state.users.length === 0) {
-        window.state.users = [{
-            id: 1,
-            name: 'System Admin',
-            email: 'info@companycertification.com',
-            role: 'Admin',
-            password: 'admin' // Will be migrated on first login
-        }];
-    }
-
     let user = null;
 
-    // Try to find and verify user
-    for (const u of window.state.users) {
-        if (u.email.toLowerCase() === email.toLowerCase()) {
-            // Check if user has hashed password
-            if (u.password_hash) {
-                // Verify against hash
-                const isValid = await window.PasswordUtils.verifyPassword(password, u.password_hash);
-                if (isValid) {
-                    user = u;
-                    break;
-                }
-            } else if (u.password) {
-                // Legacy plain text password - migrate it
-                if (u.password === password) {
-                    user = u;
-                    // Migrate to hashed password
-                    u.password_hash = await window.PasswordUtils.hashPassword(password);
-                    delete u.password; // Remove plain text
-                    window.saveData();
-                    console.log(`Migrated password for user: ${u.email}`);
-                    break;
+    // Try Supabase Auth first
+    if (window.SupabaseClient?.isInitialized) {
+        try {
+            const authResult = await window.SupabaseClient.signIn(email, password);
+            if (authResult?.user) {
+                // Supabase auth successful
+                user = {
+                    id: authResult.user.id,
+                    email: authResult.user.email,
+                    name: authResult.user.user_metadata?.full_name || authResult.user.email.split('@')[0],
+                    role: authResult.user.user_metadata?.role || 'Admin',
+                    supabaseAuth: true
+                };
+                console.log('✅ Supabase Auth login successful');
+            }
+        } catch (authError) {
+            console.warn('Supabase Auth failed, trying local auth:', authError.message);
+        }
+    }
+
+    // Fallback to local auth if Supabase auth failed
+    if (!user) {
+        // Ensure default admin exists
+        if (!window.state.users || window.state.users.length === 0) {
+            window.state.users = [{
+                id: 1,
+                name: 'System Admin',
+                email: 'info@companycertification.com',
+                role: 'Admin',
+                password: 'admin'
+            }];
+        }
+
+        // Try local user verification
+        for (const u of window.state.users) {
+            if (u.email.toLowerCase() === email.toLowerCase()) {
+                if (u.password_hash) {
+                    const isValid = await window.PasswordUtils.verifyPassword(password, u.password_hash);
+                    if (isValid) {
+                        user = u;
+                        break;
+                    }
+                } else if (u.password) {
+                    if (u.password === password) {
+                        user = u;
+                        u.password_hash = await window.PasswordUtils.hashPassword(password);
+                        delete u.password;
+                        window.saveData();
+                        break;
+                    }
                 }
             }
         }
