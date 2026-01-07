@@ -236,11 +236,20 @@ function getSettingsContent(mainTab, subTab) {
         'system': {
             'defaults': () => getDefaultsHTML(),
             'supabase': () => {
-                // Use SupabaseConfig.showConfigUI() if available
-                if (window.SupabaseConfig && typeof window.SupabaseConfig.showConfigUI === 'function') {
-                    return window.SupabaseConfig.showConfigUI();
-                }
-                return '<div class="card"><h3><i class="fa-solid fa-cloud"></i> Supabase Configuration</h3><p>Supabase configuration module not loaded.</p></div>';
+                return `
+                    <div class="fade-in">
+                        <h3 style="color: var(--primary-color); margin-bottom: 1rem;">
+                            <i class="fa-solid fa-cloud"></i> Connection Diagnostics
+                        </h3>
+                        <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <p style="margin-bottom: 1rem;">Use this tool to identify why data is not saving.</p>
+                            <button class="btn btn-primary" onclick="window.runSupabaseDiagnostics()">
+                                <i class="fa-solid fa-stethoscope" style="margin-right: 0.5rem;"></i> Run Diagnostics
+                            </button>
+                            <div id="diagnostics-output" style="margin-top: 1.5rem; background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 6px; font-family: monospace; display: none; white-space: pre-wrap;"></div>
+                        </div>
+                    </div>
+                `;
             },
             'data': () => {
                 setTimeout(() => {
@@ -299,6 +308,61 @@ window.switchSettingsSubTab = function (mainTab, subTab) {
 
     // Update content
     document.getElementById('settings-content').innerHTML = getSettingsContent(mainTab, subTab);
+};
+
+
+window.runSupabaseDiagnostics = async function () {
+    const output = document.getElementById('diagnostics-output');
+    if (!output) return;
+
+    output.style.display = 'block';
+    output.innerHTML = 'Starting diagnostics Check...\n';
+
+    const log = (msg, type = 'info') => {
+        const color = type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#e2e8f0';
+        output.innerHTML += `<div style="color: ${color}; margin-bottom: 4px;">[${type.toUpperCase()}] ${msg}</div>`;
+    };
+
+    if (!window.SupabaseClient || !window.SupabaseClient.isInitialized) {
+        log('Supabase Client NOT initialized.', 'error');
+        return;
+    }
+
+    try {
+        log('Testing "clients" table insert...');
+        const testId = 'diag-' + Date.now();
+        const testClient = {
+            id: testId,
+            name: 'Diagnostic Test',
+            status: 'Active',
+            contact_person: 'Test Person',
+            next_audit: null,
+            last_audit: null,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await window.SupabaseClient.client
+            .from('clients')
+            .upsert(testClient);
+
+        if (error) {
+            log(`Insert Failed: ${error.message}`, 'error');
+            if (error.details) log(`Details: ${error.details}`, 'error');
+            if (error.hint) log(`Hint: ${error.hint}`, 'error');
+
+            if (error.status === 400 || error.code === '400') {
+                log('ROOT CAUSE: Database Schema Mismatch (Missing Columns).', 'error');
+                log('SOLUTION: Run FIX_SCHEMA_SNAKE_CASE.sql in Supabase.', 'success');
+            }
+        } else {
+            log('Clients table insert SUCCESS! Schema is correct.', 'success');
+            // Cleanup
+            await window.SupabaseClient.client.from('clients').delete().eq('id', testId);
+        }
+
+    } catch (e) {
+        log(`Exception: ${e.message}`, 'error');
+    }
 };
 
 // Legacy function for compatibility
