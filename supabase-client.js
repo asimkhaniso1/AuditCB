@@ -1334,6 +1334,238 @@ const SupabaseClient = {
             Logger.error('Failed to fetch certification decisions from Supabase:', error);
             return { added: 0, updated: 0 };
         }
+    },
+
+    /**
+     * Upload file to Supabase Storage
+     * @param {File} file - The file to upload
+     * @param {string} folder - Optional folder path (e.g., 'audit-reports', 'certificates')
+     * @returns {Promise<{url: string, path: string}>}
+     */
+    async uploadFile(file, folder = 'documents') {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            // Generate unique filename
+            const timestamp = Date.now();
+            const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filePath = `${folder}/${timestamp}_${sanitizedName}`;
+
+            // Upload file to storage bucket
+            const { data, error } = await this.client.storage
+                .from('audit-files') // Bucket name
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (error) throw error;
+
+            // Get public URL
+            const { data: urlData } = this.client.storage
+                .from('audit-files')
+                .getPublicUrl(filePath);
+
+            Logger.info('File uploaded successfully:', filePath);
+
+            return {
+                path: data.path,
+                url: urlData.publicUrl,
+                name: file.name,
+                size: file.size,
+                type: file.type
+            };
+        } catch (error) {
+            Logger.error('Failed to upload file:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Download file from Supabase Storage
+     * @param {string} filePath - Path to the file in storage
+     * @returns {Promise<Blob>}
+     */
+    async downloadFile(filePath) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { data, error } = await this.client.storage
+                .from('audit-files')
+                .download(filePath);
+
+            if (error) throw error;
+
+            Logger.info('File downloaded successfully:', filePath);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to download file:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete file from Supabase Storage
+     * @param {string} filePath - Path to the file in storage
+     */
+    async deleteFile(filePath) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { error } = await this.client.storage
+                .from('audit-files')
+                .remove([filePath]);
+
+            if (error) throw error;
+
+            Logger.info('File deleted successfully:', filePath);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to delete file:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * List files in a folder
+     * @param {string} folder - Folder path
+     * @returns {Promise<Array>}
+     */
+    async listFiles(folder = '') {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { data, error } = await this.client.storage
+                .from('audit-files')
+                .list(folder, {
+                    limit: 100,
+                    offset: 0,
+                    sortBy: { column: 'created_at', order: 'desc' }
+                });
+
+            if (error) throw error;
+
+            Logger.info(`Listed ${data.length} files in folder: ${folder}`);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to list files:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upload document and save metadata
+     * @param {File} file - The file to upload
+     * @param {Object} metadata - Additional metadata (name, type, etc.)
+     * @returns {Promise<Object>}
+     */
+    async uploadDocument(file, metadata = {}) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            // Upload file to storage
+            const uploadResult = await this.uploadFile(file, metadata.folder || 'documents');
+
+            // Save document metadata to database
+            const docData = {
+                id: Date.now(), // Simple ID generation
+                name: metadata.name || file.name,
+                type: file.type,
+                url: uploadResult.url,
+                storage_path: uploadResult.path,
+                file_size: file.size,
+                uploaded_by: metadata.uploadedBy || window.state?.currentUser?.email || 'Unknown',
+                uploaded_at: new Date().toISOString(),
+                folder: metadata.folder || 'documents',
+                description: metadata.description || null
+            };
+
+            const { data, error } = await this.client
+                .from('documents')
+                .insert(docData)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Add to local state
+            if (!window.state.documents) window.state.documents = [];
+            window.state.documents.push({
+                id: data.id,
+                name: data.name,
+                type: data.type,
+                url: data.url,
+                storagePath: data.storage_path,
+                fileSize: data.file_size,
+                uploadedBy: data.uploaded_by,
+                uploadedAt: data.uploaded_at,
+                folder: data.folder,
+                description: data.description
+            });
+            window.saveState();
+
+            Logger.info('Document uploaded and saved:', data.name);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to upload document:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete document and its file
+     * @param {number} documentId - Document ID
+     */
+    async deleteDocument(documentId) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            // Get document metadata
+            const { data: doc, error: fetchError } = await this.client
+                .from('documents')
+                .select('storage_path')
+                .eq('id', documentId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            // Delete file from storage
+            if (doc.storage_path) {
+                await this.deleteFile(doc.storage_path);
+            }
+
+            // Delete document metadata
+            const { error: deleteError } = await this.client
+                .from('documents')
+                .delete()
+                .eq('id', documentId);
+
+            if (deleteError) throw deleteError;
+
+            // Remove from local state
+            if (window.state.documents) {
+                window.state.documents = window.state.documents.filter(d => d.id !== documentId);
+                window.saveState();
+            }
+
+            Logger.info('Document deleted:', documentId);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to delete document:', error);
+            throw error;
+        }
     }
 
 };
