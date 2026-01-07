@@ -834,7 +834,7 @@ const SupabaseClient = {
                     updatedAt: client.updated_at
                 };
 
-                const existing = localClients.find(c => c.id === client.id);
+                const existing = localClients.find(c => String(c.id) === String(client.id));
                 if (existing) {
                     // Update existing
                     Object.assign(existing, mappedClient);
@@ -881,7 +881,7 @@ const SupabaseClient = {
             let added = 0, updated = 0;
 
             data.forEach(auditor => {
-                const existing = localAuditors.find(a => a.id === auditor.id);
+                const existing = localAuditors.find(a => String(a.id) === String(auditor.id));
                 if (existing) {
                     // Update existing
                     Object.assign(existing, auditor);
@@ -1016,7 +1016,7 @@ const SupabaseClient = {
                     auditTeam: plan.audit_team || []
                 };
 
-                const existing = localPlans.find(p => p.id === plan.id);
+                const existing = localPlans.find(p => String(p.id) === String(plan.id));
                 if (existing) {
                     Object.assign(existing, mappedPlan);
                     updated++;
@@ -1078,7 +1078,7 @@ const SupabaseClient = {
                     updatedAt: report.updated_at
                 };
 
-                const existing = localReports.find(r => r.id === report.id);
+                const existing = localReports.find(r => String(r.id) === String(report.id));
                 if (existing) {
                     Object.assign(existing, mappedReport);
                     updated++;
