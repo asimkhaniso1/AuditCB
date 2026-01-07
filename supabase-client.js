@@ -1355,7 +1355,7 @@ const SupabaseClient = {
 
             // Upload file to storage bucket
             const { data, error } = await this.client.storage
-                .from('audit-files') // Bucket name
+                .from('Documents') // Using existing bucket
                 .upload(filePath, file, {
                     cacheControl: '3600',
                     upsert: false
@@ -1365,7 +1365,7 @@ const SupabaseClient = {
 
             // Get public URL
             const { data: urlData } = this.client.storage
-                .from('audit-files')
+                .from('Documents')
                 .getPublicUrl(filePath);
 
             Logger.info('File uploaded successfully:', filePath);
@@ -1395,7 +1395,7 @@ const SupabaseClient = {
 
         try {
             const { data, error } = await this.client.storage
-                .from('audit-files')
+                .from('Documents')
                 .download(filePath);
 
             if (error) throw error;
@@ -1419,7 +1419,7 @@ const SupabaseClient = {
 
         try {
             const { error } = await this.client.storage
-                .from('audit-files')
+                .from('Documents')
                 .remove([filePath]);
 
             if (error) throw error;
@@ -1444,7 +1444,7 @@ const SupabaseClient = {
 
         try {
             const { data, error } = await this.client.storage
-                .from('audit-files')
+                .from('Documents')
                 .list(folder, {
                     limit: 100,
                     offset: 0,
