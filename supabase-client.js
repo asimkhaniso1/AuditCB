@@ -900,6 +900,8 @@ const SupabaseClient = {
                     status: plan.status || 'Planned',
                     objectives: plan.objectives || null,
                     scope: plan.scope || null,
+                    "manDays": plan.manDays, // Quoted for mixed case column
+                    "selectedChecklists": plan.selectedChecklists || [],
                     updated_at: new Date().toISOString()
                 };
 
@@ -930,6 +932,7 @@ const SupabaseClient = {
                     findings: report.findings || 0,
                     conclusion: report.conclusion || null,
                     recommendation: report.recommendation || null,
+                    ncrs: report.ncrs || [],
                     updated_at: new Date().toISOString()
                 };
 
