@@ -330,20 +330,31 @@ const AuditLogger = {
 
         try {
             // Transform camelCase to snake_case for database
+            // Transform for Supabase DB schema
             const dbEntry = {
-                id: entry.id,
-                timestamp: entry.timestamp,
+                // ID is auto-generated usually, but if we want to sync local ID:
+                // id: entry.id, // Better to let DB generate ID to avoid type conflicts (text vs bigint)
+
+                created_at: entry.timestamp, // Map timestamp -> created_at
                 action: entry.action,
-                entity: entry.entity,
-                entity_id: entry.entityId, // camelCase → snake_case
-                user_id: entry.userId,     // camelCase → snake_case
-                user_name: entry.userName, // camelCase → snake_case
-                user_role: entry.userRole, // camelCase → snake_case
-                changes: entry.changes,
-                metadata: entry.metadata
+                entity_type: entry.entity,   // Map entity -> entity_type
+                entity_id: entry.entityId,   // Map entityId -> entity_id
+                user_email: entry.userName,  // Use userName as email/identifier for now
+
+                // Combine changes and metadata into 'details' JSONB
+                details: {
+                    changes: entry.changes,
+                    metadata: entry.metadata,
+                    user_id: entry.userId,
+                    user_role: entry.userRole
+                }
             };
 
-            await window.SupabaseClient.db.insert('audit_log', dbEntry);
+            const { error } = await window.SupabaseClient.client
+                .from('audit_log')
+                .insert(dbEntry);
+
+            if (error) throw error;
             Logger.debug('Audit log sent to Supabase');
         } catch (error) {
             Logger.warn('Failed to send audit log to Supabase:', error);

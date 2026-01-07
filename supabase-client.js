@@ -1162,7 +1162,7 @@ const SupabaseClient = {
                 .upsert(settingsData, { onConflict: 'id' });
 
             if (error) {
-                console.error('[DEBUG] Supabase Settings Sync Error:', error);
+                console.error('[DEBUG] Supabase Settings Sync Error:', error.message, error.details, error.hint);
                 throw error;
             }
 
