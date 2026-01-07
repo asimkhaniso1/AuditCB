@@ -973,6 +973,9 @@ function saveState() {
 
                     window.SupabaseClient.syncAuditReportsToSupabase(state.auditReports || [])
                         .catch(e => console.warn('Audit report sync failed:', e));
+
+                    window.SupabaseClient.syncChecklistsToSupabase(state.checklists || [])
+                        .catch(e => console.warn('Checklist sync failed:', e));
                 } catch (syncError) {
                     console.warn('Supabase sync error:', syncError);
                 }
@@ -2312,6 +2315,15 @@ window.handleLoginSubmit = async function (form) {
                     }
                 }).catch(err => {
                     console.warn('Supabase audit report sync failed:', err);
+                });
+
+                // Sync checklists from Supabase
+                window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced checklists from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase checklist sync failed:', err);
                 });
             } catch (e) {
                 console.warn('Supabase sync error:', e);

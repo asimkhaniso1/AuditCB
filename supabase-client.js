@@ -1032,6 +1032,101 @@ const SupabaseClient = {
             Logger.error('Failed to fetch audit reports from Supabase:', error);
             return { added: 0, updated: 0 };
         }
+    },
+
+    /**
+     * Sync checklists to Supabase
+     */
+    async syncChecklistsToSupabase(checklists) {
+        if (!this.isInitialized || !checklists?.length) return;
+
+        try {
+            for (const checklist of checklists) {
+                const checklistData = {
+                    id: checklist.id,
+                    name: checklist.name,
+                    standard: checklist.standard,
+                    type: checklist.type || 'global',
+                    audit_type: checklist.auditType || null,
+                    audit_scope: checklist.auditScope || null,
+                    created_by: checklist.createdBy || null,
+                    clauses: checklist.clauses || [],
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('checklists')
+                    .upsert(checklistData, { onConflict: 'id' });
+            }
+            Logger.info(`Synced ${checklists.length} checklists to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync checklists:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch checklists from Supabase
+     */
+    async syncChecklistsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('checklists')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localChecklists = window.state.checklists || [];
+            let added = 0, updated = 0;
+
+            data.forEach(checklist => {
+                const existing = localChecklists.find(c => c.id === checklist.id);
+                if (existing) {
+                    // Update existing - map Supabase fields back to app fields
+                    existing.name = checklist.name;
+                    existing.standard = checklist.standard;
+                    existing.type = checklist.type;
+                    existing.auditType = checklist.audit_type;
+                    existing.auditScope = checklist.audit_scope;
+                    existing.createdBy = checklist.created_by;
+                    existing.clauses = checklist.clauses;
+                    updated++;
+                } else {
+                    // Add new - map Supabase fields to app fields
+                    localChecklists.push({
+                        id: checklist.id,
+                        name: checklist.name,
+                        standard: checklist.standard,
+                        type: checklist.type,
+                        auditType: checklist.audit_type,
+                        auditScope: checklist.audit_scope,
+                        createdBy: checklist.created_by,
+                        clauses: checklist.clauses,
+                        createdAt: checklist.created_at,
+                        updatedAt: checklist.updated_at
+                    });
+                    added++;
+                }
+            });
+
+            window.state.checklists = localChecklists;
+            window.saveState();
+            Logger.info(`Synced checklists from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch checklists from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
     }
 
 };
