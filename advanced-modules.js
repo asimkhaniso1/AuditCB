@@ -45,8 +45,9 @@ function renderAuditorsEnhanced() {
             <td><span style="background: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(auditor.role)}</span></td>
             <td>${(auditor.standards || []).map(s => window.UTILS.escapeHtml(s)).join(', ')}</td>
             <td>
-                ${isAuthorized ? `<button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button>` : ''}
-                <button class="btn btn-sm view-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
+                ${isAuthorized ? `<button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);" title="Edit"><i class="fa-solid fa-edit"></i></button>` : ''}
+                <button class="btn btn-sm view-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);" title="View"><i class="fa-solid fa-eye"></i></button>
+                ${isAuthorized ? `<button class="btn btn-sm delete-auditor" data-auditor-id="${auditor.id}" style="color: var(--danger-color);" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
             </td>
         </tr>
     `).join('');
@@ -184,8 +185,8 @@ function renderAuditorsEnhanced() {
 
     document.querySelectorAll('.view-auditor, .auditor-row').forEach(el => {
         el.addEventListener('click', (e) => {
-            if (!e.target.closest('.edit-auditor')) {
-                const auditorId = parseInt(el.getAttribute('data-auditor-id'));
+            if (!e.target.closest('.edit-auditor') && !e.target.closest('.delete-auditor')) {
+                const auditorId = el.getAttribute('data-auditor-id');
                 renderAuditorDetail(auditorId);
             }
         });
@@ -195,8 +196,17 @@ function renderAuditorsEnhanced() {
     document.querySelectorAll('.edit-auditor').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const auditorId = parseInt(btn.getAttribute('data-auditor-id'));
+            const auditorId = btn.getAttribute('data-auditor-id');
             openEditAuditorModal(auditorId);
+        });
+    });
+
+    // Add event listeners for delete buttons
+    document.querySelectorAll('.delete-auditor').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const auditorId = btn.getAttribute('data-auditor-id');
+            deleteAuditor(auditorId);
         });
     });
 
@@ -223,9 +233,45 @@ window.changeAuditorItemsPerPage = function (val) {
     }
 };
 
+// Delete Auditor Function
+function deleteAuditor(auditorId) {
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
+    if (!auditor) {
+        window.showNotification('Auditor not found', 'error');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete auditor "${auditor.name}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    // Remove from state
+    window.state.auditors = window.state.auditors.filter(a => String(a.id) !== String(auditorId));
+
+    // Save and sync
+    if (window.saveData) window.saveData();
+
+    // Delete from Supabase
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        window.SupabaseClient.client
+            .from('auditors')
+            .delete()
+            .eq('id', String(auditorId))
+            .then(({ error }) => {
+                if (error) {
+                    console.error('Failed to delete auditor from Supabase:', error);
+                }
+            });
+    }
+
+    window.showNotification(`Auditor "${auditor.name}" deleted successfully`, 'success');
+    renderAuditorsEnhanced();
+}
+
+window.deleteAuditor = deleteAuditor;
 
 function renderAuditorDetail(auditorId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
+    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     const html = `
@@ -2596,7 +2642,7 @@ function openAddAuditorModal() {
 }
 
 function openEditAuditorModal(auditorId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
+    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     const modalTitle = document.getElementById('modal-title');
