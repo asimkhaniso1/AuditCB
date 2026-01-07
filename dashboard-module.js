@@ -329,10 +329,21 @@ function renderDashboardEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Destroy existing chart instances to prevent "Canvas already in use" errors
+    const chartIds = ['auditTrendsChart', 'ncrDistributionChart', 'industryChart', 'standardsChart', 'ncrTrendsChart', 'clientGrowthChart'];
+
+    chartIds.forEach(id => {
+        const existingChart = Chart.getChart(id);
+        if (existingChart) {
+            existingChart.destroy();
+        }
+    });
+
+    // Also clear our tracking object
     if (window.dashboardCharts) {
         Object.values(window.dashboardCharts).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') {
-                chart.destroy();
+                // Check if not already destroyed via getChart
+                try { chart.destroy(); } catch (e) { }
             }
         });
     }

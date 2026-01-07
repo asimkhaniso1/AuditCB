@@ -1133,14 +1133,22 @@ const SupabaseClient = {
      * Sync settings to Supabase
      */
     async syncSettingsToSupabase(settings) {
-        if (!this.isInitialized || !settings) return;
+        if (!this.isInitialized) return;
 
         try {
+            // Merge existing state with provided settings
+            const standards = settings?.standards || window.state.settings?.standards || [];
+            const roles = settings?.roles || window.state.settings?.roles || [];
+            const isAdmin = settings?.isAdmin || window.state.settings?.isAdmin || false;
+
             const settingsData = {
                 id: 1, // Single settings record
-                standards: settings.standards || [],
-                roles: settings.roles || [],
-                is_admin: settings.isAdmin || false,
+                standards: standards,
+                roles: roles,
+                is_admin: isAdmin,
+                cb_settings: window.state.cbSettings || {},
+                organization: window.state.orgStructure || [],
+                policies: window.state.cbPolicies || {},
                 updated_at: new Date().toISOString()
             };
 
@@ -1174,11 +1182,18 @@ const SupabaseClient = {
             if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
 
             if (data) {
+                // Update basic settings
                 window.state.settings = {
                     standards: data.standards || [],
                     roles: data.roles || [],
                     isAdmin: data.is_admin || false
                 };
+
+                // Update CB Configuration
+                if (data.cb_settings) window.state.cbSettings = data.cb_settings;
+                if (data.organization) window.state.orgStructure = data.organization;
+                if (data.policies) window.state.cbPolicies = data.policies;
+
                 window.saveState();
                 Logger.info('Synced settings from Supabase');
                 return { updated: true };
