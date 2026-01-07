@@ -1152,9 +1152,16 @@ const SupabaseClient = {
                 updated_at: new Date().toISOString()
             };
 
-            await this.client
+            console.log('[DEBUG] Syncing Settings to Supabase:', settingsData); // DEBUG
+
+            const { error } = await this.client
                 .from('settings')
                 .upsert(settingsData, { onConflict: 'id' });
+
+            if (error) {
+                console.error('[DEBUG] Supabase Settings Sync Error:', error);
+                throw error;
+            }
 
             Logger.info('Synced settings to Supabase');
         } catch (error) {
