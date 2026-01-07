@@ -912,19 +912,20 @@ const SupabaseClient = {
         try {
             for (const plan of auditPlans) {
                 const planData = {
-                    id: plan.id,
-                    client: plan.client,
-                    standard: plan.standard,
-                    date: plan.date,
+                    id: String(plan.id),
+                    client_name: plan.client || plan.clientName || null,
+                    client_id: plan.clientId || null,
+                    standard: plan.standard || null,
+                    date: plan.date || null,
                     cost: plan.cost || 0,
-                    auditors: plan.auditors || [],
+                    auditor_ids: plan.auditors || [],
                     status: plan.status || 'Planned',
                     objectives: plan.objectives || null,
                     scope: plan.scope || null,
-                    man_days: plan.manDays,
+                    man_days: plan.manDays || 0,
                     selected_checklists: plan.selectedChecklists || [],
-                    start_date: plan.date, // Map date to start_date as well for completeness
-                    end_date: plan.endDate || plan.date,
+                    start_date: plan.date || null,
+                    end_date: plan.endDate || plan.date || null,
                     lead_auditor: plan.leadAuditor || null,
                     audit_team: plan.auditTeam || [],
                     updated_at: new Date().toISOString()
@@ -950,9 +951,9 @@ const SupabaseClient = {
         try {
             for (const report of auditReports) {
                 const reportData = {
-                    id: report.id,
-                    client: report.client,
-                    date: report.date,
+                    id: String(report.id),
+                    client_id: report.clientId || null,
+                    date: report.date || null,
                     status: report.status || 'Draft',
                     findings: report.findings || 0,
                     conclusion: report.conclusion || null,
@@ -960,6 +961,7 @@ const SupabaseClient = {
                     ncrs: report.ncrs || [],
                     audit_type: report.auditType || null,
                     lead_auditor: report.leadAuditor || null,
+                    audit_plan_id: report.auditPlanId || null,
                     updated_at: new Date().toISOString()
                 };
 
