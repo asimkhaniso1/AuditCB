@@ -331,8 +331,21 @@ function switchSettingsTab(tabName, btnElement) {
 
 function getCBProfileHTML() {
     const settings = window.state.cbSettings;
-    const sites = settings.cbSites || [{ name: 'Head Office', address: settings.cbAddress, city: '', country: '', phone: settings.cbPhone }];
 
+    // Ensure cbSites exists in state to prevent "Office location not found" errors
+    if (!settings.cbSites || !Array.isArray(settings.cbSites) || settings.cbSites.length === 0) {
+        settings.cbSites = [{
+            name: 'Head Office',
+            address: settings.cbAddress || '',
+            city: '',
+            country: '',
+            phone: settings.cbPhone || ''
+        }];
+        // Note: We don't call properties saveData() here to avoid recursive loops, 
+        // but it will be saved next time user clicks Save.
+    }
+
+    const sites = settings.cbSites;
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
