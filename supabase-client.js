@@ -900,8 +900,12 @@ const SupabaseClient = {
                     status: plan.status || 'Planned',
                     objectives: plan.objectives || null,
                     scope: plan.scope || null,
-                    "manDays": plan.manDays, // Quoted for mixed case column
-                    "selectedChecklists": plan.selectedChecklists || [],
+                    man_days: plan.manDays,
+                    selected_checklists: plan.selectedChecklists || [],
+                    start_date: plan.date, // Map date to start_date as well for completeness
+                    end_date: plan.endDate || plan.date,
+                    lead_auditor: plan.leadAuditor || null,
+                    audit_team: plan.auditTeam || [],
                     updated_at: new Date().toISOString()
                 };
 
@@ -933,6 +937,8 @@ const SupabaseClient = {
                     conclusion: report.conclusion || null,
                     recommendation: report.recommendation || null,
                     ncrs: report.ncrs || [],
+                    audit_type: report.auditType || null,
+                    lead_auditor: report.leadAuditor || null,
                     updated_at: new Date().toISOString()
                 };
 
