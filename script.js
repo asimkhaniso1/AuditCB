@@ -976,6 +976,15 @@ function saveState() {
 
                     window.SupabaseClient.syncChecklistsToSupabase(state.checklists || [])
                         .catch(e => console.warn('Checklist sync failed:', e));
+
+                    window.SupabaseClient.syncSettingsToSupabase(state.settings)
+                        .catch(e => console.warn('Settings sync failed:', e));
+
+                    window.SupabaseClient.syncDocumentsToSupabase(state.documents || [])
+                        .catch(e => console.warn('Document sync failed:', e));
+
+                    window.SupabaseClient.syncCertificationDecisionsToSupabase(state.certificationDecisions || [])
+                        .catch(e => console.warn('Certification decision sync failed:', e));
                 } catch (syncError) {
                     console.warn('Supabase sync error:', syncError);
                 }
@@ -2324,6 +2333,33 @@ window.handleLoginSubmit = async function (form) {
                     }
                 }).catch(err => {
                     console.warn('Supabase checklist sync failed:', err);
+                });
+
+                // Sync settings from Supabase
+                window.SupabaseClient.syncSettingsFromSupabase().then(result => {
+                    if (result.updated) {
+                        console.log('Synced settings from Supabase');
+                    }
+                }).catch(err => {
+                    console.warn('Supabase settings sync failed:', err);
+                });
+
+                // Sync documents from Supabase
+                window.SupabaseClient.syncDocumentsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced documents from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase document sync failed:', err);
+                });
+
+                // Sync certification decisions from Supabase
+                window.SupabaseClient.syncCertificationDecisionsFromSupabase().then(result => {
+                    if (result.updated > 0) {
+                        console.log(`Synced ${result.updated} certification decisions from Supabase`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase certification decision sync failed:', err);
                 });
             } catch (e) {
                 console.warn('Supabase sync error:', e);

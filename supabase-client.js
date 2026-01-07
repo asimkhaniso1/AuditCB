@@ -1127,6 +1127,213 @@ const SupabaseClient = {
             Logger.error('Failed to fetch checklists from Supabase:', error);
             return { added: 0, updated: 0 };
         }
+    },
+
+    /**
+     * Sync settings to Supabase
+     */
+    async syncSettingsToSupabase(settings) {
+        if (!this.isInitialized || !settings) return;
+
+        try {
+            const settingsData = {
+                id: 1, // Single settings record
+                standards: settings.standards || [],
+                roles: settings.roles || [],
+                is_admin: settings.isAdmin || false,
+                updated_at: new Date().toISOString()
+            };
+
+            await this.client
+                .from('settings')
+                .upsert(settingsData, { onConflict: 'id' });
+
+            Logger.info('Synced settings to Supabase');
+        } catch (error) {
+            Logger.error('Failed to sync settings:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch settings from Supabase
+     */
+    async syncSettingsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { updated: false };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('settings')
+                .select('*')
+                .eq('id', 1)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
+
+            if (data) {
+                window.state.settings = {
+                    standards: data.standards || [],
+                    roles: data.roles || [],
+                    isAdmin: data.is_admin || false
+                };
+                window.saveState();
+                Logger.info('Synced settings from Supabase');
+                return { updated: true };
+            }
+
+            return { updated: false };
+        } catch (error) {
+            Logger.error('Failed to fetch settings from Supabase:', error);
+            return { updated: false };
+        }
+    },
+
+    /**
+     * Sync documents to Supabase
+     */
+    async syncDocumentsToSupabase(documents) {
+        if (!this.isInitialized || !documents?.length) return;
+
+        try {
+            for (const doc of documents) {
+                const docData = {
+                    id: doc.id,
+                    name: doc.name,
+                    type: doc.type || null,
+                    url: doc.url || null,
+                    uploaded_by: doc.uploadedBy || null,
+                    uploaded_at: doc.uploadedAt || new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('documents')
+                    .upsert(docData, { onConflict: 'id' });
+            }
+            Logger.info(`Synced ${documents.length} documents to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync documents:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch documents from Supabase
+     */
+    async syncDocumentsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('documents')
+                .select('*')
+                .order('uploaded_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localDocs = window.state.documents || [];
+            let added = 0, updated = 0;
+
+            data.forEach(doc => {
+                const existing = localDocs.find(d => d.id === doc.id);
+                if (existing) {
+                    Object.assign(existing, {
+                        name: doc.name,
+                        type: doc.type,
+                        url: doc.url,
+                        uploadedBy: doc.uploaded_by,
+                        uploadedAt: doc.uploaded_at
+                    });
+                    updated++;
+                } else {
+                    localDocs.push({
+                        id: doc.id,
+                        name: doc.name,
+                        type: doc.type,
+                        url: doc.url,
+                        uploadedBy: doc.uploaded_by,
+                        uploadedAt: doc.uploaded_at
+                    });
+                    added++;
+                }
+            });
+
+            window.state.documents = localDocs;
+            window.saveState();
+            Logger.info(`Synced documents from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch documents from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Sync certification decisions to Supabase
+     */
+    async syncCertificationDecisionsToSupabase(decisions) {
+        if (!this.isInitialized || !decisions?.length) return;
+
+        try {
+            for (const decision of decisions) {
+                const decisionData = {
+                    client: decision.client,
+                    standard: decision.standard,
+                    date: decision.date,
+                    decision: decision.decision,
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('certification_decisions')
+                    .upsert(decisionData, { onConflict: 'client,standard,date' });
+            }
+            Logger.info(`Synced ${decisions.length} certification decisions to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync certification decisions:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch certification decisions from Supabase
+     */
+    async syncCertificationDecisionsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('certification_decisions')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            window.state.certificationDecisions = data;
+            window.saveState();
+            Logger.info(`Synced ${data.length} certification decisions from Supabase`);
+            return { added: 0, updated: data.length };
+        } catch (error) {
+            Logger.error('Failed to fetch certification decisions from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
     }
 
 };
