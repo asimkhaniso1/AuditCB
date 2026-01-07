@@ -955,8 +955,9 @@ function saveState() {
 
             localStorage.setItem('auditCB360State', stateJSON);
 
-            // Auto-sync to Supabase if configured AND user is logged in
-            if (window.SupabaseClient?.isInitialized && state.currentUser) {
+            // TEMPORARILY DISABLED - Auto-sync to Supabase
+            // Will re-enable after fixing table schema issues
+            if (false && window.SupabaseClient?.isInitialized && state.currentUser) {
                 try {
                     // Sync all data types to Supabase (non-blocking)
                     window.SupabaseClient.syncUsersToSupabase(state.users || [])
