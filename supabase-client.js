@@ -744,6 +744,9 @@ const SupabaseClient = {
                     industry: client.industry || null,
                     contacts: client.contacts || [],
                     sites: client.sites || [],
+                    contact_person: client.contactPerson || null,
+                    next_audit: client.nextAudit || null,
+                    last_audit: client.lastAudit || null,
                     updated_at: new Date().toISOString()
                 };
 
@@ -813,14 +816,32 @@ const SupabaseClient = {
             let added = 0, updated = 0;
 
             data.forEach(client => {
+                const mappedClient = {
+                    id: client.id,
+                    name: client.name,
+                    standard: client.standard,
+                    status: client.status,
+                    type: client.type,
+                    website: client.website,
+                    employees: client.employees,
+                    shifts: client.shifts,
+                    industry: client.industry,
+                    contacts: client.contacts || [],
+                    sites: client.sites || [],
+                    contactPerson: client.contact_person,
+                    nextAudit: client.next_audit,
+                    lastAudit: client.last_audit,
+                    updatedAt: client.updated_at
+                };
+
                 const existing = localClients.find(c => c.id === client.id);
                 if (existing) {
                     // Update existing
-                    Object.assign(existing, client);
+                    Object.assign(existing, mappedClient);
                     updated++;
                 } else {
                     // Add new
-                    localClients.push(client);
+                    localClients.push(mappedClient);
                     added++;
                 }
             });
