@@ -635,7 +635,8 @@ window.handleLogoUpload = function (input) {
 // ============================================
 
 function getAccreditationHTML() {
-    const settings = window.state.cbSettings;
+    const settings = window.state.cbSettings || {};
+    const standardsOffered = settings.standardsOffered || [];
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
@@ -674,7 +675,7 @@ function getAccreditationHTML() {
                     ${(settings.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018']).map(std => `
                         <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; flex: 1;">
-                                <input type="checkbox" class="standard-checkbox" value="${std}" ${settings.standardsOffered.includes(std) ? 'checked' : ''}>
+                            <input type="checkbox" class="standard-checkbox" value="${std}" ${standardsOffered.includes(std) ? 'checked' : ''}>
                                 <span style="font-size: 0.9rem;">${std}</span>
                             </label>
                             <button type="button" class="btn btn-sm btn-icon" onclick="deleteStandardFromMasterlist('${std}')" title="Remove from Masterlist" style="color: #cbd5e1; padding: 0;">
@@ -1718,7 +1719,7 @@ function getRetentionHTML() {
 // ============================================
 
 function getQualityPolicyHTML() {
-    const settings = window.state.cbSettings;
+    const settings = window.state.cbSettings || {};
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
@@ -1759,7 +1760,7 @@ function getQualityPolicyHTML() {
                             </tr>
                         </thead>
                         <tbody>
-                            ${settings.qualityObjectives.map((obj, idx) => `
+                            ${(settings.qualityObjectives || []).map((obj, idx) => `
                                 <tr>
                                     <td>${window.UTILS.escapeHtml(obj.objective)}</td>
                                     <td><span class="badge bg-orange">${window.UTILS.escapeHtml(obj.target)}</span></td>
