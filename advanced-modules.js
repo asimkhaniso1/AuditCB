@@ -2314,21 +2314,21 @@ window.randomlySelectSites = function () {
 
     window.showNotification(`Randomly selected ${indicesToSelect.size} sites per sampling requirement.`, 'success');
     window.closeModal();
+};
 
+function openEditAuditorModal(auditorId) {
+    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
+    if (!auditor) return;
 
-    function openEditAuditorModal(auditorId) {
-        const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
-        if (!auditor) return;
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
+    const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
+    const auditorIndustries = auditor.industries || [];
 
-        const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
-        const auditorIndustries = auditor.industries || [];
-
-        modalTitle.textContent = 'Edit Auditor';
-        modalBody.innerHTML = `
+    modalTitle.textContent = 'Edit Auditor';
+    modalBody.innerHTML = `
         < form id = "auditor-form" style = "max-height: 70vh; overflow-y: auto;" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <!-- Basic Info -->
@@ -2424,106 +2424,106 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        window.openModal();
+    window.openModal();
 
-        modalSave.onclick = () => {
-            // 1. Define Fields
-            const fieldIds = {
-                name: 'auditor-name',
-                email: 'auditor-email',
-                phone: 'auditor-phone',
-                experience: 'auditor-experience',
-                manDayRate: 'auditor-rate',
-                customerRating: 'auditor-rating',
-                location: 'auditor-location',
-                pictureUrl: 'auditor-picture',
-                industries: 'auditor-industries', // Note: this is a select multiple in edit implementation
-                languages: 'auditor-languages'
-            };
-
-            // 2. Define Validation Rules
-            const rules = {
-                name: [
-                    { rule: 'required', fieldName: 'Full Name' },
-                    { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
-                    { rule: 'noHtmlTags', fieldName: 'Full Name' }
-                ],
-                email: [
-                    { rule: 'email', fieldName: 'Email' }
-                ],
-                experience: [
-                    { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
-                ],
-                manDayRate: [
-                    { rule: 'number', fieldName: 'Man-Day Rate' }
-                ],
-                pictureUrl: [
-                    { rule: 'url', fieldName: 'Profile Picture URL' }
-                ]
-            };
-
-            // 3. Validate
-            // Special check for standards (required)
-            const standardsSelect = document.getElementById('auditor-standards');
-            if (standardsSelect.selectedOptions.length === 0) {
-                window.showNotification('Please select at least one Qualified Standard', 'error');
-                return;
-            }
-
-            const result = Validator.validateFormElements(fieldIds, rules);
-            if (!result.valid) {
-                Validator.displayErrors(result.errors, fieldIds);
-                window.showNotification('Please fix the form errors', 'error');
-                return;
-            }
-            Validator.clearErrors(fieldIds);
-
-            // 4. Sanitize Data
-            // Note: For select multiple (industries), we get values from DOM separately, so no need to sanitize as text input
-            const cleanData = Sanitizer.sanitizeFormData(result.formData,
-                ['name', 'email', 'phone', 'location', 'languages'] // Treat as text
-            );
-
-            // 5. Update Object
-            auditor.name = cleanData.name;
-            auditor.role = document.getElementById('auditor-role').value;
-            auditor.standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
-
-            const industriesSelect = document.getElementById('auditor-industries');
-            auditor.industries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
-
-            auditor.email = cleanData.email;
-            auditor.phone = cleanData.phone;
-            auditor.location = cleanData.location;
-            auditor.pictureUrl = Sanitizer.sanitizeURL(result.formData.pictureUrl); // Use sanitized URL
-
-            auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
-            auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
-            auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
-            auditor.dateJoined = document.getElementById('auditor-date-joined').value;
-
-            auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
-            auditor.willingToTravel = document.getElementById('auditor-travel').value;
-            auditor.languages = cleanData.languages.split(',').map(l => l.trim()).filter(l => l);
-
-            // 6. Save
-            window.saveData();
-            window.closeModal();
-            renderAuditorDetail(auditorId);
-            window.showNotification('Auditor updated successfully', 'success');
+    modalSave.onclick = () => {
+        // 1. Define Fields
+        const fieldIds = {
+            name: 'auditor-name',
+            email: 'auditor-email',
+            phone: 'auditor-phone',
+            experience: 'auditor-experience',
+            manDayRate: 'auditor-rate',
+            customerRating: 'auditor-rating',
+            location: 'auditor-location',
+            pictureUrl: 'auditor-picture',
+            industries: 'auditor-industries', // Note: this is a select multiple in edit implementation
+            languages: 'auditor-languages'
         };
-    }
-    // Add Training Modal
-    function openAddTrainingModal(auditorId) {
-        const auditor = state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
+        // 2. Define Validation Rules
+        const rules = {
+            name: [
+                { rule: 'required', fieldName: 'Full Name' },
+                { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
+                { rule: 'noHtmlTags', fieldName: 'Full Name' }
+            ],
+            email: [
+                { rule: 'email', fieldName: 'Email' }
+            ],
+            experience: [
+                { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
+            ],
+            manDayRate: [
+                { rule: 'number', fieldName: 'Man-Day Rate' }
+            ],
+            pictureUrl: [
+                { rule: 'url', fieldName: 'Profile Picture URL' }
+            ]
+        };
 
-        modalTitle.textContent = 'Add Training Record';
-        modalBody.innerHTML = `
+        // 3. Validate
+        // Special check for standards (required)
+        const standardsSelect = document.getElementById('auditor-standards');
+        if (standardsSelect.selectedOptions.length === 0) {
+            window.showNotification('Please select at least one Qualified Standard', 'error');
+            return;
+        }
+
+        const result = Validator.validateFormElements(fieldIds, rules);
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
+        }
+        Validator.clearErrors(fieldIds);
+
+        // 4. Sanitize Data
+        // Note: For select multiple (industries), we get values from DOM separately, so no need to sanitize as text input
+        const cleanData = Sanitizer.sanitizeFormData(result.formData,
+            ['name', 'email', 'phone', 'location', 'languages'] // Treat as text
+        );
+
+        // 5. Update Object
+        auditor.name = cleanData.name;
+        auditor.role = document.getElementById('auditor-role').value;
+        auditor.standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
+
+        const industriesSelect = document.getElementById('auditor-industries');
+        auditor.industries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
+
+        auditor.email = cleanData.email;
+        auditor.phone = cleanData.phone;
+        auditor.location = cleanData.location;
+        auditor.pictureUrl = Sanitizer.sanitizeURL(result.formData.pictureUrl); // Use sanitized URL
+
+        auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
+        auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
+        auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
+        auditor.dateJoined = document.getElementById('auditor-date-joined').value;
+
+        auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
+        auditor.willingToTravel = document.getElementById('auditor-travel').value;
+        auditor.languages = cleanData.languages.split(',').map(l => l.trim()).filter(l => l);
+
+        // 6. Save
+        window.saveData();
+        window.closeModal();
+        renderAuditorDetail(auditorId);
+        window.showNotification('Auditor updated successfully', 'success');
+    };
+}
+// Add Training Modal
+function openAddTrainingModal(auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Add Training Record';
+    modalBody.innerHTML = `
         < form id = "training-form" >
             <div class="form-group">
                 <label>Course Name <span style="color: var(--danger-color);">*</span></label>
@@ -2544,38 +2544,38 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        window.openModal();
+    window.openModal();
 
-        modalSave.onclick = () => {
-            const course = document.getElementById('training-course').value;
-            const provider = document.getElementById('training-provider').value;
-            const date = document.getElementById('training-date').value;
-            const certificate = document.getElementById('training-certificate').value;
+    modalSave.onclick = () => {
+        const course = document.getElementById('training-course').value;
+        const provider = document.getElementById('training-provider').value;
+        const date = document.getElementById('training-date').value;
+        const certificate = document.getElementById('training-certificate').value;
 
-            if (course) {
-                if (!auditor.trainings) auditor.trainings = [];
-                auditor.trainings.push({ course, provider, date, certificate });
-                window.saveData();
-                window.closeModal();
-                renderAuditorDetail(auditorId);
-                window.showNotification('Training record added successfully');
-            } else {
-                window.showNotification('Course name is required', 'error');
-            }
-        };
-    }
+        if (course) {
+            if (!auditor.trainings) auditor.trainings = [];
+            auditor.trainings.push({ course, provider, date, certificate });
+            window.saveData();
+            window.closeModal();
+            renderAuditorDetail(auditorId);
+            window.showNotification('Training record added successfully');
+        } else {
+            window.showNotification('Course name is required', 'error');
+        }
+    };
+}
 
-    // Upload Document Modal
-    function openUploadDocumentModal(auditorId) {
-        const auditor = state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+// Upload Document Modal
+function openUploadDocumentModal(auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
 
-        modalTitle.textContent = 'Upload Document';
-        modalBody.innerHTML = `
+    modalTitle.textContent = 'Upload Document';
+    modalBody.innerHTML = `
         < form id = "document-form" >
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
@@ -2597,69 +2597,69 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        window.openModal();
+    window.openModal();
 
-        modalSave.onclick = () => {
-            const name = document.getElementById('doc-name').value;
-            const type = document.getElementById('doc-type').value;
-            const fileInput = document.getElementById('doc-file');
-            const file = fileInput.files[0];
+    modalSave.onclick = () => {
+        const name = document.getElementById('doc-name').value;
+        const type = document.getElementById('doc-type').value;
+        const fileInput = document.getElementById('doc-file');
+        const file = fileInput.files[0];
 
-            if (name) {
-                if (!auditor.documents) auditor.documents = [];
-                // Store document metadata (file would need proper backend storage in production)
-                auditor.documents.push({
-                    name: name,
-                    type: type,
-                    date: new Date().toISOString().split('T')[0],
-                    fileName: file ? file.name : null
-                });
-                window.saveData();
-                window.closeModal();
-                renderAuditorDetail(auditorId);
-                window.showNotification('Document added successfully');
-            } else {
-                window.showNotification('Document name is required', 'error');
-            }
-        };
-    }
-
-    // Export functions to global scope
-    window.renderAuditorsEnhanced = renderAuditorsEnhanced;
-    window.renderAuditorDetail = renderAuditorDetail;
-    window.renderCompetenceMatrix = renderCompetenceMatrix;
-    window.calculateManDays = calculateManDays;
-    window.renderManDayCalculator = renderManDayCalculator;
-    window.openAddAuditorModal = openAddAuditorModal;
-    window.openEditAuditorModal = openEditAuditorModal;
-    window.openAddTrainingModal = openAddTrainingModal;
-    window.openUploadDocumentModal = openUploadDocumentModal;
-
-    // Clear upcoming audit filters and show all items
-    window.clearAuditorUpcomingFilters = function (auditorId) {
-        const dateFilter = document.getElementById('upcoming-date-filter');
-        const locationFilter = document.getElementById('upcoming-location-filter');
-        if (dateFilter) dateFilter.value = '';
-        if (locationFilter) locationFilter.value = '';
-        document.querySelectorAll('.upcoming-audit-item').forEach(item => {
-            item.style.display = 'flex';
-        });
+        if (name) {
+            if (!auditor.documents) auditor.documents = [];
+            // Store document metadata (file would need proper backend storage in production)
+            auditor.documents.push({
+                name: name,
+                type: type,
+                date: new Date().toISOString().split('T')[0],
+                fileName: file ? file.name : null
+            });
+            window.saveData();
+            window.closeModal();
+            renderAuditorDetail(auditorId);
+            window.showNotification('Document added successfully');
+        } else {
+            window.showNotification('Document name is required', 'error');
+        }
     };
+}
 
-    // ============================================
-    // DOCUMENT UPLOAD HELPERS (Auditors)
-    // ============================================
+// Export functions to global scope
+window.renderAuditorsEnhanced = renderAuditorsEnhanced;
+window.renderAuditorDetail = renderAuditorDetail;
+window.renderCompetenceMatrix = renderCompetenceMatrix;
+window.calculateManDays = calculateManDays;
+window.renderManDayCalculator = renderManDayCalculator;
+window.openAddAuditorModal = openAddAuditorModal;
+window.openEditAuditorModal = openEditAuditorModal;
+window.openAddTrainingModal = openAddTrainingModal;
+window.openUploadDocumentModal = openUploadDocumentModal;
 
-    window.openAuditorUploadModal = function (auditorId) {
-        const auditor = state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+// Clear upcoming audit filters and show all items
+window.clearAuditorUpcomingFilters = function (auditorId) {
+    const dateFilter = document.getElementById('upcoming-date-filter');
+    const locationFilter = document.getElementById('upcoming-location-filter');
+    if (dateFilter) dateFilter.value = '';
+    if (locationFilter) locationFilter.value = '';
+    document.querySelectorAll('.upcoming-audit-item').forEach(item => {
+        item.style.display = 'flex';
+    });
+};
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
+// ============================================
+// DOCUMENT UPLOAD HELPERS (Auditors)
+// ============================================
 
-        modalTitle.textContent = 'Upload Auditor Document';
-        modalBody.innerHTML = `
+window.openAuditorUploadModal = function (auditorId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+
+    modalTitle.textContent = 'Upload Auditor Document';
+    modalBody.innerHTML = `
         < form id = "upload-form" >
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
@@ -2694,78 +2694,78 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        window.openModal();
+    window.openModal();
 
-        modalSave.onclick = () => {
-            const name = document.getElementById('doc-name').value;
-            const type = document.getElementById('doc-type').value;
-            const fileInput = document.getElementById('doc-file');
+    modalSave.onclick = () => {
+        const name = document.getElementById('doc-name').value;
+        const type = document.getElementById('doc-type').value;
+        const fileInput = document.getElementById('doc-file');
 
-            if (name) {
-                // Final validation before save
-                if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
-                    alert('File is too large! Max limit is 5MB.');
-                    return;
-                }
-
-                if (!auditor.documents) auditor.documents = [];
-
-                const newDoc = {
-                    id: Date.now().toString(),
-                    name: name,
-                    type: type,
-                    date: new Date().toISOString().split('T')[0],
-                    size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
-                };
-
-                auditor.documents.push(newDoc);
-
-                // Note: Since 'state' is global, we just need to re-render.
-                // If there's a specific saveData function (mock), call it.
-                if (window.saveData) window.saveData();
-
-                window.closeModal();
-                renderAuditorDetail(auditorId); // Refresh view
-                // Force switch back to documents tab
-                setTimeout(() => {
-                    const btn = document.querySelector('.tab-btn[data-tab="documents"]');
-                    if (btn) btn.click();
-                }, 100);
-
-                if (window.showNotification) window.showNotification('Document uploaded successfully');
-            } else {
-                alert('Please enter a document name');
+        if (name) {
+            // Final validation before save
+            if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
+                alert('File is too large! Max limit is 5MB.');
+                return;
             }
-        };
-    };
 
-    window.deleteAuditorDocument = function (auditorId, docId) {
-        const auditor = state.auditors.find(a => a.id === auditorId);
-        if (!auditor || !auditor.documents) return;
+            if (!auditor.documents) auditor.documents = [];
 
-        if (confirm('Are you sure you want to delete this document?')) {
-            auditor.documents = auditor.documents.filter(d => d.id !== docId);
+            const newDoc = {
+                id: Date.now().toString(),
+                name: name,
+                type: type,
+                date: new Date().toISOString().split('T')[0],
+                size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+            };
+
+            auditor.documents.push(newDoc);
+
+            // Note: Since 'state' is global, we just need to re-render.
+            // If there's a specific saveData function (mock), call it.
             if (window.saveData) window.saveData();
-            renderAuditorDetail(auditorId);
+
+            window.closeModal();
+            renderAuditorDetail(auditorId); // Refresh view
+            // Force switch back to documents tab
             setTimeout(() => {
                 const btn = document.querySelector('.tab-btn[data-tab="documents"]');
                 if (btn) btn.click();
             }, 100);
-            if (window.showNotification) window.showNotification('Document deleted');
+
+            if (window.showNotification) window.showNotification('Document uploaded successfully');
+        } else {
+            alert('Please enter a document name');
         }
+    };
+};
+
+window.deleteAuditorDocument = function (auditorId, docId) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor || !auditor.documents) return;
+
+    if (confirm('Are you sure you want to delete this document?')) {
+        auditor.documents = auditor.documents.filter(d => d.id !== docId);
+        if (window.saveData) window.saveData();
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            const btn = document.querySelector('.tab-btn[data-tab="documents"]');
+            if (btn) btn.click();
+        }, 100);
+        if (window.showNotification) window.showNotification('Document deleted');
     }
+}
 
-    // ============================================
-    // ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
-    // ============================================
+// ============================================
+// ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
+// ============================================
 
-    // Add Witness Audit Record
-    window.addWitnessAudit = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+// Add Witness Audit Record
+window.addWitnessAudit = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
 
-        document.getElementById('modal-title').textContent = 'Record Witness Audit';
-        document.getElementById('modal-body').innerHTML = `
+    document.getElementById('modal-title').textContent = 'Record Witness Audit';
+    document.getElementById('modal-body').innerHTML = `
         < form id = "witness-form" >
             <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
                 Record a witness assessment of this auditor during an actual audit.
@@ -2813,44 +2813,44 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            const client = document.getElementById('witness-client').value;
-            if (!client) {
-                window.showNotification('Please enter the client name', 'error');
-                return;
-            }
+    document.getElementById('modal-save').onclick = function () {
+        const client = document.getElementById('witness-client').value;
+        if (!client) {
+            window.showNotification('Please enter the client name', 'error');
+            return;
+        }
 
-            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-            if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
 
-            auditor.evaluations.witnessAudits.unshift({
-                date: document.getElementById('witness-date').value,
-                client: client,
-                standard: document.getElementById('witness-standard').value,
-                witnessedBy: document.getElementById('witness-by').value,
-                rating: parseInt(document.getElementById('witness-rating').value),
-                notes: document.getElementById('witness-notes').value
-            });
+        auditor.evaluations.witnessAudits.unshift({
+            date: document.getElementById('witness-date').value,
+            client: client,
+            standard: document.getElementById('witness-standard').value,
+            witnessedBy: document.getElementById('witness-by').value,
+            rating: parseInt(document.getElementById('witness-rating').value),
+            notes: document.getElementById('witness-notes').value
+        });
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Witness audit recorded', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Witness audit recorded', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+        }, 100);
     };
 
-    // Add Performance Review
-    window.addPerformanceReview = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+    window.openModal();
+};
 
-        document.getElementById('modal-title').textContent = 'Add Performance Review';
-        document.getElementById('modal-body').innerHTML = `
+// Add Performance Review
+window.addPerformanceReview = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Performance Review';
+    document.getElementById('modal-body').innerHTML = `
         < form id = "review-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
@@ -2900,38 +2900,38 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-            if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
+    document.getElementById('modal-save').onclick = function () {
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
 
-            auditor.evaluations.performanceReviews.unshift({
-                date: document.getElementById('review-date').value,
-                type: document.getElementById('review-type').value,
-                rating: parseInt(document.getElementById('review-rating').value),
-                reviewedBy: document.getElementById('review-by').value,
-                outcome: document.getElementById('review-outcome').value,
-                comments: document.getElementById('review-comments').value
-            });
+        auditor.evaluations.performanceReviews.unshift({
+            date: document.getElementById('review-date').value,
+            type: document.getElementById('review-type').value,
+            rating: parseInt(document.getElementById('review-rating').value),
+            reviewedBy: document.getElementById('review-by').value,
+            outcome: document.getElementById('review-outcome').value,
+            comments: document.getElementById('review-comments').value
+        });
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Performance review added', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Performance review added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+        }, 100);
     };
 
-    // Add Training Record
-    window.openAddTrainingModal = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+    window.openModal();
+};
 
-        document.getElementById('modal-title').textContent = 'Add Training Record';
-        document.getElementById('modal-body').innerHTML = `
+// Add Training Record
+window.openAddTrainingModal = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Training Record';
+    document.getElementById('modal-body').innerHTML = `
         < form id = "training-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group" style="grid-column: 1 / -1;">
@@ -2980,45 +2980,45 @@ window.randomlySelectSites = function () {
         </form >
         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            const course = document.getElementById('training-course').value;
-            if (!course) {
-                window.showNotification('Please enter the course name', 'error');
-                return;
-            }
+    document.getElementById('modal-save').onclick = function () {
+        const course = document.getElementById('training-course').value;
+        if (!course) {
+            window.showNotification('Please enter the course name', 'error');
+            return;
+        }
 
-            if (!auditor.trainings) auditor.trainings = [];
+        if (!auditor.trainings) auditor.trainings = [];
 
-            auditor.trainings.unshift({
-                course: course,
-                provider: document.getElementById('training-provider').value || 'Unknown',
-                date: document.getElementById('training-date').value,
-                duration: document.getElementById('training-duration').value + ' hours',
-                cpdHours: parseInt(document.getElementById('training-cpd').value) || 0,
-                type: document.getElementById('training-type').value,
-                certificate: document.getElementById('training-certificate').checked,
-                notes: document.getElementById('training-notes').value
-            });
+        auditor.trainings.unshift({
+            course: course,
+            provider: document.getElementById('training-provider').value || 'Unknown',
+            date: document.getElementById('training-date').value,
+            duration: document.getElementById('training-duration').value + ' hours',
+            cpdHours: parseInt(document.getElementById('training-cpd').value) || 0,
+            type: document.getElementById('training-type').value,
+            certificate: document.getElementById('training-certificate').checked,
+            notes: document.getElementById('training-notes').value
+        });
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Training record added', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="training"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Training record added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="training"]')?.click();
+        }, 100);
     };
 
-    // Add Qualification
-    window.openAddQualificationModal = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+    window.openModal();
+};
 
-        document.getElementById('modal-title').textContent = 'Add Qualification / Academic Degree';
-        document.getElementById('modal-body').innerHTML = `
+// Add Qualification
+window.openAddQualificationModal = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Qualification / Academic Degree';
+    document.getElementById('modal-body').innerHTML = `
         < form id = "qual-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group" style="grid-column: 1 / -1;">
@@ -3102,58 +3102,58 @@ window.randomlySelectSites = function () {
                                                                                                         </form>
                                                                                                         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            const standard = document.getElementById('qual-standard').value;
+    document.getElementById('modal-save').onclick = function () {
+        const standard = document.getElementById('qual-standard').value;
 
-            if (!auditor.qualifications) auditor.qualifications = [];
+        if (!auditor.qualifications) auditor.qualifications = [];
 
-            // Check if standard already exists
-            const exists = auditor.qualifications.some(q => q.standard === standard);
-            if (exists) {
-                if (!confirm('This auditor already has a qualification for ' + standard + '. Add anyway?')) {
-                    return;
-                }
+        // Check if standard already exists
+        const exists = auditor.qualifications.some(q => q.standard === standard);
+        if (exists) {
+            if (!confirm('This auditor already has a qualification for ' + standard + '. Add anyway?')) {
+                return;
             }
+        }
 
-            auditor.qualifications.push({
-                type: document.getElementById('qual-type').value,
-                standard: standard,
-                level: document.getElementById('qual-level').value,
-                certNumber: document.getElementById('qual-cert-number').value || `CERT-${Date.now()}`,
-                issuingBody: document.getElementById('qual-issuing-body').value,
-                fieldOfStudy: document.getElementById('qual-field').value,
-                issueDate: document.getElementById('qual-issue-date').value,
-                expiryDate: document.getElementById('qual-expiry-date').value || null
-            });
+        auditor.qualifications.push({
+            type: document.getElementById('qual-type').value,
+            standard: standard,
+            level: document.getElementById('qual-level').value,
+            certNumber: document.getElementById('qual-cert-number').value || `CERT-${Date.now()}`,
+            issuingBody: document.getElementById('qual-issuing-body').value,
+            fieldOfStudy: document.getElementById('qual-field').value,
+            issueDate: document.getElementById('qual-issue-date').value,
+            expiryDate: document.getElementById('qual-expiry-date').value || null
+        });
 
-            // Also add to standards array if not present
-            if (!auditor.standards.includes(standard.split(':')[0])) {
-                auditor.standards.push(standard.split(':')[0]);
-            }
+        // Also add to standards array if not present
+        if (!auditor.standards.includes(standard.split(':')[0])) {
+            auditor.standards.push(standard.split(':')[0]);
+        }
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Qualification added successfully', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="qualifications"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Qualification added successfully', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="qualifications"]')?.click();
+        }, 100);
     };
 
-    // ============================================
-    // ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
-    // ============================================
+    window.openModal();
+};
 
-    // Add Witness Audit Record
-    window.addWitnessAudit = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+// ============================================
+// ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
+// ============================================
 
-        document.getElementById('modal-title').textContent = 'Record Witness Audit';
-        document.getElementById('modal-body').innerHTML = `
+// Add Witness Audit Record
+window.addWitnessAudit = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Record Witness Audit';
+    document.getElementById('modal-body').innerHTML = `
                                                                                                         <form id="witness-form">
                                                                                                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                                                                                                                 <div class="form-group">
@@ -3200,56 +3200,56 @@ window.randomlySelectSites = function () {
                                                                                                         </form>
                                                                                                         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            const client = document.getElementById('witness-client').value;
-            if (!client) {
-                window.showNotification('Please enter the client name', 'error');
-                return;
-            }
+    document.getElementById('modal-save').onclick = function () {
+        const client = document.getElementById('witness-client').value;
+        if (!client) {
+            window.showNotification('Please enter the client name', 'error');
+            return;
+        }
 
-            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-            if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
 
-            auditor.evaluations.witnessAudits.unshift({
-                date: document.getElementById('witness-date').value,
-                client: client,
-                standard: document.getElementById('witness-standard').value,
-                witnessedBy: document.getElementById('witness-by').value,
-                rating: parseInt(document.getElementById('witness-rating').value),
-                notes: document.getElementById('witness-notes').value
-            });
+        auditor.evaluations.witnessAudits.unshift({
+            date: document.getElementById('witness-date').value,
+            client: client,
+            standard: document.getElementById('witness-standard').value,
+            witnessedBy: document.getElementById('witness-by').value,
+            rating: parseInt(document.getElementById('witness-rating').value),
+            notes: document.getElementById('witness-notes').value
+        });
 
-            // Update auditor evaluation status
-            const isFirstTime = document.getElementById('first-time-audit').checked;
-            if (isFirstTime) {
-                auditor.evaluations.firstTimeAuditor = false; // Requirement met
-            }
+        // Update auditor evaluation status
+        const isFirstTime = document.getElementById('first-time-audit').checked;
+        if (isFirstTime) {
+            auditor.evaluations.firstTimeAuditor = false; // Requirement met
+        }
 
-            // Calculate next witness due date (3 years rule per ISO 17021-1)
-            const witnessDate = new Date(document.getElementById('witness-date').value);
-            witnessDate.setFullYear(witnessDate.getFullYear() + 3);
-            auditor.evaluations.nextWitnessAuditDue = witnessDate.toISOString().split('T')[0];
-            auditor.evaluations.lastWitnessDate = document.getElementById('witness-date').value;
+        // Calculate next witness due date (3 years rule per ISO 17021-1)
+        const witnessDate = new Date(document.getElementById('witness-date').value);
+        witnessDate.setFullYear(witnessDate.getFullYear() + 3);
+        auditor.evaluations.nextWitnessAuditDue = witnessDate.toISOString().split('T')[0];
+        auditor.evaluations.lastWitnessDate = document.getElementById('witness-date').value;
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Witness audit recorded', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="activity"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Witness audit recorded', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+        }, 100);
     };
 
-    // Add Performance Review
-    window.addPerformanceReview = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+    window.openModal();
+};
 
-        document.getElementById('modal-title').textContent = 'Add Performance Review';
-        document.getElementById('modal-body').innerHTML = `
+// Add Performance Review
+window.addPerformanceReview = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Performance Review';
+    document.getElementById('modal-body').innerHTML = `
                                                                                                         <form id="review-form">
                                                                                                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                                                                                                                 <div class="form-group">
@@ -3296,38 +3296,38 @@ window.randomlySelectSites = function () {
                                                                                                         </form>
                                                                                                         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-            if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
+    document.getElementById('modal-save').onclick = function () {
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+        if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
 
-            auditor.evaluations.performanceReviews.unshift({
-                date: document.getElementById('review-date').value,
-                type: document.getElementById('review-type').value,
-                rating: parseInt(document.getElementById('review-rating').value),
-                reviewedBy: document.getElementById('review-by').value,
-                outcome: document.getElementById('review-outcome').value,
-                notes: document.getElementById('review-notes').value
-            });
+        auditor.evaluations.performanceReviews.unshift({
+            date: document.getElementById('review-date').value,
+            type: document.getElementById('review-type').value,
+            rating: parseInt(document.getElementById('review-rating').value),
+            reviewedBy: document.getElementById('review-by').value,
+            outcome: document.getElementById('review-outcome').value,
+            notes: document.getElementById('review-notes').value
+        });
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Performance review added', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="performance"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Performance review added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="performance"]')?.click();
+        }, 100);
     };
 
-    // Add Report Review (Office-based)
-    window.addReportReview = function (auditorId) {
-        const auditor = window.state.auditors.find(a => a.id === auditorId);
-        if (!auditor) return;
+    window.openModal();
+};
 
-        document.getElementById('modal-title').textContent = 'Add Report Review';
-        document.getElementById('modal-body').innerHTML = `
+// Add Report Review (Office-based)
+window.addReportReview = function (auditorId) {
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    if (!auditor) return;
+
+    document.getElementById('modal-title').textContent = 'Add Report Review';
+    document.getElementById('modal-body').innerHTML = `
                                                                                                         <form id="report-review-form">
                                                                                                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                                                                                                                 <div class="form-group">
@@ -3372,82 +3372,82 @@ window.randomlySelectSites = function () {
                                                                                                         </form>
                                                                                                         `;
 
-        document.getElementById('modal-save').onclick = function () {
-            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [], reportReviews: [] };
-            if (!auditor.evaluations.reportReviews) auditor.evaluations.reportReviews = [];
+    document.getElementById('modal-save').onclick = function () {
+        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [], reportReviews: [] };
+        if (!auditor.evaluations.reportReviews) auditor.evaluations.reportReviews = [];
 
-            auditor.evaluations.reportReviews.unshift({
-                reviewDate: document.getElementById('review-date').value,
-                reportType: document.getElementById('report-type').value,
-                client: document.getElementById('audit-client').value,
-                reviewer: document.getElementById('reviewer-name').value,
-                qualityRating: parseInt(document.getElementById('quality-rating').value),
-                completenessRating: parseInt(document.getElementById('completeness-rating').value),
-                technicalRating: parseInt(document.getElementById('technical-rating').value),
-                notes: document.getElementById('review-notes').value
-            });
+        auditor.evaluations.reportReviews.unshift({
+            reviewDate: document.getElementById('review-date').value,
+            reportType: document.getElementById('report-type').value,
+            client: document.getElementById('audit-client').value,
+            reviewer: document.getElementById('reviewer-name').value,
+            qualityRating: parseInt(document.getElementById('quality-rating').value),
+            completenessRating: parseInt(document.getElementById('completeness-rating').value),
+            technicalRating: parseInt(document.getElementById('technical-rating').value),
+            notes: document.getElementById('review-notes').value
+        });
 
-            window.saveData();
-            window.closeModal();
-            window.showNotification('Report review added', 'success');
-            renderAuditorDetail(auditorId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="performance"]')?.click();
-            }, 100);
-        };
-
-        window.openModal();
+        window.saveData();
+        window.closeModal();
+        window.showNotification('Report review added', 'success');
+        renderAuditorDetail(auditorId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="performance"]')?.click();
+        }, 100);
     };
-    // ============================================
-    // MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
-    // ============================================
 
-    function calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites = []) {
-        // IAF MD 1 Formula: Sample = √n
-        let baseSample = Math.sqrt(totalSites);
+    window.openModal();
+};
+// ============================================
+// MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
+// ============================================
 
-        // Risk adjustments
-        const riskMultiplier = {
-            'Low': 0.8,
-            'Medium': 1.0,
-            'High': 1.2
-        };
+function calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites = []) {
+    // IAF MD 1 Formula: Sample = √n
+    let baseSample = Math.sqrt(totalSites);
 
-        // Maturity adjustments (inverse of risk for simplicity)
-        const maturityMultiplier = {
-            'Low': 1.2,      // Low maturity = higher sample
-            'Normal': 1.0,
-            'High': 0.8      // High maturity = lower sample
-        };
+    // Risk adjustments
+    const riskMultiplier = {
+        'Low': 0.8,
+        'Medium': 1.0,
+        'High': 1.2
+    };
 
-        let adjustedSample = baseSample * (riskMultiplier[riskLevel] || 1.0) * (maturityMultiplier[maturityLevel] || 1.0);
+    // Maturity adjustments (inverse of risk for simplicity)
+    const maturityMultiplier = {
+        'Low': 1.2,      // Low maturity = higher sample
+        'Normal': 1.0,
+        'High': 0.8      // High maturity = lower sample
+    };
 
-        // Round up
-        adjustedSample = Math.ceil(adjustedSample);
+    let adjustedSample = baseSample * (riskMultiplier[riskLevel] || 1.0) * (maturityMultiplier[maturityLevel] || 1.0);
 
-        // Minimum 25% of sites
-        const minimumSample = Math.ceil(totalSites * 0.25);
-        adjustedSample = Math.max(adjustedSample, minimumSample);
+    // Round up
+    adjustedSample = Math.ceil(adjustedSample);
 
-        // Never exceed total sites
-        adjustedSample = Math.min(adjustedSample, totalSites);
+    // Minimum 25% of sites
+    const minimumSample = Math.ceil(totalSites * 0.25);
+    adjustedSample = Math.max(adjustedSample, minimumSample);
 
-        // Account for mandatory sites
-        const mandatoryCount = mandatorySites.length;
-        const randomSitesNeeded = Math.max(0, adjustedSample - mandatoryCount);
+    // Never exceed total sites
+    adjustedSample = Math.min(adjustedSample, totalSites);
 
-        return {
-            totalSites,
-            sampleSize: adjustedSample,
-            mandatorySites: mandatoryCount,
-            randomSites: randomSitesNeeded,
-            baseSample: Math.ceil(baseSample),
-            minimumRequired: minimumSample
-        };
-    }
+    // Account for mandatory sites
+    const mandatoryCount = mandatorySites.length;
+    const randomSitesNeeded = Math.max(0, adjustedSample - mandatoryCount);
 
-    function renderMultiSiteSamplingCalculator() {
-        const html = `
+    return {
+        totalSites,
+        sampleSize: adjustedSample,
+        mandatorySites: mandatoryCount,
+        randomSites: randomSitesNeeded,
+        baseSample: Math.ceil(baseSample),
+        minimumRequired: minimumSample
+    };
+}
+
+function renderMultiSiteSamplingCalculator() {
+    const html = `
                                                                                                         <div class="fade-in">
                                                                                                             <div class="card" style="max-width: 900px; margin: 0 auto;">
                                                                                                                 <h2 style="margin-bottom: 1rem; color: var(--primary-color);">
@@ -3548,30 +3548,30 @@ window.randomlySelectSites = function () {
                                                                                                         </div>
                                                                                                         `;
 
-        window.contentArea.innerHTML = html;
+    window.contentArea.innerHTML = html;
 
-        // Form submission handler
-        document.getElementById('sampling-form').addEventListener('submit', (e) => {
-            e.preventDefault();
+    // Form submission handler
+    document.getElementById('sampling-form').addEventListener('submit', (e) => {
+        e.preventDefault();
 
-            const totalSites = parseInt(document.getElementById('total-sites').value);
-            const riskLevel = document.getElementById('risk-level').value;
-            const maturityLevel = document.getElementById('maturity-level').value;
-            const mandatoryCount = parseInt(document.getElementById('mandatory-sites').value) || 0;
+        const totalSites = parseInt(document.getElementById('total-sites').value);
+        const riskLevel = document.getElementById('risk-level').value;
+        const maturityLevel = document.getElementById('maturity-level').value;
+        const mandatoryCount = parseInt(document.getElementById('mandatory-sites').value) || 0;
 
-            // Create array of mandatory sites (just count for now)
-            const mandatorySites = Array(mandatoryCount).fill('Mandatory');
+        // Create array of mandatory sites (just count for now)
+        const mandatorySites = Array(mandatoryCount).fill('Mandatory');
 
-            // Calculate
-            const results = calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites);
+        // Calculate
+        const results = calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites);
 
-            // Display results
-            document.getElementById('result-sample-size').textContent = results.sampleSize;
-            document.getElementById('result-mandatory').textContent = results.mandatorySites;
-            document.getElementById('result-random').textContent = results.randomSites;
+        // Display results
+        document.getElementById('result-sample-size').textContent = results.sampleSize;
+        document.getElementById('result-mandatory').textContent = results.mandatorySites;
+        document.getElementById('result-random').textContent = results.randomSites;
 
-            // Show breakdown
-            const details = `
+        // Show breakdown
+        const details = `
                                                                                                         <div style="display: grid; gap: 0.5rem;">
                                                                                                             <div><strong>Formula Application:</strong></div>
                                                                                                             <div>• Base Sample (√${totalSites}): ${results.baseSample} sites</div>
@@ -3584,12 +3584,16 @@ window.randomlySelectSites = function () {
                                                                                                             <div>• <strong>Total: ${results.sampleSize} sites to audit</strong></div>
                                                                                                         </div>
                                                                                                         `;
-            document.getElementById('sampling-details').innerHTML = details;
+        document.getElementById('sampling-details').innerHTML = details;
 
-            // Show results section
-            document.getElementById('sampling-results').style.display = 'block';
+        // Show results section
+        document.getElementById('sampling-results').style.display = 'block';
 
-            // Scroll to results
-            document.getElementById('sampling-results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-    }
+        // Scroll to results
+        document.getElementById('sampling-results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+}
+}
+// Export function to global scope
+window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
+
