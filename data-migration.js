@@ -226,9 +226,22 @@ const DataMigration = {
                 // Determine if we need to logout
             }
 
-            window.showNotification('Local data cleared successfully! Reloading...', 'success');
+            // 5. Clear Sync Queue and Caches (Offline Manager)
+            localStorage.removeItem('auditcb_sync_queue');
 
-            // 5. Force hard reload after short delay
+            if ('caches' in window) {
+                try {
+                    caches.keys().then(names => {
+                        for (let name of names) {
+                            caches.delete(name);
+                        }
+                    });
+                } catch (e) { console.warn('Cache clearing failed:', e); }
+            }
+
+            window.showNotification('Local data and caches cleared! Reloading...', 'success');
+
+            // 6. Force hard reload after short delay
             setTimeout(() => {
                 window.location.href = window.location.href.split('#')[0] + '#dashboard';
                 window.location.reload(true);

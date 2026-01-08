@@ -2630,7 +2630,7 @@ window.renderAuditorDetail = renderAuditorDetail;
 window.renderCompetenceMatrix = renderCompetenceMatrix;
 window.calculateManDays = calculateManDays;
 window.renderManDayCalculator = renderManDayCalculator;
-window.openAddAuditorModal = openAddAuditorModal;
+
 window.openEditAuditorModal = openEditAuditorModal;
 window.openAddTrainingModal = openAddTrainingModal;
 window.openUploadDocumentModal = openUploadDocumentModal;

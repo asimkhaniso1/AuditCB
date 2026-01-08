@@ -1354,19 +1354,20 @@ document.addEventListener('click', (e) => {
 // Hash-based Routing
 function handleRouteChange() {
     const hash = window.location.hash.substring(1); // Remove #
+    const [baseHash, queryString] = hash.split('?');
 
     // Check if we are leaving a client workspace
-    if (!hash.startsWith('client/') && window.state && window.state.activeClientId) {
+    if (!baseHash.startsWith('client/') && window.state && window.state.activeClientId) {
         if (typeof window.backToDashboard === 'function') {
             window.backToDashboard();
         }
     }
 
-    if (!hash || hash === 'dashboard') {
+    if (!baseHash || baseHash === 'dashboard') {
         renderModule('dashboard', false);
         updateActiveNavItem('dashboard');
-    } else if (hash.startsWith('client/')) {
-        const parts = hash.split('/');
+    } else if (baseHash.startsWith('client/')) {
+        const parts = baseHash.split('/');
         const clientId = parseInt(parts[1]);
         const subModule = parts[2] || 'overview';
         if (typeof window.selectClient === 'function') {
@@ -1382,8 +1383,8 @@ function handleRouteChange() {
             renderModule('clients', false);
         }
     } else {
-        renderModule(hash, false);
-        updateActiveNavItem(hash);
+        renderModule(baseHash, false);
+        updateActiveNavItem(baseHash);
     }
 }
 
@@ -1437,11 +1438,16 @@ async function renderModule(moduleName, syncHash = true) {
         return;
     }
 
+    // Parse Query Params
+    const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
+
     // Update Title
     const titleMap = {
         'dashboard': 'Dashboard',
         'clients': 'Client Management',
+        'client-form': 'Client Form',
         'auditors': 'Auditor Management',
+        'auditor-form': 'Auditor Form',
         'audit-programs': 'Audit Programs',
         'audit-planning': 'Audit Planning',
         'checklists': 'Checklist Library',
@@ -1456,28 +1462,7 @@ async function renderModule(moduleName, syncHash = true) {
         'internal-audit': 'Internal Audit',
         'settings': 'Settings'
     };
-    const routes = {
-        'dashboard': window.renderDashboard,
-        'clients-list': window.renderClientsEnhanced || window.renderClients,
-        'client-overview': window.renderClientOverview,
-        'client-form': window.renderClientForm,
-        'planning-list': window.renderPlanningModule,
-        'execution-list': window.renderExecutionModule,
-        'reporting-list': window.renderReportingModule,
-        'auditors-list': window.renderAuditorsEnhanced || window.renderAuditorsList,
-        'auditor-form': window.renderAuditorForm,
-        'checklists': window.renderChecklistModule,
-        'settings': window.renderSettings,
-        'audit-trail': window.renderAuditTrail,
-        'export': window.renderExportModule,
-        'documents': window.renderDocumentsModule,
-        'certifications': window.renderCertificationsModule,
-        'appeals': window.renderAppealsModule,
-        'impartiality': window.renderImpartialityModule,
-        'management-review': window.renderManagementReviewModule,
-        'retention': window.renderRecordRetentionModule,
-        'ncr-capa': window.renderNcrCapaModule
-    };
+
     pageTitle.textContent = titleMap[moduleName] || 'Dashboard';
 
     // Show Loading State
@@ -1498,19 +1483,31 @@ async function renderModule(moduleName, syncHash = true) {
             case 'clients':
                 if (typeof renderClientsEnhanced === 'function') {
                     renderClientsEnhanced();
-                } else if (route === 'client-form') {
-                    const id = params.get('id');
-                    window.renderClientForm(id);
-                } else if (route === 'auditor-form') {
-                    const id = params.get('id');
-                    window.renderAuditorForm(id);
-                } else if (route === 'checklists') { }
+                } else {
+                    renderClients();
+                }
+                break;
+            case 'client-form':
+                const clientId = urlParams.get('id');
+                if (typeof window.renderClientForm === 'function') {
+                    window.renderClientForm(clientId);
+                } else {
+                    contentArea.innerHTML = '<div class="alert alert-danger">Client Form module not loaded</div>';
+                }
                 break;
             case 'auditors':
                 if (typeof renderAuditorsEnhanced === 'function') {
                     renderAuditorsEnhanced();
                 } else {
                     renderAuditors();
+                }
+                break;
+            case 'auditor-form':
+                const auditorId = urlParams.get('id');
+                if (typeof window.renderAuditorForm === 'function') {
+                    window.renderAuditorForm(auditorId);
+                } else {
+                    contentArea.innerHTML = '<div class="alert alert-danger">Auditor Form module not loaded</div>';
                 }
                 break;
             case 'audit-programs':
