@@ -977,8 +977,11 @@ function saveState() {
                     window.SupabaseClient.syncChecklistsToSupabase(state.checklists || [])
                         .catch(e => console.warn('Checklist sync failed:', e));
 
-                    window.SupabaseClient.syncSettingsToSupabase(state.settings)
-                        .catch(e => console.warn('Settings sync failed:', e));
+                    // NOTE: Settings sync is intentionally NOT automatic
+                    // Settings should only sync when user explicitly clicks Save in Settings UI
+                    // This prevents default values from overwriting user's saved data
+                    // window.SupabaseClient.syncSettingsToSupabase(state.settings)
+                    //     .catch(e => console.warn('Settings sync failed:', e));
 
                     window.SupabaseClient.syncDocumentsToSupabase(state.documents || [])
                         .catch(e => console.warn('Document sync failed:', e));

@@ -127,6 +127,17 @@ function renderSettings() {
     if (!window.state.settingsMainTab) window.state.settingsMainTab = 'cb-profile';
     if (!window.state.settingsSubTab) window.state.settingsSubTab = 'profile';
 
+    // Trigger Supabase settings sync in background (will re-render when complete)
+    if (window.SupabaseClient?.isInitialized && window.SupabaseClient.syncSettingsFromSupabase) {
+        window.SupabaseClient.syncSettingsFromSupabase().then(result => {
+            if (result.updated) {
+                console.log('[Settings] Supabase data loaded, refreshing form...');
+                // Update form fields with loaded data without full re-render (avoid loop)
+                updateSettingsFormFields();
+            }
+        }).catch(err => console.warn('Settings sync error:', err));
+    }
+
     const html = `
         <div class="fade-in">
             <div class="card" style="margin-bottom: 2rem;">
@@ -544,6 +555,14 @@ window.saveCBProfile = function () {
         if (secondaryColor) settings.secondaryColor = secondaryColor.value;
 
         window.saveData();
+
+        // Explicitly sync settings to Supabase when user saves
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.syncSettingsToSupabase(window.state.settings)
+                .then(() => console.log('[Settings] Synced to Supabase'))
+                .catch(e => console.warn('Settings Supabase sync failed:', e));
+        }
+
         window.showNotification('CB Profile saved successfully', 'success');
 
         // Update sidebar header logo
@@ -553,6 +572,36 @@ window.saveCBProfile = function () {
         window.showNotification('An unexpected error occurred. Please refresh the page.', 'error');
     }
 };
+
+// Helper function to update form fields from state (after Supabase sync)
+function updateSettingsFormFields() {
+    const settings = window.state.cbSettings;
+    if (!settings) return;
+
+    const cbName = document.getElementById('cb-name');
+    const cbTagline = document.getElementById('cb-tagline');
+    const cbEmail = document.getElementById('cb-email');
+    const cbWebsite = document.getElementById('cb-website');
+    const cbLogo = document.getElementById('cb-logo');
+    const primaryColor = document.getElementById('primary-color');
+    const secondaryColor = document.getElementById('secondary-color');
+
+    if (cbName && settings.cbName) cbName.value = settings.cbName;
+    if (cbTagline && settings.cbTagline) cbTagline.value = settings.cbTagline;
+    if (cbEmail && settings.cbEmail) cbEmail.value = settings.cbEmail;
+    if (cbWebsite && settings.cbWebsite) cbWebsite.value = settings.cbWebsite;
+    if (cbLogo && settings.logoUrl) cbLogo.value = settings.logoUrl;
+    if (primaryColor && settings.primaryColor) primaryColor.value = settings.primaryColor;
+    if (secondaryColor && settings.secondaryColor) secondaryColor.value = settings.secondaryColor;
+
+    // Update logo preview
+    const logoPreview = document.querySelector('.logo-preview img');
+    if (logoPreview && settings.logoUrl) {
+        logoPreview.src = settings.logoUrl;
+    }
+
+    console.log('[Settings] Form fields updated with Supabase data');
+}
 
 window.handleLogoUpload = function (input) {
     if (input.files && input.files[0]) {
