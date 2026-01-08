@@ -1227,7 +1227,7 @@ const SupabaseClient = {
             const isAdmin = settings?.isAdmin || window.state.settings?.isAdmin || false;
 
             const settingsData = {
-                id: 1, // Single settings record
+                id: '1', // Single settings record - must be TEXT to match DB column
                 standards: standards,
                 roles: roles,
                 is_admin: isAdmin,
@@ -1268,7 +1268,7 @@ const SupabaseClient = {
             const { data, error } = await this.client
                 .from('settings')
                 .select('*')
-                .eq('id', 1)
+                .eq('id', '1')
                 .single();
 
             if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
