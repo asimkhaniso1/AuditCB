@@ -1371,8 +1371,8 @@ function handleRouteChange() {
         const clientId = parseInt(parts[1]);
         const subModule = parts[2] || 'overview';
         if (typeof window.selectClient === 'function') {
-            // If already in client workspace, just switch tab
-            if (window.state.activeClientId === clientId) {
+            // If already in client workspace, just switch tab (use loose equality for ID type mismatch)
+            if (window.state.activeClientId == clientId) {
                 window.renderClientModule(clientId, subModule);
             } else {
                 window.selectClient(clientId);

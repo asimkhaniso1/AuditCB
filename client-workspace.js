@@ -72,7 +72,8 @@ function setupClientSearch() {
 
 // Select a client and switch to their workspace
 window.selectClient = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    // Use loose equality to handle string/number ID mismatch
+    const client = window.state.clients.find(c => c.id == clientId);
     if (!client) return;
 
     // Update active state
@@ -96,7 +97,8 @@ function renderClientSidebarMenu(clientId) {
     const navList = document.querySelector('.main-nav ul');
     if (!navList) return;
 
-    const client = window.state.clients.find(c => c.id === clientId);
+    // Use loose equality to handle string/number ID mismatch
+    const client = window.state.clients.find(c => c.id == clientId);
 
     // Force left sidebar to be visible
     const sidebar = document.getElementById('sidebar');
@@ -234,8 +236,13 @@ window.backToDashboard = function () {
 
 // Main function to render client modules
 window.renderClientModule = function (clientId, moduleName) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+    // Use loose equality to handle string/number ID mismatch
+    const client = window.state.clients.find(c => c.id == clientId);
+    if (!client) {
+        console.error('Client not found for ID:', clientId, 'Available IDs:', window.state.clients.map(c => c.id));
+        window.showNotification('Client not found', 'error');
+        return;
+    }
 
     // Update Sidebar Active Class
     const sidebarItems = document.querySelectorAll('.main-nav li');
