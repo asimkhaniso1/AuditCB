@@ -1584,7 +1584,7 @@ function saveAuditPlan() {
         manDays: [
             { rule: 'required', fieldName: 'Man-Days' },
             { rule: 'number', fieldName: 'Man-Days' },
-            { rule: 'range', min: 0.1, max: 1000, fieldName: 'Man-Days' }
+            { rule: 'range', min: 0, max: 1000, fieldName: 'Man-Days' }
         ],
         onsiteDays: [
             { rule: 'number', fieldName: 'Onsite Days' }

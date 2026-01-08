@@ -733,7 +733,7 @@ function getAccreditationHTML() {
     `;
 }
 
-window.saveAccreditation = function () {
+window.saveAccreditation = async function () {
     const settings = window.state.cbSettings;
     settings.accreditationBody = document.getElementById('ab-name').value;
     settings.accreditationNumber = document.getElementById('ab-number').value;
@@ -743,6 +743,11 @@ window.saveAccreditation = function () {
     settings.standardsOffered = Array.from(document.querySelectorAll('.standard-checkbox:checked')).map(cb => cb.value);
 
     window.saveData();
+
+    if (window.SupabaseClient?.isInitialized) {
+        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+    }
+
     window.showNotification('Accreditation settings saved', 'success');
 };
 
@@ -760,7 +765,7 @@ window.addStandardToMasterlist = function () {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const std = document.getElementById('new-standard-name').value;
 
         if (!std || !std.trim()) {
@@ -777,6 +782,11 @@ window.addStandardToMasterlist = function () {
         if (!settings.availableStandards.includes(cleanStd)) {
             settings.availableStandards.push(cleanStd);
             window.saveData();
+
+            if (window.SupabaseClient?.isInitialized) {
+                try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+            }
+
             window.closeModal();
             switchSettingsTab('accreditation', document.querySelectorAll('.tab-btn')[3]);
             window.showNotification('Standard added to masterlist', 'success');
@@ -875,7 +885,7 @@ window.addGlobalDesignation = function () {
     `;
 
     document.getElementById('modal-save').style.display = '';
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const title = document.getElementById('designation-title').value.trim();
         if (!title) return;
 
@@ -887,6 +897,11 @@ window.addGlobalDesignation = function () {
         });
 
         window.saveData();
+
+        if (window.SupabaseClient?.isInitialized) {
+            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        }
+
         window.closeModal();
         switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
         window.showNotification('Designation added', 'success');
@@ -918,7 +933,7 @@ window.editGlobalDesignation = function (id) {
     `;
 
     document.getElementById('modal-save').style.display = '';
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const title = document.getElementById('designation-title').value.trim();
         if (!title) return;
 
@@ -935,10 +950,15 @@ window.editGlobalDesignation = function (id) {
     window.openModal();
 };
 
-window.deleteGlobalDesignation = function (id) {
+window.deleteGlobalDesignation = async function (id) {
     if (confirm('Delete this designation?')) {
         window.state.orgStructure = window.state.orgStructure.filter(p => p.id !== id);
         window.saveData();
+
+        if (window.SupabaseClient?.isInitialized) {
+            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        }
+
         switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
         window.showNotification('Designation deleted', 'success');
     }
@@ -1815,7 +1835,7 @@ function getQualityPolicyHTML() {
     `;
 }
 
-window.saveQualityPolicy = function () {
+window.saveQualityPolicy = async function () {
     const settings = window.state.cbSettings;
     settings.qualityPolicy = document.getElementById('quality-policy').value;
     settings.msScope = document.getElementById('ms-scope').value;
@@ -1823,6 +1843,11 @@ window.saveQualityPolicy = function () {
     settings.policyApprovedBy = document.getElementById('policy-approved').value;
 
     window.saveData();
+
+    if (window.SupabaseClient?.isInitialized) {
+        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+    }
+
     window.showNotification('Quality Policy saved', 'success');
 };
 
@@ -2214,7 +2239,7 @@ window.addCBSite = function () {
     `;
 
     document.getElementById('modal-save').style.display = '';
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const name = document.getElementById('site-name').value.trim();
         const address = document.getElementById('site-address').value.trim();
 
@@ -2240,6 +2265,11 @@ window.addCBSite = function () {
         });
 
         window.saveData();
+
+        if (window.SupabaseClient?.isInitialized) {
+            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        }
+
         window.closeModal();
         switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
         window.showNotification('Office location added', 'success');
@@ -2294,7 +2324,7 @@ window.editCBSite = function (idx) {
     `;
 
     document.getElementById('modal-save').style.display = '';
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         // Update the site directly in state
         window.state.cbSettings.cbSites[idx] = {
             name: window.Sanitizer.sanitizeText(document.getElementById('site-name').value.trim()),
@@ -2305,6 +2335,11 @@ window.editCBSite = function (idx) {
         };
 
         window.saveData();
+
+        if (window.SupabaseClient?.isInitialized) {
+            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        }
+
         window.closeModal();
         switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
         window.showNotification('Office location updated', 'success');
@@ -2313,10 +2348,15 @@ window.editCBSite = function (idx) {
     window.openModal();
 };
 
-window.deleteCBSite = function (idx) {
+window.deleteCBSite = async function (idx) {
     if (confirm('Delete this office location?')) {
         window.state.cbSettings.cbSites.splice(idx, 1);
         window.saveData();
+
+        if (window.SupabaseClient?.isInitialized) {
+            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        }
+
         switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
         window.showNotification('Office location deleted', 'success');
     }
@@ -2350,6 +2390,11 @@ window.saveQualityPolicy = function () {
     settings.policyApprovedBy = window.Sanitizer.sanitizeText(document.getElementById('policy-approved').value);
 
     window.saveData();
+
+    if (window.SupabaseClient?.isInitialized) {
+        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+    }
+
     window.showNotification('Quality Policy saved', 'success');
 };
 
