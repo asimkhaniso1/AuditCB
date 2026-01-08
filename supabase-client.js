@@ -1018,13 +1018,18 @@ const SupabaseClient = {
                 // Map snake_case DB fields to camelCase app fields
                 const mappedPlan = {
                     id: plan.id,
+                    client: plan.client_name || plan.client,  // Map client_name to client
+                    clientName: plan.client_name,
                     clientId: plan.client_id,
                     date: plan.date,
                     status: plan.status,
                     auditType: plan.audit_type,
                     standard: plan.standard,
                     scope: plan.scope,
+                    objectives: plan.objectives,
+                    cost: plan.cost,
                     manDays: plan.man_days,
+                    auditors: plan.auditor_ids || [],  // Map auditor_ids to auditors
                     selectedChecklists: plan.selected_checklists || [],
                     startDate: plan.start_date,
                     endDate: plan.end_date,
