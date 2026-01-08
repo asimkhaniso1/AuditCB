@@ -600,7 +600,42 @@ function updateSettingsFormFields() {
         logoPreview.src = settings.logoUrl;
     }
 
-    console.log('[Settings] Form fields updated with Supabase data');
+    // Ensure cbSites exists in state (Supabase might not have them)
+    if (!settings.cbSites || !Array.isArray(settings.cbSites) || settings.cbSites.length === 0) {
+        settings.cbSites = [{
+            name: 'Head Office',
+            address: settings.cbAddress || '',
+            city: '',
+            country: '',
+            phone: ''
+        }];
+    }
+
+    // Re-render Office Locations Table
+    const tbody = document.getElementById('cb-sites-tbody');
+    if (tbody) {
+        tbody.innerHTML = settings.cbSites.map((site, idx) => `
+            <tr>
+                <td>${window.UTILS.escapeHtml(site.name)}</td>
+                <td>${window.UTILS.escapeHtml(site.address)}</td>
+                <td>${window.UTILS.escapeHtml(site.city || '')}</td>
+                <td>${window.UTILS.escapeHtml(site.country || '')}</td>
+                <td>${window.UTILS.escapeHtml(site.phone || '')}</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-icon" onclick="window.editCBSite(${idx})" title="Edit">
+                        <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                    </button>
+                    ${settings.cbSites.length > 1 ? `
+                        <button type="button" class="btn btn-sm btn-icon" onclick="window.deleteCBSite(${idx})" title="Delete">
+                            <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    console.log('[Settings] Form fields and tables updated with Supabase data');
 }
 
 window.handleLogoUpload = function (input) {
