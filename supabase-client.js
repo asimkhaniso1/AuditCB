@@ -911,23 +911,34 @@ const SupabaseClient = {
 
         try {
             for (const plan of auditPlans) {
+                // Ensure proper types for all fields
+                const auditorIds = Array.isArray(plan.auditors)
+                    ? plan.auditors.map(a => String(a))
+                    : [];
+                const auditTeam = Array.isArray(plan.auditTeam)
+                    ? plan.auditTeam.map(t => typeof t === 'object' ? String(t.id || t.name || t) : String(t))
+                    : [];
+                const selectedChecklists = Array.isArray(plan.selectedChecklists)
+                    ? plan.selectedChecklists
+                    : [];
+
                 const planData = {
                     id: String(plan.id),
                     client_name: plan.client || plan.clientName || null,
-                    client_id: plan.clientId || null,
+                    client_id: plan.clientId ? String(plan.clientId) : null,
                     standard: plan.standard || null,
                     date: plan.date || null,
-                    cost: plan.cost || 0,
-                    auditor_ids: plan.auditors || [],
+                    cost: Number(plan.cost) || 0,
+                    auditor_ids: auditorIds,
                     status: plan.status || 'Planned',
                     objectives: plan.objectives || null,
                     scope: plan.scope || null,
-                    man_days: plan.manDays || 0,
-                    selected_checklists: plan.selectedChecklists || [],
-                    start_date: plan.date || null,
+                    man_days: Number(plan.manDays) || 0,
+                    selected_checklists: selectedChecklists,
+                    start_date: plan.date || plan.startDate || null,
                     end_date: plan.endDate || plan.date || null,
                     lead_auditor: plan.leadAuditor || null,
-                    audit_team: plan.auditTeam || [],
+                    audit_team: auditTeam,
                     updated_at: new Date().toISOString()
                 };
 
@@ -950,18 +961,21 @@ const SupabaseClient = {
 
         try {
             for (const report of auditReports) {
+                // Ensure proper types for all fields
+                const ncrs = Array.isArray(report.ncrs) ? report.ncrs : [];
+
                 const reportData = {
                     id: String(report.id),
-                    client_id: report.clientId || null,
+                    client_id: report.clientId ? String(report.clientId) : null,
                     date: report.date || null,
                     status: report.status || 'Draft',
-                    findings: report.findings || 0,
+                    findings: Number(report.findings) || 0,
                     conclusion: report.conclusion || null,
                     recommendation: report.recommendation || null,
-                    ncrs: report.ncrs || [],
+                    ncrs: ncrs,
                     audit_type: report.auditType || null,
                     lead_auditor: report.leadAuditor || null,
-                    audit_plan_id: report.auditPlanId || null,
+                    audit_plan_id: report.auditPlanId ? String(report.auditPlanId) : null,
                     updated_at: new Date().toISOString()
                 };
 
