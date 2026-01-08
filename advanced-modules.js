@@ -5,6 +5,12 @@
 // AUDITORS MODULE - Enhanced
 // ============================================
 
+// Emergency Fix: Define missing function to prevent crashes if called by old event listeners
+window.openAddAuditorModal = function () {
+    console.warn('openAddAuditorModal is deprecated. Redirecting to #auditor-form');
+    window.location.hash = '#auditor-form';
+};
+
 function renderAuditorsEnhanced() {
     const state = window.state;
     const searchTerm = state.auditorSearchTerm || '';
