@@ -2369,7 +2369,7 @@ window.deleteCBSite = async function (idx) {
 // Note: saveCBProfile is defined earlier in the file (around line 290)
 // Removed duplicate definition that was overriding the fixed version
 
-window.saveAccreditation = function () {
+window.saveAccreditation = async function () {
     const settings = window.state.cbSettings;
     settings.accreditationBody = window.Sanitizer.sanitizeText(document.getElementById('ab-name').value);
     settings.accreditationNumber = window.Sanitizer.sanitizeText(document.getElementById('ab-number').value);
@@ -2379,10 +2379,15 @@ window.saveAccreditation = function () {
     settings.standardsOffered = Array.from(document.querySelectorAll('.standard-checkbox:checked')).map(cb => window.Sanitizer.sanitizeText(cb.value));
 
     window.saveData();
+
+    if (window.SupabaseClient?.isInitialized) {
+        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+    }
+
     window.showNotification('Accreditation settings saved', 'success');
 };
 
-window.saveQualityPolicy = function () {
+window.saveQualityPolicy = async function () {
     const settings = window.state.cbSettings;
     settings.qualityPolicy = window.Sanitizer.sanitizeText(document.getElementById('quality-policy').value);
     settings.msScope = window.Sanitizer.sanitizeText(document.getElementById('ms-scope').value);
