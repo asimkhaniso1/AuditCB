@@ -59,9 +59,53 @@ const AuditTrail = {
 
         this.save();
 
+        // Cloud Sync (Centralized Logging)
+        this.syncToCloud(entry);
+
         Logger.info(`[AuditTrail] ${entry.user.name} ${action} ${resource}`, details.name || details.id || '');
 
         return entry;
+    },
+
+    /**
+     * Sync log entry to Supabase
+     */
+    syncToCloud: async function (entry) {
+        if (!window.SupabaseClient || !window.SupabaseClient.isInitialized) return;
+
+        try {
+            // Map to DB schema
+            const dbEntry = {
+                // id: let DB generate UUID or serial if needed, but we can try sending our ID
+                // actually DB has gen_random_uuid() default if text, or BIGSERIAL if int.
+                // Best to let DB handle ID or use UUID. 
+                // Our local ID is timestamp (int). DB ID might be UUID (text).
+                // Let's omit ID and let DB generate it.
+                user_email: entry.user.email || entry.user.name, // Fallback
+                action: entry.action,
+                entity_type: entry.resource,
+                entity_id: String(entry.resourceId || ''),
+                details: {
+                    resourceName: entry.resourceName,
+                    ...entry.details,
+                    ip: entry.ip,
+                    userAgent: entry.userAgent
+                },
+                created_at: entry.timestamp
+            };
+
+            const { error } = await window.SupabaseClient.client
+                .from('audit_log')
+                .insert(dbEntry);
+
+            if (error) {
+                // Determine if table missing or permissions issue
+                console.warn('[AuditTrail] Cloud sync error:', error.message);
+            }
+        } catch (err) {
+            // Silent fail for offline
+            // console.debug('[AuditTrail] Offline, log saved locally only');
+        }
     },
 
     /**

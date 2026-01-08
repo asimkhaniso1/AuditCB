@@ -777,6 +777,13 @@ const SupabaseClient = {
                     phone: auditor.phone || null,
                     location: auditor.location || null,
                     experience: auditor.experience || 0,
+                    standards: auditor.standards || [],
+                    expertise: auditor.domainExpertise || auditor.expertise || [],
+                    industries: auditor.industries || [],
+                    man_day_rate: auditor.manDayRate || 0,
+                    education: auditor.education || null,
+                    rating: auditor.customerRating || 0,
+                    status: auditor.status || 'Active',
                     updated_at: new Date().toISOString()
                 };
 
@@ -888,7 +895,22 @@ const SupabaseClient = {
                     updated++;
                 } else {
                     // Add new
-                    localAuditors.push(auditor);
+                    localAuditors.push({
+                        id: auditor.id,
+                        name: auditor.name,
+                        role: auditor.role,
+                        email: auditor.email,
+                        phone: auditor.phone,
+                        location: auditor.location,
+                        experience: auditor.experience,
+                        standards: auditor.standards || [],
+                        domainExpertise: auditor.expertise || [],
+                        industries: auditor.industries || [],
+                        manDayRate: auditor.man_day_rate,
+                        education: auditor.education,
+                        customerRating: auditor.rating,
+                        status: auditor.status
+                    });
                     added++;
                 }
             });
@@ -1030,7 +1052,6 @@ const SupabaseClient = {
                     client_id: plan.clientId ? String(plan.clientId) : null,
                     standard: plan.standard || null,
                     date: plan.date || null,
-                    cost: Number(plan.cost) || 0,
                     auditor_ids: auditorIds,
                     status: plan.status || 'Planned',
                     objectives: plan.objectives || null,
@@ -1129,7 +1150,6 @@ const SupabaseClient = {
                     standard: plan.standard,
                     scope: plan.scope,
                     objectives: plan.objectives,
-                    cost: plan.cost,
                     manDays: plan.man_days,
                     auditors: plan.auditor_ids || [],  // Map auditor_ids to auditors
                     selectedChecklists: plan.selected_checklists || [],

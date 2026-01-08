@@ -11,6 +11,7 @@ async function testFullSupabaseSync() {
         userSync: false,
         clientSync: false,
         auditorSync: false,
+        assignmentSync: false,
         auditPlanSync: false,
         auditReportSync: false
     };
@@ -73,8 +74,28 @@ async function testFullSupabaseSync() {
         console.log('   ❌ Auditor sync failed:', e.message);
     }
 
-    // Test 5: Audit Plan Sync
-    console.log('\n5️⃣ Testing Audit Plan Sync...');
+    // Test 5: Auditor Assignment Sync
+    console.log('\n5️⃣ Testing Auditor Assignment Sync...');
+    try {
+        const assignmentCount = window.state.auditorAssignments?.length || 0;
+        console.log(`   📊 Local assignments: ${assignmentCount}`);
+
+        if (assignmentCount > 0) {
+            await window.SupabaseClient.syncAuditorAssignmentsToSupabase(window.state.auditorAssignments);
+            console.log('   ✅ Assignments synced to Supabase');
+        } else {
+            console.log('   ℹ️ No local assignments to sync (skipping upload)');
+        }
+
+        const assignmentResult = await window.SupabaseClient.syncAuditorAssignmentsFromSupabase();
+        console.log(`   ✅ Assignments loaded from Supabase: ${assignmentResult.added} added, ${assignmentResult.updated} updated`);
+        results.assignmentSync = true;
+    } catch (e) {
+        console.log('   ❌ Assignment sync failed:', e.message);
+    }
+
+    // Test 6: Audit Plan Sync
+    console.log('\n6️⃣ Testing Audit Plan Sync...');
     try {
         const planCount = window.state.auditPlans?.length || 0;
         console.log(`   📊 Local audit plans: ${planCount}`);
@@ -89,8 +110,8 @@ async function testFullSupabaseSync() {
         console.log('   ❌ Audit plan sync failed:', e.message);
     }
 
-    // Test 6: Audit Report Sync
-    console.log('\n6️⃣ Testing Audit Report Sync...');
+    // Test 7: Audit Report Sync
+    console.log('\n7️⃣ Testing Audit Report Sync...');
     try {
         const reportCount = window.state.auditReports?.length || 0;
         console.log(`   📊 Local audit reports: ${reportCount}`);
@@ -111,6 +132,7 @@ async function testFullSupabaseSync() {
     console.log(`Users:          ${results.userSync ? '✅' : '❌'}`);
     console.log(`Clients:        ${results.clientSync ? '✅' : '❌'}`);
     console.log(`Auditors:       ${results.auditorSync ? '✅' : '❌'}`);
+    console.log(`Assignments:    ${results.assignmentSync ? '✅' : '❌'}`);
     console.log(`Audit Plans:    ${results.auditPlanSync ? '✅' : '❌'}`);
     console.log(`Audit Reports:  ${results.auditReportSync ? '✅' : '❌'}`);
 

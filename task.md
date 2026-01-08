@@ -26,7 +26,7 @@
 - [x] Update reporting-module.js to use filtered data
 - [x] Add Assignments tab to settings-module.js
 - [x] Implement assignment CRUD operations
-- [/] Verification testing-module.js to filter reports
+- [x] Verification testing-module.js to filter reports
 - [x] Create assignment management UI for Cert Manager/Admin
 - [x] Sync assignments with Supabase
 
@@ -34,7 +34,7 @@
 - [ ] Test auditor view (sees only assigned clients/plans/reports)
 - [ ] Test Cert Manager view (sees all)
 - [ ] Test Admin view (sees all)
-- [ ] Test assignment persistence in Supabase
+- [x] Test assignment persistence in Supabase
     
 ### Cleanup & Optimization
-- [ ] Run CLEANUP_CLIENT_DUPLICATES.sql to remove duplicate columns
+- [x] Run CLEANUP_CLIENT_DUPLICATES.sql to remove duplicate columns

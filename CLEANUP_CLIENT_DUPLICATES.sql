@@ -1,34 +1,43 @@
 -- ============================================
--- CLEANUP CLIENT DUPLICATES MIGRATION
+-- CLEANUP CLIENT DUPLICATES MIGRATION (ROBUST)
 -- ============================================
--- This script merges data from camelCase columns into snake_case columns
--- and then drops the camelCase columns to fix schema inconsistencies.
+-- This script safely merges data from camelCase columns into snake_case columns if they exist.
 
-BEGIN;
+DO $$
+BEGIN
+    -- 1. Merge nextAudit -> next_audit
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='nextAudit') THEN
+        RAISE NOTICE 'Found "nextAudit" column. Merging data...';
+        EXECUTE 'UPDATE clients SET next_audit = COALESCE(next_audit, "nextAudit") WHERE "nextAudit" IS NOT NULL';
+    ELSE
+        RAISE NOTICE '"nextAudit" column not found. Skipping merge.';
+    END IF;
 
--- 1. Merge nextAudit -> next_audit
-UPDATE clients 
-SET next_audit = COALESCE(next_audit, "nextAudit") 
-WHERE next_audit IS NULL AND "nextAudit" IS NOT NULL;
+    -- 2. Merge lastAudit -> last_audit
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='lastAudit') THEN
+        RAISE NOTICE 'Found "lastAudit" column. Merging data...';
+        EXECUTE 'UPDATE clients SET last_audit = COALESCE(last_audit, "lastAudit") WHERE "lastAudit" IS NOT NULL';
+    ELSE
+        RAISE NOTICE '"lastAudit" column not found. Skipping merge.';
+    END IF;
 
--- 2. Merge lastAudit -> last_audit
-UPDATE clients 
-SET last_audit = COALESCE(last_audit, "lastAudit") 
-WHERE last_audit IS NULL AND "lastAudit" IS NOT NULL;
+    -- 3. Merge contactPerson -> contact_person
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='contactPerson') THEN
+        RAISE NOTICE 'Found "contactPerson" column. Merging data...';
+        EXECUTE 'UPDATE clients SET contact_person = COALESCE(contact_person, "contactPerson") WHERE "contactPerson" IS NOT NULL';
+    ELSE
+        RAISE NOTICE '"contactPerson" column not found. Skipping merge.';
+    END IF;
 
--- 3. Merge contactPerson -> contact_person
-UPDATE clients 
-SET contact_person = COALESCE(contact_person, "contactPerson") 
-WHERE contact_person IS NULL AND "contactPerson" IS NOT NULL;
+END $$;
 
--- 4. Drop duplicate columns
+-- 4. Drop duplicate columns (Safe operation)
 ALTER TABLE clients DROP COLUMN IF EXISTS "nextAudit";
 ALTER TABLE clients DROP COLUMN IF EXISTS "lastAudit";
 ALTER TABLE clients DROP COLUMN IF EXISTS "contactPerson";
 
-COMMIT;
-
--- Verify changes
+-- 5. Verify Cleanup
 SELECT column_name 
 FROM information_schema.columns 
-WHERE table_name = 'clients';
+WHERE table_name = 'clients' 
+ORDER BY column_name;

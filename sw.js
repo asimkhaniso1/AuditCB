@@ -2,23 +2,41 @@
 // SERVICE WORKER - AuditCB360 Offline Mode
 // ============================================
 
-const CACHE_NAME = 'auditcb-v1';
+const CACHE_NAME = 'auditcb-v2';
 const ASSETS_TO_CACHE = [
     './index.html',
     './styles.css',
+    './script.js',
+    './ai-service.js',
     './auth-manager.js',
     './data-sync.js',
     './backup-manager.js',
+    './supabase-client.js',
     './planning-module.js',
     './execution-module.js',
     './reporting-module.js',
     './dashboard-module.js',
     './clients-module.js',
+    './clients-list.js',
+    './clients-detail.js',
+    './clients-modals.js',
+    './client-workspace.js',
     './checklist-module.js',
     './settings-module.js',
     './notifications-module.js',
     './audit-trail-module.js',
+    './auditor-form-module.js',
     './offline-manager.js',
+    './export-module.js',
+    './documents-module.js',
+    './certifications-module.js',
+    './appeals-complaints-module.js',
+    './impartiality-module.js',
+    './management-review-module.js',
+    './record-retention-module.js',
+    './ncr-capa-module.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/chart.js'
 ];

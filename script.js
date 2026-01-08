@@ -1456,6 +1456,28 @@ async function renderModule(moduleName, syncHash = true) {
         'internal-audit': 'Internal Audit',
         'settings': 'Settings'
     };
+    const routes = {
+        'dashboard': window.renderDashboard,
+        'clients-list': window.renderClientsEnhanced || window.renderClients,
+        'client-overview': window.renderClientOverview,
+        'client-form': window.renderClientForm,
+        'planning-list': window.renderPlanningModule,
+        'execution-list': window.renderExecutionModule,
+        'reporting-list': window.renderReportingModule,
+        'auditors-list': window.renderAuditorsEnhanced || window.renderAuditorsList,
+        'auditor-form': window.renderAuditorForm,
+        'checklists': window.renderChecklistModule,
+        'settings': window.renderSettings,
+        'audit-trail': window.renderAuditTrail,
+        'export': window.renderExportModule,
+        'documents': window.renderDocumentsModule,
+        'certifications': window.renderCertificationsModule,
+        'appeals': window.renderAppealsModule,
+        'impartiality': window.renderImpartialityModule,
+        'management-review': window.renderManagementReviewModule,
+        'retention': window.renderRecordRetentionModule,
+        'ncr-capa': window.renderNcrCapaModule
+    };
     pageTitle.textContent = titleMap[moduleName] || 'Dashboard';
 
     // Show Loading State
@@ -1475,10 +1497,13 @@ async function renderModule(moduleName, syncHash = true) {
                 break;
             case 'clients':
                 if (typeof renderClientsEnhanced === 'function') {
-                    renderClientsEnhanced();
-                } else {
-                    renderClients();
-                }
+                } else if (route === 'client-form') {
+                    const id = params.get('id');
+                    window.renderClientForm(id);
+                } else if (route === 'auditor-form') {
+                    const id = params.get('id');
+                    window.renderAuditorForm(id);
+                } else if (route === 'checklists') { }
                 break;
             case 'auditors':
                 if (typeof renderAuditorsEnhanced === 'function') {

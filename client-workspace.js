@@ -400,9 +400,7 @@ function renderClientOverview(client) {
                 <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">
                     <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Raise NCR
                 </button>
-                <button class="btn btn-outline-secondary" onclick="window.openEditClientModal(${client.id})">
-                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem;"></i>Edit Profile
-                </button>
+
             </div>
 
             <!-- Alerts Section -->
