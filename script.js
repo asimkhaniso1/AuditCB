@@ -2357,6 +2357,11 @@ window.handleLoginSubmit = async function (form) {
                 window.SupabaseClient.syncSettingsFromSupabase().then(result => {
                     if (result.updated) {
                         console.log('Synced settings from Supabase');
+                        // Re-render Settings page if user is currently viewing it
+                        if (window.location.hash === '#settings' && window.renderSettings) {
+                            console.log('Re-rendering Settings page with Supabase data');
+                            window.renderSettings();
+                        }
                     }
                 }).catch(err => {
                     console.warn('Supabase settings sync failed:', err);
