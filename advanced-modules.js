@@ -3593,7 +3593,6 @@ function renderMultiSiteSamplingCalculator() {
         document.getElementById('sampling-results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 }
-}
 // Export function to global scope
 window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
 
