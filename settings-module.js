@@ -4149,7 +4149,7 @@ window.openQuickAssignModal = function (auditorId, auditorName) {
 };
 
 // Save assignment
-function saveAssignment() {
+async function saveAssignment() {
     const auditorId = parseInt(document.getElementById('assign-auditor').value);
     const clientId = parseInt(document.getElementById('assign-client').value);
     const notes = document.getElementById('assign-notes')?.value || '';
@@ -4182,6 +4182,17 @@ function saveAssignment() {
     });
 
     window.saveData();
+
+    // Sync with Supabase
+    if (window.SupabaseClient?.isInitialized) {
+        try {
+            await window.SupabaseClient.syncAuditorAssignmentsToSupabase(window.state.auditorAssignments);
+        } catch (error) {
+            console.error('Failed to sync assignments to Supabase:', error);
+            window.showNotification('Assignment saved locally, but cloud sync failed.', 'warning');
+        }
+    }
+
     window.closeModal();
     switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
     window.showNotification('Assignment created successfully!', 'success');
@@ -4253,7 +4264,7 @@ function getActivityLogHTML() {
 }
 
 // Remove assignment
-window.removeAssignment = function (auditorId, clientId) {
+window.removeAssignment = async function (auditorId, clientId) {
     const auditor = window.state.auditors.find(a => a.id == auditorId);
     const client = window.state.clients.find(c => c.id == clientId);
 
@@ -4269,6 +4280,17 @@ This only removes future access to new client data.`;
             a => !(a.auditorId == auditorId && a.clientId == clientId)
         );
         window.saveData();
+
+        // Sync delete to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            try {
+                await window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId);
+            } catch (error) {
+                console.error('Failed to remove assignment from Supabase:', error);
+                window.showNotification('Assignment removed locally, but cloud sync failed.', 'warning');
+            }
+        }
+
         switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
         window.showNotification('Assignment removed. Historical audit records retained.', 'success');
     }

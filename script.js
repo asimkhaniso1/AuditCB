@@ -2329,6 +2329,15 @@ window.handleLoginSubmit = async function (form) {
                     console.warn('Supabase auditor sync failed:', err);
                 });
 
+                // Sync auditor assignments from Supabase
+                window.SupabaseClient.syncAuditorAssignmentsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced auditor assignments from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase auditor assignments sync failed:', err);
+                });
+
                 // Sync audit plans from Supabase
                 window.SupabaseClient.syncAuditPlansFromSupabase().then(result => {
                     if (result.added > 0 || result.updated > 0) {

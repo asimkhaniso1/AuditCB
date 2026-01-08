@@ -904,6 +904,108 @@ const SupabaseClient = {
     },
 
     /**
+     * Sync auditor assignments to Supabase
+     */
+    async syncAuditorAssignmentsToSupabase(assignments) {
+        if (!this.isInitialized || !assignments?.length) return;
+
+        try {
+            for (const assignment of assignments) {
+                const data = {
+                    auditor_id: assignment.auditorId,
+                    client_id: assignment.clientId,
+                    assigned_by: assignment.assignedBy,
+                    assigned_at: assignment.assignedAt || new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                await this.client
+                    .from('auditor_assignments')
+                    .upsert(data, { onConflict: 'auditor_id,client_id' });
+            }
+            Logger.info(`Synced ${assignments.length} assignments to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync assignments:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch auditor assignments from Supabase
+     */
+    async syncAuditorAssignmentsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { data, error } = await this.client
+                .from('auditor_assignments')
+                .select('*');
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localAssignments = window.state.auditorAssignments || [];
+            let added = 0, updated = 0;
+
+            data.forEach(remote => {
+                const existing = localAssignments.find(l =>
+                    l.auditorId === remote.auditor_id && l.clientId === remote.client_id
+                );
+
+                const mapped = {
+                    auditorId: remote.auditor_id,
+                    clientId: remote.client_id,
+                    assignedBy: remote.assigned_by,
+                    assignedAt: remote.assigned_at
+                };
+
+                if (existing) {
+                    Object.assign(existing, mapped);
+                    updated++;
+                } else {
+                    localAssignments.push(mapped);
+                    added++;
+                }
+            });
+
+            window.state.auditorAssignments = localAssignments;
+            window.saveData();
+            Logger.info(`Synced assignments from Supabase: ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch assignments from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Delete auditor assignment
+     */
+    async deleteAuditorAssignment(auditorId, clientId) {
+        if (!this.isInitialized) return null;
+
+        try {
+            const { error } = await this.client
+                .from('auditor_assignments')
+                .delete()
+                .match({ auditor_id: auditorId, client_id: clientId });
+
+            if (error) throw error;
+            Logger.info(`Deleted assignment for auditor ${auditorId} and client ${clientId}`);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to delete assignment:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Sync audit plans to Supabase
      */
     async syncAuditPlansToSupabase(auditPlans) {

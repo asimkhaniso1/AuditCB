@@ -65,7 +65,7 @@ const DataSync = {
 
             const userId = window.state.currentUser.id;
             // Sanitize file path
-            const safeUserId = userId.replace(/[^a-z0-9-]/gi, '_');
+            const safeUserId = String(userId).replace(/[^a-z0-9-]/gi, '_');
             const path = `user_data/${safeUserId}/latest_state.json`;
             const timestamp = new Date().toISOString();
 
@@ -128,7 +128,8 @@ const DataSync = {
         try {
             window.showNotification('Downloading cloud data...', 'info');
             const userId = window.state.currentUser.id;
-            const safeUserId = userId.replace(/[^a-z0-9-]/gi, '_');
+            // Sanitize file path
+            const safeUserId = String(userId).replace(/[^a-z0-9-]/gi, '_');
             const path = `user_data/${safeUserId}/latest_state.json`;
             const bucketName = 'app-data';
 
