@@ -1714,12 +1714,16 @@ window.saveNewClient = function () {
 };
 
 window.renderEditClient = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    // Use loose equality to handle string/number ID mismatch
+    const client = window.state.clients.find(c => c.id == clientId);
     if (!client) {
         window.showNotification('Client not found', 'error');
         renderClientsEnhanced();
         return;
     }
+
+    // Alias for consistent routing if not already defined (or ensure it points here)
+    window.renderClientForm = window.renderEditClient;
 
     const firstSite = client.sites && client.sites[0] ? client.sites[0] : {};
     const firstContact = client.contacts && client.contacts[0] ? client.contacts[0] : {};
