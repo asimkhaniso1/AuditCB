@@ -83,7 +83,7 @@ const AuditTrail = {
                 // Let's omit ID and let DB generate it.
                 user_email: entry.user.email || entry.user.name, // Fallback
                 action: entry.action,
-                entity_type: entry.resource,
+                entity: entry.resource, // Matches 'entity' column in DB
                 entity_id: String(entry.resourceId || ''),
                 details: {
                     resourceName: entry.resourceName,
@@ -91,7 +91,7 @@ const AuditTrail = {
                     ip: entry.ip,
                     userAgent: entry.userAgent
                 },
-                created_at: entry.timestamp
+                timestamp: entry.timestamp // Matches 'timestamp' column in DB
             };
 
             const { error } = await window.SupabaseClient.client

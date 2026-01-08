@@ -171,7 +171,9 @@ function renderAuditorsEnhanced() {
     window.contentArea.innerHTML = html;
 
     // Event listeners
-    document.getElementById('btn-add-auditor')?.addEventListener('click', openAddAuditorModal);
+    document.getElementById('btn-add-auditor')?.addEventListener('click', () => {
+        window.location.hash = '#auditor-form';
+    });
 
     document.getElementById('auditor-search')?.addEventListener('input', (e) => {
         state.auditorSearchTerm = e.target.value;
@@ -197,7 +199,7 @@ function renderAuditorsEnhanced() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const auditorId = btn.getAttribute('data-auditor-id');
-            openEditAuditorModal(auditorId);
+            window.location.hash = '#auditor-form?id=' + auditorId;
         });
     });
 
@@ -365,7 +367,7 @@ function renderAuditorDetail(auditorId) {
 
     // Add event listener for Edit Auditor button
     document.querySelector('.edit-auditor')?.addEventListener('click', () => {
-        openEditAuditorModal(auditor.id);
+        window.location.hash = '#auditor-form?id=' + auditor.id;
     });
 
     renderAuditorTab(auditor, 'profile');
@@ -2312,353 +2314,26 @@ window.randomlySelectSites = function () {
 
     window.showNotification(`Randomly selected ${indicesToSelect.size} sites per sampling requirement.`, 'success');
     window.closeModal();
-}
 
-function openAddAuditorModal() {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
 
-    modalTitle.textContent = 'Add New Auditor';
-    modalBody.innerHTML = `
-        <form id="auditor-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            <!-- Basic Info -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Personal Details</div>
-            <div class="form-group">
-                <label>Full Name <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="auditor-name" required>
-            </div>
-            <div class="form-group">
-                <label>Role</label>
-                <select class="form-control" id="auditor-role">
-                    <option>Lead Auditor</option>
-                    <option>Auditor</option>
-                    <option>Technical Expert</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Age</label>
-                <input type="number" class="form-control" id="auditor-age" min="18" max="80" placeholder="e.g. 35">
-            </div>
-            <div class="form-group">
-                <label>Experience (Years)</label>
-                <input type="number" class="form-control" id="auditor-experience" min="0" placeholder="e.g. 10">
-            </div>
-            <div class="form-group">
-                <label>Date Joined</label>
-                <input type="date" class="form-control" id="auditor-joined">
-            </div>
+    function openEditAuditorModal(auditorId) {
+        const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
+        if (!auditor) return;
 
-            <!-- Soft Skills -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Soft Skills & Competencies</div>
-            <div class="form-group">
-                <label>Communication</label>
-                <select class="form-control" id="auditor-communication">
-                    <option value="excellent">Excellent</option>
-                    <option value="good" selected>Good</option>
-                    <option value="average">Average</option>
-                    <option value="needs-improvement">Needs Improvement</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Report Writing</label>
-                <select class="form-control" id="auditor-writing">
-                    <option value="excellent">Excellent</option>
-                    <option value="good" selected>Good</option>
-                    <option value="average">Average</option>
-                    <option value="needs-improvement">Needs Improvement</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Analytical Skills</label>
-                <select class="form-control" id="auditor-analytical">
-                    <option value="excellent">Excellent</option>
-                    <option value="good" selected>Good</option>
-                    <option value="average">Average</option>
-                    <option value="needs-improvement">Needs Improvement</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Attention to Detail</label>
-                <select class="form-control" id="auditor-attention">
-                    <option value="excellent">Excellent</option>
-                    <option value="good" selected>Good</option>
-                    <option value="average">Average</option>
-                    <option value="needs-improvement">Needs Improvement</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Interviewing Skills</label>
-                <select class="form-control" id="auditor-interviewing">
-                    <option value="excellent">Excellent</option>
-                    <option value="good" selected>Good</option>
-                    <option value="average">Average</option>
-                    <option value="needs-improvement">Needs Improvement</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Time Management</label>
-                <select class="form-control" id="auditor-time-management">
-                    <option value="excellent">Excellent</option>
-                    <option value="good" selected>Good</option>
-                    <option value="average">Average</option>
-                    <option value="needs-improvement">Needs Improvement</option>
-                </select>
-            </div>
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-            <!-- Contact Info -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Contact Information</div>
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" class="form-control" id="auditor-email" placeholder="auditor@example.com">
-            </div>
-            <div class="form-group">
-                <label>Phone</label>
-                <input type="text" class="form-control" id="auditor-phone" placeholder="+1 234 567 8900">
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Location</label>
-                <input type="text" class="form-control" id="auditor-location" placeholder="City, Country">
-            </div>
+        const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
+        const auditorIndustries = auditor.industries || [];
 
-            <!-- Academic Qualifications -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Academic Qualifications</div>
-            <div class="form-group">
-                <label>Highest Degree</label>
-                <select class="form-control" id="auditor-degree">
-                    <option value="">-- Select Degree --</option>
-                    <option value="Diploma">Diploma</option>
-                    <option value="Bachelor">Bachelor's Degree</option>
-                    <option value="Master">Master's Degree</option>
-                    <option value="PhD">PhD / Doctorate</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Field of Study</label>
-                <select class="form-control" id="auditor-field">
-                    <option value="">-- Select Field --</option>
-                    <option value="Engineering">Engineering</option>
-                    <option value="Computer Science">Computer Science / IT</option>
-                    <option value="Business Administration">Business Administration</option>
-                    <option value="Quality Management">Quality Management</option>
-                    <option value="Environmental Science">Environmental Science</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Biology">Biology / Biotechnology</option>
-                    <option value="Food Science">Food Science</option>
-                    <option value="Healthcare">Healthcare / Medical</option>
-                    <option value="Finance">Finance / Accounting</option>
-                    <option value="Industrial Engineering">Industrial Engineering</option>
-                    <option value="Information Security">Information Security</option>
-                    <option value="Safety Engineering">Safety / Occupational Health</option>
-                    <option value="Other">Other</option>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Specialization / Additional Qualifications</label>
-                <input type="text" class="form-control" id="auditor-specialization" placeholder="e.g. ISO Lead Auditor certified, Six Sigma Black Belt">
-            </div>
-
-            <!-- Travel & Availability -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Travel & Availability</div>
-            <div class="form-group">
-                <label>Valid Passport</label>
-                <select class="form-control" id="auditor-passport">
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Willing to Travel</label>
-                <select class="form-control" id="auditor-travel">
-                    <option value="international">International</option>
-                    <option value="regional">Regional Only</option>
-                    <option value="local">Local Only</option>
-                    <option value="no">Not Available</option>
-                </select>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Languages (comma-separated)</label>
-                <input type="text" class="form-control" id="auditor-languages" placeholder="e.g. English, Arabic, French, Spanish">
-            </div>
-            <div class="form-group">
-                <label>Profile Picture URL</label>
-                <input type="url" class="form-control" id="auditor-picture" placeholder="https://example.com/photo.jpg">
-                <small style="color: var(--text-secondary);">Enter URL of profile photo</small>
-            </div>
-            <div class="form-group">
-                <label>Customer Rating (1-5)</label>
-                <select class="form-control" id="auditor-rating">
-                    <option value="">-- No Rating Yet --</option>
-                    <option value="5">⭐⭐⭐⭐⭐ Excellent (5)</option>
-                    <option value="4">⭐⭐⭐⭐ Very Good (4)</option>
-                    <option value="3">⭐⭐⭐ Good (3)</option>
-                    <option value="2">⭐⭐ Fair (2)</option>
-                    <option value="1">⭐ Needs Improvement (1)</option>
-                </select>
-            </div>
-
-            <!-- Expertise & Rates -->
-            <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Expertise & Rate</div>
-            <div class="form-group">
-                <label>Qualified Standards <span style="color: var(--danger-color);">*</span></label>
-                <select class="form-control" id="auditor-standards" multiple style="height: 100px;">
-                    <option>ISO 9001</option>
-                    <option>ISO 14001</option>
-                    <option>ISO 27001</option>
-                    <option>ISO 45001</option>
-                </select>
-                <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
-            </div>
-            <div class="form-group">
-                <label>Man-Day Rate (USD)</label>
-                <input type="number" class="form-control" id="auditor-rate" min="0" placeholder="e.g. 600">
-            </div>
-            <div class="form-group">
-                <label>Domain Expertise (comma-separated)</label>
-                <input type="text" class="form-control" id="auditor-domain" placeholder="e.g. Quality, Environmental">
-            </div>
-            <div class="form-group">
-                <label>Industries (comma-separated)</label>
-                <input type="text" class="form-control" id="auditor-industries" placeholder="e.g. Manufacturing, IT, Healthcare">
-            </div>
-        </form>
-
-    `;
-
-    window.openModal();
-
-    modalSave.onclick = () => {
-        // 1. Define Fields
-        const fieldIds = {
-            name: 'auditor-name',
-            email: 'auditor-email',
-            phone: 'auditor-phone',
-            age: 'auditor-age',
-            experience: 'auditor-experience',
-            manDayRate: 'auditor-rate',
-            location: 'auditor-location',
-            pictureUrl: 'auditor-picture',
-            specialization: 'auditor-specialization',
-            domainExpertise: 'auditor-domain',
-            industries: 'auditor-industries',
-            languages: 'auditor-languages'
-        };
-
-        // 2. Define Validation Rules
-        const rules = {
-            name: [
-                { rule: 'required', fieldName: 'Full Name' },
-                { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
-                { rule: 'noHtmlTags', fieldName: 'Full Name' }
-            ],
-            email: [
-                { rule: 'email', fieldName: 'Email' } // Optional but must be valid if present
-            ],
-            age: [
-                { rule: 'range', min: 18, max: 90, fieldName: 'Age' }
-            ],
-            experience: [
-                { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
-            ],
-            manDayRate: [
-                { rule: 'number', fieldName: 'Man-Day Rate' }
-            ],
-            pictureUrl: [
-                { rule: 'url', fieldName: 'Profile Picture URL' }
-            ]
-        };
-
-        // 3. Validate
-        // Check core fields first
-        const standardsSelect = document.getElementById('auditor-standards');
-        if (standardsSelect.selectedOptions.length === 0) {
-            window.showNotification('Please select at least one Qualified Standard', 'error');
-            return;
-        }
-
-        const result = Validator.validateFormElements(fieldIds, rules);
-        if (!result.valid) {
-            Validator.displayErrors(result.errors, fieldIds);
-            window.showNotification('Please fix the form errors', 'error');
-            return;
-        }
-        Validator.clearErrors(fieldIds);
-
-        // 4. Sanitize Data
-        const cleanData = Sanitizer.sanitizeFormData(result.formData,
-            ['name', 'email', 'phone', 'location', 'specialization', 'domainExpertise', 'industries', 'languages'] // Treat as text
-        );
-
-        // 5. Construct Object
-        const standards = Array.from(standardsSelect.selectedOptions).map(opt => opt.value); // Values are safe (from select)
-
-        const newAuditor = {
-            id: Date.now(),
-            name: cleanData.name,
-            role: document.getElementById('auditor-role').value, // Select
-            standards: standards,
-            age: parseInt(cleanData.age) || null,
-            experience: parseInt(cleanData.experience) || 0,
-            email: cleanData.email,
-            phone: cleanData.phone,
-            location: cleanData.location,
-            manDayRate: parseInt(cleanData.manDayRate) || 0,
-
-            // Split and sanitize arrays
-            domainExpertise: cleanData.domainExpertise.split(',').map(s => s.trim()).filter(s => s),
-            industries: cleanData.industries.split(',').map(s => s.trim()).filter(s => s),
-            languages: cleanData.languages.split(',').map(s => s.trim()).filter(s => s),
-
-            education: {
-                degree: document.getElementById('auditor-degree').value, // Select
-                fieldOfStudy: document.getElementById('auditor-field').value, // Select
-                specialization: cleanData.specialization
-            },
-
-            hasPassport: document.getElementById('auditor-passport').value === 'yes',
-            willingToTravel: document.getElementById('auditor-travel').value,
-            pictureUrl: Sanitizer.sanitizeURL(cleanData.pictureUrl),
-            customerRating: parseInt(document.getElementById('auditor-rating').value) || null,
-            dateJoined: document.getElementById('auditor-joined').value,
-
-            softSkills: {
-                communication: document.getElementById('auditor-communication').value,
-                reportWriting: document.getElementById('auditor-writing').value,
-                analyticalSkills: document.getElementById('auditor-analytical').value,
-                attentionToDetail: document.getElementById('auditor-attention').value,
-                interviewingSkills: document.getElementById('auditor-interviewing').value,
-                timeManagement: document.getElementById('auditor-time-management').value
-            },
-
-            auditHistory: []
-        };
-
-        // 6. Save
-        state.auditors.push(newAuditor);
-        window.saveData();
-        window.closeModal();
-        renderAuditorsEnhanced();
-        window.showNotification('Auditor added successfully', 'success');
-    };
-}
-
-function openEditAuditorModal(auditorId) {
-    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
-    if (!auditor) return;
-
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
-    const auditorIndustries = auditor.industries || [];
-
-    modalTitle.textContent = 'Edit Auditor';
-    modalBody.innerHTML = `
-        <form id="auditor-form" style="max-height: 70vh; overflow-y: auto;">
+        modalTitle.textContent = 'Edit Auditor';
+        modalBody.innerHTML = `
+        < form id = "auditor-form" style = "max-height: 70vh; overflow-y: auto;" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <!-- Basic Info -->
                 <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color); font-weight: 600;">Basic Information</div>
-                
+
                 <div class="form-group">
                     <label>Full Name <span style="color: var(--danger-color);">*</span></label>
                     <input type="text" class="form-control" id="auditor-name" value="${window.UTILS.escapeHtml(auditor.name)}" required>
@@ -2690,7 +2365,7 @@ function openEditAuditorModal(auditorId) {
 
                 <!-- Qualifications -->
                 <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Qualifications & Experience</div>
-                
+
                 <div class="form-group">
                     <label>Qualified Standards <span style="color: var(--danger-color);">*</span></label>
                     <select class="form-control" id="auditor-standards" multiple style="height: 80px;">
@@ -2725,7 +2400,7 @@ function openEditAuditorModal(auditorId) {
 
                 <!-- Travel -->
                 <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem; margin-top: 0.5rem; color: var(--primary-color); font-weight: 600;">Travel & Availability</div>
-                
+
                 <div class="form-group">
                     <label>Has Valid Passport</label>
                     <select class="form-control" id="auditor-passport">
@@ -2746,110 +2421,110 @@ function openEditAuditorModal(auditorId) {
                     <input type="text" class="form-control" id="auditor-languages" value="${(auditor.languages || []).map(l => window.UTILS.escapeHtml(l)).join(', ')}" placeholder="English, Spanish, French">
                 </div>
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    window.openModal();
+        window.openModal();
 
-    modalSave.onclick = () => {
-        // 1. Define Fields
-        const fieldIds = {
-            name: 'auditor-name',
-            email: 'auditor-email',
-            phone: 'auditor-phone',
-            experience: 'auditor-experience',
-            manDayRate: 'auditor-rate',
-            customerRating: 'auditor-rating',
-            location: 'auditor-location',
-            pictureUrl: 'auditor-picture',
-            industries: 'auditor-industries', // Note: this is a select multiple in edit implementation
-            languages: 'auditor-languages'
+        modalSave.onclick = () => {
+            // 1. Define Fields
+            const fieldIds = {
+                name: 'auditor-name',
+                email: 'auditor-email',
+                phone: 'auditor-phone',
+                experience: 'auditor-experience',
+                manDayRate: 'auditor-rate',
+                customerRating: 'auditor-rating',
+                location: 'auditor-location',
+                pictureUrl: 'auditor-picture',
+                industries: 'auditor-industries', // Note: this is a select multiple in edit implementation
+                languages: 'auditor-languages'
+            };
+
+            // 2. Define Validation Rules
+            const rules = {
+                name: [
+                    { rule: 'required', fieldName: 'Full Name' },
+                    { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
+                    { rule: 'noHtmlTags', fieldName: 'Full Name' }
+                ],
+                email: [
+                    { rule: 'email', fieldName: 'Email' }
+                ],
+                experience: [
+                    { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
+                ],
+                manDayRate: [
+                    { rule: 'number', fieldName: 'Man-Day Rate' }
+                ],
+                pictureUrl: [
+                    { rule: 'url', fieldName: 'Profile Picture URL' }
+                ]
+            };
+
+            // 3. Validate
+            // Special check for standards (required)
+            const standardsSelect = document.getElementById('auditor-standards');
+            if (standardsSelect.selectedOptions.length === 0) {
+                window.showNotification('Please select at least one Qualified Standard', 'error');
+                return;
+            }
+
+            const result = Validator.validateFormElements(fieldIds, rules);
+            if (!result.valid) {
+                Validator.displayErrors(result.errors, fieldIds);
+                window.showNotification('Please fix the form errors', 'error');
+                return;
+            }
+            Validator.clearErrors(fieldIds);
+
+            // 4. Sanitize Data
+            // Note: For select multiple (industries), we get values from DOM separately, so no need to sanitize as text input
+            const cleanData = Sanitizer.sanitizeFormData(result.formData,
+                ['name', 'email', 'phone', 'location', 'languages'] // Treat as text
+            );
+
+            // 5. Update Object
+            auditor.name = cleanData.name;
+            auditor.role = document.getElementById('auditor-role').value;
+            auditor.standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
+
+            const industriesSelect = document.getElementById('auditor-industries');
+            auditor.industries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
+
+            auditor.email = cleanData.email;
+            auditor.phone = cleanData.phone;
+            auditor.location = cleanData.location;
+            auditor.pictureUrl = Sanitizer.sanitizeURL(result.formData.pictureUrl); // Use sanitized URL
+
+            auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
+            auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
+            auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
+            auditor.dateJoined = document.getElementById('auditor-date-joined').value;
+
+            auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
+            auditor.willingToTravel = document.getElementById('auditor-travel').value;
+            auditor.languages = cleanData.languages.split(',').map(l => l.trim()).filter(l => l);
+
+            // 6. Save
+            window.saveData();
+            window.closeModal();
+            renderAuditorDetail(auditorId);
+            window.showNotification('Auditor updated successfully', 'success');
         };
+    }
+    // Add Training Modal
+    function openAddTrainingModal(auditorId) {
+        const auditor = state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-        // 2. Define Validation Rules
-        const rules = {
-            name: [
-                { rule: 'required', fieldName: 'Full Name' },
-                { rule: 'length', min: 2, max: 100, fieldName: 'Full Name' },
-                { rule: 'noHtmlTags', fieldName: 'Full Name' }
-            ],
-            email: [
-                { rule: 'email', fieldName: 'Email' }
-            ],
-            experience: [
-                { rule: 'range', min: 0, max: 60, fieldName: 'Experience' }
-            ],
-            manDayRate: [
-                { rule: 'number', fieldName: 'Man-Day Rate' }
-            ],
-            pictureUrl: [
-                { rule: 'url', fieldName: 'Profile Picture URL' }
-            ]
-        };
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-        // 3. Validate
-        // Special check for standards (required)
-        const standardsSelect = document.getElementById('auditor-standards');
-        if (standardsSelect.selectedOptions.length === 0) {
-            window.showNotification('Please select at least one Qualified Standard', 'error');
-            return;
-        }
-
-        const result = Validator.validateFormElements(fieldIds, rules);
-        if (!result.valid) {
-            Validator.displayErrors(result.errors, fieldIds);
-            window.showNotification('Please fix the form errors', 'error');
-            return;
-        }
-        Validator.clearErrors(fieldIds);
-
-        // 4. Sanitize Data
-        // Note: For select multiple (industries), we get values from DOM separately, so no need to sanitize as text input
-        const cleanData = Sanitizer.sanitizeFormData(result.formData,
-            ['name', 'email', 'phone', 'location', 'languages'] // Treat as text
-        );
-
-        // 5. Update Object
-        auditor.name = cleanData.name;
-        auditor.role = document.getElementById('auditor-role').value;
-        auditor.standards = Array.from(standardsSelect.selectedOptions).map(option => option.value);
-
-        const industriesSelect = document.getElementById('auditor-industries');
-        auditor.industries = Array.from(industriesSelect.selectedOptions).map(option => option.value);
-
-        auditor.email = cleanData.email;
-        auditor.phone = cleanData.phone;
-        auditor.location = cleanData.location;
-        auditor.pictureUrl = Sanitizer.sanitizeURL(result.formData.pictureUrl); // Use sanitized URL
-
-        auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
-        auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
-        auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
-        auditor.dateJoined = document.getElementById('auditor-date-joined').value;
-
-        auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
-        auditor.willingToTravel = document.getElementById('auditor-travel').value;
-        auditor.languages = cleanData.languages.split(',').map(l => l.trim()).filter(l => l);
-
-        // 6. Save
-        window.saveData();
-        window.closeModal();
-        renderAuditorDetail(auditorId);
-        window.showNotification('Auditor updated successfully', 'success');
-    };
-}
-// Add Training Modal
-function openAddTrainingModal(auditorId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Add Training Record';
-    modalBody.innerHTML = `
-        <form id="training-form">
+        modalTitle.textContent = 'Add Training Record';
+        modalBody.innerHTML = `
+        < form id = "training-form" >
             <div class="form-group">
                 <label>Course Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="training-course" placeholder="e.g. ISO 9001 Lead Auditor" required>
@@ -2866,42 +2541,42 @@ function openAddTrainingModal(auditorId) {
                 <label>Certificate Number</label>
                 <input type="text" class="form-control" id="training-certificate" placeholder="e.g. IRCA-12345">
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    window.openModal();
+        window.openModal();
 
-    modalSave.onclick = () => {
-        const course = document.getElementById('training-course').value;
-        const provider = document.getElementById('training-provider').value;
-        const date = document.getElementById('training-date').value;
-        const certificate = document.getElementById('training-certificate').value;
+        modalSave.onclick = () => {
+            const course = document.getElementById('training-course').value;
+            const provider = document.getElementById('training-provider').value;
+            const date = document.getElementById('training-date').value;
+            const certificate = document.getElementById('training-certificate').value;
 
-        if (course) {
-            if (!auditor.trainings) auditor.trainings = [];
-            auditor.trainings.push({ course, provider, date, certificate });
-            window.saveData();
-            window.closeModal();
-            renderAuditorDetail(auditorId);
-            window.showNotification('Training record added successfully');
-        } else {
-            window.showNotification('Course name is required', 'error');
-        }
-    };
-}
+            if (course) {
+                if (!auditor.trainings) auditor.trainings = [];
+                auditor.trainings.push({ course, provider, date, certificate });
+                window.saveData();
+                window.closeModal();
+                renderAuditorDetail(auditorId);
+                window.showNotification('Training record added successfully');
+            } else {
+                window.showNotification('Course name is required', 'error');
+            }
+        };
+    }
 
-// Upload Document Modal
-function openUploadDocumentModal(auditorId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
+    // Upload Document Modal
+    function openUploadDocumentModal(auditorId) {
+        const auditor = state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-    modalTitle.textContent = 'Upload Document';
-    modalBody.innerHTML = `
-        <form id="document-form">
+        modalTitle.textContent = 'Upload Document';
+        modalBody.innerHTML = `
+        < form id = "document-form" >
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="doc-name" placeholder="e.g. Lead Auditor Certificate" required>
@@ -2919,73 +2594,73 @@ function openUploadDocumentModal(auditorId) {
                 <input type="file" class="form-control" id="doc-file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
                 <small style="color: var(--text-secondary);">Accepted: PDF, Images, Word documents</small>
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    window.openModal();
+        window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('doc-name').value;
-        const type = document.getElementById('doc-type').value;
-        const fileInput = document.getElementById('doc-file');
-        const file = fileInput.files[0];
+        modalSave.onclick = () => {
+            const name = document.getElementById('doc-name').value;
+            const type = document.getElementById('doc-type').value;
+            const fileInput = document.getElementById('doc-file');
+            const file = fileInput.files[0];
 
-        if (name) {
-            if (!auditor.documents) auditor.documents = [];
-            // Store document metadata (file would need proper backend storage in production)
-            auditor.documents.push({
-                name: name,
-                type: type,
-                date: new Date().toISOString().split('T')[0],
-                fileName: file ? file.name : null
-            });
-            window.saveData();
-            window.closeModal();
-            renderAuditorDetail(auditorId);
-            window.showNotification('Document added successfully');
-        } else {
-            window.showNotification('Document name is required', 'error');
-        }
+            if (name) {
+                if (!auditor.documents) auditor.documents = [];
+                // Store document metadata (file would need proper backend storage in production)
+                auditor.documents.push({
+                    name: name,
+                    type: type,
+                    date: new Date().toISOString().split('T')[0],
+                    fileName: file ? file.name : null
+                });
+                window.saveData();
+                window.closeModal();
+                renderAuditorDetail(auditorId);
+                window.showNotification('Document added successfully');
+            } else {
+                window.showNotification('Document name is required', 'error');
+            }
+        };
+    }
+
+    // Export functions to global scope
+    window.renderAuditorsEnhanced = renderAuditorsEnhanced;
+    window.renderAuditorDetail = renderAuditorDetail;
+    window.renderCompetenceMatrix = renderCompetenceMatrix;
+    window.calculateManDays = calculateManDays;
+    window.renderManDayCalculator = renderManDayCalculator;
+    window.openAddAuditorModal = openAddAuditorModal;
+    window.openEditAuditorModal = openEditAuditorModal;
+    window.openAddTrainingModal = openAddTrainingModal;
+    window.openUploadDocumentModal = openUploadDocumentModal;
+
+    // Clear upcoming audit filters and show all items
+    window.clearAuditorUpcomingFilters = function (auditorId) {
+        const dateFilter = document.getElementById('upcoming-date-filter');
+        const locationFilter = document.getElementById('upcoming-location-filter');
+        if (dateFilter) dateFilter.value = '';
+        if (locationFilter) locationFilter.value = '';
+        document.querySelectorAll('.upcoming-audit-item').forEach(item => {
+            item.style.display = 'flex';
+        });
     };
-}
 
-// Export functions to global scope
-window.renderAuditorsEnhanced = renderAuditorsEnhanced;
-window.renderAuditorDetail = renderAuditorDetail;
-window.renderCompetenceMatrix = renderCompetenceMatrix;
-window.calculateManDays = calculateManDays;
-window.renderManDayCalculator = renderManDayCalculator;
-window.openAddAuditorModal = openAddAuditorModal;
-window.openEditAuditorModal = openEditAuditorModal;
-window.openAddTrainingModal = openAddTrainingModal;
-window.openUploadDocumentModal = openUploadDocumentModal;
+    // ============================================
+    // DOCUMENT UPLOAD HELPERS (Auditors)
+    // ============================================
 
-// Clear upcoming audit filters and show all items
-window.clearAuditorUpcomingFilters = function (auditorId) {
-    const dateFilter = document.getElementById('upcoming-date-filter');
-    const locationFilter = document.getElementById('upcoming-location-filter');
-    if (dateFilter) dateFilter.value = '';
-    if (locationFilter) locationFilter.value = '';
-    document.querySelectorAll('.upcoming-audit-item').forEach(item => {
-        item.style.display = 'flex';
-    });
-};
+    window.openAuditorUploadModal = function (auditorId) {
+        const auditor = state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-// ============================================
-// DOCUMENT UPLOAD HELPERS (Auditors)
-// ============================================
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-window.openAuditorUploadModal = function (auditorId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Upload Auditor Document';
-    modalBody.innerHTML = `
-        <form id="upload-form">
+        modalTitle.textContent = 'Upload Auditor Document';
+        modalBody.innerHTML = `
+        < form id = "upload-form" >
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="doc-name" required placeholder="e.g. ISO 9001 Certificate">
@@ -3016,82 +2691,82 @@ window.openAuditorUploadModal = function (auditorId) {
                     }
                 }">
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    window.openModal();
+        window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('doc-name').value;
-        const type = document.getElementById('doc-type').value;
-        const fileInput = document.getElementById('doc-file');
+        modalSave.onclick = () => {
+            const name = document.getElementById('doc-name').value;
+            const type = document.getElementById('doc-type').value;
+            const fileInput = document.getElementById('doc-file');
 
-        if (name) {
-            // Final validation before save
-            if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
-                alert('File is too large! Max limit is 5MB.');
-                return;
+            if (name) {
+                // Final validation before save
+                if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
+                    alert('File is too large! Max limit is 5MB.');
+                    return;
+                }
+
+                if (!auditor.documents) auditor.documents = [];
+
+                const newDoc = {
+                    id: Date.now().toString(),
+                    name: name,
+                    type: type,
+                    date: new Date().toISOString().split('T')[0],
+                    size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+                };
+
+                auditor.documents.push(newDoc);
+
+                // Note: Since 'state' is global, we just need to re-render.
+                // If there's a specific saveData function (mock), call it.
+                if (window.saveData) window.saveData();
+
+                window.closeModal();
+                renderAuditorDetail(auditorId); // Refresh view
+                // Force switch back to documents tab
+                setTimeout(() => {
+                    const btn = document.querySelector('.tab-btn[data-tab="documents"]');
+                    if (btn) btn.click();
+                }, 100);
+
+                if (window.showNotification) window.showNotification('Document uploaded successfully');
+            } else {
+                alert('Please enter a document name');
             }
+        };
+    };
 
-            if (!auditor.documents) auditor.documents = [];
+    window.deleteAuditorDocument = function (auditorId, docId) {
+        const auditor = state.auditors.find(a => a.id === auditorId);
+        if (!auditor || !auditor.documents) return;
 
-            const newDoc = {
-                id: Date.now().toString(),
-                name: name,
-                type: type,
-                date: new Date().toISOString().split('T')[0],
-                size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
-            };
-
-            auditor.documents.push(newDoc);
-
-            // Note: Since 'state' is global, we just need to re-render.
-            // If there's a specific saveData function (mock), call it.
+        if (confirm('Are you sure you want to delete this document?')) {
+            auditor.documents = auditor.documents.filter(d => d.id !== docId);
             if (window.saveData) window.saveData();
-
-            window.closeModal();
-            renderAuditorDetail(auditorId); // Refresh view
-            // Force switch back to documents tab
+            renderAuditorDetail(auditorId);
             setTimeout(() => {
                 const btn = document.querySelector('.tab-btn[data-tab="documents"]');
                 if (btn) btn.click();
             }, 100);
-
-            if (window.showNotification) window.showNotification('Document uploaded successfully');
-        } else {
-            alert('Please enter a document name');
+            if (window.showNotification) window.showNotification('Document deleted');
         }
-    };
-};
-
-window.deleteAuditorDocument = function (auditorId, docId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
-    if (!auditor || !auditor.documents) return;
-
-    if (confirm('Are you sure you want to delete this document?')) {
-        auditor.documents = auditor.documents.filter(d => d.id !== docId);
-        if (window.saveData) window.saveData();
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            const btn = document.querySelector('.tab-btn[data-tab="documents"]');
-            if (btn) btn.click();
-        }, 100);
-        if (window.showNotification) window.showNotification('Document deleted');
     }
-}
 
-// ============================================
-// ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
-// ============================================
+    // ============================================
+    // ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
+    // ============================================
 
-// Add Witness Audit Record
-window.addWitnessAudit = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
+    // Add Witness Audit Record
+    window.addWitnessAudit = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-    document.getElementById('modal-title').textContent = 'Record Witness Audit';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="witness-form">
+        document.getElementById('modal-title').textContent = 'Record Witness Audit';
+        document.getElementById('modal-body').innerHTML = `
+        < form id = "witness-form" >
             <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 1rem;">
                 Record a witness assessment of this auditor during an actual audit.
             </p>
@@ -3135,48 +2810,48 @@ window.addWitnessAudit = function (auditorId) {
                 <label>Observations/Notes</label>
                 <textarea id="witness-notes" class="form-control" rows="3" placeholder="Key observations, strengths, areas for improvement..."></textarea>
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    document.getElementById('modal-save').onclick = function () {
-        const client = document.getElementById('witness-client').value;
-        if (!client) {
-            window.showNotification('Please enter the client name', 'error');
-            return;
-        }
+        document.getElementById('modal-save').onclick = function () {
+            const client = document.getElementById('witness-client').value;
+            if (!client) {
+                window.showNotification('Please enter the client name', 'error');
+                return;
+            }
 
-        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-        if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
+            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+            if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
 
-        auditor.evaluations.witnessAudits.unshift({
-            date: document.getElementById('witness-date').value,
-            client: client,
-            standard: document.getElementById('witness-standard').value,
-            witnessedBy: document.getElementById('witness-by').value,
-            rating: parseInt(document.getElementById('witness-rating').value),
-            notes: document.getElementById('witness-notes').value
-        });
+            auditor.evaluations.witnessAudits.unshift({
+                date: document.getElementById('witness-date').value,
+                client: client,
+                standard: document.getElementById('witness-standard').value,
+                witnessedBy: document.getElementById('witness-by').value,
+                rating: parseInt(document.getElementById('witness-rating').value),
+                notes: document.getElementById('witness-notes').value
+            });
 
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Witness audit recorded', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
-        }, 100);
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Witness audit recorded', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
     };
 
-    window.openModal();
-};
+    // Add Performance Review
+    window.addPerformanceReview = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-// Add Performance Review
-window.addPerformanceReview = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    document.getElementById('modal-title').textContent = 'Add Performance Review';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="review-form">
+        document.getElementById('modal-title').textContent = 'Add Performance Review';
+        document.getElementById('modal-body').innerHTML = `
+        < form id = "review-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
                     <label>Review Date</label>
@@ -3222,42 +2897,42 @@ window.addPerformanceReview = function (auditorId) {
                 <label>Comments</label>
                 <textarea id="review-comments" class="form-control" rows="3" placeholder="Review findings and recommendations..."></textarea>
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    document.getElementById('modal-save').onclick = function () {
-        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-        if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
+        document.getElementById('modal-save').onclick = function () {
+            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+            if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
 
-        auditor.evaluations.performanceReviews.unshift({
-            date: document.getElementById('review-date').value,
-            type: document.getElementById('review-type').value,
-            rating: parseInt(document.getElementById('review-rating').value),
-            reviewedBy: document.getElementById('review-by').value,
-            outcome: document.getElementById('review-outcome').value,
-            comments: document.getElementById('review-comments').value
-        });
+            auditor.evaluations.performanceReviews.unshift({
+                date: document.getElementById('review-date').value,
+                type: document.getElementById('review-type').value,
+                rating: parseInt(document.getElementById('review-rating').value),
+                reviewedBy: document.getElementById('review-by').value,
+                outcome: document.getElementById('review-outcome').value,
+                comments: document.getElementById('review-comments').value
+            });
 
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Performance review added', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
-        }, 100);
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Performance review added', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="evaluations"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
     };
 
-    window.openModal();
-};
+    // Add Training Record
+    window.openAddTrainingModal = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-// Add Training Record
-window.openAddTrainingModal = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    document.getElementById('modal-title').textContent = 'Add Training Record';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="training-form">
+        document.getElementById('modal-title').textContent = 'Add Training Record';
+        document.getElementById('modal-body').innerHTML = `
+        < form id = "training-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label>Course/Training Name <span style="color: red;">*</span></label>
@@ -3302,49 +2977,49 @@ window.openAddTrainingModal = function (auditorId) {
                 <label>Notes</label>
                 <textarea id="training-notes" class="form-control" rows="2" placeholder="Additional notes..."></textarea>
             </div>
-        </form>
-    `;
+        </form >
+        `;
 
-    document.getElementById('modal-save').onclick = function () {
-        const course = document.getElementById('training-course').value;
-        if (!course) {
-            window.showNotification('Please enter the course name', 'error');
-            return;
-        }
+        document.getElementById('modal-save').onclick = function () {
+            const course = document.getElementById('training-course').value;
+            if (!course) {
+                window.showNotification('Please enter the course name', 'error');
+                return;
+            }
 
-        if (!auditor.trainings) auditor.trainings = [];
+            if (!auditor.trainings) auditor.trainings = [];
 
-        auditor.trainings.unshift({
-            course: course,
-            provider: document.getElementById('training-provider').value || 'Unknown',
-            date: document.getElementById('training-date').value,
-            duration: document.getElementById('training-duration').value + ' hours',
-            cpdHours: parseInt(document.getElementById('training-cpd').value) || 0,
-            type: document.getElementById('training-type').value,
-            certificate: document.getElementById('training-certificate').checked,
-            notes: document.getElementById('training-notes').value
-        });
+            auditor.trainings.unshift({
+                course: course,
+                provider: document.getElementById('training-provider').value || 'Unknown',
+                date: document.getElementById('training-date').value,
+                duration: document.getElementById('training-duration').value + ' hours',
+                cpdHours: parseInt(document.getElementById('training-cpd').value) || 0,
+                type: document.getElementById('training-type').value,
+                certificate: document.getElementById('training-certificate').checked,
+                notes: document.getElementById('training-notes').value
+            });
 
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Training record added', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="training"]')?.click();
-        }, 100);
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Training record added', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="training"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
     };
 
-    window.openModal();
-};
+    // Add Qualification
+    window.openAddQualificationModal = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
 
-// Add Qualification
-window.openAddQualificationModal = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    document.getElementById('modal-title').textContent = 'Add Qualification / Academic Degree';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="qual-form">
+        document.getElementById('modal-title').textContent = 'Add Qualification / Academic Degree';
+        document.getElementById('modal-body').innerHTML = `
+        < form id = "qual-form" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label>Qualification Type <span style="color: red;">*</span></label>
@@ -3357,564 +3032,564 @@ window.openAddQualificationModal = function (auditorId) {
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label>Standard / Degree <span style="color: red;">*</span></label>
                     <input list="qual-standards" id="qual-standard" class="form-control" placeholder="Type or select..." required>
-                    <datalist id="qual-standards">
-                        <option value="ISO 9001:2015">
-                        <option value="ISO 14001:2015">
-                        <option value="ISO 45001:2018">
-                        <option value="ISO 27001:2022">
-                        <option value="ISO 22000:2018">
-                        <option value="ISO 50001:2018">
-                        <option value="ISO 13485:2016">
-                        <option value="IATF 16949:2016">
-                        <option value="Bachelor of Engineering">
-                        <option value="Bachelor of Science">
-                        <option value="Master of Engineering">
-                        <option value="Master of Business Administration (MBA)">
-                        <option value="PhD">
-                        <option value="CQE (Certified Quality Engineer)">
-                        <option value="PMP (Project Management Professional)">
-                    </datalist>
-                </div>
-                <div class="form-group">
-                    <label>Qualification Level</label>
-                    <select id="qual-level" class="form-control">
-                        <option value="Lead Auditor">Lead Auditor</option>
-                        <option value="Auditor">Auditor</option>
-                        <option value="Provisional Auditor">Provisional Auditor</option>
-                        <option value="Technical Expert">Technical Expert</option>
-                        <option value="Bachelor">Bachelor's Degree</option>
-                        <option value="Master">Master's Degree</option>
-                        <option value="Doctorate">Doctorate</option>
-                        <option value="Certified">Certified Professional</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Certificate Number</label>
-                    <input type="text" id="qual-cert-number" class="form-control" placeholder="e.g. IRCA/12345/2024">
-                </div>
-                <div class="form-group">
-                    <label>Issuing Body / University</label>
-                    <input list="issuing-bodies" id="qual-issuing-body" class="form-control" placeholder="Type or select...">
-                    <datalist id="issuing-bodies">
-                        <option value="IRCA">
-                        <option value="Exemplar Global">
-                        <option value="PECB">
-                        <option value="CQI">
-                        <option value="Internal (CB Approved)">
-                        <option value="PMI">
-                        <option value="ASQ">
-                    </datalist>
-                </div>
-                <div class="form-group">
-                    <label>Field of Study</label>
-                    <input type="text" id="qual-field" class="form-control" placeholder="e.g. Mechanical Engineering, Quality Management">
-                </div>
-                <div class="form-group">
-                    <label>Issue Date</label>
-                    <input type="date" id="qual-issue-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
-                </div>
-                <div class="form-group">
-                    <label>Expiry Date <small>(leave blank if no expiry)</small></label>
-                    <input type="date" id="qual-expiry-date" class="form-control" value="${new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
-                </div>
-            </div>
-            <div style="padding: 0.75rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
-                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
-                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                    ISO qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
-                </p>
-            </div>
-        </form>
-    `;
+                        <datalist id="qual-standards">
+                            <option value="ISO 9001:2015">
+                                <option value="ISO 14001:2015">
+                                    <option value="ISO 45001:2018">
+                                        <option value="ISO 27001:2022">
+                                            <option value="ISO 22000:2018">
+                                                <option value="ISO 50001:2018">
+                                                    <option value="ISO 13485:2016">
+                                                        <option value="IATF 16949:2016">
+                                                            <option value="Bachelor of Engineering">
+                                                                <option value="Bachelor of Science">
+                                                                    <option value="Master of Engineering">
+                                                                        <option value="Master of Business Administration (MBA)">
+                                                                            <option value="PhD">
+                                                                                <option value="CQE (Certified Quality Engineer)">
+                                                                                    <option value="PMP (Project Management Professional)">
+                                                                                    </datalist>
+                                                                                </div>
+                                                                                <div class="form-group">
+                                                                                    <label>Qualification Level</label>
+                                                                                    <select id="qual-level" class="form-control">
+                                                                                        <option value="Lead Auditor">Lead Auditor</option>
+                                                                                        <option value="Auditor">Auditor</option>
+                                                                                        <option value="Provisional Auditor">Provisional Auditor</option>
+                                                                                        <option value="Technical Expert">Technical Expert</option>
+                                                                                        <option value="Bachelor">Bachelor's Degree</option>
+                                                                                        <option value="Master">Master's Degree</option>
+                                                                                        <option value="Doctorate">Doctorate</option>
+                                                                                        <option value="Certified">Certified Professional</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div class="form-group">
+                                                                                    <label>Certificate Number</label>
+                                                                                    <input type="text" id="qual-cert-number" class="form-control" placeholder="e.g. IRCA/12345/2024">
+                                                                                </div>
+                                                                                <div class="form-group">
+                                                                                    <label>Issuing Body / University</label>
+                                                                                    <input list="issuing-bodies" id="qual-issuing-body" class="form-control" placeholder="Type or select...">
+                                                                                        <datalist id="issuing-bodies">
+                                                                                            <option value="IRCA">
+                                                                                                <option value="Exemplar Global">
+                                                                                                    <option value="PECB">
+                                                                                                        <option value="CQI">
+                                                                                                            <option value="Internal (CB Approved)">
+                                                                                                                <option value="PMI">
+                                                                                                                    <option value="ASQ">
+                                                                                                                    </datalist>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Field of Study</label>
+                                                                                                                    <input type="text" id="qual-field" class="form-control" placeholder="e.g. Mechanical Engineering, Quality Management">
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Issue Date</label>
+                                                                                                                    <input type="date" id="qual-issue-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Expiry Date <small>(leave blank if no expiry)</small></label>
+                                                                                                                    <input type="date" id="qual-expiry-date" class="form-control" value="${new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                            <div style="padding: 0.75rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
+                                                                                                                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                                                                                                                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                                                                                                                    ISO qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
+                                                                                                                </p>
+                                                                                                            </div>
+                                                                                                        </form>
+                                                                                                        `;
 
-    document.getElementById('modal-save').onclick = function () {
-        const standard = document.getElementById('qual-standard').value;
+        document.getElementById('modal-save').onclick = function () {
+            const standard = document.getElementById('qual-standard').value;
 
-        if (!auditor.qualifications) auditor.qualifications = [];
+            if (!auditor.qualifications) auditor.qualifications = [];
 
-        // Check if standard already exists
-        const exists = auditor.qualifications.some(q => q.standard === standard);
-        if (exists) {
-            if (!confirm('This auditor already has a qualification for ' + standard + '. Add anyway?')) {
+            // Check if standard already exists
+            const exists = auditor.qualifications.some(q => q.standard === standard);
+            if (exists) {
+                if (!confirm('This auditor already has a qualification for ' + standard + '. Add anyway?')) {
+                    return;
+                }
+            }
+
+            auditor.qualifications.push({
+                type: document.getElementById('qual-type').value,
+                standard: standard,
+                level: document.getElementById('qual-level').value,
+                certNumber: document.getElementById('qual-cert-number').value || `CERT-${Date.now()}`,
+                issuingBody: document.getElementById('qual-issuing-body').value,
+                fieldOfStudy: document.getElementById('qual-field').value,
+                issueDate: document.getElementById('qual-issue-date').value,
+                expiryDate: document.getElementById('qual-expiry-date').value || null
+            });
+
+            // Also add to standards array if not present
+            if (!auditor.standards.includes(standard.split(':')[0])) {
+                auditor.standards.push(standard.split(':')[0]);
+            }
+
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Qualification added successfully', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="qualifications"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
+    };
+
+    // ============================================
+    // ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
+    // ============================================
+
+    // Add Witness Audit Record
+    window.addWitnessAudit = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
+
+        document.getElementById('modal-title').textContent = 'Record Witness Audit';
+        document.getElementById('modal-body').innerHTML = `
+                                                                                                        <form id="witness-form">
+                                                                                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Date of Witness Audit</label>
+                                                                                                                    <input type="date" id="witness-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Client Name</label>
+                                                                                                                    <input type="text" id="witness-client" class="form-control" placeholder="Enter client name" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Standard Audited</label>
+                                                                                                                    <select id="witness-standard" class="form-control">
+                                                                                                                        <option value="ISO 9001:2015">ISO 9001:2015</option>
+                                                                                                                        <option value="ISO 14001:2015">ISO 14001:2015</option>
+                                                                                                                        <option value="ISO 45001:2018">ISO 45001:2018</option>
+                                                                                                                        <option value="ISO 27001:2022">ISO 27001:2022</option>
+                                                                                                                        <option value="ISO 22000:2018">ISO 22000:2018</option>
+                                                                                                                    </select>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Witnessed By</label>
+                                                                                                                    <input type="text" id="witness-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group" style="grid-column: 1 / -1;">
+                                                                                                                    <label>Overall Rating</label>
+                                                                                                                    <select id="witness-rating" class="form-control">
+                                                                                                                        <option value="5">5 - Excellent</option>
+                                                                                                                        <option value="4" selected>4 - Good</option>
+                                                                                                                        <option value="3">3 - Satisfactory</option>
+                                                                                                                        <option value="2">2 - Needs Improvement</option>
+                                                                                                                        <option value="1">1 - Unsatisfactory</option>
+                                                                                                                    </select>
+                                                                                                                </div>
+                                                                                                                <div class="form-group" style="grid-column: 1 / -1;">
+                                                                                                                    <label>Observations/Notes</label>
+                                                                                                                    <textarea id="witness-notes" class="form-control" rows="4" placeholder="Enter observations, strengths, areas for improvement..."></textarea>
+                                                                                                                </div>
+                                                                                                                <div class="form-group" style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                                                                                                                    <input type="checkbox" id="first-time-audit">
+                                                                                                                        <label for="first-time-audit" style="margin: 0; font-weight: 500;">This is a First-Time Auditor Witness Audit</label>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </form>
+                                                                                                        `;
+
+        document.getElementById('modal-save').onclick = function () {
+            const client = document.getElementById('witness-client').value;
+            if (!client) {
+                window.showNotification('Please enter the client name', 'error');
                 return;
             }
-        }
 
-        auditor.qualifications.push({
-            type: document.getElementById('qual-type').value,
-            standard: standard,
-            level: document.getElementById('qual-level').value,
-            certNumber: document.getElementById('qual-cert-number').value || `CERT-${Date.now()}`,
-            issuingBody: document.getElementById('qual-issuing-body').value,
-            fieldOfStudy: document.getElementById('qual-field').value,
-            issueDate: document.getElementById('qual-issue-date').value,
-            expiryDate: document.getElementById('qual-expiry-date').value || null
+            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+            if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
+
+            auditor.evaluations.witnessAudits.unshift({
+                date: document.getElementById('witness-date').value,
+                client: client,
+                standard: document.getElementById('witness-standard').value,
+                witnessedBy: document.getElementById('witness-by').value,
+                rating: parseInt(document.getElementById('witness-rating').value),
+                notes: document.getElementById('witness-notes').value
+            });
+
+            // Update auditor evaluation status
+            const isFirstTime = document.getElementById('first-time-audit').checked;
+            if (isFirstTime) {
+                auditor.evaluations.firstTimeAuditor = false; // Requirement met
+            }
+
+            // Calculate next witness due date (3 years rule per ISO 17021-1)
+            const witnessDate = new Date(document.getElementById('witness-date').value);
+            witnessDate.setFullYear(witnessDate.getFullYear() + 3);
+            auditor.evaluations.nextWitnessAuditDue = witnessDate.toISOString().split('T')[0];
+            auditor.evaluations.lastWitnessDate = document.getElementById('witness-date').value;
+
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Witness audit recorded', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="activity"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
+    };
+
+    // Add Performance Review
+    window.addPerformanceReview = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
+
+        document.getElementById('modal-title').textContent = 'Add Performance Review';
+        document.getElementById('modal-body').innerHTML = `
+                                                                                                        <form id="review-form">
+                                                                                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Review Date</label>
+                                                                                                                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Review Type</label>
+                                                                                                                    <select id="review-type" class="form-control">
+                                                                                                                        <option value="Annual Review">Annual Review</option>
+                                                                                                                        <option value="Quarterly Review">Quarterly Review</option>
+                                                                                                                        <option value="Post-Audit Review">Post-Audit Review</option>
+                                                                                                                        <option value="Competence Assessment">Competence Assessment</option>
+                                                                                                                    </select>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Overall Rating (1-5)</label>
+                                                                                                                    <select id="review-rating" class="form-control">
+                                                                                                                        <option value="5">5 - Excellent</option>
+                                                                                                                        <option value="4" selected>4 - Good</option>
+                                                                                                                        <option value="3">3 - Satisfactory</option>
+                                                                                                                        <option value="2">2 - Needs Improvement</option>
+                                                                                                                        <option value="1">1 - Unsatisfactory</option>
+                                                                                                                    </select>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Reviewed By</label>
+                                                                                                                    <input type="text" id="review-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group" style="grid-column: 1 / -1;">
+                                                                                                                    <label>Outcome/Decision</label>
+                                                                                                                    <select id="review-outcome" class="form-control">
+                                                                                                                        <option value="Approved">Approved - Continue</option>
+                                                                                                                        <option value="Approved with Conditions">Approved with Conditions</option>
+                                                                                                                        <option value="Retraining Required">Retraining Required</option>
+                                                                                                                        <option value="Pending">Pending Further Review</option>
+                                                                                                                    </select>
+                                                                                                                </div>
+                                                                                                                <div class="form-group" style="grid-column: 1 / -1;">
+                                                                                                                    <label>Comments/Notes</label>
+                                                                                                                    <textarea id="review-notes" class="form-control" rows="4" placeholder="Enter review comments, strengths, development areas..."></textarea>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </form>
+                                                                                                        `;
+
+        document.getElementById('modal-save').onclick = function () {
+            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
+            if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
+
+            auditor.evaluations.performanceReviews.unshift({
+                date: document.getElementById('review-date').value,
+                type: document.getElementById('review-type').value,
+                rating: parseInt(document.getElementById('review-rating').value),
+                reviewedBy: document.getElementById('review-by').value,
+                outcome: document.getElementById('review-outcome').value,
+                notes: document.getElementById('review-notes').value
+            });
+
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Performance review added', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="performance"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
+    };
+
+    // Add Report Review (Office-based)
+    window.addReportReview = function (auditorId) {
+        const auditor = window.state.auditors.find(a => a.id === auditorId);
+        if (!auditor) return;
+
+        document.getElementById('modal-title').textContent = 'Add Report Review';
+        document.getElementById('modal-body').innerHTML = `
+                                                                                                        <form id="report-review-form">
+                                                                                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Review Date</label>
+                                                                                                                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Report Type</label>
+                                                                                                                    <select id="report-type" class="form-control">
+                                                                                                                        <option value="Stage 1 Audit">Stage 1 Audit</option>
+                                                                                                                        <option value="Stage 2 Audit">Stage 2 Audit</option>
+                                                                                                                        <option value="Surveillance Audit">Surveillance Audit</option>
+                                                                                                                        <option value="Recertification Audit">Recertification Audit</option>
+                                                                                                                        <option value="Special Audit">Special Audit</option>
+                                                                                                                    </select>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Client</label>
+                                                                                                                    <input type="text" id="audit-client" class="form-control" placeholder="Client Name" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Reviewer</label>
+                                                                                                                    <input type="text" id="reviewer-name" class="form-control" value="${window.state.currentUser?.name || ''}" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Quality Rating (1-5)</label>
+                                                                                                                    <input type="number" id="quality-rating" class="form-control" min="1" max="5" value="4" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Completeness Rating (1-5)</label>
+                                                                                                                    <input type="number" id="completeness-rating" class="form-control" min="1" max="5" value="5" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label>Technical Accuracy (1-5)</label>
+                                                                                                                    <input type="number" id="technical-rating" class="form-control" min="1" max="5" value="4" required>
+                                                                                                                </div>
+                                                                                                                <div class="form-group" style="grid-column: 1 / -1;">
+                                                                                                                    <label>Feedback/Notes</label>
+                                                                                                                    <textarea id="review-notes" class="form-control" rows="4" placeholder="Enter feedback on the report..."></textarea>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </form>
+                                                                                                        `;
+
+        document.getElementById('modal-save').onclick = function () {
+            if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [], reportReviews: [] };
+            if (!auditor.evaluations.reportReviews) auditor.evaluations.reportReviews = [];
+
+            auditor.evaluations.reportReviews.unshift({
+                reviewDate: document.getElementById('review-date').value,
+                reportType: document.getElementById('report-type').value,
+                client: document.getElementById('audit-client').value,
+                reviewer: document.getElementById('reviewer-name').value,
+                qualityRating: parseInt(document.getElementById('quality-rating').value),
+                completenessRating: parseInt(document.getElementById('completeness-rating').value),
+                technicalRating: parseInt(document.getElementById('technical-rating').value),
+                notes: document.getElementById('review-notes').value
+            });
+
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Report review added', 'success');
+            renderAuditorDetail(auditorId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="performance"]')?.click();
+            }, 100);
+        };
+
+        window.openModal();
+    };
+    // ============================================
+    // MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
+    // ============================================
+
+    function calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites = []) {
+        // IAF MD 1 Formula: Sample = √n
+        let baseSample = Math.sqrt(totalSites);
+
+        // Risk adjustments
+        const riskMultiplier = {
+            'Low': 0.8,
+            'Medium': 1.0,
+            'High': 1.2
+        };
+
+        // Maturity adjustments (inverse of risk for simplicity)
+        const maturityMultiplier = {
+            'Low': 1.2,      // Low maturity = higher sample
+            'Normal': 1.0,
+            'High': 0.8      // High maturity = lower sample
+        };
+
+        let adjustedSample = baseSample * (riskMultiplier[riskLevel] || 1.0) * (maturityMultiplier[maturityLevel] || 1.0);
+
+        // Round up
+        adjustedSample = Math.ceil(adjustedSample);
+
+        // Minimum 25% of sites
+        const minimumSample = Math.ceil(totalSites * 0.25);
+        adjustedSample = Math.max(adjustedSample, minimumSample);
+
+        // Never exceed total sites
+        adjustedSample = Math.min(adjustedSample, totalSites);
+
+        // Account for mandatory sites
+        const mandatoryCount = mandatorySites.length;
+        const randomSitesNeeded = Math.max(0, adjustedSample - mandatoryCount);
+
+        return {
+            totalSites,
+            sampleSize: adjustedSample,
+            mandatorySites: mandatoryCount,
+            randomSites: randomSitesNeeded,
+            baseSample: Math.ceil(baseSample),
+            minimumRequired: minimumSample
+        };
+    }
+
+    function renderMultiSiteSamplingCalculator() {
+        const html = `
+                                                                                                        <div class="fade-in">
+                                                                                                            <div class="card" style="max-width: 900px; margin: 0 auto;">
+                                                                                                                <h2 style="margin-bottom: 1rem; color: var(--primary-color);">
+                                                                                                                    <i class="fa-solid fa-map-marked-alt" style="margin-right: 0.5rem;"></i>
+                                                                                                                    Multi-Site Sampling Calculator (IAF MD 1)
+                                                                                                                </h2>
+                                                                                                                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                                                                                                                    Calculate the number of sites to audit based on IAF Mandatory Document 1 requirements
+                                                                                                                </p>
+
+                                                                                                                <form id="sampling-form" style="margin-bottom: 2rem;">
+                                                                                                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                                                                                                                        <!-- Total Sites -->
+                                                                                                                        <div class="form-group">
+                                                                                                                            <label for="total-sites">Total Number of Sites <span style="color: var(--danger-color);">*</span></label>
+                                                                                                                            <input type="number" id="total-sites" min="1" value="10" required>
+                                                                                                                                <small style="color: var(--text-secondary); font-size: 0.8rem;">All client locations</small>
+                                                                                                                        </div>
+
+                                                                                                                        <!-- Risk Level -->
+                                                                                                                        <div class="form-group">
+                                                                                                                            <label for="risk-level">Risk Level <span style="color: var(--danger-color);">*</span></label>
+                                                                                                                            <select id="risk-level" required>
+                                                                                                                                <option value="Low">Low (Simple operations)</option>
+                                                                                                                                <option value="Medium" selected>Medium (Standard operations)</option>
+                                                                                                                                <option value="High">High (Complex/hazardous)</option>
+                                                                                                                            </select>
+                                                                                                                        </div>
+
+                                                                                                                        <!-- Maturity Level -->
+                                                                                                                        <div class="form-group">
+                                                                                                                            <label for="maturity-level">Management System Maturity <span style="color: var(--danger-color);">*</span></label>
+                                                                                                                            <select id="maturity-level" required>
+                                                                                                                                <option value="Low">Low (First certification)</option>
+                                                                                                                                <option value="Normal" selected>Normal (Established)</option>
+                                                                                                                                <option value="High">High (Mature, proven)</option>
+                                                                                                                            </select>
+                                                                                                                        </div>
+
+                                                                                                                        <!-- Mandatory Sites -->
+                                                                                                                        <div class="form-group">
+                                                                                                                            <label for="mandatory-sites">Mandatory Sites Count</label>
+                                                                                                                            <input type="number" id="mandatory-sites" min="0" value="1">
+                                                                                                                                <small style="color: var(--text-secondary); font-size: 0.8rem;">HQ, special processes, NCR sites</small>
+                                                                                                                        </div>
+                                                                                                                    </div>
+
+                                                                                                                    <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem; width: 100%;">
+                                                                                                                        <i class="fa-solid fa-calculator" style="margin-right: 0.5rem;"></i>
+                                                                                                                        Calculate Sample Size
+                                                                                                                    </button>
+                                                                                                                </form>
+
+                                                                                                                <!-- Results Section -->
+                                                                                                                <div id="sampling-results" style="display: none;">
+                                                                                                                    <hr style="border: none; border-top: 2px solid var(--border-color); margin: 2rem 0;">
+
+                                                                                                                        <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                                                                                                                            <i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem;"></i>
+                                                                                                                            Sampling Results
+                                                                                                                        </h3>
+
+                                                                                                                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                                                                                                                            <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 1.5rem;">
+                                                                                                                                <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Sample Size</p>
+                                                                                                                                <p style="font-size: 2.5rem; font-weight: 700; margin: 0;" id="result-sample-size">--</p>
+                                                                                                                                <p style="font-size: 0.875rem; opacity: 0.9; margin-top: 0.5rem;">sites to audit</p>
+                                                                                                                            </div>
+
+                                                                                                                            <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-align: center; padding: 1.5rem;">
+                                                                                                                                <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Mandatory Sites</p>
+                                                                                                                                <p style="font-size: 2.5rem; font-weight: 700; margin: 0;" id="result-mandatory">--</p>
+                                                                                                                                <p style="font-size: 0.875rem; opacity: 0.9; margin-top: 0.5rem;">must audit</p>
+                                                                                                                            </div>
+
+                                                                                                                            <div class="card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; text-align: center; padding: 1.5rem;">
+                                                                                                                                <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Random Selection</p>
+                                                                                                                                <p style="font-size: 2.5rem; font-weight: 700; margin: 0;" id="result-random">--</p>
+                                                                                                                                <p style="font-size: 0.875rem; opacity: 0.9; margin-top: 0.5rem;">sites</p>
+                                                                                                                            </div>
+                                                                                                                        </div>
+
+                                                                                                                        <!-- Calculation Details -->
+                                                                                                                        <div class="card" style="background: #f8fafc; padding: 1.5rem;">
+                                                                                                                            <h4 style="margin: 0 0 1rem 0; font-size: 1rem;">Calculation Breakdown</h4>
+                                                                                                                            <div id="sampling-details" style="font-size: 0.9rem; color: var(--text-secondary);"></div>
+                                                                                                                        </div>
+
+                                                                                                                        <!-- IAF MD 1 Reference -->
+                                                                                                                        <div style="margin-top: 1.5rem; padding: 1rem; background: #eff6ff; border-left: 4px solid #0284c7; border-radius: 4px;">
+                                                                                                                            <p style="margin: 0; font-size: 0.85rem; color: #0369a1;">
+                                                                                                                                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                                                                                                                                <strong>IAF MD 1 Formula:</strong> Sample = √n (square root of total sites), adjusted for risk and maturity. Minimum 25% of sites must be audited.
+                                                                                                                            </p>
+                                                                                                                        </div>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                        `;
+
+        window.contentArea.innerHTML = html;
+
+        // Form submission handler
+        document.getElementById('sampling-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const totalSites = parseInt(document.getElementById('total-sites').value);
+            const riskLevel = document.getElementById('risk-level').value;
+            const maturityLevel = document.getElementById('maturity-level').value;
+            const mandatoryCount = parseInt(document.getElementById('mandatory-sites').value) || 0;
+
+            // Create array of mandatory sites (just count for now)
+            const mandatorySites = Array(mandatoryCount).fill('Mandatory');
+
+            // Calculate
+            const results = calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites);
+
+            // Display results
+            document.getElementById('result-sample-size').textContent = results.sampleSize;
+            document.getElementById('result-mandatory').textContent = results.mandatorySites;
+            document.getElementById('result-random').textContent = results.randomSites;
+
+            // Show breakdown
+            const details = `
+                                                                                                        <div style="display: grid; gap: 0.5rem;">
+                                                                                                            <div><strong>Formula Application:</strong></div>
+                                                                                                            <div>• Base Sample (√${totalSites}): ${results.baseSample} sites</div>
+                                                                                                            <div>• Risk Adjustment (${riskLevel}): ${riskLevel === 'Low' ? '×0.8' : riskLevel === 'High' ? '×1.2' : '×1.0'}</div>
+                                                                                                            <div>• Maturity Adjustment (${maturityLevel}): ${maturityLevel === 'Low' ? '×1.2' : maturityLevel === 'High' ? '×0.8' : '×1.0'}</div>
+                                                                                                            <div>• Minimum Required (25% of ${totalSites}): ${results.minimumRequired} sites</div>
+                                                                                                            <div style="margin-top: 0.5rem;"><strong>Final Sample:</strong></div>
+                                                                                                            <div>• ${results.mandatorySites} mandatory sites (HQ, special processes, NCR sites)</div>
+                                                                                                            <div>• ${results.randomSites} sites selected randomly from remaining ${totalSites - results.mandatorySites} sites</div>
+                                                                                                            <div>• <strong>Total: ${results.sampleSize} sites to audit</strong></div>
+                                                                                                        </div>
+                                                                                                        `;
+            document.getElementById('sampling-details').innerHTML = details;
+
+            // Show results section
+            document.getElementById('sampling-results').style.display = 'block';
+
+            // Scroll to results
+            document.getElementById('sampling-results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
-
-        // Also add to standards array if not present
-        if (!auditor.standards.includes(standard.split(':')[0])) {
-            auditor.standards.push(standard.split(':')[0]);
-        }
-
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Qualification added successfully', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="qualifications"]')?.click();
-        }, 100);
-    };
-
-    window.openModal();
-};
-
-// ============================================
-// ISO 17021-1 AUDITOR EVALUATION FUNCTIONS
-// ============================================
-
-// Add Witness Audit Record
-window.addWitnessAudit = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    document.getElementById('modal-title').textContent = 'Record Witness Audit';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="witness-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label>Date of Witness Audit</label>
-                    <input type="date" id="witness-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
-                </div>
-                <div class="form-group">
-                    <label>Client Name</label>
-                    <input type="text" id="witness-client" class="form-control" placeholder="Enter client name" required>
-                </div>
-                <div class="form-group">
-                    <label>Standard Audited</label>
-                    <select id="witness-standard" class="form-control">
-                        <option value="ISO 9001:2015">ISO 9001:2015</option>
-                        <option value="ISO 14001:2015">ISO 14001:2015</option>
-                        <option value="ISO 45001:2018">ISO 45001:2018</option>
-                        <option value="ISO 27001:2022">ISO 27001:2022</option>
-                        <option value="ISO 22000:2018">ISO 22000:2018</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Witnessed By</label>
-                    <input type="text" id="witness-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Overall Rating</label>
-                    <select id="witness-rating" class="form-control">
-                        <option value="5">5 - Excellent</option>
-                        <option value="4" selected>4 - Good</option>
-                        <option value="3">3 - Satisfactory</option>
-                        <option value="2">2 - Needs Improvement</option>
-                        <option value="1">1 - Unsatisfactory</option>
-                    </select>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Observations/Notes</label>
-                    <textarea id="witness-notes" class="form-control" rows="4" placeholder="Enter observations, strengths, areas for improvement..."></textarea>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-                    <input type="checkbox" id="first-time-audit">
-                    <label for="first-time-audit" style="margin: 0; font-weight: 500;">This is a First-Time Auditor Witness Audit</label>
-                </div>
-            </div>
-        </form>
-    `;
-
-    document.getElementById('modal-save').onclick = function () {
-        const client = document.getElementById('witness-client').value;
-        if (!client) {
-            window.showNotification('Please enter the client name', 'error');
-            return;
-        }
-
-        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-        if (!auditor.evaluations.witnessAudits) auditor.evaluations.witnessAudits = [];
-
-        auditor.evaluations.witnessAudits.unshift({
-            date: document.getElementById('witness-date').value,
-            client: client,
-            standard: document.getElementById('witness-standard').value,
-            witnessedBy: document.getElementById('witness-by').value,
-            rating: parseInt(document.getElementById('witness-rating').value),
-            notes: document.getElementById('witness-notes').value
-        });
-
-        // Update auditor evaluation status
-        const isFirstTime = document.getElementById('first-time-audit').checked;
-        if (isFirstTime) {
-            auditor.evaluations.firstTimeAuditor = false; // Requirement met
-        }
-
-        // Calculate next witness due date (3 years rule per ISO 17021-1)
-        const witnessDate = new Date(document.getElementById('witness-date').value);
-        witnessDate.setFullYear(witnessDate.getFullYear() + 3);
-        auditor.evaluations.nextWitnessAuditDue = witnessDate.toISOString().split('T')[0];
-        auditor.evaluations.lastWitnessDate = document.getElementById('witness-date').value;
-
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Witness audit recorded', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="activity"]')?.click();
-        }, 100);
-    };
-
-    window.openModal();
-};
-
-// Add Performance Review
-window.addPerformanceReview = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    document.getElementById('modal-title').textContent = 'Add Performance Review';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="review-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label>Review Date</label>
-                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
-                </div>
-                <div class="form-group">
-                    <label>Review Type</label>
-                    <select id="review-type" class="form-control">
-                        <option value="Annual Review">Annual Review</option>
-                        <option value="Quarterly Review">Quarterly Review</option>
-                        <option value="Post-Audit Review">Post-Audit Review</option>
-                        <option value="Competence Assessment">Competence Assessment</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Overall Rating (1-5)</label>
-                    <select id="review-rating" class="form-control">
-                        <option value="5">5 - Excellent</option>
-                        <option value="4" selected>4 - Good</option>
-                        <option value="3">3 - Satisfactory</option>
-                        <option value="2">2 - Needs Improvement</option>
-                        <option value="1">1 - Unsatisfactory</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Reviewed By</label>
-                    <input type="text" id="review-by" class="form-control" value="${window.state.currentUser?.name || ''}" required>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Outcome/Decision</label>
-                    <select id="review-outcome" class="form-control">
-                        <option value="Approved">Approved - Continue</option>
-                        <option value="Approved with Conditions">Approved with Conditions</option>
-                        <option value="Retraining Required">Retraining Required</option>
-                        <option value="Pending">Pending Further Review</option>
-                    </select>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Comments/Notes</label>
-                    <textarea id="review-notes" class="form-control" rows="4" placeholder="Enter review comments, strengths, development areas..."></textarea>
-                </div>
-            </div>
-        </form>
-    `;
-
-    document.getElementById('modal-save').onclick = function () {
-        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [] };
-        if (!auditor.evaluations.performanceReviews) auditor.evaluations.performanceReviews = [];
-
-        auditor.evaluations.performanceReviews.unshift({
-            date: document.getElementById('review-date').value,
-            type: document.getElementById('review-type').value,
-            rating: parseInt(document.getElementById('review-rating').value),
-            reviewedBy: document.getElementById('review-by').value,
-            outcome: document.getElementById('review-outcome').value,
-            notes: document.getElementById('review-notes').value
-        });
-
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Performance review added', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="performance"]')?.click();
-        }, 100);
-    };
-
-    window.openModal();
-};
-
-// Add Report Review (Office-based)
-window.addReportReview = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
-    if (!auditor) return;
-
-    document.getElementById('modal-title').textContent = 'Add Report Review';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="report-review-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label>Review Date</label>
-                    <input type="date" id="review-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
-                </div>
-                <div class="form-group">
-                    <label>Report Type</label>
-                    <select id="report-type" class="form-control">
-                        <option value="Stage 1 Audit">Stage 1 Audit</option>
-                        <option value="Stage 2 Audit">Stage 2 Audit</option>
-                        <option value="Surveillance Audit">Surveillance Audit</option>
-                        <option value="Recertification Audit">Recertification Audit</option>
-                        <option value="Special Audit">Special Audit</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Client</label>
-                    <input type="text" id="audit-client" class="form-control" placeholder="Client Name" required>
-                </div>
-                <div class="form-group">
-                    <label>Reviewer</label>
-                    <input type="text" id="reviewer-name" class="form-control" value="${window.state.currentUser?.name || ''}" required>
-                </div>
-                <div class="form-group">
-                    <label>Quality Rating (1-5)</label>
-                    <input type="number" id="quality-rating" class="form-control" min="1" max="5" value="4" required>
-                </div>
-                <div class="form-group">
-                    <label>Completeness Rating (1-5)</label>
-                    <input type="number" id="completeness-rating" class="form-control" min="1" max="5" value="5" required>
-                </div>
-                 <div class="form-group">
-                    <label>Technical Accuracy (1-5)</label>
-                    <input type="number" id="technical-rating" class="form-control" min="1" max="5" value="4" required>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Feedback/Notes</label>
-                    <textarea id="review-notes" class="form-control" rows="4" placeholder="Enter feedback on the report..."></textarea>
-                </div>
-            </div>
-        </form>
-    `;
-
-    document.getElementById('modal-save').onclick = function () {
-        if (!auditor.evaluations) auditor.evaluations = { witnessAudits: [], performanceReviews: [], reportReviews: [] };
-        if (!auditor.evaluations.reportReviews) auditor.evaluations.reportReviews = [];
-
-        auditor.evaluations.reportReviews.unshift({
-            reviewDate: document.getElementById('review-date').value,
-            reportType: document.getElementById('report-type').value,
-            client: document.getElementById('audit-client').value,
-            reviewer: document.getElementById('reviewer-name').value,
-            qualityRating: parseInt(document.getElementById('quality-rating').value),
-            completenessRating: parseInt(document.getElementById('completeness-rating').value),
-            technicalRating: parseInt(document.getElementById('technical-rating').value),
-            notes: document.getElementById('review-notes').value
-        });
-
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Report review added', 'success');
-        renderAuditorDetail(auditorId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="performance"]')?.click();
-        }, 100);
-    };
-
-    window.openModal();
-};
-// ============================================
-// MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
-// ============================================
-
-function calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites = []) {
-    // IAF MD 1 Formula: Sample = √n
-    let baseSample = Math.sqrt(totalSites);
-
-    // Risk adjustments
-    const riskMultiplier = {
-        'Low': 0.8,
-        'Medium': 1.0,
-        'High': 1.2
-    };
-
-    // Maturity adjustments (inverse of risk for simplicity)
-    const maturityMultiplier = {
-        'Low': 1.2,      // Low maturity = higher sample
-        'Normal': 1.0,
-        'High': 0.8      // High maturity = lower sample
-    };
-
-    let adjustedSample = baseSample * (riskMultiplier[riskLevel] || 1.0) * (maturityMultiplier[maturityLevel] || 1.0);
-
-    // Round up
-    adjustedSample = Math.ceil(adjustedSample);
-
-    // Minimum 25% of sites
-    const minimumSample = Math.ceil(totalSites * 0.25);
-    adjustedSample = Math.max(adjustedSample, minimumSample);
-
-    // Never exceed total sites
-    adjustedSample = Math.min(adjustedSample, totalSites);
-
-    // Account for mandatory sites
-    const mandatoryCount = mandatorySites.length;
-    const randomSitesNeeded = Math.max(0, adjustedSample - mandatoryCount);
-
-    return {
-        totalSites,
-        sampleSize: adjustedSample,
-        mandatorySites: mandatoryCount,
-        randomSites: randomSitesNeeded,
-        baseSample: Math.ceil(baseSample),
-        minimumRequired: minimumSample
-    };
-}
-
-function renderMultiSiteSamplingCalculator() {
-    const html = `
-        <div class="fade-in">
-            <div class="card" style="max-width: 900px; margin: 0 auto;">
-                <h2 style="margin-bottom: 1rem; color: var(--primary-color);">
-                    <i class="fa-solid fa-map-marked-alt" style="margin-right: 0.5rem;"></i>
-                    Multi-Site Sampling Calculator (IAF MD 1)
-                </h2>
-                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
-                    Calculate the number of sites to audit based on IAF Mandatory Document 1 requirements
-                </p>
-
-                <form id="sampling-form" style="margin-bottom: 2rem;">
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
-                        <!-- Total Sites -->
-                        <div class="form-group">
-                            <label for="total-sites">Total Number of Sites <span style="color: var(--danger-color);">*</span></label>
-                            <input type="number" id="total-sites" min="1" value="10" required>
-                            <small style="color: var(--text-secondary); font-size: 0.8rem;">All client locations</small>
-                        </div>
-
-                        <!-- Risk Level -->
-                        <div class="form-group">
-                            <label for="risk-level">Risk Level <span style="color: var(--danger-color);">*</span></label>
-                            <select id="risk-level" required>
-                                <option value="Low">Low (Simple operations)</option>
-                                <option value="Medium" selected>Medium (Standard operations)</option>
-                                <option value="High">High (Complex/hazardous)</option>
-                            </select>
-                        </div>
-
-                        <!-- Maturity Level -->
-                        <div class="form-group">
-                            <label for="maturity-level">Management System Maturity <span style="color: var(--danger-color);">*</span></label>
-                            <select id="maturity-level" required>
-                                <option value="Low">Low (First certification)</option>
-                                <option value="Normal" selected>Normal (Established)</option>
-                                <option value="High">High (Mature, proven)</option>
-                            </select>
-                        </div>
-
-                        <!-- Mandatory Sites -->
-                        <div class="form-group">
-                            <label for="mandatory-sites">Mandatory Sites Count</label>
-                            <input type="number" id="mandatory-sites" min="0" value="1">
-                            <small style="color: var(--text-secondary); font-size: 0.8rem;">HQ, special processes, NCR sites</small>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem; width: 100%;">
-                        <i class="fa-solid fa-calculator" style="margin-right: 0.5rem;"></i>
-                        Calculate Sample Size
-                    </button>
-                </form>
-
-                <!-- Results Section -->
-                <div id="sampling-results" style="display: none;">
-                    <hr style="border: none; border-top: 2px solid var(--border-color); margin: 2rem 0;">
-                    
-                    <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-                        <i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem;"></i>
-                        Sampling Results
-                    </h3>
-
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                        <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 1.5rem;">
-                            <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Sample Size</p>
-                            <p style="font-size: 2.5rem; font-weight: 700; margin: 0;" id="result-sample-size">--</p>
-                            <p style="font-size: 0.875rem; opacity: 0.9; margin-top: 0.5rem;">sites to audit</p>
-                        </div>
-
-                        <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-align: center; padding: 1.5rem;">
-                            <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Mandatory Sites</p>
-                            <p style="font-size: 2.5rem; font-weight: 700; margin: 0;" id="result-mandatory">--</p>
-                            <p style="font-size: 0.875rem; opacity: 0.9; margin-top: 0.5rem;">must audit</p>
-                        </div>
-
-                        <div class="card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; text-align: center; padding: 1.5rem;">
-                            <p style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Random Selection</p>
-                            <p style="font-size: 2.5rem; font-weight: 700; margin: 0;" id="result-random">--</p>
-                            <p style="font-size: 0.875rem; opacity: 0.9; margin-top: 0.5rem;">sites</p>
-                        </div>
-                    </div>
-
-                    <!-- Calculation Details -->
-                    <div class="card" style="background: #f8fafc; padding: 1.5rem;">
-                        <h4 style="margin: 0 0 1rem 0; font-size: 1rem;">Calculation Breakdown</h4>
-                        <div id="sampling-details" style="font-size: 0.9rem; color: var(--text-secondary);"></div>
-                    </div>
-
-                    <!-- IAF MD 1 Reference -->
-                    <div style="margin-top: 1.5rem; padding: 1rem; background: #eff6ff; border-left: 4px solid #0284c7; border-radius: 4px;">
-                        <p style="margin: 0; font-size: 0.85rem; color: #0369a1;">
-                            <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                            <strong>IAF MD 1 Formula:</strong> Sample = √n (square root of total sites), adjusted for risk and maturity. Minimum 25% of sites must be audited.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    window.contentArea.innerHTML = html;
-
-    // Form submission handler
-    document.getElementById('sampling-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const totalSites = parseInt(document.getElementById('total-sites').value);
-        const riskLevel = document.getElementById('risk-level').value;
-        const maturityLevel = document.getElementById('maturity-level').value;
-        const mandatoryCount = parseInt(document.getElementById('mandatory-sites').value) || 0;
-
-        // Create array of mandatory sites (just count for now)
-        const mandatorySites = Array(mandatoryCount).fill('Mandatory');
-
-        // Calculate
-        const results = calculateSiteSampling(totalSites, riskLevel, maturityLevel, mandatorySites);
-
-        // Display results
-        document.getElementById('result-sample-size').textContent = results.sampleSize;
-        document.getElementById('result-mandatory').textContent = results.mandatorySites;
-        document.getElementById('result-random').textContent = results.randomSites;
-
-        // Show breakdown
-        const details = `
-            <div style="display: grid; gap: 0.5rem;">
-                <div><strong>Formula Application:</strong></div>
-                <div>• Base Sample (√${totalSites}): ${results.baseSample} sites</div>
-                <div>• Risk Adjustment (${riskLevel}): ${riskLevel === 'Low' ? '×0.8' : riskLevel === 'High' ? '×1.2' : '×1.0'}</div>
-                <div>• Maturity Adjustment (${maturityLevel}): ${maturityLevel === 'Low' ? '×1.2' : maturityLevel === 'High' ? '×0.8' : '×1.0'}</div>
-                <div>• Minimum Required (25% of ${totalSites}): ${results.minimumRequired} sites</div>
-                <div style="margin-top: 0.5rem;"><strong>Final Sample:</strong></div>
-                <div>• ${results.mandatorySites} mandatory sites (HQ, special processes, NCR sites)</div>
-                <div>• ${results.randomSites} sites selected randomly from remaining ${totalSites - results.mandatorySites} sites</div>
-                <div>• <strong>Total: ${results.sampleSize} sites to audit</strong></div>
-            </div>
-        `;
-        document.getElementById('sampling-details').innerHTML = details;
-
-        // Show results section
-        document.getElementById('sampling-results').style.display = 'block';
-
-        // Scroll to results
-        document.getElementById('sampling-results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-}
+    }

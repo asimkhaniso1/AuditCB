@@ -1497,6 +1497,7 @@ async function renderModule(moduleName, syncHash = true) {
                 break;
             case 'clients':
                 if (typeof renderClientsEnhanced === 'function') {
+                    renderClientsEnhanced();
                 } else if (route === 'client-form') {
                     const id = params.get('id');
                     window.renderClientForm(id);
