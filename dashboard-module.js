@@ -326,9 +326,7 @@ function renderDashboardEnhanced() {
         </div>
     `;
 
-    window.contentArea.innerHTML = html;
-
-    // Destroy existing chart instances to prevent "Canvas already in use" errors
+    // Destroy existing chart instances BEFORE setting innerHTML to prevent "Canvas already in use" errors
     const chartIds = ['auditTrendsChart', 'ncrDistributionChart', 'industryChart', 'standardsChart', 'ncrTrendsChart', 'clientGrowthChart'];
 
     chartIds.forEach(id => {
@@ -348,6 +346,9 @@ function renderDashboardEnhanced() {
         });
     }
     window.dashboardCharts = {};
+
+    // Now safe to set innerHTML
+    window.contentArea.innerHTML = html;
 
     // Render Charts (Staggered to prevent blocking main thread)
     requestAnimationFrame(() => {

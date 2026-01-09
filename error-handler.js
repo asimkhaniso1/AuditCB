@@ -257,13 +257,19 @@ window.ErrorHandler = ErrorHandler;
 
 // Setup global error handlers
 window.addEventListener('error', (event) => {
-    ErrorHandler.handle(event.error, 'Global Error', true);
+    // Prevent null/undefined errors from crashing handler
+    if (event.error || event.message) {
+        const error = event.error || new Error(event.message || 'Unknown error');
+        ErrorHandler.handle(error, 'Global Error', true);
+    } else {
+        Logger.warn('Global Error event with no error object:', event);
+    }
 });
 
 window.addEventListener('unhandledrejection', (event) => {
     const error = event.reason instanceof Error
         ? event.reason
-        : new Error(String(event.reason));
+        : new Error(String(event.reason || 'Unhandled Promise Rejection'));
     ErrorHandler.handle(error, 'Unhandled Promise', true);
 });
 
