@@ -1,16 +1,11 @@
 -- ============================================
--- MASTER DATABASE SCHEMA FIX MIGRATION
+-- MASTER DATABASE SCHEMA FIX MIGRATION v2
 -- ============================================
 -- Rollback Point: v1.0-stable-before-schema-fixes
 -- Execute in: Supabase SQL Editor
 -- Risk: Medium (ID type changes, schema modifications)
 -- 
--- INSTRUCTIONS:
--- 1. Copy this entire script
--- 2. Go to Supabase Dashboard > SQL Editor
--- 3. Paste and click "Run"
--- 4. Review output messages
--- 5. Run VERIFICATION queries at bottom
+-- FIXED: Now checks for column existence before altering
 -- ============================================
 
 -- ============================================
@@ -42,17 +37,68 @@ ALTER TABLE audit_reports DROP CONSTRAINT IF EXISTS audit_reports_plan_id_fkey;
 ALTER TABLE audit_reports DROP CONSTRAINT IF EXISTS audit_reports_client_id_fkey;
 
 -- 2. CONVERT PRIMARY KEYS TO TEXT
-ALTER TABLE clients ALTER COLUMN id TYPE TEXT;
-ALTER TABLE audit_plans ALTER COLUMN id TYPE TEXT;
-ALTER TABLE audit_reports ALTER COLUMN id TYPE TEXT;
-ALTER TABLE auditors ALTER COLUMN id TYPE TEXT;
-ALTER TABLE audit_log ALTER COLUMN id TYPE TEXT;
+DO $$
+BEGIN
+    -- Convert clients.id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='id') THEN
+        ALTER TABLE clients ALTER COLUMN id TYPE TEXT;
+        RAISE NOTICE 'Converted clients.id to TEXT';
+    END IF;
+
+    -- Convert audit_plans.id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_plans' AND column_name='id') THEN
+        ALTER TABLE audit_plans ALTER COLUMN id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_plans.id to TEXT';
+    END IF;
+
+    -- Convert audit_reports.id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_reports' AND column_name='id') THEN
+        ALTER TABLE audit_reports ALTER COLUMN id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_reports.id to TEXT';
+    END IF;
+
+    -- Convert auditors.id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='auditors' AND column_name='id') THEN
+        ALTER TABLE auditors ALTER COLUMN id TYPE TEXT;
+        RAISE NOTICE 'Converted auditors.id to TEXT';
+    END IF;
+
+    -- Convert audit_log.id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='id') THEN
+        ALTER TABLE audit_log ALTER COLUMN id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_log.id to TEXT';
+    END IF;
+END $$;
 
 -- 3. CONVERT FOREIGN KEY COLUMNS TO TEXT
-ALTER TABLE audit_plans ALTER COLUMN client_id TYPE TEXT;
-ALTER TABLE audit_reports ALTER COLUMN audit_plan_id TYPE TEXT;
-ALTER TABLE audit_reports ALTER COLUMN plan_id TYPE TEXT;
-ALTER TABLE audit_reports ALTER COLUMN client_id TYPE TEXT;
+DO $$
+BEGIN
+    -- Convert audit_plans.client_id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_plans' AND column_name='client_id') THEN
+        ALTER TABLE audit_plans ALTER COLUMN client_id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_plans.client_id to TEXT';
+    END IF;
+
+    -- Convert audit_reports.audit_plan_id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_reports' AND column_name='audit_plan_id') THEN
+        ALTER TABLE audit_reports ALTER COLUMN audit_plan_id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_reports.audit_plan_id to TEXT';
+    END IF;
+
+    -- Convert audit_reports.plan_id (only if exists)
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_reports' AND column_name='plan_id') THEN
+        ALTER TABLE audit_reports ALTER COLUMN plan_id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_reports.plan_id to TEXT';
+    ELSE
+        RAISE NOTICE 'Skipped audit_reports.plan_id - column does not exist';
+    END IF;
+
+    -- Convert audit_reports.client_id
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_reports' AND column_name='client_id') THEN
+        ALTER TABLE audit_reports ALTER COLUMN client_id TYPE TEXT;
+        RAISE NOTICE 'Converted audit_reports.client_id to TEXT';
+    END IF;
+END $$;
 
 SELECT 'PHASE 2 COMPLETE: ID columns converted to TEXT' as status;
 
@@ -115,9 +161,17 @@ ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS entity_type TEXT;
 ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS action TEXT;
 ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS user_email TEXT;
 
--- Make columns nullable
-ALTER TABLE audit_log ALTER COLUMN entity_id DROP NOT NULL;
-ALTER TABLE audit_log ALTER COLUMN details DROP NOT NULL;
+-- Make columns nullable (handle if they don't exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='entity_id') THEN
+        ALTER TABLE audit_log ALTER COLUMN entity_id DROP NOT NULL;
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='details') THEN
+        ALTER TABLE audit_log ALTER COLUMN details DROP NOT NULL;
+    END IF;
+END $$;
 
 -- Disable RLS for smooth sync
 ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
