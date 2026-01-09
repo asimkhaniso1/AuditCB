@@ -2,140 +2,140 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface EmailRequest {
-    type: 'user_invitation' | 'audit_assignment' | 'report_approval' | 'certificate_issued'
-    to: string
-    data: any
+  type: 'user_invitation' | 'audit_assignment' | 'report_approval' | 'certificate_issued'
+  to: string
+  data: any
 }
 
 serve(async (req) => {
-    // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders })
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const { type, to, data }: EmailRequest = await req.json()
+
+    if (!to || !type) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: to, type' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    try {
-        const { type, to, data }: EmailRequest = await req.json()
+    // Get email template
+    const emailContent = getEmailTemplate(type, data)
 
-        if (!to || !type) {
-            return new Response(
-                JSON.stringify({ error: 'Missing required fields: to, type' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
-        }
+    // Send email using Resend API
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
-        // Get email template
-        const emailContent = getEmailTemplate(type, data)
+    if (!RESEND_API_KEY) {
+      console.warn('RESEND_API_KEY not configured, email will be logged but not sent')
+      console.log('Email would be sent:', { to, subject: emailContent.subject })
 
-        // Send email using Resend API
-        const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-
-        if (!RESEND_API_KEY) {
-            console.warn('RESEND_API_KEY not configured, email will be logged but not sent')
-            console.log('Email would be sent:', { to, subject: emailContent.subject })
-
-            return new Response(
-                JSON.stringify({
-                    success: true,
-                    message: 'Email logged (Resend not configured)',
-                    preview: emailContent.subject
-                }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
-        }
-
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${RESEND_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                from: data.from || 'AuditCB <notifications@companycertification.com>',
-                to: to,
-                subject: emailContent.subject,
-                html: emailContent.html,
-            }),
-        })
-
-        const result = await response.json()
-
-        if (!response.ok) {
-            throw new Error(result.message || 'Failed to send email')
-        }
-
-        // Log email send to database
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-
-        await supabase.from('audit_log').insert({
-            action: 'email_sent',
-            user_id: data.user_id || null,
-            details: {
-                type: type,
-                to: to,
-                subject: emailContent.subject,
-                email_id: result.id
-            }
-        })
-
-        return new Response(
-            JSON.stringify({
-                success: true,
-                email_id: result.id,
-                message: 'Email sent successfully'
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-
-    } catch (error) {
-        console.error('Email send error:', error)
-        return new Response(
-            JSON.stringify({ error: error.message }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Email logged (Resend not configured)',
+          preview: emailContent.subject
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: data.from || 'AuditCB <onboarding@resend.dev>',
+        to: to,
+        subject: emailContent.subject,
+        html: emailContent.html,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to send email')
+    }
+
+    // Log email send to database
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    await supabase.from('audit_log').insert({
+      action: 'email_sent',
+      user_id: data.user_id || null,
+      details: {
+        type: type,
+        to: to,
+        subject: emailContent.subject,
+        email_id: result.id
+      }
+    })
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        email_id: result.id,
+        message: 'Email sent successfully'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('Email send error:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
 })
 
 function getEmailTemplate(type: string, data: any): { subject: string, html: string } {
-    switch (type) {
-        case 'user_invitation':
-            return {
-                subject: `Welcome to AuditCB - Complete Your Registration`,
-                html: getUserInvitationTemplate(data)
-            }
+  switch (type) {
+    case 'user_invitation':
+      return {
+        subject: `Welcome to AuditCB - Complete Your Registration`,
+        html: getUserInvitationTemplate(data)
+      }
 
-        case 'audit_assignment':
-            return {
-                subject: `New Audit Assignment: ${data.client_name}`,
-                html: getAuditAssignmentTemplate(data)
-            }
+    case 'audit_assignment':
+      return {
+        subject: `New Audit Assignment: ${data.client_name}`,
+        html: getAuditAssignmentTemplate(data)
+      }
 
-        case 'report_approval':
-            return {
-                subject: `Report ${data.status}: ${data.client_name}`,
-                html: getReportApprovalTemplate(data)
-            }
+    case 'report_approval':
+      return {
+        subject: `Report ${data.status}: ${data.client_name}`,
+        html: getReportApprovalTemplate(data)
+      }
 
-        case 'certificate_issued':
-            return {
-                subject: `Certificate Issued: ${data.client_name}`,
-                html: getCertificateIssuedTemplate(data)
-            }
+    case 'certificate_issued':
+      return {
+        subject: `Certificate Issued: ${data.client_name}`,
+        html: getCertificateIssuedTemplate(data)
+      }
 
-        default:
-            throw new Error(`Unknown email type: ${type}`)
-    }
+    default:
+      throw new Error(`Unknown email type: ${type}`)
+  }
 }
 
 function getUserInvitationTemplate(data: any): string {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -208,7 +208,7 @@ function getUserInvitationTemplate(data: any): string {
 }
 
 function getAuditAssignmentTemplate(data: any): string {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -283,9 +283,9 @@ function getAuditAssignmentTemplate(data: any): string {
 }
 
 function getReportApprovalTemplate(data: any): string {
-    const statusColor = data.status === 'Approved' ? '#059669' : '#dc2626'
+  const statusColor = data.status === 'Approved' ? '#059669' : '#dc2626'
 
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -347,7 +347,7 @@ function getReportApprovalTemplate(data: any): string {
 }
 
 function getCertificateIssuedTemplate(data: any): string {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
