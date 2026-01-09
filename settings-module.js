@@ -1511,11 +1511,55 @@ window.inviteUser = async function () {
         document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
 
         window.closeModal();
-        window.showNotification(`Invitation sent to ${email}`, 'success');
+
+        // Send invitation email
+        if (window.EmailService?.isAvailable()) {
+            const confirmationUrl = authData.user.confirmation_url ||
+                `${window.location.origin}/#auth/confirm?token=${authData.user.id}`;
+
+            const emailResult = await window.EmailService.sendUserInvitation(
+                email,
+                fullName,
+                role,
+                confirmationUrl
+            );
+
+            if (emailResult.success) {
+                window.showNotification(
+                    `User created! Invitation email sent to ${email}.`,
+                    'success'
+                );
+            } else {
+                window.showNotification(
+                    `User created but email failed to send. Please contact ${email} manually.`,
+                    'warning'
+                );
+            }
+        } else {
+            window.showNotification(
+                `User created! A confirmation email has been sent to ${email}.`,
+                'success'
+            );
+        }
+
+        Logger.info('User invited successfully:', newUser);
+
     } catch (error) {
-        window.showNotification('Failed to invite user: ' + error.message, 'error');
+        Logger.error('Failed to invite user:', error);
+
+        let errorMessage = 'Failed to send invitation: ' + error.message;
+
+        // Provide helpful error messages
+        if (error.message.includes('already registered')) {
+            errorMessage = 'This email is already registered. User may already have an account.';
+        } else if (error.message.includes('email')) {
+            errorMessage = 'Email configuration error. Please configure Supabase email settings.';
+        }
+
+        window.showNotification(errorMessage, 'error');
     }
 };
+
 
 // Open invite user modal
 window.openInviteUserModal = function () {

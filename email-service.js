@@ -1,179 +1,160 @@
 // ============================================
-// EMAIL SERVICE MODULE
+// EMAIL SERVICE - Client-Side Wrapper
 // ============================================
-// Handles transactional email delivery
-// Configuration based on: audit.companycertification.com
+// Provides a simple interface for sending emails via Supabase Edge Function
 
-const EmailService = {
-    // Configuration - Site5 Hosting with Cloudflare
-    config: {
-        domain: 'audit.companycertification.com',
-        fromName: 'AuditCB360',
-        fromEmail: 'info@companycertification.com',
-        replyTo: 'info@companycertification.com',
-        enabled: true,
-        // Site5 SMTP Settings (adjust based on your cPanel email settings)
-        smtpHost: 'mail.companycertification.com', // or your Site5 server hostname
-        smtpPort: 587, // TLS port (use 465 for SSL)
-        smtpSecure: false, // true for SSL (port 465), false for TLS (port 587)
-        // Note: SMTP credentials should be set via environment variables in production
-        // smtpUser: process.env.SMTP_USER
-        // smtpPass: process.env.SMTP_PASS
-    },
-
+window.EmailService = {
     /**
-     * Send an email via Vercel API endpoint
-     * Connects to Site5 SMTP server
+     * Send user invitation email
      */
-    send: async function (to, subject, htmlContent, templateId = null) {
-        if (!this.config.enabled) {
-            console.log('[EmailService] Disabled - skipping send');
-            return false;
-        }
-
-        console.log(`[EmailService] Sending to ${to}...`);
-
-        const emailData = {
-            to: to,
-            from: `${this.config.fromName} <${this.config.fromEmail}>`,
-            replyTo: this.config.replyTo,
-            subject: subject,
-            html: htmlContent
-        };
-
+    sendUserInvitation: async function (email, fullName, role, confirmationUrl) {
         try {
-            // Call Vercel API endpoint
-            const response = await fetch('/api/send-email', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(emailData)
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
+
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'user_invitation',
+                    to: email,
+                    data: {
+                        full_name: fullName,
+                        role: role,
+                        confirmation_url: confirmationUrl,
+                        organization: window.state.settings?.cbName || 'Company Certification',
+                        user_id: window.state.currentUser?.id
+                    }
+                }
             });
 
-            const result = await response.json();
+            if (error) throw error;
 
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to send email');
-            }
-
-            console.log(`[EmailService] ✅ Email sent successfully to ${to}`);
-            console.log(`[EmailService] Message ID: ${result.messageId}`);
-
-            // Log to Audit Trail
-            if (window.AuditTrail) {
-                window.AuditTrail.log('email_sent', 'system', {
-                    recipient: to,
-                    subject: subject,
-                    messageId: result.messageId
-                });
-            }
-
-            return true;
+            Logger.info('User invitation email sent:', email);
+            return { ...data, success: true };
 
         } catch (error) {
-            console.error('[EmailService] ❌ Failed to send email:', error.message);
-
-            // Fallback: Log email for manual sending
-            console.groupCollapsed(`📧 EMAIL QUEUED (API unavailable): ${subject}`);
-            console.log(`To: ${to}`);
-            console.log(`Subject: ${subject}`);
-            console.log('--- Content Preview ---');
-            console.log(htmlContent.replace(/<[^>]*>/g, ' ').substring(0, 200) + '...');
-            console.groupEnd();
-
-            // Show user notification
-            if (window.showNotification) {
-                window.showNotification('Email queued - will retry when connection restored', 'warning');
-            }
-
-            return false;
+            Logger.error('Failed to send invitation email:', error);
+            return { success: false, error: error.message };
         }
     },
 
     /**
-     * Send User Invite
+     * Send audit assignment notification
      */
-    sendInvite: async function (user, tempPassword) {
-        const loginUrl = `https://${this.config.domain}/#login`;
+    sendAuditAssignment: async function (auditorEmail, auditorName, clientName, auditDetails) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
 
-        const subject = 'Welcome to AuditCB360 - Account Created';
-        const html = `
-            <h2>Welcome, ${user.name}!</h2>
-            <p>An account has been created for you on the AuditCB360 platform.</p>
-            <p><strong>Username:</strong> ${user.email}</p>
-            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-            <p>Please log in and change your password immediately.</p>
-            <br>
-            <a href="${loginUrl}" style="background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Login Now</a>
-            <br><br>
-            <small>If the button doesn't work, copy this link: ${loginUrl}</small>
-        `;
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'audit_assignment',
+                    to: auditorEmail,
+                    data: {
+                        auditor_name: auditorName,
+                        client_name: clientName,
+                        standard: auditDetails.standard,
+                        scheduled_date: auditDetails.scheduledDate,
+                        role: auditDetails.role || 'Auditor',
+                        audit_url: `${window.location.origin}/#audit-execution?id=${auditDetails.auditId}`,
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
 
-        return this.send(user.email, subject, html, 'invite_user');
+            if (error) throw error;
+
+            Logger.info('Audit assignment email sent:', auditorEmail);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send audit assignment email:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**
-     * Send Password Reset
+     * Send report approval/rejection notification
      */
-    sendPasswordReset: async function (email, resetToken) {
-        // In a real app, resetToken would be part of the URL
-        // Here we just simulate sending the temporary code or link
-        const resetLink = `https://${this.config.domain}/#reset-password?token=${resetToken}`;
+    sendReportApproval: async function (auditorEmail, auditorName, clientName, status, comments, reportId) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
 
-        const subject = 'Password Reset Request';
-        const html = `
-            <h2>Password Reset</h2>
-            <p>We received a request to reset your password.</p>
-            <p>Click the link below to verify your email and set a new password:</p>
-            <br>
-            <a href="${resetLink}" style="background:#ef4444;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Reset Password</a>
-            <br><br>
-            <small>This link expires in 30 minutes.</small>
-        `;
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'report_approval',
+                    to: auditorEmail,
+                    data: {
+                        auditor_name: auditorName,
+                        client_name: clientName,
+                        status: status, // 'Approved' or 'Rejected'
+                        comments: comments,
+                        report_url: `${window.location.origin}/#reporting-detail?id=${reportId}`,
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
 
-        return this.send(email, subject, html, 'password_reset');
+            if (error) throw error;
+
+            Logger.info('Report approval email sent:', auditorEmail);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send report approval email:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**
-     * Send Audit Assignment Notification
+     * Send certificate issuance notification
      */
-    sendAssignment: async function (auditorEmail, clientName, auditDate) {
-        const subject = `New Audit Assignment: ${clientName}`;
-        const html = `
-            <h2>New Assignment</h2>
-            <p>You have been assigned to an audit.</p>
-            <ul>
-                <li><strong>Client:</strong> ${clientName}</li>
-                <li><strong>Date:</strong> ${auditDate}</li>
-            </ul>
-            <p>Please log in to review the audit plan.</p>
-        `;
+    sendCertificateIssued: async function (clientEmail, clientName, certificateDetails) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
 
-        return this.send(auditorEmail, subject, html, 'audit_assigned');
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'certificate_issued',
+                    to: clientEmail,
+                    data: {
+                        client_name: clientName,
+                        certificate_number: certificateDetails.number,
+                        issue_date: certificateDetails.issueDate,
+                        expiry_date: certificateDetails.expiryDate,
+                        standard: certificateDetails.standard,
+                        certificate_url: certificateDetails.downloadUrl || `${window.location.origin}/#certificates`,
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            Logger.info('Certificate issuance email sent:', clientEmail);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send certificate email:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**
-     * Send Report Published Notification (to Client)
+     * Check if email service is available
      */
-    sendReportPublished: async function (clientEmail, clientName, reportId) {
-        const downloadLink = `https://${this.config.domain}/#report/${reportId}`;
-
-        const subject = `Audit Report Available: ${clientName}`;
-        const html = `
-            <h2>Audit Report Published</h2>
-            <p>Dear ${clientName},</p>
-            <p>Your audit report (ID: ${reportId}) has been finalized and published.</p>
-            <p>You can view and download it from the portal.</p>
-            <br>
-            <a href="${downloadLink}" style="background:#10b981;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Report</a>
-        `;
-
-        return this.send(clientEmail, subject, html, 'report_published');
+    isAvailable: function () {
+        return window.SupabaseClient?.isInitialized === true;
     }
 };
 
-// Export
-window.EmailService = EmailService;
-
-Logger.info('EmailService module loaded', EmailService.config);
+Logger.info('Email Service loaded');
