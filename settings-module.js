@@ -1397,17 +1397,31 @@ window.sendPasswordReset = async function (email) {
     if (!confirm(`Send password reset email to ${email}?`)) return;
 
     try {
+        // Check if Supabase is initialized
         if (!window.SupabaseClient?.isInitialized) {
-            // Mock/Demo mode
-            window.showNotification(`Password reset email sent to ${email} (Demo Mode)`, 'success');
+            window.showNotification('Supabase is not configured. Please configure in System Settings.', 'error');
             return;
         }
+
+        // Check if the method exists
+        if (typeof window.SupabaseClient.sendPasswordResetEmail !== 'function') {
+            window.showNotification('Password reset feature is not available. Please update the application.', 'error');
+            Logger.error('sendPasswordResetEmail method not found on SupabaseClient');
+            return;
+        }
+
+        window.showNotification('Sending password reset email...', 'info');
+
         await window.SupabaseClient.sendPasswordResetEmail(email);
+
         window.showNotification(`Password reset email sent to ${email}`, 'success');
+        Logger.info('Password reset email sent to:', email);
     } catch (error) {
+        Logger.error('Password reset failed:', error);
         window.showNotification('Failed to send reset email: ' + error.message, 'error');
     }
 };
+
 
 // Invite user (create with email invitation)
 window.inviteUser = async function () {
