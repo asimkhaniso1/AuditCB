@@ -25,9 +25,11 @@
     <link rel="stylesheet" href="styles.css?v=5">
     <link rel="preload" href="styles.css?v=5" as="style">
     <link rel="stylesheet" href="required-fields.css">
+    <link rel="stylesheet" href="font-fallback.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"
+        media="all" onerror="this.media='none'">
     <!-- Favicon -->
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
@@ -239,10 +241,13 @@
     </div>
 
     <!-- Security Libraries (Load FIRST) -->
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <!-- DOMPurify with fallback to cdnjs if jsdelivr fails -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"
+        onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js'"></script>
 
-    <!-- Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Client with fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2'"></script>
 
     <!-- PDF Generation Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
@@ -301,7 +306,10 @@
     <script src="auditor-form-module.js?v=20260108220000"></script>
     <script src="offline-manager.js?v=20260108220000"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <!-- Chart.js with fallback to cdnjs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"
+        onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'"
+        defer></script>
 </body>
 
 </html>
