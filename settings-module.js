@@ -2433,32 +2433,7 @@ function restoreData(input) {
     input.value = '';
 }
 
-// ============================================
-// CB PROFILE HELPER FUNCTIONS
-// ============================================
 
-window.handleLogoUpload = function (input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-        window.showNotification('Logo file too large. Max 2MB', 'error');
-        input.value = '';
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        window.state.cbSettings.logoUrl = e.target.result;
-        document.getElementById('cb-logo').value = 'Data URL (uploaded)';
-        window.saveData();
-        switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
-        window.showNotification('Logo uploaded successfully', 'success');
-        // Update sidebar header logo
-        if (window.updateCBLogoDisplay) window.updateCBLogoDisplay();
-    };
-    reader.readAsDataURL(file);
-};
 
 window.addCBSite = function () {
     document.getElementById('modal-title').textContent = 'Add Office Location';
