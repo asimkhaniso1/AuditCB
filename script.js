@@ -7,11 +7,8 @@ const DATA_VERSION = '1.3'; // Increment to force state reset
 // Application State
 const state = {
     version: DATA_VERSION,
-    // Current User Context (For Demo Roles)
-    currentUser: {
-        name: 'Demo User',
-        role: 'Lead Auditor'
-    },
+    // Current User Context (Populated after authentication)
+    currentUser: null,
     currentModule: 'dashboard',
     clients: [
         {
@@ -832,7 +829,7 @@ function getVisiblePlans() {
     if (!user) return allPlans;
 
     // Admin and Cert Manager see all
-    if (user.role === 'Admin' || user.role === 'Certification Manager' || user.name === 'Demo User') {
+    if (user.role === 'Admin' || user.role === 'Certification Manager') {
         return allPlans;
     }
 
@@ -875,7 +872,7 @@ function getVisibleReports() {
     if (!user) return allReports;
 
     // Admin and Cert Manager see all
-    if (user.role === 'Admin' || user.role === 'Certification Manager' || user.name === 'Demo User') {
+    if (user.role === 'Admin' || user.role === 'Certification Manager') {
         return allReports;
     }
 
@@ -1032,12 +1029,11 @@ function loadState() {
             if (data.version === DATA_VERSION) {
                 Object.assign(state, data);
 
-                // SAFETY: Ensure currentUser is always initialized (fix for legacy null values)
+                // SAFETY: Ensure currentUser is initialized from authentication
                 if (!state.currentUser) {
-                    state.currentUser = {
-                        name: 'Demo User',
-                        role: 'Lead Auditor'
-                    };
+                    // No saved user - require authentication
+                    window.Logger.warn('Core', 'No authenticated user found. Login required.');
+                    state.currentUser = null;
                 }
             } else {
                 window.Logger.warn('Core', `Version mismatch (Store: ${data.version}, App: ${DATA_VERSION}). Resetting to defaults.`);
@@ -2100,10 +2096,12 @@ window.logoutUser = function () {
 
 window.switchUserRole = function (role) {
     if (!state.currentUser) {
-        state.currentUser = { name: 'Demo User', role: role };
-    } else {
-        state.currentUser.role = role;
+        window.Logger.warn('Cannot switch role - no authenticated user');
+        window.showNotification('Please log in first', 'error');
+        return;
     }
+
+    state.currentUser.role = role;
 
     // Update navigation visibility based on role
     updateNavigationForRole(role);
