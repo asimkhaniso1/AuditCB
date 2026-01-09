@@ -988,7 +988,7 @@ function getUsersHTML() {
                     User Management
                 </h3>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    ${window.AuthManager?.canPerform('create', 'user') ? `
+                    ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                     <button class="btn btn-outline-secondary btn-sm" onclick="syncUsersFromCloud()" title="Pull users from Supabase">
                         <i class="fa-solid fa-cloud-arrow-down" style="margin-right: 0.25rem;"></i>Sync from Cloud
                     </button>
@@ -1116,17 +1116,17 @@ function renderUsersList(users) {
                                 <i class="fa-solid fa-check"></i> Approve
                             </button>
                             ` : ''}
-                            ${window.AuthManager?.canPerform('edit', 'user') ? `
+                            ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                             <button class="btn btn-sm btn-icon" onclick="editUser(${user.id})" title="Edit">
                                 <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                             </button>
                             ` : ''}
-                            ${window.AuthManager?.canPerform('edit', 'user') ? `
+                            ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                             <button class="btn btn-sm btn-icon" onclick="toggleUserStatus(${user.id})" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
                                 <i class="fa-solid ${user.status === 'Active' ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color: ${user.status === 'Active' ? '#16a34a' : '#cbd5e1'}; font-size: 1.2rem;"></i>
                             </button>
                             ` : ''}
-                            ${window.AuthManager?.canPerform('edit', 'user') ? `
+                            ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
                             <button class="btn btn-sm btn-icon" onclick="sendPasswordReset('${user.email}')" title="Send Password Reset">
                                 <i class="fa-solid fa-key" style="color: #f59e0b;"></i>
                             </button>
