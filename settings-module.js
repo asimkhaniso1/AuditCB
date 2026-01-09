@@ -999,7 +999,10 @@ function getUsersHTML() {
                         <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i>Invite User
                     </button>
                     <button class="btn btn-primary" onclick="openAddUserModal()">
-                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add User
+                        <i class="fa-solid fa-user-plus"></i> Add User
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.cleanupDemoUsers()" title="Remove local-only demo users">
+                        <i class="fa-solid fa-broom"></i> Clean Demo Users
                     </button>
                     ` : ''}
                 </div>
@@ -1011,6 +1014,69 @@ function getUsersHTML() {
         </div>
     `;
 }
+
+// Clean up demo users (keep only Supabase authenticated users)
+window.cleanupDemoUsers = async function () {
+    try {
+        // Real Supabase user emails (from auth.users table)
+        const realSupabaseEmails = [
+            'asimkhaniso@gmail.com',
+            'info@companycertification.com'
+        ];
+
+        const currentUsers = window.state?.users || [];
+
+        // Filter users
+        const realUsers = currentUsers.filter(user =>
+            realSupabaseEmails.includes(user.email)
+        );
+
+        const demoUsers = currentUsers.filter(user =>
+            !realSupabaseEmails.includes(user.email)
+        );
+
+        if (demoUsers.length === 0) {
+            window.showNotification('No demo users found to clean up', 'info');
+            return;
+        }
+
+        // Show confirmation dialog
+        const userList = demoUsers.map(u =>
+            `  • ${u.name} (${u.email || 'no email'})`
+        ).join('\n');
+
+        const confirmed = confirm(
+            `Remove ${demoUsers.length} demo user(s)?\n\n` +
+            `Demo users to remove:\n${userList}\n\n` +
+            `Keeping ${realUsers.length} real Supabase users`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        // Update state
+        window.state.users = realUsers;
+        window.saveData();
+
+        // Refresh UI
+        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+
+        window.showNotification(
+            `Removed ${demoUsers.length} demo users. ${realUsers.length} real users remaining.`,
+            'success'
+        );
+
+        Logger.info('Demo users cleaned up:', {
+            removed: demoUsers.length,
+            remaining: realUsers.length
+        });
+
+    } catch (error) {
+        Logger.error('Failed to cleanup demo users:', error);
+        window.showNotification('Cleanup failed: ' + error.message, 'error');
+    }
+};
 
 function renderUsersList(users) {
     if (users.length === 0) {
