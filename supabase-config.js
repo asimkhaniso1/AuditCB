@@ -140,8 +140,23 @@ const SupabaseConfig = {
 
         try {
             // Try to create a client and test connection
+            if (typeof supabase === 'undefined' || !supabase.createClient) {
+                return {
+                    success: false,
+                    error: 'Supabase library not loaded yet'
+                };
+            }
+
             const { createClient } = supabase;
             const client = createClient(url, key);
+
+            // Safety check: ensure client and auth are initialized
+            if (!client || !client.auth || typeof client.auth.getSession !== 'function') {
+                return {
+                    success: false,
+                    error: 'Supabase client not fully initialized'
+                };
+            }
 
             // Test by getting session (doesn't require auth)
             const { data, error } = await client.auth.getSession();
