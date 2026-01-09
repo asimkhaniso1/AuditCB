@@ -1202,7 +1202,7 @@ window.openAddUserModal = function (userId = null) {
     window.openModal();
 };
 
-window.saveUser = function (userId) {
+window.saveUser = async function (userId) {
     const name = document.getElementById('user-name').value.trim();
     const email = document.getElementById('user-email').value.trim();
     const role = document.getElementById('user-role').value;
@@ -1213,40 +1213,67 @@ window.saveUser = function (userId) {
     }
 
     if (userId) {
-        // Update existing
+        // Update existing user
         const user = window.state.users.find(u => u.id === userId);
         if (user) {
+            const oldEmail = user.email;
             user.name = name;
             user.role = role;
+
             // Admin can update email
             if (window.state.currentUser?.role === 'Admin' && email) {
                 user.email = email;
             }
+
             if (!user.avatar) {
                 user.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
             }
 
             // Handle password update if provided
             const newPassword = document.getElementById('user-new-password')?.value;
-            if (newPassword && newPassword.trim()) {
-                // Update password in Supabase if user exists there
-                if (window.SupabaseClient?.isInitialized && user.email) {
-                    window.SupabaseClient.updateUserPassword(user.email, newPassword.trim())
-                        .then(() => {
-                            window.showNotification('User and password updated successfully', 'success');
-                        })
-                        .catch(err => {
-                            window.showNotification('User updated but password update failed: ' + err.message, 'warning');
-                        });
-                } else {
-                    window.showNotification('User updated (password change requires Supabase)', 'info');
+
+            // Update in Supabase profiles table if available
+            if (window.SupabaseClient?.isInitialized) {
+                try {
+                    // Update profiles table
+                    const profileData = {
+                        full_name: name,
+                        role: role,
+                        email: email,
+                        avatar_url: user.avatar
+                    };
+
+                    const { error: profileError } = await window.SupabaseClient.client
+                        .from('profiles')
+                        .update(profileData)
+                        .eq('email', oldEmail);
+
+                    if (profileError) {
+                        console.warn('Profile update warning:', profileError);
+                    }
+
+                    // Handle password if provided
+                    if (newPassword && newPassword.trim()) {
+                        await window.SupabaseClient.updateUserPassword(email, newPassword.trim());
+                        window.showNotification('User and password updated successfully', 'success');
+                    } else {
+                        window.showNotification('User updated successfully', 'success');
+                    }
+                } catch (error) {
+                    Logger.error('Supabase update failed:', error);
+                    window.showNotification('User updated locally (cloud sync failed)', 'warning');
                 }
             } else {
-                window.showNotification('User updated successfully', 'success');
+                // No Supabase - just local update
+                if (newPassword && newPassword.trim()) {
+                    window.showNotification('User updated (password change requires Supabase)', 'info');
+                } else {
+                    window.showNotification('User updated successfully', 'success');
+                }
             }
         }
     } else {
-        // Create new
+        // Create new user
         const newUser = {
             id: Date.now(),
             name: name,
@@ -1255,8 +1282,34 @@ window.saveUser = function (userId) {
             status: 'Active',
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
         };
+
+        // Add to Supabase if available
+        if (window.SupabaseClient?.isInitialized) {
+            try {
+                // Create in profiles table
+                const { error: profileError } = await window.SupabaseClient.client
+                    .from('profiles')
+                    .insert([{
+                        email: email,
+                        full_name: name,
+                        role: role,
+                        avatar_url: newUser.avatar
+                    }]);
+
+                if (profileError) {
+                    console.warn('Profile creation warning:', profileError);
+                }
+
+                window.showNotification('User created successfully', 'success');
+            } catch (error) {
+                Logger.error('Supabase user creation failed:', error);
+                window.showNotification('User created locally (cloud sync pending)', 'warning');
+            }
+        } else {
+            window.showNotification('User created successfully', 'success');
+        }
+
         window.state.users.push(newUser);
-        window.showNotification('User created successfully', 'success');
     }
 
     window.saveData();
