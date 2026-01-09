@@ -1,0 +1,60 @@
+@echo off
+echo ===================================================
+echo   AUDITCB EMAIL SYSTEM DEPLOYMENT
+echo ===================================================
+
+echo.
+echo 1. Checking Supabase Login Status...
+call npx supabase projects list >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] You are not logged in to Supabase.
+    echo Please run the following command in your terminal and follow the browser instructions:
+    echo.
+    echo     npx supabase login
+    echo.
+    echo After logging in, run this script again.
+    pause
+    exit /b 1
+)
+
+echo.
+echo 2. Linking Project (dfzisgfpstrsyncfsxyb)...
+call npx supabase link --project-ref dfzisgfpstrsyncfsxyb
+if %errorlevel% neq 0 (
+    echo [WARNING] Link might have failed or is already linked. Continuing...
+)
+
+echo.
+echo 3. Setting Secrets...
+echo Setting RESEND_API_KEY...
+call npx supabase secrets set RESEND_API_KEY=re_4mZDnrCB_NQW841uDFNnENyYbNVW1ntr1
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to set secrets.
+    pause
+    exit /b 1
+)
+
+echo.
+echo 4. Deploying 'send-email' function...
+call npx supabase functions deploy send-email --no-verify-jwt
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to deploy send-email.
+    pause
+    exit /b 1
+)
+
+echo.
+echo 5. Deploying 'invite-user' function...
+call npx supabase functions deploy invite-user --no-verify-jwt
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to deploy invite-user.
+    pause
+    exit /b 1
+)
+
+echo.
+echo ===================================================
+echo   DEPLOYMENT SUCCESSFUL!
+echo ===================================================
+echo.
+pause

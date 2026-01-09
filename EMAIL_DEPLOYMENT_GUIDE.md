@@ -32,7 +32,7 @@ supabase login
 
 ```bash
 cd c:\Users\Administrator\Documents\AuditCB
-supabase link --project-ref [YOUR_PROJECT_REF]
+supabase link --project-ref dfzisgfpstrsyncfsxyb
 ```
 
 Find your project ref at: `https://supabase.com/dashboard/project/[PROJECT_REF]`

@@ -1469,6 +1469,36 @@ async function renderModule(moduleName, syncHash = true) {
 
         // Render Specific Content
         switch (moduleName) {
+            case 'auth/callback':
+                // Handle Supabase Auth Callback
+                console.log('Processing auth callback...', window.location.hash);
+
+                contentArea.innerHTML = `
+                    <div class="fade-in" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 2rem;"></i>
+                        <h2>Verifying Information...</h2>
+                        <p style="color: var(--text-secondary);">Please wait while we log you in securely.</p>
+                    </div>
+                `;
+
+                // Allow Supabase client to process the hash (it does this automatically on load/hashchange)
+                // We just need to give it a moment to set the session
+                setTimeout(async () => {
+                    const { data: { session } } = await window.SupabaseClient.client.auth.getSession();
+
+                    if (session) {
+                        console.log('Session established via link', session.user);
+                        window.showNotification('Welcome! You are now logged in.', 'success');
+                        window.location.hash = 'dashboard';
+                    } else {
+                        console.warn('No session found after callback delay');
+                        // Stay on dashboard or go to login if it exists
+                        window.location.hash = 'dashboard';
+                        window.showNotification('Login verification failed. Please try again.', 'error');
+                    }
+                }, 2000);
+                break;
+
             case 'dashboard':
                 if (typeof renderDashboardEnhanced === 'function') {
                     renderDashboardEnhanced();

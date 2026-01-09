@@ -8,5 +8,7 @@
     "engines": {
         "node": "20.x"
     },
-    "dependencies": {}
+    "devDependencies": {
+        "supabase": "^2.72.2"
+    }
 }
