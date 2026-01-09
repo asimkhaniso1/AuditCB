@@ -1411,46 +1411,92 @@ window.sendPasswordReset = async function (email) {
 
 // Invite user (create with email invitation)
 window.inviteUser = async function () {
-    const email = document.getElementById('invite-email')?.value?.trim();
-    const role = document.getElementById('invite-role')?.value || 'Auditor';
+    const email = document.getElementById('invite-email').value.trim();
+    const role = document.getElementById('invite-role').value;
 
     if (!email) {
-        window.showNotification('Please enter an email address', 'warning');
+        window.showNotification('Please enter an email address', 'error');
+        return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        window.showNotification('Please enter a valid email address', 'error');
         return;
     }
 
     // Check if user already exists
-    if (window.state.users.some(u => u.email === email)) {
-        window.showNotification('User with this email already exists', 'warning');
+    const existingUser = window.state.users?.find(u => u.email === email);
+    if (existingUser) {
+        window.showNotification('A user with this email already exists', 'warning');
         return;
     }
 
     try {
-        if (window.SupabaseClient?.isInitialized) {
-            // Send Supabase invite (magic link)
-            await window.SupabaseClient.client.auth.admin.inviteUserByEmail(email);
+        window.showNotification('Creating user and sending invitation...', 'info');
+
+        if (!window.SupabaseClient?.isInitialized) {
+            throw new Error('Supabase is not configured. Please set up Supabase in System Settings.');
         }
 
-        // Add to local users as pending
+        // Use Supabase's signUp with email confirmation
+        const tempPassword = 'TempPass' + Math.random().toString(36).substring(2, 15) + '!';
+        const fullName = email.split('@')[0]; // Use email username as temporary name
+
+        const { data: authData, error: signUpError } = await window.SupabaseClient.client.auth.signUp({
+            email: email,
+            password: tempPassword,
+            options: {
+                data: {
+                    full_name: fullName,
+                    role: role
+                },
+                emailRedirectTo: `${window.location.origin}/#auth/callback`
+            }
+        });
+
+        if (signUpError) {
+            throw signUpError;
+        }
+
+        Logger.info('Auth user created:', authData.user.id);
+
+        // Create profile entry
+        const { error: profileError } = await window.SupabaseClient.client
+            .from('profiles')
+            .upsert([{
+                id: authData.user.id,
+                email: email,
+                full_name: fullName,
+                role: role,
+                avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`
+            }], {
+                onConflict: 'id'
+            });
+
+        if (profileError) {
+            Logger.warn('Profile creation warning:', profileError.message);
+            // Continue anyway - profile might be created by database trigger
+        }
+
+        // Add to local state
         const newUser = {
-            id: Date.now(),
-            name: email.split('@')[0],
+            id: authData.user.id,
+            name: fullName,
             email: email,
             role: role,
-            status: 'Pending',
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`
+            status: 'Pending', //Will be 'Active' after email confirmation
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`
         };
+
         window.state.users.push(newUser);
         window.saveData();
 
-        // Send Email Invite (if not using Supabase or as notification)
-        if (window.EmailService) {
-            const tempPass = Math.random().toString(36).slice(-8);
-            window.EmailService.sendInvite(newUser, tempPass);
-        }
+        // Refresh UI
+        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
 
         window.closeModal();
-        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
         window.showNotification(`Invitation sent to ${email}`, 'success');
     } catch (error) {
         window.showNotification('Failed to invite user: ' + error.message, 'error');
