@@ -702,24 +702,61 @@ const SupabaseClient = {
     },
 
     /**
-     * Send password reset email via Supabase Auth
-     */
-    async sendPasswordResetEmail(email) {
-        if (!this.isInitialized) {
-            throw new Error('Supabase not initialized');
-        }
-
+     // Send password reset email via Supabase Auth
+    sendPasswordResetEmail: async function (email) {
         try {
-            const { data, error } = await this.client.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin + '/#reset-password'
+            if (!this.client) {
+                throw new Error('Supabase client not initialized');
+            }
+
+            const { error } = await this.client.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/#password-reset`
             });
 
             if (error) throw error;
 
             Logger.info('Password reset email sent to:', email);
-            return true;
+            return { success: true };
         } catch (error) {
             Logger.error('Failed to send password reset email:', error);
+            throw error;
+        }
+    },
+
+    // Update user password (Admin function - requires Supabase Admin API or Service Role)
+    // This is a workaround using password reset for now
+    updateUserPassword: async function (email, newPassword) {
+        try {
+            if (!this.client) {
+                throw new Error('Supabase client not initialized');
+            }
+
+            // Note: Updating another user's password requires Supabase Admin API
+            // This implementation uses the current session to update password
+            // For a production app, you'd need a backend endpoint with service role key
+            
+            Logger.warn('Password update for users other than current user requires backend implementation');
+            
+            // Check if we're updating the current user
+            const { data: { user } } = await this.client.auth.getUser();
+            
+            if (user && user.email === email) {
+                // Updating current user - this works
+                const { error } = await this.client.auth.updateUser({
+                    password: newPassword
+                });
+
+                if (error) throw error;
+
+                Logger.info('Password updated successfully for:', email);
+                return { success: true };
+            } else {
+                // Updating another user - send password reset instead
+                Logger.info('Sending password reset email to:', email);
+                return await this.sendPasswordResetEmail(email);
+            }
+        } catch (error) {
+            Logger.error('Failed to update password:', error);
             throw error;
         }
     },

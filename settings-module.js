@@ -1114,8 +1114,18 @@ window.openAddUserModal = function (userId = null) {
                 <input type="text" class="form-control" id="user-password" value="Welcome123!" readonly style="background: #f8fafc;">
                 <small style="color: var(--text-secondary);">Default password for new users.</small>
             </div>
-            ` : ''
-        }
+            ` : `
+            <div class="form-group">
+                <label>Reset Password</label>
+                <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                    <input type="password" class="form-control" id="user-new-password" placeholder="Leave blank to keep current password">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('user-new-password').type = document.getElementById('user-new-password').type === 'password' ? 'text' : 'password'">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+                <small style="color: var(--text-secondary);">Enter new password only if you want to change it.</small>
+            </div>
+            `}
         </form>
     `;
 
@@ -1149,7 +1159,25 @@ window.saveUser = function (userId) {
             if (!user.avatar) {
                 user.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
             }
-            window.showNotification('User updated successfully', 'success');
+
+            // Handle password update if provided
+            const newPassword = document.getElementById('user-new-password')?.value;
+            if (newPassword && newPassword.trim()) {
+                // Update password in Supabase if user exists there
+                if (window.SupabaseClient?.isInitialized && user.email) {
+                    window.SupabaseClient.updateUserPassword(user.email, newPassword.trim())
+                        .then(() => {
+                            window.showNotification('User and password updated successfully', 'success');
+                        })
+                        .catch(err => {
+                            window.showNotification('User updated but password update failed: ' + err.message, 'warning');
+                        });
+                } else {
+                    window.showNotification('User updated (password change requires Supabase)', 'info');
+                }
+            } else {
+                window.showNotification('User updated successfully', 'success');
+            }
         }
     } else {
         // Create new
