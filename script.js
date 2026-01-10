@@ -2350,182 +2350,183 @@ window.handleLoginSubmit = async function (form) {
         window.location.hash = 'dashboard';
         handleRouteChange();
 
-// Auto-sync from Supabase if configured
-// DISABLED: This sync runs on every session restore and overwrites local changes
-// Data now loads via handleSignIn() on login only
-// Manual sync available via Settings > Data Management button
-/* COMMENTED OUT - CAUSING DATA OVERWRITES
-if (window.SupabaseClient?.isInitialized) {
-    try {
-        // Sync users from Supabase
-        window.SupabaseClient.syncUsersFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced users from Supabase: ${result.added} added, ${result.updated} updated`);
+        // Auto-sync from Supabase if configured
+        // DISABLED: This sync runs on every session restore and overwrites local changes
+        // Data now loads via handleSignIn() on login only
+        // Manual sync available via Settings > Data Management button
+        /* COMMENTED OUT - CAUSING DATA OVERWRITES
+        if (window.SupabaseClient?.isInitialized) {
+            try {
+                // Sync users from Supabase
+                window.SupabaseClient.syncUsersFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced users from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase user sync failed:', err);
+                });
+        
+                // Sync clients from Supabase
+                window.SupabaseClient.syncClientsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced clients from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase client sync failed:', err);
+                });
+        
+                // Sync auditors from Supabase
+                window.SupabaseClient.syncAuditorsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced auditors from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase auditor sync failed:', err);
+                });
+        
+                // Sync auditor assignments from Supabase
+                window.SupabaseClient.syncAuditorAssignmentsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced auditor assignments from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase auditor assignments sync failed:', err);
+                });
+        
+                // Sync audit plans from Supabase
+                window.SupabaseClient.syncAuditPlansFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced audit plans from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase audit plan sync failed:', err);
+                });
+        
+                // Sync audit reports from Supabase
+                window.SupabaseClient.syncAuditReportsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced audit reports from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase audit report sync failed:', err);
+                });
+        
+                // Sync checklists from Supabase
+                window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced checklists from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase checklist sync failed:', err);
+                });
+        
+                // Sync settings from Supabase
+                window.SupabaseClient.syncSettingsFromSupabase().then(result => {
+                    if (result.updated) {
+                        console.log('Synced settings from Supabase');
+                        // Re-render Settings page if user is currently viewing it
+                        if (window.location.hash === '#settings' && window.renderSettings) {
+                            console.log('Re-rendering Settings page with Supabase data');
+                            window.renderSettings();
+                        }
+                    }
+                }).catch(err => {
+                    console.warn('Supabase settings sync failed:', err);
+                });
+        
+                // Sync documents from Supabase
+                window.SupabaseClient.syncDocumentsFromSupabase().then(result => {
+                    if (result.added > 0 || result.updated > 0) {
+                        console.log(`Synced documents from Supabase: ${result.added} added, ${result.updated} updated`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase document sync failed:', err);
+                });
+        
+                // Sync certification decisions from Supabase
+                window.SupabaseClient.syncCertificationDecisionsFromSupabase().then(result => {
+                    if (result.updated > 0) {
+                        console.log(`Synced ${result.updated} certification decisions from Supabase`);
+                    }
+                }).catch(err => {
+                    console.warn('Supabase certification decision sync failed:', err);
+                });
+            } catch (e) {
+                console.warn('Supabase sync error:', e);
             }
-        }).catch(err => {
-            console.warn('Supabase user sync failed:', err);
-        });
+        }
+        */ // END COMMENTED OUT AUTO-SYNC
 
-        // Sync clients from Supabase
-        window.SupabaseClient.syncClientsFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced clients from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase client sync failed:', err);
-        });
-
-        // Sync auditors from Supabase
-        window.SupabaseClient.syncAuditorsFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced auditors from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase auditor sync failed:', err);
-        });
-
-        // Sync auditor assignments from Supabase
-        window.SupabaseClient.syncAuditorAssignmentsFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced auditor assignments from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase auditor assignments sync failed:', err);
-        });
-
-        // Sync audit plans from Supabase
-        window.SupabaseClient.syncAuditPlansFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced audit plans from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase audit plan sync failed:', err);
-        });
-
-        // Sync audit reports from Supabase
-        window.SupabaseClient.syncAuditReportsFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced audit reports from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase audit report sync failed:', err);
-        });
-
-        // Sync checklists from Supabase
-        window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced checklists from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase checklist sync failed:', err);
-        });
-
-        // Sync settings from Supabase
-        window.SupabaseClient.syncSettingsFromSupabase().then(result => {
-            if (result.updated) {
-                console.log('Synced settings from Supabase');
-                // Re-render Settings page if user is currently viewing it
-                if (window.location.hash === '#settings' && window.renderSettings) {
-                    console.log('Re-rendering Settings page with Supabase data');
-                    window.renderSettings();
-                }
-            }
-        }).catch(err => {
-            console.warn('Supabase settings sync failed:', err);
-        });
-
-        // Sync documents from Supabase
-        window.SupabaseClient.syncDocumentsFromSupabase().then(result => {
-            if (result.added > 0 || result.updated > 0) {
-                console.log(`Synced documents from Supabase: ${result.added} added, ${result.updated} updated`);
-            }
-        }).catch(err => {
-            console.warn('Supabase document sync failed:', err);
-        });
-
-        // Sync certification decisions from Supabase
-        window.SupabaseClient.syncCertificationDecisionsFromSupabase().then(result => {
-            if (result.updated > 0) {
-                console.log(`Synced ${result.updated} certification decisions from Supabase`);
-            }
-        }).catch(err => {
-            console.warn('Supabase certification decision sync failed:', err);
-        });
-    } catch (e) {
-        console.warn('Supabase sync error:', e);
+        window.showNotification(`Welcome, ${user.name}!`, 'success');
+    } else {
+        window.showNotification('Invalid email or password', 'error');
     }
-}
-
-window.showNotification(`Welcome, ${user.name}!`, 'success');
-} else {
-window.showNotification('Invalid email or password', 'error');
-}
 };
 
 // Show Forgot Password Dialog
 window.showForgotPassword = function () {
-const email = prompt('Enter your email address to reset your password:');
+    const email = prompt('Enter your email address to reset your password:');
 
-if (!email) return;
+    if (!email) return;
 
-// Validate email format
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-if (!emailRegex.test(email)) {
-window.showNotification('Please enter a valid email address', 'error');
-return;
-}
-
-// Check if user exists
-const user = window.state.users?.find(u => u.email === email);
-if (!user) {
-window.showNotification('No account found with that email address', 'error');
-return;
-}
-
-// If Supabase is configured, use Supabase password reset
-if (window.SupabaseClient?.isInitialized) {
-window.SupabaseClient.sendPasswordResetEmail(email)
-    .then(() => {
-        window.showNotification('Password reset email sent! Check your inbox.', 'success');
-    })
-    .catch(err => {
-        console.error('Password reset failed:', err);
-        window.showNotification('Failed to send reset email. Please contact admin.', 'error');
-    });
-} else {
-// Local mode - show password to admin
-if (confirm(`Local mode: Contact your administrator.\n\nAdmin: Would you like to reset this user's password?`)) {
-    const newPassword = prompt('Enter new password for ' + email + ':');
-    if (newPassword && newPassword.length >= 6) {
-        window.PasswordUtils.hashPassword(newPassword).then(hash => {
-            user.password_hash = hash;
-            delete user.password;
-            window.saveData();
-            window.showNotification('Password reset successfully!', 'success');
-        });
-    } else {
-        window.showNotification('Password must be at least 6 characters', 'error');
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        window.showNotification('Please enter a valid email address', 'error');
+        return;
     }
-}
-}
+
+    // Check if user exists
+    const user = window.state.users?.find(u => u.email === email);
+    if (!user) {
+        window.showNotification('No account found with that email address', 'error');
+        return;
+    }
+
+    // If Supabase is configured, use Supabase password reset
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.sendPasswordResetEmail(email)
+            .then(() => {
+                window.showNotification('Password reset email sent! Check your inbox.', 'success');
+            })
+            .catch(err => {
+                console.error('Password reset failed:', err);
+                window.showNotification('Failed to send reset email. Please contact admin.', 'error');
+            });
+    } else {
+        // Local mode - show password to admin
+        if (confirm(`Local mode: Contact your administrator.\n\nAdmin: Would you like to reset this user's password?`)) {
+            const newPassword = prompt('Enter new password for ' + email + ':');
+            if (newPassword && newPassword.length >= 6) {
+                window.PasswordUtils.hashPassword(newPassword).then(hash => {
+                    user.password_hash = hash;
+                    delete user.password;
+                    window.saveData();
+                    window.showNotification('Password reset successfully!', 'success');
+                });
+            } else {
+                window.showNotification('Password must be at least 6 characters', 'error');
+            }
+        }
+    }
 };
 
 
 // Update CB Logo in Sidebar Header
 function updateCBLogoDisplay() {
-const logoContainer = document.getElementById('cb-logo-display');
-if (!logoContainer) return;
+    const logoContainer = document.getElementById('cb-logo-display');
+    if (!logoContainer) return;
 
-const logoUrl = state.cbSettings?.logoUrl;
-const cbName = state.cbSettings?.cbName || 'AuditCB360';
+    const logoUrl = state.cbSettings?.logoUrl;
+    const cbName = state.cbSettings?.cbName || 'AuditCB360';
 
-if (logoUrl && logoUrl.startsWith('data:')) {
-// Replace entire header with just the logo
-logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${cbName}">`;
-} else {
-// Default: icon + text
-logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${cbName}</h1>`;
-}
+    if (logoUrl && logoUrl.startsWith('data:')) {
+        // Replace entire header with just the logo
+        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${cbName}">`;
+    } else {
+        // Default: icon + text
+        logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${cbName}</h1>`;
+    }
 }
 window.updateCBLogoDisplay = updateCBLogoDisplay;
 
@@ -2534,88 +2535,88 @@ const sidebarToggleBtn = document.getElementById('sidebar-toggle');
 const clientSidebar = document.getElementById('client-sidebar');
 
 if (sidebarToggleBtn) {
-sidebarToggleBtn.addEventListener('click', () => {
-clientSidebar.classList.toggle('collapsed');
-const isCollapsed = clientSidebar.classList.contains('collapsed');
-sidebarToggleBtn.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-});
+    sidebarToggleBtn.addEventListener('click', () => {
+        clientSidebar.classList.toggle('collapsed');
+        const isCollapsed = clientSidebar.classList.contains('collapsed');
+        sidebarToggleBtn.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    });
 }
 
 // Side Bar Group Toggle
 window.toggleNavGroup = function (header) {
-const content = header.nextElementSibling;
-const arrow = header.querySelector('.group-arrow');
+    const content = header.nextElementSibling;
+    const arrow = header.querySelector('.group-arrow');
 
-if (content.style.display === 'none') {
-content.style.display = 'block';
-content.classList.remove('collapsed');
-arrow.classList.remove('fa-chevron-down');
-arrow.classList.add('fa-chevron-up');
-} else {
-content.style.display = 'none';
-content.classList.add('collapsed');
-arrow.classList.remove('fa-chevron-up');
-arrow.classList.add('fa-chevron-down');
-}
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        content.classList.remove('collapsed');
+        arrow.classList.remove('fa-chevron-down');
+        arrow.classList.add('fa-chevron-up');
+    } else {
+        content.style.display = 'none';
+        content.classList.add('collapsed');
+        arrow.classList.remove('fa-chevron-up');
+        arrow.classList.add('fa-chevron-down');
+    }
 };
 
 // Toggle User Dropdown Menu in Header
 window.toggleUserMenu = function () {
-console.log('[DEBUG] toggleUserMenu called');
-const dropdown = document.getElementById('user-dropdown-menu');
-console.log('[DEBUG] dropdown element:', dropdown);
-if (!dropdown) {
-console.error('[DEBUG] Dropdown element not found!');
-return;
-}
+    console.log('[DEBUG] toggleUserMenu called');
+    const dropdown = document.getElementById('user-dropdown-menu');
+    console.log('[DEBUG] dropdown element:', dropdown);
+    if (!dropdown) {
+        console.error('[DEBUG] Dropdown element not found!');
+        return;
+    }
 
-const isVisible = dropdown.style.display !== 'none';
-dropdown.style.display = isVisible ? 'none' : 'block';
-console.log('[DEBUG] Dropdown toggled to:', dropdown.style.display);
+    const isVisible = dropdown.style.display !== 'none';
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    console.log('[DEBUG] Dropdown toggled to:', dropdown.style.display);
 
-// Update user info in dropdown
-if (!isVisible && window.state?.currentUser) {
-const nameEl = document.getElementById('header-user-name');
-const infoEl = document.getElementById('dropdown-user-info');
-if (nameEl) nameEl.textContent = window.state.currentUser.name || 'User';
-if (infoEl) {
-    infoEl.innerHTML = `
+    // Update user info in dropdown
+    if (!isVisible && window.state?.currentUser) {
+        const nameEl = document.getElementById('header-user-name');
+        const infoEl = document.getElementById('dropdown-user-info');
+        if (nameEl) nameEl.textContent = window.state.currentUser.name || 'User';
+        if (infoEl) {
+            infoEl.innerHTML = `
         <div style="font-weight: 600; color: var(--text-color);">${window.state.currentUser.name || 'User'}</div>
         <div style="font-size: 0.8rem; color: var(--text-secondary);">${window.state.currentUser.role || 'Role'}</div>
     `;
-}
-}
+        }
+    }
 };
 
 // Close dropdown when clicking outside
 document.addEventListener('click', function (e) {
-const dropdown = document.getElementById('user-dropdown-menu');
-const profile = document.getElementById('header-user-profile');
-if (dropdown && profile && !profile.contains(e.target)) {
-dropdown.style.display = 'none';
-}
+    const dropdown = document.getElementById('user-dropdown-menu');
+    const profile = document.getElementById('header-user-profile');
+    if (dropdown && profile && !profile.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
 });
 
 // Logout User
 window.logoutUser = function () {
-console.log('[DEBUG] logoutUser called');
-if (confirm('Are you sure you want to logout?')) {
-console.log('[DEBUG] User confirmed logout');
+    console.log('[DEBUG] logoutUser called');
+    if (confirm('Are you sure you want to logout?')) {
+        console.log('[DEBUG] User confirmed logout');
 
-// Clear current user completely
-window.state.currentUser = null;
-window.saveData();
+        // Clear current user completely
+        window.state.currentUser = null;
+        window.saveData();
 
-// Close dropdown
-const dropdown = document.getElementById('user-dropdown-menu');
-if (dropdown) dropdown.style.display = 'none';
+        // Close dropdown
+        const dropdown = document.getElementById('user-dropdown-menu');
+        if (dropdown) dropdown.style.display = 'none';
 
-// Show login overlay
-showLoginOverlay();
+        // Show login overlay
+        showLoginOverlay();
 
-window.showNotification('Logged out successfully', 'info');
-console.log('[DEBUG] Login overlay shown');
-} else {
-console.log('[DEBUG] User cancelled logout');
-}
+        window.showNotification('Logged out successfully', 'info');
+        console.log('[DEBUG] Login overlay shown');
+    } else {
+        console.log('[DEBUG] User cancelled logout');
+    }
 };
