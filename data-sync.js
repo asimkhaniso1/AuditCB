@@ -92,6 +92,9 @@ const DataSync = {
 
             const bucketName = 'app-data';
 
+            // DISABLED: Storage backup can have stale data
+            // We now use database tables only for sync
+            /*
             const { data, error } = await window.SupabaseClient.client.storage
                 .from(bucketName)
                 .upload(path, blob, {
@@ -100,6 +103,7 @@ const DataSync = {
                 });
 
             if (error) throw error;
+            */
 
             // CRITICAL: Sync to database tables (not just storage backup)
             // This ensures data is queryable and accessible across devices
