@@ -295,14 +295,27 @@ window.deleteClient = async function (clientId) {
         // 5. Delete Client from Supabase first
         if (window.SupabaseClient?.isInitialized) {
             try {
-                await window.SupabaseClient.client
+                Logger.info(`Attempting to delete client ${clientId} from Supabase...`);
+                const { error } = await window.SupabaseClient.client
                     .from('clients')
                     .delete()
                     .eq('id', clientId);
-                Logger.info(`Deleted client ${clientId} from Supabase`);
+
+                if (error) {
+                    Logger.error('Supabase deletion error:', error);
+                    console.error('[DELETE ERROR]', error);
+                    window.showNotification('Warning: Failed to delete from database', 'warning');
+                } else {
+                    Logger.info(`✅ Client ${clientId} deleted from Supabase`);
+                    console.log(`[DELETE SUCCESS] Removed from database`);
+                }
             } catch (error) {
-                Logger.warn('Failed to delete from Supabase:', error.message);
+                Logger.error('Exception during deletion:', error);
+                console.error('[DELETE EXCEPTION]', error);
             }
+        } else {
+            Logger.warn('Supabase not initialized');
+            console.warn('[SKIP] Cloud deletion skipped - Supabase not available');
         }
 
         // 6. Delete Client from local state
