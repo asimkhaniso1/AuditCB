@@ -1701,7 +1701,18 @@ function saveAuditPlan() {
         teamMembers.forEach(name => {
             const auditor = window.state.auditors.find(a => a.name === name);
             if (auditor && auditor.email) {
-                window.EmailService.sendAssignment(auditor.email, clientName, date);
+                // Fixed: correct function name and parameters
+                window.EmailService.sendAuditAssignment(
+                    auditor.email,
+                    auditor.name,
+                    clientName,
+                    {
+                        standard: standard,
+                        scheduledDate: date,
+                        role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
+                        auditId: window.editingPlanId || Date.now()
+                    }
+                );
             }
         });
     }
