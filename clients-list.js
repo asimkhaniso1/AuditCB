@@ -292,7 +292,20 @@ window.deleteClient = function (clientId) {
             deleteStats.decisions = initialDecisions - window.state.certificationDecisions.length;
         }
 
-        // 5. Delete Client
+        // 5. Delete Client from Supabase first
+        if (window.SupabaseClient?.isInitialized) {
+            try {
+                await window.SupabaseClient.client
+                    .from('clients')
+                    .delete()
+                    .eq('id', clientId);
+                Logger.info(`Deleted client ${clientId} from Supabase`);
+            } catch (error) {
+                Logger.warn('Failed to delete from Supabase:', error.message);
+            }
+        }
+
+        // 6. Delete Client from local state
         window.state.clients.splice(clientIndex, 1);
 
         if (window.saveData) {
