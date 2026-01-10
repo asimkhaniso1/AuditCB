@@ -65,16 +65,31 @@ const SupabaseClient = {
     handleSignIn: async function (session) {
         const user = session.user;
 
+        // Determine role based on email if not set in metadata
+        let userRole = user.user_metadata?.role;
+        let userPermissions = user.user_metadata?.permissions;
+
+        // Check if admin email
+        const adminEmails = ['admin@companycertification.com', 'info@companycertification.com'];
+        if (adminEmails.includes(user.email.toLowerCase())) {
+            userRole = 'Admin';
+            userPermissions = ['all'];
+        } else if (!userRole) {
+            // Default to Auditor if no role set
+            userRole = 'Auditor';
+            userPermissions = ['view_assigned'];
+        }
+
         // Update app state with user info
         window.state.currentUser = {
             id: user.id,
             email: user.email,
             name: user.user_metadata?.name || user.email,
-            role: user.user_metadata?.role || 'Auditor',
-            permissions: user.user_metadata?.permissions || ['view_assigned']
+            role: userRole,
+            permissions: userPermissions
         };
 
-        Logger.info('User signed in:', window.state.currentUser.email);
+        Logger.info('User signed in:', window.state.currentUser.email, 'Role:', userRole);
 
         // 🆕 Load user's data from Supabase
         try {
