@@ -10,94 +10,9 @@ const state = {
     // Current User Context (Populated after authentication)
     currentUser: null,
     currentModule: 'dashboard',
-    clients: [
-        {
-            id: 1,
-            name: 'Tech Solutions Ltd',
-            standard: 'ISO 9001:2015',
-            status: 'Active',
-            type: 'external', // external = regular client, internal = CB self-audit
-            nextAudit: '2024-03-15',
-            website: 'https://techsolutions.com',
-            contacts: [
-                { name: 'Alice Whitman', designation: 'Quality Manager', phone: '+1-555-0101', email: 'alice@techsolutions.com' },
-                { name: 'David Chen', designation: 'CEO', phone: '+1-555-0110', email: 'david@techsolutions.com' }
-            ],
-            sites: [
-                { name: 'Head Office', address: '123 Tech Park', city: 'Silicon Valley', country: 'USA', geotag: '37.3382, -121.8863', employees: 100, shift: 'No' },
-                { name: 'R&D Center', address: '456 Innovation Blvd', city: 'San Francisco', country: 'USA', geotag: '37.7749, -122.4194', employees: 50, shift: 'No' }
-            ],
-            employees: 150,
-            shifts: 'No',
-            industry: 'IT'
-        },
-        {
-            id: 2,
-            name: 'Global Manufacturing',
-            standard: 'ISO 14001:2015',
-            status: 'Active',
-            type: 'external',
-            nextAudit: '2024-04-20',
-            website: 'https://globalmfg.com',
-            contacts: [
-                { name: 'Bob Builder', designation: 'Plant Manager', phone: '+1-555-0102', email: 'bob@globalmfg.com' }
-            ],
-            sites: [
-                { name: 'Main Plant', address: '456 Industrial Way', city: 'Detroit', country: 'USA', geotag: '42.3314, -83.0458', employees: 350, shift: 'Yes' },
-                { name: 'Warehouse', address: '789 Storage Blvd', city: 'Detroit', country: 'USA', geotag: '42.3500, -83.0600', employees: 150, shift: 'Yes' }
-            ],
-            employees: 500,
-            shifts: 'Yes',
-            industry: 'Manufacturing'
-        },
-        {
-            id: 3,
-            name: 'SecureData Corp',
-            standard: 'ISO 27001:2022',
-            status: 'Suspended',
-            type: 'external',
-            nextAudit: '2024-05-10',
-            website: 'https://securedata.com',
-            contacts: [
-                { name: 'Charlie Root', designation: 'CISO', phone: '+1-555-0103', email: 'croot@securedata.com' },
-                { name: 'Sarah Admin', designation: 'IT Manager', phone: '+1-555-0104', email: 'sadmin@securedata.com' }
-            ],
-            sites: [
-                { name: 'HQ', address: '789 Cyber Lane', city: 'Austin', country: 'USA', geotag: '30.2672, -97.7431', employees: 30, shift: 'No' },
-                { name: 'Data Center', address: '101 Server Road', city: 'Dallas', country: 'USA', geotag: '32.7767, -96.7970', employees: 20, shift: 'Yes' }
-            ],
-            employees: 50,
-            shifts: 'No',
-            industry: 'Financial Services'
-        },
-        {
-            id: 999,
-            name: 'AuditCB360 - Internal Operations',
-            standard: 'ISO 17021-1:2015',
-            status: 'Active',
-            type: 'internal', // Internal client for CB self-audits (ISO 17021 Clause 8.6)
-            nextAudit: '2024-06-15',
-            website: '',
-            contacts: [
-                { name: 'Quality Manager', designation: 'Quality Manager', phone: '', email: 'quality@companycertification.com' }
-            ],
-            sites: [
-                { name: 'Head Office', address: 'CB Headquarters', city: '', country: '', geotag: '', employees: 10, shift: 'No' }
-            ],
-            employees: 10,
-            shifts: 'No',
-            industry: 'Certification Body',
-            internalAuditScopes: [
-                'Certification Decision Process (7.6)',
-                'Auditor Competence Management (6.1)',
-                'Impartiality Management (5.2)',
-                'Appeals & Complaints (9.10, 9.11)',
-                'Document Control (8.3)',
-                'Record Retention (8.4)',
-                'Management Review (8.5)'
-            ]
-        }
-    ],
+    // DEMO DATA REMOVED - Data now loads from Supabase database
+    // Demo users can use "admin/admin123" login to get demo data via restoreDemoData()
+    clients: [],
     auditors: [
         {
             id: 1,
