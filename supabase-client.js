@@ -62,7 +62,7 @@ const SupabaseClient = {
     /**
      * Handle sign in
      */
-    handleSignIn: function (session) {
+    handleSignIn: async function (session) {
         const user = session.user;
 
         // Update app state with user info
@@ -75,6 +75,15 @@ const SupabaseClient = {
         };
 
         Logger.info('User signed in:', window.state.currentUser.email);
+
+        // 🆕 Load user's data from Supabase
+        try {
+            Logger.info('Loading user data from Supabase...');
+            await this.loadUserDataFromCloud();
+            Logger.info('User data loaded successfully from cloud');
+        } catch (error) {
+            Logger.warn('Failed to load cloud data, using local data:', error.message);
+        }
 
         // Redirect to dashboard if on login page
         if (window.location.hash === '' || window.location.hash === '#login') {
@@ -199,6 +208,70 @@ const SupabaseClient = {
         } catch (error) {
             Logger.error('Get user failed:', error);
             return null;
+        }
+    },
+
+    /**
+     * Load all user data from Supabase cloud
+     * Called automatically on sign-in to sync data across devices
+     */
+    async loadUserDataFromCloud() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized, skipping cloud data load');
+            return;
+        }
+
+        try {
+            Logger.info('Loading user data from Supabase cloud...');
+
+            // Sync all data entities from Supabase
+            const results = {
+                clients: { added: 0, updated: 0 },
+                auditors: { added: 0, updated: 0 },
+                users: { added: 0, updated: 0 }
+            };
+
+            // Load clients
+            try {
+                results.clients = await this.syncClientsFromSupabase();
+            } catch (error) {
+                Logger.warn('Failed to sync clients:', error.message);
+            }
+
+            // Load auditors
+            try {
+                results.auditors = await this.syncAuditorsFromSupabase();
+            } catch (error) {
+                Logger.warn('Failed to sync auditors:', error.message);
+            }
+
+            // Load users
+            try {
+                results.users = await this.syncUsersFromSupabase();
+            } catch (error) {
+                Logger.warn('Failed to sync users:', error.message);
+            }
+
+            // Save synced data
+            window.saveData();
+
+            Logger.info('Cloud data loaded:', results);
+
+            // Show success notification
+            const totalAdded = results.clients.added + results.auditors.added + results.users.added;
+            const totalUpdated = results.clients.updated + results.auditors.updated + results.users.updated;
+
+            if (totalAdded > 0 || totalUpdated > 0) {
+                window.showNotification(
+                    `Data synced: ${totalAdded} new, ${totalUpdated} updated`,
+                    'success'
+                );
+            }
+
+            return results;
+        } catch (error) {
+            Logger.error('Failed to load user data from cloud:', error);
+            throw error;
         }
     },
 
