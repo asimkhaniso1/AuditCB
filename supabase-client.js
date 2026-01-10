@@ -881,11 +881,22 @@ const SupabaseClient = {
      * Sync clients to Supabase
      */
     async syncClientsToSupabase(clients) {
-        if (!this.isInitialized || !clients?.length) return;
+        if (!this.isInitialized) return;
 
         try {
-            for (const client of clients) {
-                const clientData = {
+            // CRITICAL: Delete ALL clients first, then insert current list
+            // Upsert won't remove deleted clients from database
+            Logger.info('Replacing all clients in database...');
+
+            // Delete all existing clients
+            await this.client
+                .from('clients')
+                .delete()
+                .gte('id', 0); // Delete all (id >= 0 matches everything)
+
+            // Insert current clients if any
+            if (clients?.length > 0) {
+                const clientsData = clients.map(client => ({
                     id: client.id,
                     name: client.name,
                     standard: client.standard,
@@ -901,13 +912,16 @@ const SupabaseClient = {
                     next_audit: client.nextAudit || null,
                     last_audit: client.lastAudit || null,
                     updated_at: new Date().toISOString()
-                };
+                }));
 
-                await this.client
+                const { error } = await this.client
                     .from('clients')
-                    .upsert(clientData, { onConflict: 'id' });
+                    .insert(clientsData);
+
+                if (error) throw error;
             }
-            Logger.info(`Synced ${clients.length} clients to Supabase`);
+
+            Logger.info(`✅ Database updated: ${clients?.length || 0} clients`);
         } catch (error) {
             Logger.error('Failed to sync clients:', error);
             throw error;
