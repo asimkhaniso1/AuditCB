@@ -255,6 +255,10 @@ const SupabaseClient = {
             // Save synced data
             window.saveData();
 
+            // Mark that data is fully loaded from cloud
+            // This allows subsequent saves to sync to cloud
+            window._dataFullyLoaded = true;
+
             Logger.info('Cloud data loaded:', results);
 
             // Show success notification
