@@ -219,21 +219,10 @@ window.DataSync = DataSync;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         DataSync.init();
-        // Enable sync for existing sessions (page refreshes)
-        setTimeout(() => {
-            if (window.state?.currentUser) {
-                window._dataFullyLoaded = true;
-                Logger.info('Sync enabled for existing session');
-            }
-        }, 1000);
+        // REMOVED: Don't set flag here - causes race condition!
+        // The flag is set by loadUserDataFromCloud() AFTER data loads
     });
 } else {
     DataSync.init();
-    // Enable sync for existing sessions
-    setTimeout(() => {
-        if (window.state?.currentUser) {
-            window._dataFullyLoaded = true;
-            Logger.info('Sync enabled for existing session');
-        }
-    }, 1000);
+    // REMOVED: Don't set flag here - causes race condition!
 }
