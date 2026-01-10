@@ -245,7 +245,7 @@ Logger.info('Clients List module loaded (split version with bug fixes)');
 // CLIENT ACTIONS (Moved from clients-module.js for reliability)
 // ============================================
 
-window.deleteClient = function (clientId) {
+window.deleteClient = async function (clientId) {
     const clientIndex = window.state.clients.findIndex(c => c.id == clientId);
     if (clientIndex === -1) {
         console.error('Client not found for deletion:', clientId);
