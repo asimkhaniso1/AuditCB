@@ -222,6 +222,10 @@ const SupabaseClient = {
         }
 
         try {
+            //  CRITICAL: Disable sync during initial data load
+            // This prevents saveData() calls within sync methods from uploading to cloud
+            window._dataFullyLoaded = false;
+
             Logger.info('Loading user data from Supabase cloud...');
 
             // Sync all data entities from Supabase
