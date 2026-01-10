@@ -297,8 +297,9 @@ const SupabaseClient = {
                 Logger.warn('Failed to sync users:', error.message);
             }
 
-            // Save synced data
-            window.saveData();
+            // CRITICAL: Save to localStorage directly (don't call saveData - it triggers upload!)
+            // This prevents re-uploading data we just downloaded from database
+            localStorage.setItem('auditCB360State', JSON.stringify(window.state));
 
             // Mark that data is fully loaded from cloud
             // This allows subsequent saves to sync to cloud
