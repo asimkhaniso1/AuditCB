@@ -101,6 +101,33 @@ const DataSync = {
 
             if (error) throw error;
 
+            // CRITICAL: Sync to database tables (not just storage backup)
+            // This ensures data is queryable and accessible across devices
+            try {
+                if (window.SupabaseClient?.isInitialized) {
+                    // Sync clients to database
+                    if (window.state.clients?.length > 0) {
+                        await window.SupabaseClient.syncClientsToSupabase(window.state.clients);
+                        Logger.info(`Synced ${window.state.clients.length} clients to database`);
+                    }
+
+                    // Sync auditors to database
+                    if (window.state.auditors?.length > 0) {
+                        await window.SupabaseClient.syncAuditorsToSupabase(window.state.auditors);
+                        Logger.info(`Synced ${window.state.auditors.length} auditors to database`);
+                    }
+
+                    // Sync users to database
+                    if (window.state.users?.length > 0) {
+                        await window.SupabaseClient.syncUsersToSupabase(window.state.users);
+                        Logger.info(`Synced ${window.state.users.length} users to database`);
+                    }
+                }
+            } catch (dbError) {
+                Logger.warn('Database sync failed:', dbError.message);
+                // Continue anyway - storage backup succeeded
+            }
+
             this.lastSyncTime = timestamp;
             updateSyncStatus('Cloud Saved', 'success');
             Logger.info(`State synced to cloud: ${path}`);
