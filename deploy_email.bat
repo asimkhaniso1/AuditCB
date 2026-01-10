@@ -26,8 +26,17 @@ if %errorlevel% neq 0 (
 
 echo.
 echo 3. Setting Secrets...
-echo Setting RESEND_API_KEY...
-call npx supabase secrets set RESEND_API_KEY=re_4mZDnrCB_NQW841uDFNnENyYbNVW1ntr1
+echo.
+echo IMPORTANT: You will be prompted to enter your Resend API Key
+echo Get your API key from: https://resend.com/api-keys
+echo.
+set /p RESEND_API_KEY=Enter Resend API Key: 
+if "%RESEND_API_KEY%"=="" (
+    echo [ERROR] Resend API Key is required.
+    pause
+    exit /b 1
+)
+call npx supabase secrets set RESEND_API_KEY=%RESEND_API_KEY%
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to set secrets.
     pause
