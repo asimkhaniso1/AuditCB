@@ -324,12 +324,10 @@ window.deleteClient = async function (clientId) {
         if (window.saveData) {
             window.saveData();
 
-            // CRITICAL: Force immediate sync (bypass debounce)
-            // This ensures deletion syncs to database before any refresh
-            if (window.DataSync?.uploadStateToCloud) {
-                Logger.info('Forcing immediate sync after deletion...');
-                window.DataSync.uploadStateToCloud();
-            }
+            // NOTE: Don't call uploadStateToCloud here
+            // The single-row delete above (line 299-302) already removed from database
+            // uploadStateToCloud would do DELETE ALL + INSERT ALL which is inefficient
+            // and could cause race conditions
         } else {
             console.warn('window.saveData not defined, attempting manual local storage save');
             localStorage.setItem('auditCB360State', JSON.stringify(window.state));
