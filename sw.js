@@ -2,7 +2,7 @@
 // SERVICE WORKER - AuditCB360 Offline Mode
 // ============================================
 
-const CACHE_NAME = 'auditcb-v2';
+const CACHE_NAME = 'auditcb-v3'; // 🔥 INCREMENTED TO FORCE CACHE CLEAR - Demo data removed 2026-01-10
 const ASSETS_TO_CACHE = [
     './index.html',
     './styles.css',
