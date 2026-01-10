@@ -38,8 +38,15 @@ const DataSync = {
 
     /**
      * Trigger Cloud Sync (Debounced)
+     * DISABLED: This was causing localStorage to overwrite database
      */
     triggerCloudSync: function () {
+        // DISABLED: Cloud sync was uploading stale localStorage data to database
+        // This caused deleted data to reappear
+        console.log('[DataSync] Cloud sync DISABLED - using direct database operations');
+        return;
+
+        /* ORIGINAL CODE - DISABLED
         if (!window.SupabaseClient || !window.SupabaseClient.isInitialized) {
             return; // Supabase not ready, skip
         }
@@ -54,6 +61,7 @@ const DataSync = {
         this.syncTimeout = setTimeout(() => {
             this.uploadStateToCloud();
         }, 5000);
+        */
     },
 
     /**
@@ -105,8 +113,12 @@ const DataSync = {
             if (error) throw error;
             */
 
-            // CRITICAL: Sync to database tables (not just storage backup)
-            // This ensures data is queryable and accessible across devices
+            // DISABLED: Database table sync from localStorage
+            // This was the root cause of deleted data reappearing!
+            // localStorage contained stale demo data that kept overwriting the database
+            // Now using direct database operations only
+            console.log('[DataSync] Database sync from localStorage DISABLED');
+            /*
             try {
                 if (window.SupabaseClient?.isInitialized) {
                     // Sync clients to database
@@ -131,6 +143,7 @@ const DataSync = {
                 Logger.warn('Database sync failed:', dbError.message);
                 // Continue anyway - storage backup succeeded
             }
+            */
 
             this.lastSyncTime = timestamp;
             updateSyncStatus('Cloud Saved', 'success');

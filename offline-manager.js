@@ -275,17 +275,20 @@ const OfflineManager = {
     }
 };
 
-// Registered SW Helper
+// Registered SW Helper - DISABLED to prevent caching issues
+// Service worker was caching old JavaScript files with demo data
 window.registerServiceWorker = function () {
+    // DISABLED: Service worker registration
+    // The service worker was caching old script.js with demo data
+    console.log('[OfflineManager] Service Worker registration DISABLED for real-time mode');
+
+    // Unregister any existing service workers
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(registration => {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                })
-                .catch(err => {
-                    console.error('ServiceWorker registration failed: ', err);
-                });
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let registration of registrations) {
+                registration.unregister();
+                console.log('[OfflineManager] Unregistered existing service worker');
+            }
         });
     }
 };
@@ -293,13 +296,16 @@ window.registerServiceWorker = function () {
 // Export
 window.OfflineManager = OfflineManager;
 
-// Initialize
+// Initialize - but DON'T register service worker
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         OfflineManager.init();
-        window.registerServiceWorker();
+        // DISABLED: window.registerServiceWorker();
+        window.registerServiceWorker(); // Now just unregisters existing SWs
     });
 } else {
     OfflineManager.init();
-    window.registerServiceWorker();
+    // DISABLED: window.registerServiceWorker();
+    window.registerServiceWorker(); // Now just unregisters existing SWs
 }
+

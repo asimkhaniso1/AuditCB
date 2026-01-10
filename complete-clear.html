@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>AuditCB - Complete Cache Clear</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #d32f2f;
+            margin-top: 0;
+        }
+
+        button {
+            background: #d32f2f;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background: #b71c1c;
+        }
+
+        .info {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            padding: 15px;
+            border-left: 4px solid #28a745;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .data {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧹 Complete Cache Clear for AuditCB</h1>
+
+        <div class="info">
+            <strong>⚠️ This will:</strong>
+            <ul>
+                <li>Clear ALL localStorage</li>
+                <li>Unregister service worker</li>
+                <li>Clear all caches</li>
+                <li>Delete all cookies for this site</li>
+            </ul>
+        </div>
+
+        <div id="current-data">
+            <h3>Current Data:</h3>
+            <div class="data" id="data-display">Checking...</div>
+        </div>
+
+        <button onclick="clearEverything()">🗑️ CLEAR EVERYTHING</button>
+        <button onclick="location.reload()">🔄 Refresh Page</button>
+
+        <div class="success" id="success">
+            ✅ <strong>All data cleared!</strong><br><br>
+            Now close this tab and:
+            <ol>
+                <li>Go to <a href="https://audit.companycertification.com/"
+                        target="_blank">audit.companycertification.com</a></li>
+                <li>Press Ctrl + Shift + R (hard refresh)</li>
+                <li>Login and check - should have 0 clients!</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Show current data
+        function updateDataDisplay() {
+            const stateData = localStorage.getItem('auditCB360State');
+            const display = document.getElementById('data-display');
+
+            if (stateData) {
+                try {
+                    const parsed = JSON.parse(stateData);
+                    display.innerHTML = `
+                        <strong>LocalStorage found:</strong><br>
+                        Clients: ${parsed.clients?.length || 0}<br>
+                        Auditors: ${parsed.auditors?.length || 0}<br>
+                        Size: ${(stateData.length / 1024).toFixed(2)} KB
+                    `;
+                } catch (e) {
+                    display.textContent = 'Invalid data in localStorage';
+                }
+            } else {
+                display.textContent = 'No localStorage data found';
+            }
+        }
+
+        async function clearEverything() {
+            console.log('Starting complete clear...');
+
+            // 1. Clear localStorage
+            localStorage.clear();
+            console.log('✅ localStorage cleared');
+
+            // 2. Clear sessionStorage
+            sessionStorage.clear();
+            console.log('✅ sessionStorage cleared');
+
+            // 3. Unregister service workers
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                    console.log('✅ Service worker unregistered');
+                }
+            }
+
+            // 4. Clear all caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) {
+                    await caches.delete(name);
+                    console.log('✅ Cache deleted:', name);
+                }
+            }
+
+            // 5. Clear cookies
+            document.cookie.split(";").forEach((c) => {
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            });
+            console.log('✅ Cookies cleared');
+
+            // Show success
+            document.getElementById('success').style.display = 'block';
+            document.getElementById('current-data').style.display = 'none';
+
+            console.log('🎉 Everything cleared!');
+        }
+
+        // Initial display
+        updateDataDisplay();
+    </script>
+</body>
+
+</html>

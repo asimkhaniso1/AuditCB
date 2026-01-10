@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Clear AuditCB LocalStorage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        button {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px;
+        }
+
+        button:hover {
+            background: #cc0000;
+        }
+
+        .success {
+            background: #44ff44;
+            color: #000;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px;
+            display: none;
+        }
+
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧹 Clear AuditCB LocalStorage</h1>
+
+    <div class="info">
+        <p><strong>Current localStorage size:</strong> <span id="size">Calculating...</span></p>
+        <p><strong>AuditCB State:</strong> <span id="state">Checking...</span></p>
+    </div>
+
+    <button onclick="clearStorage()">Clear LocalStorage Now</button>
+
+    <div class="success" id="success">
+        ✅ <strong>LocalStorage Cleared!</strong><br>
+        <a href="https://audit.companycertification.com/#dashboard">Click here to open AuditCB</a>
+    </div>
+
+    <script>
+        // Show current state
+        function updateInfo() {
+            const stateData = localStorage.getItem('auditCB360State');
+            document.getElementById('size').textContent =
+                stateData ? (stateData.length / 1024).toFixed(2) + ' KB' : 'Empty';
+
+            if (stateData) {
+                try {
+                    const parsed = JSON.parse(stateData);
+                    document.getElementById('state').textContent =
+                        `${parsed.clients?.length || 0} clients, ${parsed.auditors?.length || 0} auditors`;
+                } catch (e) {
+                    document.getElementById('state').textContent = 'Invalid data';
+                }
+            } else {
+                document.getElementById('state').textContent = 'No data';
+            }
+        }
+
+        function clearStorage() {
+            // Clear everything
+            localStorage.clear();
+
+            // Show success
+            document.getElementById('success').style.display = 'block';
+
+            // Update info
+            updateInfo();
+
+            console.log('✅ LocalStorage cleared successfully!');
+        }
+
+        // Initial info update
+        updateInfo();
+    </script>
+</body>
+
+</html>
