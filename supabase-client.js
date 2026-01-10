@@ -91,41 +91,33 @@ const SupabaseClient = {
 
         Logger.info('User signed in:', window.state.currentUser.email, 'Initial Role:', userRole);
 
-        // 🆕 Load user's data from Supabase ONLY on fresh login
-        // Skip on page refresh to preserve local changes
-        const hasLocalData = window.state.clients && window.state.clients.length > 0;
+        // 🆕 Load user's data from Supabase (always, for cross-window sync)
+        try {
+            Logger.info('Loading user data from Supabase...');
+            await this.loadUserDataFromCloud();
+            Logger.info('User data loaded successfully from cloud');
 
-        if (!hasLocalData) {
-            // Fresh login - load from cloud
-            try {
-                Logger.info('Fresh login - Loading user data from Supabase...');
-                await this.loadUserDataFromCloud();
-                Logger.info('User data loaded successfully from cloud');
+            // Now update role from user management system
+            const managedUser = window.state?.users?.find(u =>
+                u.email?.toLowerCase() === window.state.currentUser.email.toLowerCase()
+            );
 
-                // Now update role from user management system
-                const managedUser = window.state?.users?.find(u =>
-                    u.email?.toLowerCase() === window.state.currentUser.email.toLowerCase()
-                );
+            if (managedUser && managedUser.role) {
+                window.state.currentUser.role = managedUser.role;
+                window.state.currentUser.name = managedUser.name || window.state.currentUser.name;
 
-                if (managedUser && managedUser.role) {
-                    window.state.currentUser.role = managedUser.role;
-                    window.state.currentUser.name = managedUser.name || window.state.currentUser.name;
-
-                    // Update permissions based on role
-                    const rolePermissions = {
-                        'Admin': ['all'],
-                        'Certification Manager': ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors'],
-                        'Lead Auditor': ['view_assigned', 'edit_reports', 'create_ncr'],
-                        'Auditor': ['view_assigned']
-                    };
-                    window.state.currentUser.permissions = rolePermissions[managedUser.role] || ['view_assigned'];
-                    Logger.info('Role updated from user management:', managedUser.role);
-                }
-            } catch (error) {
-                Logger.warn('Failed to load cloud data, using local data:', error.message);
+                // Update permissions based on role
+                const rolePermissions = {
+                    'Admin': ['all'],
+                    'Certification Manager': ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors'],
+                    'Lead Auditor': ['view_assigned', 'edit_reports', 'create_ncr'],
+                    'Auditor': ['view_assigned']
+                };
+                window.state.currentUser.permissions = rolePermissions[managedUser.role] || ['view_assigned'];
+                Logger.info('Role updated from user management:', managedUser.role);
             }
-        } else {
-            Logger.info('Page refresh - Keeping local data (use Settings > Migrate to sync from cloud)');
+        } catch (error) {
+            Logger.warn('Failed to load cloud data, using local data:', error.message);
         }
 
         // Redirect to dashboard if on login page
