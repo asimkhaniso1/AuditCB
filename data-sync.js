@@ -23,8 +23,11 @@ const DataSync = {
                 originalSaveData();
             }
 
-            // 2. Trigger Cloud Sync
-            DataSync.triggerCloudSync();
+            // 2. Trigger Cloud Sync (but NOT on initial load)
+            // Only sync when user makes actual changes, not when loading from cloud
+            if (window._dataFullyLoaded) {
+                DataSync.triggerCloudSync();
+            }
         };
 
         Logger.info('DataSync initialized: Hooked into saveData()');
