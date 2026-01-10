@@ -116,6 +116,12 @@ const SupabaseClient = {
                 window.state.currentUser.permissions = rolePermissions[managedUser.role] || ['view_assigned'];
                 Logger.info('Role updated from user management:', managedUser.role);
             }
+
+            // CRITICAL: Re-render dashboard to show fresh data from database
+            if (window.location.hash === '#dashboard' && window.renderModule) {
+                Logger.info('Re-rendering dashboard with fresh data...');
+                window.renderModule('dashboard');
+            }
         } catch (error) {
             Logger.warn('Failed to load cloud data, using local data:', error.message);
         }
