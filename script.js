@@ -4,6 +4,13 @@
 
 const DATA_VERSION = '1.3'; // Increment to force state reset
 
+// 🔍 VERSION CHECK - Verify code deployment
+console.log('%c🚀 AuditCB360 Loaded', 'color: #4CAF50; font-weight: bold; font-size: 14px;');
+console.log('Version:', DATA_VERSION, '| Demo Data Removed: 2026-01-10 18:32 UTC');
+if (typeof window !== 'undefined') {
+    window.AUDITCB_VERSION = '2026-01-10-NO-DEMO-DATA';
+}
+
 // Application State
 const state = {
     version: DATA_VERSION,
