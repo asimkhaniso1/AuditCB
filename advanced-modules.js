@@ -2141,18 +2141,18 @@ window.openMultiSiteSamplingCalculatorModal = function () {
 
     modalBody.innerHTML = `
         <div style="padding: 0 0.5rem;">
-            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
                 Calculate minimum site sampling requirements for multi-site certification (IAF MD 1:2018).
             </p>
 
-            <form id="modal-multisite-form" style="margin-bottom: 1.5rem;">
+            <form id="modal-multisite-form" style="margin-bottom: 1.25rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
-                        <label>Total Sites <span style="color: var(--danger-color);">*</span></label>
+                        <label style="font-size: 0.8rem;">Total Sites <span style="color: var(--danger-color);">*</span></label>
                         <input type="number" id="modal-total-sites" class="form-control" min="2" value="${totalSitesDefault}" required>
                     </div>
                     <div class="form-group">
-                        <label>Risk Level <span style="color: var(--danger-color);">*</span></label>
+                        <label style="font-size: 0.8rem;">Risk Level <span style="color: var(--danger-color);">*</span></label>
                         <select id="modal-site-risk" class="form-control">
                             <option value="Low">Low (0.8x)</option>
                             <option value="Medium" selected>Medium (1.0x)</option>
@@ -2160,14 +2160,14 @@ window.openMultiSiteSamplingCalculatorModal = function () {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Any NCRs?</label>
+                        <label style="font-size: 0.8rem;">Any NCRs?</label>
                         <select id="modal-sites-with-ncrs" class="form-control">
-                            <option value="false" selected>No open NCRs</option>
+                            <option value="false" selected>No</option>
                             <option value="true">Yes (+20%)</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Complex Processes?</label>
+                        <label style="font-size: 0.8rem;">Complex Processes?</label>
                         <select id="modal-complex-processes" class="form-control">
                             <option value="false" selected>No</option>
                             <option value="true">Yes (+10%)</option>
@@ -2175,43 +2175,46 @@ window.openMultiSiteSamplingCalculatorModal = function () {
                     </div>
                 </div>
                 
-                <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                     <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Mandatory Inclusions</label>
-                     <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer;">
-                            <input type="checkbox" id="modal-include-hq" checked> HQ
+                <div style="margin-top: 1rem;">
+                     <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Mandatory Inclusions</label>
+                     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; cursor: pointer;">
+                            <input type="checkbox" id="modal-include-hq" checked> HQ/Central
                         </label>
-                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; cursor: pointer;">
                             <input type="checkbox" id="modal-include-special"> Special Proc.
                         </label>
-                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; cursor: pointer;">
                             <input type="checkbox" id="modal-include-new"> New Sites
                         </label>
                      </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem; width: 100%;">
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 1rem; width: 100%; height: 36px;">
                     Calculate Sample Size
                 </button>
             </form>
 
-            <div id="modal-calc-results" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 1.5rem; text-align: center;">
-                <h3 style="margin: 0 0 0.5rem 0; color: #1e40af;">Result: Audit <span id="modal-result-count" style="font-size: 1.5rem; font-weight: 800;">0</span> Sites</h3>
-                <p id="modal-result-text" style="color: #1e3a8a; font-size: 0.9rem; margin-bottom: 1rem;"></p>
+            <div id="modal-calc-results" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1.25rem; text-align: center;">
+                <div style="font-size: 0.85rem; color: #1e40af; margin-bottom: 0.25rem;">IAF MD 1 Result:</div>
+                <div style="margin: 0.5rem 0; color: #1e40af; font-size: 1.25rem; font-weight: 800;">
+                    Audit <span id="modal-result-count" style="font-size: 1.75rem;">0</span> Sites
+                </div>
+                <p id="modal-result-text" style="color: #1e3a8a; font-size: 0.85rem; margin-bottom: 1rem;"></p>
                 
                 <hr style="border-top: 1px solid #bfdbfe; opacity: 0.5; margin: 1rem 0;">
                 
-                <div style="text-align: left; font-size: 0.85rem; color: #3b82f6; margin-bottom: 1rem;">
-                    <strong>Calculation:</strong> <span id="modal-calc-details"></span>
+                <div style="text-align: left; font-size: 0.75rem; color: #3b82f6; margin-bottom: 1.25rem;">
+                    <strong>Breakdown:</strong> <span id="modal-calc-details"></span>
                 </div>
 
-                <div style="display:flex; gap: 1rem; justify-content: center;">
-                    <button class="btn btn-sm btn-primary" onclick="window.applySamplingToPlan()">
+                <div style="display:flex; gap: 0.75rem; justify-content: center;">
+                    <button class="btn btn-sm btn-primary" onclick="window.applySamplingToPlan()" style="padding: 6px 16px;">
                         <i class="fa-solid fa-check" style="margin-right: 0.25rem;"></i> Apply to Plan
                     </button>
                     ${sitesContainer ? `
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.randomlySelectSites()">
-                        <i class="fa-solid fa-shuffle" style="margin-right: 0.25rem;"></i> Select Randomly
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.randomlySelectSites()" style="padding: 6px 16px;">
+                        <i class="fa-solid fa-shuffle" style="margin-right: 0.25rem;"></i> Random Select
                     </button>
                     ` : ''}
                 </div>

@@ -187,191 +187,235 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
     const html = `
         <div class="fade-in">
-             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
+                    <button class="btn btn-secondary btn-sm" onclick="renderAuditPlanningEnhanced()" title="Back">
                         <i class="fa-solid fa-arrow-left"></i>
                     </button>
-                    <h2 id="plan-form-title" style="margin: 0;">Create Audit Plan Details</h2>
+                    <h2 id="plan-form-title" style="margin: 0; font-size: 1.5rem;">Create Audit Plan</h2>
                 </div>
             </div>
 
-            <!-- Single Page Form -->
-            <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
-
-            <!-- Step 1: Basic Details -->
-            <div id="step-1-content">
-                <form id="plan-form">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                        <!-- Client Selection -->
-                        <div class="form-group">
-                            <label>Client <span style="color: var(--danger-color);">*</span></label>
-                            <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)" ${window.state.activeClientId ? 'disabled' : ''}>
-                                <option value="">-- Select Client --</option>
-                                ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name} (${c.industry || 'N/A'})</option>`).join('')}
-                            </select>
-                        </div>
-
-                        <!-- Standard -->
-                        <div class="form-group">
-                            <label>Audit Standard(s) <span style="color: var(--danger-color);">*</span></label>
-                                <select class="form-control" id="plan-standard" multiple style="height: 120px;" disabled>
-                                    <option value="">-- Select Client First --</option>
-                                </select>
-                            <small id="standards-hint" style="color: var(--text-secondary);">Select a client to see applicable standards</small>
-                        </div>
-
-                        <!-- Client Info & Sites (Collapsible/Dynamic) -->
-                        <div id="client-info-panel" style="grid-column: 1 / -1; display: none; background: #f0f9ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bae6fd;"></div>
+            <form id="plan-form">
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start;">
+                    
+                    <!-- Main Column -->
+                    <div style="display: grid; gap: 1.5rem;">
                         
-                        <div class="form-group" id="site-selection-group" style="grid-column: 1 / -1; display: none;">
-                            <label><i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Audit Site(s) (Scope)</label>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <small style="color: var(--text-secondary);">Select sites to be audited in this plan</small>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.openMultiSiteSamplingCalculatorModal()" title="Calculate sample size per IAF MD 1">
-                                    <i class="fa-solid fa-calculator" style="margin-right: 0.25rem;"></i>Sampling
+                        <!-- Card: Client & Basic Details -->
+                        <div class="card" style="margin: 0; padding: 1.5rem;">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
+                                <i class="fa-solid fa-building"></i> Client & Audit Details
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Client <span style="color: var(--danger-color);">*</span></label>
+                                    <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)" ${window.state.activeClientId ? 'disabled' : ''}>
+                                        <option value="">-- Select Client --</option>
+                                        ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Planned Date <span style="color: var(--danger-color);">*</span></label>
+                                    <input type="date" class="form-control" id="plan-date" required>
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1; margin: 0;">
+                                    <label>Audit Standard(s) <span style="color: var(--danger-color);">*</span></label>
+                                    <select class="form-control" id="plan-standard" multiple style="height: 100px; font-size: 0.9rem;" disabled title="Hold Ctrl/Cmd to select multiple">
+                                        <option value="">-- Select Client First --</option>
+                                    </select>
+                                    <small id="standards-hint" style="color: var(--text-secondary); display: block; margin-top: 4px;">Select a client to see applicable standards</small>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Client Info Panel -->
+                            <div id="client-info-panel" style="margin-top: 1.25rem; display: none; background: #f0f9ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bae6fd;"></div>
+                        </div>
+
+                        <!-- Card: Audit Scope & Sites -->
+                        <div class="card" style="margin: 0; padding: 1.5rem;" id="site-selection-group-container">
+                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                                <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
+                                    <i class="fa-solid fa-location-dot"></i> Audit Scope & Sites
+                                </h3>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.openMultiSiteSamplingCalculatorModal()" style="font-size: 0.75rem; padding: 2px 8px;">
+                                    <i class="fa-solid fa-calculator" style="margin-right: 0.25rem;"></i>Sampling Tool
                                 </button>
                             </div>
-                            <div id="site-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); background: white;"></div>
-                        </div>
-
-                        <!-- Planned Date -->
-                        <div class="form-group">
-                            <label>Planned Date <span style="color: var(--danger-color);">*</span></label>
-                            <input type="date" class="form-control" id="plan-date" required>
-                        </div>
-                    </div>
-
-                    <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-
-                    <!-- Man-Day Calc -->
-                    <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                         <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: var(--primary-color);">
-                            <i class="fa-solid fa-calculator"></i> Audit Duration
-                        </h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
-                             <div class="form-group"><label style="font-size:0.8rem">Employees</label><input type="number" class="form-control" id="plan-employees" readonly placeholder="0"></div>
-                             <div class="form-group"><label style="font-size:0.8rem">Sites</label><input type="number" class="form-control" id="plan-sites" readonly placeholder="0"></div>
-                             <div class="form-group"><label style="font-size:0.8rem">Risk</label><select class="form-control" id="plan-risk"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
-                        </div>
-                        <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1rem;" onclick="autoCalculateDays()" disabled>
-                            <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i>Calculate Man-Days
-                        </button>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <div class="form-group"><label>Total Days</label><input type="number" class="form-control" id="plan-mandays" step="0.5"></div>
-                            <div class="form-group"><label>On-Site Days</label><input type="number" class="form-control" id="plan-onsite-days" step="0.5"></div>
-                        </div>
-                    </div>
-
-                    <!-- Auditor Selection -->
-                    <div class="form-group">
-                        <label>Lead Auditor</label>
-                        <select class="form-control" id="plan-lead-auditor">
-                            <option value="">-- Select Lead Auditor --</option>
-                            ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Team Members</label>
-                        <select class="form-control" id="plan-team" multiple style="height: 100px;">
-                            ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    
-                    <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-                    
-                    <!-- ISO 17021-1 Compliance Section -->
-                    <div style="background: #eff6ff; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #bfdbfe; margin-bottom: 1rem;">
-                        <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #1d4ed8;">
-                            <i class="fa-solid fa-shield-halved"></i> ISO 17021-1 Compliance
-                        </h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <div class="form-group" style="margin: 0;">
-                                <label>Audit Type</label>
-                                <select class="form-control" id="plan-audit-type">
-                                    <option value="Stage 1">Stage 1 (Documentation Review)</option>
-                                    <option value="Stage 2" selected>Stage 2 (Implementation Audit)</option>
-                                    <option value="Surveillance">Surveillance Audit</option>
-                                    <option value="Recertification">Recertification Audit</option>
-                                    <option value="Special">Special/Follow-up Audit</option>
-                                </select>
+                            <div id="site-selection-group" style="display: none;">
+                                <div id="site-checkboxes" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; max-height: 250px; overflow-y: auto; padding: 2px;">
+                                    <!-- Sites populate here -->
+                                </div>
+                                <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-secondary);">
+                                    <i class="fa-solid fa-circle-info" style="margin-right: 0.4rem;"></i>
+                                    Selected sites will be included in the audit plan and man-day calculation.
+                                </div>
                             </div>
-                            <div class="form-group" style="margin: 0;">
-                                <label>Audit Method</label>
-                                <select class="form-control" id="plan-audit-method">
-                                    <option value="On-site" selected>On-site</option>
-                                    <option value="Remote">Remote (ICT-based)</option>
-                                    <option value="Hybrid">Hybrid (On-site + Remote)</option>
-                                </select>
+                            <div id="no-sites-message" style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem; background: #f9fafb; border-radius: 8px;">
+                                Select a client to view available sites
                             </div>
                         </div>
-                        <div class="form-group" style="margin: 0 0 1rem 0;">
-                            <label>Impartiality Assessment <span style="color: #dc2626;">*</span></label>
-                            <select class="form-control" id="plan-impartiality-risk">
-                                <option value="None" selected>No risk identified</option>
-                                <option value="Low">Low risk - Mitigated</option>
-                                <option value="Medium">Medium risk - Requires monitoring</option>
-                                <option value="High">High risk - Not recommended</option>
-                            </select>
+
+                        <!-- Card: Audit Team -->
+                        <div class="card" style="margin: 0; padding: 1.5rem;">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
+                                <i class="fa-solid fa-users"></i> Audit Team
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Lead Auditor</label>
+                                    <select class="form-control" id="plan-lead-auditor">
+                                        <option value="">-- Select Lead Auditor --</option>
+                                        ${state.auditors.filter(a => a.role === 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Team Members</label>
+                                    <select class="form-control" id="plan-team" multiple style="height: 100px;">
+                                        ${state.auditors.filter(a => a.role !== 'Lead Auditor').map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                    </select>
+                                    <small style="color: var(--text-secondary); display: block; margin-top: 4px;">Hold Ctrl/Cmd to select multiple</small>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group" style="margin: 0;">
-                            <label>Impartiality Notes (if any risk identified)</label>
-                            <textarea class="form-control" id="plan-impartiality-notes" rows="2" placeholder="Describe any potential conflicts of interest and mitigation actions..."></textarea>
+
+                        <!-- Card: Agenda -->
+                        <div class="card" style="margin: 0; padding: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                                <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
+                                    <i class="fa-solid fa-calendar-days"></i> Audit Agenda
+                                </h3>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateAIAgenda()" id="btn-ai-generate">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
+                                        <i class="fa-solid fa-plus"></i> Add Row
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10; border-bottom: 2px solid var(--border-color);">
+                                        <tr>
+                                            <th style="width: 10%; padding: 12px; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">Day</th>
+                                            <th style="width: 15%; padding: 12px; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">Time</th>
+                                            <th style="width: 40%; padding: 12px; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">Activity / Clause</th>
+                                            <th style="width: 15%; padding: 12px; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">Auditee</th>
+                                            <th style="width: 15%; padding: 12px; font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary);">Auditor</th>
+                                            <th style="width: 5%;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="agenda-tbody">
+                                        <!-- Rows added dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </form>
-            </div>
 
-            <hr style="border: none; border-top: 2px solid var(--border-color); margin: 2rem 0;">
+                    <!-- Sidebar Column -->
+                    <div style="display: grid; gap: 1.5rem; position: sticky; top: 1.5rem;">
+                        
+                        <!-- Card: Duration Calculation -->
+                        <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid var(--primary-color);">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
+                                <i class="fa-solid fa-calculator"></i> Audit Duration
+                            </h3>
+                            
+                            <div style="display: grid; gap: 1rem; margin-bottom: 1.25rem;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                    <div class="form-group" style="margin: 0;">
+                                        <label style="font-size: 0.8rem;">Employees</label>
+                                        <input type="number" class="form-control form-control-sm" id="plan-employees" readonly placeholder="0" style="background: #f1f5f9;">
+                                    </div>
+                                    <div class="form-group" style="margin: 0;">
+                                        <label style="font-size: 0.8rem;">Sites</label>
+                                        <input type="number" class="form-control form-control-sm" id="plan-sites" readonly placeholder="0" style="background: #f1f5f9;">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Operational Risk</label>
+                                    <select class="form-control form-control-sm" id="plan-risk">
+                                        <option>Low</option>
+                                        <option selected>Medium</option>
+                                        <option>High</option>
+                                    </select>
+                                </div>
+                            </div>
 
-            <!-- Section 2: Agenda -->
-            <div id="step-2-content">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0; font-size: 1.1rem;">Audit Agenda / Itinerary</h3>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateAIAgenda()" id="btn-ai-generate">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate with AI
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
-                            <i class="fa-solid fa-plus"></i> Add Row
-                        </button>
+                            <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1.25rem; height: 36px;" onclick="autoCalculateDays()" disabled>
+                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.4rem;"></i>Calculate Days
+                            </button>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding: 1rem; background: #f8fafc; border: 1px dashed var(--border-color); border-radius: 8px;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Total Days</label>
+                                    <input type="number" class="form-control" id="plan-mandays" step="0.5" style="font-weight: bold; color: var(--primary-color);">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem; font-weight: 600;">On-Site</label>
+                                    <input type="number" class="form-control" id="plan-onsite-days" step="0.5" style="font-weight: bold; color: var(--success-color);">
+                                </div>
+                            </div>
+                            <small id="manday-hint" style="color: #6b7280; display: block; margin-top: 8px; font-size: 0.75rem; text-align: center;">Based on ISO 17021-1 Annex Tables</small>
+                        </div>
+
+                        <!-- Card: Compliance & Method -->
+                        <div class="card" style="margin: 0; padding: 1.5rem;">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #1d4ed8;">
+                                <i class="fa-solid fa-shield-halved"></i> Governance
+                            </h3>
+                            
+                            <div style="display: grid; gap: 1rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Type</label>
+                                    <select class="form-control" id="plan-audit-type">
+                                        <option value="Stage 1">Stage 1 Audit</option>
+                                        <option value="Stage 2" selected>Stage 2 Audit</option>
+                                        <option value="Surveillance">Surveillance</option>
+                                        <option value="Recertification">Recertification</option>
+                                        <option value="Special">Special Audit</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Method</label>
+                                    <select class="form-control" id="plan-audit-method">
+                                        <option value="On-site" selected>On-site</option>
+                                        <option value="Remote">Remote</option>
+                                        <option value="Hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Impartiality Risk</label>
+                                    <select class="form-control" id="plan-impartiality-risk">
+                                        <option value="None" selected>None Identified</option>
+                                        <option value="Low">Low - Mitigated</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High Risk</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Impartiality Notes</label>
+                                    <textarea class="form-control" id="plan-impartiality-notes" rows="2" style="font-size: 0.8rem;" placeholder="Mitigation actions..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Actions -->
+                        <div style="display: grid; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--border-color); position: sticky; bottom: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.05);">
+                            <button type="button" id="btn-plan-save" class="btn btn-primary" style="height: 48px; font-weight: 600;">
+                                <i class="fa-solid fa-floppy-disk" style="margin-right: 0.5rem;"></i> Save Audit Plan
+                            </button>
+                            <button type="button" id="btn-plan-save-print" class="btn btn-outline-primary" style="height: 42px;">
+                                <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Save & Print Draft
+                            </button>
+                            <button type="button" id="btn-plan-cancel" class="btn btn-link" style="color: #6b7280; text-decoration: none;">Cancel</button>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
-                    <table style="width: 100%;">
-                        <thead style="position: sticky; top: 0; background: white; z-index: 10;">
-                            <tr>
-                                <th style="width: 10%;">Day</th>
-                                <th style="width: 15%;">Time</th>
-                                <th style="width: 45%;">Activity / Clause</th>
-                                <th style="width: 15%;">Department/Auditee</th>
-                                <th style="width: 15%;">Auditor(s)</th>
-                                <th style="width: 5%;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="agenda-tbody">
-                            <!-- Rows added dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color);">
-                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
-                        <i class="fa-solid fa-lightbulb"></i> Tip: Define the daily schedule for all auditors. This will be generated into the final Audit Plan document.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Action Bar -->
-            <div style="position: sticky; bottom: 0; background: white; padding: 1.5rem; border-radius: var(--radius-md); border-top: 2px solid var(--border-color); margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem; box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);">
-                <button id="btn-plan-cancel" class="btn btn-secondary">Cancel</button>
-                <button id="btn-plan-save-print" class="btn btn-outline-primary">
-                    <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Save & Print
-                </button>
-                <button id="btn-plan-save" class="btn btn-primary">Save Audit Plan</button>
-            </div>
-
+            </form>
         </div>
     `;
 
@@ -491,8 +535,12 @@ function updateClientDetails(clientName) {
     const client = state.clients.find(c => c.name === clientName);
     const siteGroup = document.getElementById('site-selection-group');
     const siteCheckboxes = document.getElementById('site-checkboxes');
+    const noSitesMessage = document.getElementById('no-sites-message');
 
     if (client) {
+        // Define sitesCount early to avoid ReferenceError
+        const sitesCount = (client.sites && client.sites.length) || 1;
+
         // Update Standards Filtered by Client
         const stdSelect = document.getElementById('plan-standard');
         const stdHint = document.getElementById('standards-hint');
@@ -528,8 +576,6 @@ function updateClientDetails(clientName) {
             document.getElementById('plan-employees').value = client.employees || 0;
         }
 
-        // Update sites count from sites array
-        const sitesCount = (client.sites && client.sites.length) || 1;
         if (document.getElementById('plan-sites')) {
             document.getElementById('plan-sites').value = sitesCount;
         }
@@ -537,24 +583,14 @@ function updateClientDetails(clientName) {
         // Populate site selection checkboxes
         if (siteGroup && siteCheckboxes && client.sites && client.sites.length > 0) {
             siteGroup.style.display = 'block';
+            if (noSitesMessage) noSitesMessage.style.display = 'none';
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
-                <div style="margin-bottom: 0.5rem; padding: 1rem; background: #fff; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                    <label style="display: grid; grid-template-columns: 40px 1fr; align-items: start; gap: 1rem; cursor: pointer; font-weight: normal;">
-                        <div style="display: flex; justify-content: center; padding-top: 2px;">
-                            <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="margin: 0; min-width: 18px; min-height: 18px; cursor: pointer;">
-                        </div>
-                        <div style="text-align: left;">
-                            <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">${s.name}</div>
-                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px;">
-                                <i class="fa-solid fa-location-dot"></i> ${s.address || ''}, ${s.city || ''}
-                                ${s.geotag ? `<span style="margin-left: 0.5rem; color: #0369a1;"><i class="fa-solid fa-map-pin"></i> GPS</span>` : ''}
-                            </div>
-                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                ${s.employees ? `<span style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem;"><i class="fa-solid fa-users" style="margin-right: 3px;"></i>${s.employees} emp</span>` : ''}
-                                ${s.shift ? `<span style="background: ${s.shift === 'Yes' ? '#fef3c7' : '#f1f5f9'}; color: ${s.shift === 'Yes' ? '#d97706' : '#64748b'}; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem;">${s.shift === 'Yes' ? 'Multi-Shift' : 'General Shift'}</span>` : ''}
-                            </div>
-                        </div>
-                    </label>
+                <div style="padding: 0.5rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem;">
+                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer;">
+                    <div style="min-width: 0;">
+                        <div style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${s.name}">${s.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${s.city || ''}</div>
+                    </div>
                 </div>
             `).join('');
 
@@ -570,14 +606,12 @@ function updateClientDetails(clientName) {
                     const hint = document.getElementById('manday-hint');
                     if (calcBtn) {
                         calcBtn.disabled = count === 0;
-                        if (hint) {
-                            hint.style.display = count > 0 ? 'none' : 'block';
-                        }
                     }
                 });
             });
         } else if (siteGroup) {
             siteGroup.style.display = 'none';
+            if (noSitesMessage) noSitesMessage.style.display = 'block';
         }
 
         // Show client info panel
@@ -590,13 +624,12 @@ function updateClientDetails(clientName) {
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
                     <div><strong>Total Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
-                    <div><strong>Contact:</strong> ${primaryContact.name || '-'} (${primaryContact.designation || ''})</div>
-                    <div><strong>Website:</strong> ${client.website ? `<a href="${client.website}" target="_blank">${client.website}</a>` : '-'}</div>
+                    <div><strong>Contact:</strong> ${primaryContact.name || '-'}</div>
+                    <div><strong>Status:</strong> <span style="color: ${client.status === 'Active' ? 'var(--success-color)' : 'var(--danger-color)'}; font-weight: 600;">${client.status || 'Draft'}</span></div>
                 </div>
             `;
             clientInfoPanel.style.display = 'block';
         }
-
         // Populate auditee dropdown with client contacts
         const auditeeSelect = document.getElementById('plan-auditee');
         if (auditeeSelect && client.contacts && client.contacts.length > 0) {
@@ -679,7 +712,8 @@ function autoCalculateDays() {
         // Signature: calculateManDays(employees, sites, effectiveness, shiftWork, riskLevel)
         const results = calculateManDays(totalEmployees, siteCount, 2, hasShiftWork, risk);
 
-        const type = document.getElementById('plan-type').value;
+        const typeSelect = document.getElementById('plan-audit-type');
+        const type = typeSelect ? typeSelect.value : 'Surveillance';
         let days = 0;
 
         if (type.includes('Stage 1')) days = results.stage1;
