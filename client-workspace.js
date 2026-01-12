@@ -398,6 +398,9 @@ function renderClientOverview(client) {
 
             <!-- Quick Actions Bar -->
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/plans'">
+                    <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>View Audit Plans
+                </button>
                 <button class="btn btn-primary" onclick="window.renderCreateAuditPlanForm('${window.UTILS.escapeHtml(client.name).replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
                 </button>
