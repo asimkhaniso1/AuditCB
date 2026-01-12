@@ -283,8 +283,28 @@ function renderReportSummaryTab(report, tabContent) {
         `);
 }
 
+// Helper for Persistent Update
+async function updateReportInDB(report, message) {
+    try {
+        await window.SupabaseClient.update('audit_reports', {
+            id: report.id,
+            plan_id: report.planId,
+            client_name: report.client,
+            audit_date: report.date,
+            status: report.status,
+            findings_count: report.findings || 0,
+            checklist_data: report.checklistProgress || [],
+            data: report // Store full JSON blob
+        });
+        if (message) window.showNotification(message, 'success');
+    } catch (dbError) {
+        console.error('Database Update Failed:', dbError);
+        window.showNotification('Saved locally, but DB failed: ' + dbError.message, 'warning');
+    }
+}
+
 // Submit report for QA Review
-function submitForReview(reportId) {
+window.submitForReview = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
@@ -309,9 +329,12 @@ function submitForReview(reportId) {
     report.documentsReviewed = Sanitizer.sanitizeText(document.getElementById('documents-reviewed')?.value || '');
 
     report.status = window.CONSTANTS.STATUS.IN_REVIEW;
+
+    // Save to DB and Local
     window.saveData();
+    updateReportInDB(report, 'Report submitted for QA review (Saved to DB)');
+
     window.renderExecutionDetail(reportId);
-    window.showNotification('Report submitted for QA review', 'success');
 }
 
 // Approve Report (Certification Manager Step)
@@ -329,18 +352,24 @@ window.approveReport = function (reportId) {
     }
 
     report.status = window.CONSTANTS.STATUS.APPROVED;
+
+    // Save to DB and Local
     window.saveData();
+    updateReportInDB(report, 'Report Approved by Certification Manager (Saved to DB)');
+
     window.renderExecutionDetail(reportId);
-    window.showNotification('Report Approved by Certification Manager. Ready to Publish.', 'success');
 };
 
 window.revertToDraft = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (report) {
         report.status = window.CONSTANTS.STATUS.DRAFT;
+
+        // Save to DB and Local
         window.saveData();
+        updateReportInDB(report, 'Report reverted to Draft for editing');
+
         window.renderExecutionDetail(reportId);
-        window.showNotification('Report reverted to Draft for editing.');
     }
 }
 
@@ -348,9 +377,12 @@ window.revertToReview = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (report) {
         report.status = window.CONSTANTS.STATUS.IN_REVIEW;
+
+        // Save to DB and Local
         window.saveData();
+        updateReportInDB(report, 'Report re-opened for Review');
+
         window.renderExecutionDetail(reportId);
-        window.showNotification('Report re-opened for Review.');
     }
 }
 
@@ -370,9 +402,12 @@ function publishReport(reportId) {
 
     report.status = window.CONSTANTS.STATUS.FINALIZED;
     report.finalizedAt = new Date().toISOString();
+
+    // Save to DB and Local
     window.saveData();
+    updateReportInDB(report, 'Report Finalized & Ready for Certification!');
+
     window.renderExecutionDetail(reportId);
-    window.showNotification('Report Finalized & Ready for Certification!', 'success');
     setTimeout(() => window.generateAuditReport(reportId), 500);
 }
 
@@ -404,8 +439,9 @@ window.saveReportDraft = function (reportId) {
 
     report.recommendation = document.getElementById('recommendation')?.value || '';
 
+    // Save to DB and Local
     window.saveData();
-    window.showNotification('Report draft saved to local storage', 'success');
+    updateReportInDB(report, 'Report draft saved to database');
 };
 
 // AI-powered draft generation (enhanced with Gemini API)

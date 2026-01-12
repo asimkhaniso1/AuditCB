@@ -3,6 +3,27 @@
 // ISO 17021-1 Clause 8.5
 // ============================================
 
+// Persist Management Review
+async function persistManagementReview(review) {
+    if (!window.SupabaseClient) return;
+    try {
+        const payload = {
+            date: review.date,
+            reviewed_by: review.reviewedBy,
+            attendees: review.attendees,
+            inputs: review.inputs,
+            outputs: review.outputs,
+            action_items: review.actionItems,
+            next_review_date: review.nextReviewDate,
+            minutes_approved_by: review.minutesApprovedBy,
+            minutes_approved_date: review.minutesApprovedDate
+        };
+        await window.SupabaseClient.update('audit_management_reviews', payload, { id: review.id });
+    } catch (e) {
+        console.error('Failed to sync management review:', e);
+    }
+}
+
 // Initialize state
 if (!window.state.managementReviews) {
     window.state.managementReviews = [
@@ -435,6 +456,35 @@ window.openNewManagementReviewModal = function () {
         if (!window.state.managementReviews) window.state.managementReviews = [];
         window.state.managementReviews.unshift(newReview);
         window.saveData();
+
+        // Persist
+        if (window.SupabaseClient) {
+            (async () => {
+                try {
+                    const payload = {
+                        date: newReview.date,
+                        reviewed_by: newReview.reviewedBy,
+                        attendees: newReview.attendees,
+                        inputs: newReview.inputs,
+                        outputs: newReview.outputs,
+                        action_items: newReview.actionItems,
+                        next_review_date: newReview.nextReviewDate,
+                        minutes_approved_by: newReview.minutesApprovedBy,
+                        minutes_approved_date: newReview.minutesApprovedDate
+                    };
+                    const { data, error } = await window.SupabaseClient.insert('audit_management_reviews', payload);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        newReview.id = data[0].id;
+                        window.saveData();
+                    }
+                    window.showNotification('Review saved to DB', 'success');
+                } catch (e) {
+                    console.error('DB Insert Error:', e);
+                }
+            })();
+        }
+
         window.closeModal();
         renderManagementReviewModule();
         window.showNotification('Management review created successfully', 'success');
@@ -533,7 +583,7 @@ window.printManagementReview = function (reviewId) {
 // AI-POWERED MANAGEMENT REVIEW GENERATION
 // ============================================
 
-window.generateManagementReviewInputs = async function() {
+window.generateManagementReviewInputs = async function () {
     const btn = document.getElementById('ai-generate-btn');
     const originalHTML = btn.innerHTML;
     btn.disabled = true;

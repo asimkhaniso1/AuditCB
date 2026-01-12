@@ -827,6 +827,41 @@ function saveChecklistFromEditor(checklistId) {
         }
     });
 
+    // Helper for Async Saving
+    const persistChecklist = async (checklistData, isUpdate) => {
+        try {
+            if (isUpdate) {
+                await window.SupabaseClient.update('audit_checklists', {
+                    id: checklistData.id,
+                    name: checklistData.name,
+                    standard: checklistData.standard,
+                    type: checklistData.type,
+                    audit_type: checklistData.auditType,
+                    audit_scope: checklistData.auditScope,
+                    clauses: checklistData.clauses,
+                    updated_at: new Date().toISOString()
+                });
+            } else {
+                await window.SupabaseClient.insert('audit_checklists', {
+                    id: checklistData.id,
+                    name: checklistData.name,
+                    standard: checklistData.standard,
+                    type: checklistData.type,
+                    audit_type: checklistData.auditType,
+                    audit_scope: checklistData.auditScope,
+                    clauses: checklistData.clauses,
+                    created_by: checklistData.createdBy,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                });
+            }
+            window.showNotification('Checklist saved to Database.', 'success');
+        } catch (dbError) {
+            console.error('Checklist DB Save Error:', dbError);
+            window.showNotification('Saved locally, but DB sync failed: ' + dbError.message, 'warning');
+        }
+    };
+
     if (isEdit) {
         const checklist = state.checklists.find(c => c.id === checklistId);
         if (checklist) {
@@ -838,8 +873,11 @@ function saveChecklistFromEditor(checklistId) {
             checklist.clauses = Object.values(clauseGroups);
             delete checklist.items;
             checklist.updatedAt = new Date().toISOString().split('T')[0];
+
+            // Persist Update
+            persistChecklist(checklist, true);
         }
-        window.showNotification('Checklist updated successfully', 'success');
+        window.showNotification('Checklist updated locally', 'success');
     } else {
         const newChecklist = {
             id: Date.now(),
@@ -855,12 +893,16 @@ function saveChecklistFromEditor(checklistId) {
         };
         if (!state.checklists) state.checklists = [];
         state.checklists.push(newChecklist);
-        window.showNotification('Checklist created successfully', 'success');
+
+        // Persist Insert
+        persistChecklist(newChecklist, false);
+
+        window.showNotification('Checklist created locally', 'success');
     }
 
     window.saveData();
 
-    // Queue checklist template for offline sync
+    // Queue checklist template for offline sync (Keep existing logic)
     if (window.OfflineManager) {
         const checklistIdToQueue = isEdit ? checklistId : state.checklists[state.checklists.length - 1].id;
         window.OfflineManager.queueAction('SAVE_CHECKLIST_TEMPLATE', {
@@ -1046,9 +1088,22 @@ function deleteChecklist(id) {
 
     if (confirm(`Are you sure you want to delete "${checklist.name}"?`)) {
         state.checklists = state.checklists.filter(c => c.id !== id);
+
+        // Persist Delete to DB
+        (async () => {
+            try {
+                if (window.SupabaseClient) {
+                    await window.SupabaseClient.delete('audit_checklists', id);
+                    window.showNotification('Checklist deleted from Database', 'success');
+                }
+            } catch (dbError) {
+                console.error('Checklist DB Delete Error:', dbError);
+                window.showNotification('Deleted locally, but DB delete failed: ' + dbError.message, 'warning');
+            }
+        })();
+
         window.saveData();
         renderChecklistLibrary();
-        window.showNotification('Checklist deleted successfully');
     }
 }
 

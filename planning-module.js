@@ -1243,28 +1243,61 @@ function openChecklistSelectionModal(planId) {
         </div>
     `;
 
-    window.openModal();
+    // Open modal first
+    window.openModal(
+        'Configure Checklists for Audit',
+        modalBody.innerHTML,
+        () => {
+            const selected = [];
+            document.querySelectorAll('.checklist-select-cb:checked').forEach(cb => {
+                selected.push(parseInt(cb.getAttribute('data-id')));
+            });
 
-    // Update summary on checkbox change
-    document.querySelectorAll('.checklist-select-cb').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const count = document.querySelectorAll('.checklist-select-cb:checked').length;
-            document.getElementById('checklist-selection-summary').innerHTML = `<strong>${count}</strong> checklist(s) selected`;
+            plan.selectedChecklists = selected;
+
+            // Persist to DB immediately
+            (async () => {
+                try {
+                    if (window.SupabaseClient) {
+                        // Update just the selected checklists field if possible, or full plan
+                        // But since plan structure is complex, we update the data blob and specific fields
+                        await window.SupabaseClient.update('audit_plans', {
+                            id: plan.id,
+                            data: plan // Full plan has updated checklist IDs
+                        });
+                        window.showNotification('Checklists assigned and saved to database.', 'success');
+                    }
+                } catch (e) {
+                    console.error('DB Save Checklists Error:', e);
+                    window.showNotification('Checklists updated locally (DB Error)', 'warning');
+                }
+            })();
+
+            window.saveData();
+            window.closeModal();
+            viewAuditPlan(planId);
+        }
+    );
+
+    // Update summary on checkbox change (Post-render)
+    setTimeout(() => {
+        const checkboxes = document.querySelectorAll('.checklist-select-cb');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                const count = document.querySelectorAll('.checklist-select-cb:checked').length;
+                const summary = document.getElementById('checklist-selection-summary');
+                if (summary) summary.innerHTML = `<strong>${count}</strong> checklist(s) selected`;
+            });
         });
-    });
 
-    modalSave.onclick = () => {
-        const selected = [];
-        document.querySelectorAll('.checklist-select-cb:checked').forEach(cb => {
-            selected.push(parseInt(cb.getAttribute('data-id')));
-        });
-
-        plan.selectedChecklists = selected;
-        window.saveData();
-        window.closeModal();
-        viewAuditPlan(planId);
-        window.showNotification(`${selected.length} checklist(s) assigned to this audit plan`);
-    };
+        // Ensure save button text is correct
+        const btnSave = document.getElementById('modal-save');
+        if (btnSave) {
+            btnSave.textContent = 'Save Configuration';
+            btnSave.style.display = 'inline-block'; // Ensure it's visible
+            btnSave.disabled = false;
+        }
+    }, 100);
 }
 
 // --- Agenda & Wizard Logic ---
@@ -1679,49 +1712,106 @@ function saveAuditPlan() {
         }
     };
 
-    if (window.editingPlanId) {
-        const index = state.auditPlans.findIndex(p => p.id === window.editingPlanId);
-        if (index !== -1) {
-            state.auditPlans[index] = { ...state.auditPlans[index], ...planData }; // Merge
-            window.showNotification('Audit Plan updated successfully', 'success');
+    // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
+    const btnSave = document.getElementById('btn-plan-next');
+    const originalText = btnSave ? btnSave.textContent : 'Save Audit Plan';
+
+    // Helper to Restore Button State
+    const restoreButton = () => {
+        if (btnSave) {
+            btnSave.textContent = originalText;
+            btnSave.disabled = false;
         }
-    } else {
-        const newPlan = {
-            id: Date.now(),
-            progress: 0,
-            ...planData
-        };
-        state.auditPlans.push(newPlan);
-        window.showNotification('Audit Plan created successfully', 'success');
+    };
+
+    if (btnSave) {
+        btnSave.textContent = 'Saving to Database...';
+        btnSave.disabled = true;
     }
 
-    // Send Assignment Emails
-    if (window.EmailService && window.state.auditors) {
-        const teamMembers = [leadAuditor, ...team].filter(Boolean);
-        teamMembers.forEach(name => {
-            const auditor = window.state.auditors.find(a => a.name === name);
-            if (auditor && auditor.email) {
-                // Fixed: correct function name and parameters
-                window.EmailService.sendAuditAssignment(
-                    auditor.email,
-                    auditor.name,
-                    clientName,
-                    {
-                        standard: standard,
-                        scheduledDate: date,
-                        role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
-                        auditId: window.editingPlanId || Date.now()
-                    }
-                );
+    // Wrap DB operations in async function to allow await
+    (async () => {
+        try {
+            if (window.editingPlanId) {
+                // Update existing plan
+                const { error } = await window.SupabaseClient.update('audit_plans', {
+                    id: window.editingPlanId,
+                    client_name: planData.client,
+                    plan_date: planData.date,
+                    type: planData.type,
+                    lead_auditor: planData.team[0] || null,
+                    status: planData.status,
+                    data: planData // Store full JSON blob
+                });
+
+                if (error) throw error;
+
+                // Update Local State
+                const index = state.auditPlans.findIndex(p => p.id === window.editingPlanId);
+                if (index !== -1) {
+                    state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
+                }
+                window.showNotification('Audit Plan updated in database', 'success');
+
+            } else {
+                // Insert new plan
+                const newPlanId = Date.now();
+                const newPlan = {
+                    id: newPlanId,
+                    progress: 0,
+                    ...planData
+                };
+
+                const { error } = await window.SupabaseClient.insert('audit_plans', {
+                    id: newPlanId,
+                    client_name: planData.client,
+                    plan_date: planData.date,
+                    type: planData.type,
+                    lead_auditor: planData.team[0] || null,
+                    status: 'Scheduled',
+                    data: newPlan
+                });
+
+                if (error) throw error;
+
+                state.auditPlans.push(newPlan);
+                window.showNotification('Audit Plan saved to database', 'success');
             }
-        });
-    }
 
-    window.saveData();
-    // window.closeModal(); // No longer modal
-    renderAuditPlanningEnhanced();
-    if (window.renderDashboardEnhanced) renderDashboardEnhanced();
-    window.editingPlanId = null;
+            // Send Assignment Emails (Async, non-blocking)
+            if (window.EmailService && window.state.auditors) {
+                const teamMembers = [leadAuditor, ...team].filter(Boolean);
+                teamMembers.forEach(name => {
+                    const auditor = window.state.auditors.find(a => a.name === name);
+                    if (auditor && auditor.email) {
+                        window.EmailService.sendAuditAssignment(
+                            auditor.email,
+                            auditor.name,
+                            clientName,
+                            {
+                                standard: standard,
+                                scheduledDate: date,
+                                role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
+                                auditId: window.editingPlanId || Date.now()
+                            }
+                        ).catch(e => console.warn('Email failed:', e));
+                    }
+                });
+            }
+
+            // Update Local Storage & UI
+            window.saveData();
+            renderAuditPlanningEnhanced();
+            if (window.renderDashboardEnhanced) renderDashboardEnhanced();
+            window.editingPlanId = null;
+
+        } catch (dbError) {
+            console.error('Database Save Failed:', dbError);
+            window.showNotification('Failed to save to database: ' + dbError.message, 'error');
+        } finally {
+            restoreButton();
+        }
+    })();
 }
 
 async function generateAIAgenda() {

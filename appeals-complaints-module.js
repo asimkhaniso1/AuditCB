@@ -4,6 +4,62 @@
 // Internal CB Register for Auditors
 // ============================================
 
+// Persist Appeal to Supabase
+async function persistAppeal(appeal) {
+    if (!window.SupabaseClient) return;
+    try {
+        const payload = {
+            client_id: appeal.clientId,
+            client_name: appeal.clientName,
+            type: appeal.type,
+            subject: appeal.subject,
+            description: appeal.description,
+            date_received: appeal.dateReceived,
+            due_date: appeal.dueDate,
+            status: appeal.status,
+            assigned_to: appeal.assignedTo,
+            resolution: appeal.resolution,
+            date_resolved: appeal.dateResolved || null,
+            history: appeal.history,
+            panel_records: appeal.panelRecords || {}
+        };
+        await window.SupabaseClient.update('audit_appeals', payload, { id: appeal.id });
+    } catch (e) {
+        console.error('Failed to sync appeal:', e);
+        window.showNotification('Failed to sync appeal to DB', 'error');
+    }
+}
+
+// Persist Complaint to Supabase
+async function persistComplaint(complaint) {
+    if (!window.SupabaseClient) return;
+    try {
+        const payload = {
+            source: complaint.source,
+            client_name: complaint.clientName,
+            related_audit_id: complaint.relatedAuditId || null,
+            type: complaint.type,
+            severity: complaint.severity,
+            auditors_involved: complaint.auditorsInvolved || [],
+            subject: complaint.subject,
+            description: complaint.description,
+            date_received: complaint.dateReceived,
+            due_date: complaint.dueDate,
+            status: complaint.status,
+            investigator: complaint.investigator,
+            findings: complaint.findings,
+            corrective_action: complaint.correctiveAction,
+            resolution: complaint.resolution,
+            date_resolved: complaint.dateResolved || null,
+            history: complaint.history
+        };
+        await window.SupabaseClient.update('audit_complaints', payload, { id: complaint.id });
+    } catch (e) {
+        console.error('Failed to sync complaint:', e);
+        window.showNotification('Failed to sync complaint to DB', 'error');
+    }
+}
+
 function renderAppealsComplaintsModule() {
     const state = window.state;
     const appeals = state.appeals || [];
@@ -308,6 +364,38 @@ window.openNewAppealModal = function () {
 
         window.state.appeals.push(newAppeal);
         window.saveData();
+
+        // Persist Insert
+        if (window.SupabaseClient) {
+            (async () => {
+                try {
+                    const payload = {
+                        client_id: newAppeal.clientId,
+                        client_name: newAppeal.clientName,
+                        type: newAppeal.type,
+                        subject: newAppeal.subject,
+                        description: newAppeal.description,
+                        date_received: newAppeal.dateReceived,
+                        due_date: newAppeal.dueDate,
+                        status: newAppeal.status,
+                        assigned_to: newAppeal.assignedTo,
+                        resolution: newAppeal.resolution,
+                        date_resolved: newAppeal.dateResolved || null,
+                        history: newAppeal.history,
+                        panel_records: newAppeal.panelRecords || {}
+                    };
+                    const { data, error } = await window.SupabaseClient.insert('audit_appeals', payload);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        newAppeal.id = data[0].id; // Update ID
+                        window.saveData();
+                    }
+                    window.showNotification('Appeal saved to DB', 'success');
+                } catch (e) {
+                    console.error('Appeal DB Insert Error:', e);
+                }
+            })();
+        }
         window.closeModal();
         window.showNotification('Appeal logged successfully', 'success');
         renderAppealsComplaintsModule();
@@ -514,6 +602,42 @@ window.openNewComplaintModal = function () {
 
         window.state.complaints.push(newComplaint);
         window.saveData();
+
+        // Persist Insert
+        if (window.SupabaseClient) {
+            (async () => {
+                try {
+                    const payload = {
+                        source: newComplaint.source,
+                        client_name: newComplaint.clientName,
+                        related_audit_id: newComplaint.relatedAuditId || null,
+                        type: newComplaint.type,
+                        severity: newComplaint.severity,
+                        auditors_involved: newComplaint.auditorsInvolved || [],
+                        subject: newComplaint.subject,
+                        description: newComplaint.description,
+                        date_received: newComplaint.dateReceived,
+                        due_date: newComplaint.dueDate,
+                        status: newComplaint.status,
+                        investigator: newComplaint.investigator,
+                        findings: newComplaint.findings,
+                        corrective_action: newComplaint.correctiveAction,
+                        resolution: newComplaint.resolution,
+                        date_resolved: newComplaint.dateResolved || null,
+                        history: newComplaint.history
+                    };
+                    const { data, error } = await window.SupabaseClient.insert('audit_complaints', payload);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        newComplaint.id = data[0].id; // Update ID
+                        window.saveData();
+                    }
+                    window.showNotification('Complaint saved to DB', 'success');
+                } catch (e) {
+                    console.error('Complaint DB Insert Error:', e);
+                }
+            })();
+        }
         window.closeModal();
         window.showNotification('Complaint logged successfully', 'success');
         renderAppealsComplaintsModule();
@@ -868,6 +992,7 @@ window.updateAppealStatus = function (id) {
         });
 
         window.saveData();
+        persistAppeal(appeal);
         window.closeModal();
         window.showNotification('Appeal status updated', 'success');
         window.viewAppealDetail(id);
@@ -932,6 +1057,7 @@ window.updateComplaintStatus = function (id) {
         });
 
         window.saveData();
+        persistComplaint(complaint);
         window.closeModal();
         window.showNotification('Complaint status updated', 'success');
         window.viewComplaintDetail(id);
@@ -972,6 +1098,7 @@ window.addAppealNote = function (id) {
         });
 
         window.saveData();
+        persistAppeal(appeal);
         window.closeModal();
         window.showNotification('Note added', 'success');
         window.viewAppealDetail(id);
@@ -1009,6 +1136,7 @@ window.addComplaintNote = function (id) {
         });
 
         window.saveData();
+        persistComplaint(complaint);
         window.closeModal();
         window.showNotification('Note added', 'success');
         window.viewComplaintDetail(id);
@@ -1256,6 +1384,7 @@ window.managePanelRecords = function (appealId) {
         });
 
         window.saveData();
+        persistAppeal(appeal);
         window.closeModal();
         window.showNotification('Panel records saved successfully', 'success');
         window.viewAppealDetail(appealId);

@@ -3,6 +3,63 @@
 // ISO 17021-1 Clause 5.2
 // ============================================
 
+// Persist Member
+async function persistImpartialityMember(member) {
+    if (!window.SupabaseClient) return;
+    try {
+        const payload = {
+            name: member.name,
+            organization: member.organization,
+            role: member.role,
+            expertise: member.expertise,
+            appointed_date: member.appointedDate,
+            term_end: member.termEnd,
+            status: member.status
+        };
+        await window.SupabaseClient.update('audit_impartiality_members', payload, { id: member.id });
+    } catch (e) {
+        console.error('Failed to sync member:', e);
+    }
+}
+
+// Persist Threat
+async function persistImpartialityThreat(threat) {
+    if (!window.SupabaseClient) return;
+    try {
+        const payload = {
+            date: threat.date,
+            type: threat.type,
+            description: threat.description,
+            client: threat.client,
+            safeguard: threat.safeguard,
+            identified_by: threat.identifiedBy,
+            status: threat.status,
+            reviewed_by_committee: threat.reviewedByCommittee,
+            committee_decision: threat.committeeDecision || null
+        };
+        await window.SupabaseClient.update('audit_impartiality_threats', payload, { id: threat.id });
+    } catch (e) {
+        console.error('Failed to sync threat:', e);
+    }
+}
+
+// Persist Meeting
+async function persistImpartialityMeeting(meeting) {
+    if (!window.SupabaseClient) return;
+    try {
+        const payload = {
+            date: meeting.date,
+            attendees: meeting.attendees,
+            threats_reviewed: meeting.threatsReviewed,
+            decisions: meeting.decisions,
+            next_meeting_date: meeting.nextMeetingDate
+        };
+        await window.SupabaseClient.update('audit_impartiality_meetings', payload, { id: meeting.id });
+    } catch (e) {
+        console.error('Failed to sync meeting:', e);
+    }
+}
+
 // Initialize state
 if (!window.state.impartialityCommittee) {
     window.state.impartialityCommittee = {
@@ -298,6 +355,32 @@ window.openAddCommitteeMemberModal = function () {
 
         window.state.impartialityCommittee.members.push(newMember);
         window.saveData();
+
+        // Persist
+        if (window.SupabaseClient) {
+            (async () => {
+                try {
+                    const payload = {
+                        name: newMember.name,
+                        organization: newMember.organization,
+                        role: newMember.role,
+                        expertise: newMember.expertise,
+                        appointed_date: newMember.appointedDate,
+                        term_end: newMember.termEnd,
+                        status: newMember.status
+                    };
+                    const { data, error } = await window.SupabaseClient.insert('audit_impartiality_members', payload);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        newMember.id = data[0].id;
+                        window.saveData();
+                    }
+                    window.showNotification('Member saved to DB', 'success');
+                } catch (e) {
+                    console.error('DB Insert Error:', e);
+                }
+            })();
+        }
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Committee member added successfully', 'success');
@@ -369,6 +452,34 @@ window.openAddThreatModal = function () {
 
         window.state.impartialityCommittee.threats.push(newThreat);
         window.saveData();
+
+        // Persist
+        if (window.SupabaseClient) {
+            (async () => {
+                try {
+                    const payload = {
+                        date: newThreat.date,
+                        type: newThreat.type,
+                        description: newThreat.description,
+                        client: newThreat.client,
+                        safeguard: newThreat.safeguard,
+                        identified_by: newThreat.identifiedBy,
+                        status: newThreat.status,
+                        reviewed_by_committee: newThreat.reviewedByCommittee,
+                        committee_decision: null
+                    };
+                    const { data, error } = await window.SupabaseClient.insert('audit_impartiality_threats', payload);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        newThreat.id = data[0].id;
+                        window.saveData();
+                    }
+                    window.showNotification('Threat saved to DB', 'success');
+                } catch (e) {
+                    console.error('DB Insert Error:', e);
+                }
+            })();
+        }
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Threat logged successfully', 'success');
@@ -471,6 +582,30 @@ window.openAddMeetingModal = function () {
 
         window.state.impartialityCommittee.meetings.push(newMeeting);
         window.saveData();
+
+        // Persist
+        if (window.SupabaseClient) {
+            (async () => {
+                try {
+                    const payload = {
+                        date: newMeeting.date,
+                        attendees: newMeeting.attendees,
+                        threats_reviewed: newMeeting.threatsReviewed,
+                        decisions: newMeeting.decisions,
+                        next_meeting_date: newMeeting.nextMeetingDate
+                    };
+                    const { data, error } = await window.SupabaseClient.insert('audit_impartiality_meetings', payload);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        newMeeting.id = data[0].id;
+                        window.saveData();
+                    }
+                    window.showNotification('Meeting saved to DB', 'success');
+                } catch (e) {
+                    console.error('DB Insert Error:', e);
+                }
+            })();
+        }
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Meeting recorded successfully', 'success');
@@ -544,6 +679,7 @@ window.editCommitteeMember = function (id) {
         member.status = document.getElementById('member-status').value;
 
         window.saveData();
+        persistImpartialityMember(member);
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Committee member updated successfully', 'success');
