@@ -642,7 +642,10 @@ function saveState() {
 
             localStorage.setItem('auditCB360State', stateJSON);
 
-            // Auto-sync to Supabase if configured AND user is logged in
+            // DISABLED 2026-01-12: Auto-sync causes DELETE ALL + INSERT ALL on every save
+            // This was the root cause of "deleted data reappearing" bug
+            // Direct database operations (per-record insert/update/delete) are used instead
+            /*
             if (window.SupabaseClient?.isInitialized && state.currentUser) {
                 try {
                     // Sync all data types to Supabase (non-blocking)
@@ -679,6 +682,7 @@ function saveState() {
                     console.warn('Supabase sync error:', syncError);
                 }
             }
+            */
         } catch (e) {
             console.error('Save failed:', e);
             if (e.name === 'QuotaExceededError') {
