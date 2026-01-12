@@ -192,7 +192,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                     <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
                         <i class="fa-solid fa-arrow-left"></i>
                     </button>
-                    <h2 id="plan-form-title" style="margin: 0;">Create Audit Plan - Step 1/2</h2>
+                    <h2 id="plan-form-title" style="margin: 0;">Create Audit Plan Details</h2>
                 </div>
             </div>
 
