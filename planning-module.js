@@ -196,12 +196,8 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                 </div>
             </div>
 
-            <!-- Wizard Progress -->
-            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-                <div id="step-indicator-1" style="color: var(--primary-color); font-weight: bold; font-size: 1.1rem;">1. Plan Details</div>
-                <div style="color: var(--text-secondary);"><i class="fa-solid fa-chevron-right"></i></div>
-                <div id="step-indicator-2" style="color: var(--text-secondary); font-size: 1.1rem;">2. Audit Agenda</div>
-            </div>
+            <!-- Single Page Form -->
+            <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
 
             <!-- Step 1: Basic Details -->
             <div id="step-1-content">
@@ -218,12 +214,11 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
                         <!-- Standard -->
                         <div class="form-group">
-                            <label>Audit Standard(s)</label>
-                                <select class="form-control" id="plan-standard" multiple style="height: 120px;">
-                                    ${(window.state.settings?.standards || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
-        `<option value="${std}">${std}</option>`).join('')}
+                            <label>Audit Standard(s) <span style="color: var(--danger-color);">*</span></label>
+                                <select class="form-control" id="plan-standard" multiple style="height: 120px;" disabled>
+                                    <option value="">-- Select Client First --</option>
                                 </select>
-                            <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
+                            <small id="standards-hint" style="color: var(--text-secondary);">Select a client to see applicable standards</small>
                         </div>
 
                         <!-- Client Info & Sites (Collapsible/Dynamic) -->
@@ -240,16 +235,9 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             <div id="site-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); background: white;"></div>
                         </div>
 
-                        <!-- Audit Type & Date -->
+                        <!-- Planned Date -->
                         <div class="form-group">
-                            <label>Audit Type</label>
-                            <select class="form-control" id="plan-type">
-                                ${window.CONSTANTS.AUDIT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Planned Date</label>
+                            <label>Planned Date <span style="color: var(--danger-color);">*</span></label>
                             <input type="date" class="form-control" id="plan-date" required>
                         </div>
                     </div>
@@ -266,7 +254,9 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                              <div class="form-group"><label style="font-size:0.8rem">Sites</label><input type="number" class="form-control" id="plan-sites" readonly placeholder="0"></div>
                              <div class="form-group"><label style="font-size:0.8rem">Risk</label><select class="form-control" id="plan-risk"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
                         </div>
-                        <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1rem;" onclick="autoCalculateDays()" disabled>Calculate Man-Days</button>
+                        <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1rem;" onclick="autoCalculateDays()" disabled>
+                            <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i>Calculate Man-Days
+                        </button>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                             <div class="form-group"><label>Total Days</label><input type="number" class="form-control" id="plan-mandays" step="0.5"></div>
                             <div class="form-group"><label>On-Site Days</label><input type="number" class="form-control" id="plan-onsite-days" step="0.5"></div>
@@ -332,8 +322,10 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                 </form>
             </div>
 
-            <!-- Step 2: Agenda -->
-            <div id="step-2-content" style="display: none;">
+            <hr style="border: none; border-top: 2px solid var(--border-color); margin: 2rem 0;">
+
+            <!-- Section 2: Agenda -->
+            <div id="step-2-content">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0; font-size: 1.1rem;">Audit Agenda / Itinerary</h3>
                     <div style="display: flex; gap: 0.5rem;">
@@ -372,9 +364,12 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
             </div>
 
             <!-- Action Bar -->
-            <div style="background: whitesmoke; padding: 1rem; border-radius: var(--radius-md); border-top: 1px solid var(--border-color); margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem;">
+            <div style="position: sticky; bottom: 0; background: white; padding: 1.5rem; border-radius: var(--radius-md); border-top: 2px solid var(--border-color); margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem; box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);">
                 <button id="btn-plan-cancel" class="btn btn-secondary">Cancel</button>
-                <button id="btn-plan-next" class="btn btn-primary">Next: Agenda -></button>
+                <button id="btn-plan-save-print" class="btn btn-outline-primary">
+                    <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Save & Print
+                </button>
+                <button id="btn-plan-save" class="btn btn-primary">Save Audit Plan</button>
             </div>
 
         </div>
@@ -382,14 +377,17 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
     window.contentArea.innerHTML = html;
 
-    // Set Initial Buttons - using new IDs
-    const btnNext = document.getElementById('btn-plan-next');
+    // Set Initial Buttons
+    const btnSave = document.getElementById('btn-plan-save');
+    const btnSavePrint = document.getElementById('btn-plan-save-print');
     const btnCancel = document.getElementById('btn-plan-cancel');
 
-    btnNext.onclick = () => goToStep2();
-    btnCancel.onclick = () => renderAuditPlanningEnhanced();
+    if (btnSave) btnSave.onclick = () => saveAuditPlan(false);
+    if (btnSavePrint) btnSavePrint.onclick = () => saveAuditPlan(true);
+    if (btnCancel) btnCancel.onclick = () => renderAuditPlanningEnhanced();
 
-    currentPlanStep = 1;
+    // Fill initial agenda row
+    addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
 
     // Auto-trigger client details if activeClientId needed or pre-selected
     if (preSelectedClientName) {
@@ -418,16 +416,16 @@ function editAuditPlan(id) {
 
     // Fill data
     setTimeout(() => {
-        document.getElementById('plan-form-title').textContent = 'Edit Audit Plan - Step 1/2';
+        document.getElementById('plan-form-title').textContent = 'Edit Audit Plan';
         document.getElementById('plan-client').value = plan.client;
 
         // Manual standard selection
-        const currentStandards = (plan.standard || '').split(', ');
-        Array.from(document.getElementById('plan-standard').options).forEach(opt => {
-            opt.selected = currentStandards.includes(opt.value);
-        });
+        const stdSelect = document.getElementById('plan-standard');
+        if (stdSelect) {
+            // We need to wait for updateClientDetails to populate it if it's dynamic
+        }
 
-        document.getElementById('plan-type').value = plan.type || 'Surveillance';
+        document.getElementById('plan-audit-type').value = plan.type || 'Surveillance';
         document.getElementById('plan-date').value = plan.date;
         if (document.getElementById('plan-mandays')) document.getElementById('plan-mandays').value = plan.manDays || '';
         if (document.getElementById('plan-onsite-days')) document.getElementById('plan-onsite-days').value = plan.onsiteDays || '';
@@ -437,6 +435,15 @@ function editAuditPlan(id) {
 
         // Pre-fill rest after delay
         setTimeout(() => {
+            // Restore standards
+            const currentStandards = (plan.standard || '').split(', ').map(s => s.trim());
+            const stdSelect = document.getElementById('plan-standard');
+            if (stdSelect) {
+                Array.from(stdSelect.options).forEach(opt => {
+                    opt.selected = currentStandards.includes(opt.value);
+                });
+            }
+
             // Restore site selection
             if (plan.selectedSites && plan.selectedSites.length > 0) {
                 const selectedSiteNames = plan.selectedSites.map(s => s.name);
@@ -486,16 +493,34 @@ function updateClientDetails(clientName) {
     const siteCheckboxes = document.getElementById('site-checkboxes');
 
     if (client) {
-        // Auto-select standard
-        if (client.standard) {
-            const stdSelect = document.getElementById('plan-standard');
-            if (stdSelect) {
-                // Determine if client standard is single or comma-separated
-                const clientStds = (client.standard || '').split(', ');
-                Array.from(stdSelect.options).forEach(opt => {
-                    opt.selected = clientStds.includes(opt.value);
-                });
+        // Update Standards Filtered by Client
+        const stdSelect = document.getElementById('plan-standard');
+        const stdHint = document.getElementById('standards-hint');
+        if (stdSelect) {
+            // Get standards assigned to client
+            const clientStdsStr = client.standard || '';
+            const clientStds = clientStdsStr.split(',').map(s => s.trim()).filter(Boolean);
+
+            if (clientStds.length > 0) {
+                stdSelect.disabled = false;
+                stdSelect.innerHTML = clientStds.map(std => `<option value="${std}">${std}</option>`).join('');
+                if (stdHint) stdHint.textContent = 'Hold Ctrl/Cmd to select multiple';
+
+                // If there's only one standard, auto-select it
+                if (clientStds.length === 1) {
+                    stdSelect.options[0].selected = true;
+                }
+            } else {
+                stdSelect.disabled = true;
+                stdSelect.innerHTML = '<option value="">-- No Standards Assigned to Client --</option>';
+                if (stdHint) stdHint.textContent = 'Please update client profile with applicable standards';
             }
+        }
+
+        // Enable Man-Day button if employees/sites are present
+        const calcBtn = document.getElementById('btn-calculate-mandays');
+        if (calcBtn) {
+            calcBtn.disabled = !(client.employees > 0 || sitesCount > 0);
         }
 
         // Auto-fill calculation params
@@ -1300,76 +1325,7 @@ function openChecklistSelectionModal(planId) {
     }, 100);
 }
 
-// --- Agenda & Wizard Logic ---
-
-function goToStep2() {
-    const form = document.getElementById('plan-form');
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-    }
-
-    document.getElementById('step-1-content').style.display = 'none';
-    document.getElementById('step-2-content').style.display = 'block';
-
-    document.getElementById('step-indicator-1').style.color = 'var(--text-secondary)';
-    document.getElementById('step-indicator-1').style.fontWeight = 'normal';
-    document.getElementById('step-indicator-2').style.color = 'var(--primary-color)';
-    document.getElementById('step-indicator-2').style.fontWeight = 'bold';
-
-    // Icon update
-    document.querySelector('#step-indicator-1').innerHTML = '1. Plan Details <i class="fa-solid fa-check-circle" style="color:var(--success-color)"></i>';
-
-    const btnNext = document.getElementById('btn-plan-next');
-    const btnCancel = document.getElementById('btn-plan-cancel');
-
-    if (btnNext) {
-        btnNext.textContent = 'Save Audit Plan';
-        btnNext.onclick = () => saveAuditPlan();
-    }
-
-    if (btnCancel) {
-        btnCancel.textContent = 'Back';
-        btnCancel.onclick = () => goToStep1();
-    }
-
-    const tbody = document.getElementById('agenda-tbody');
-    if (tbody.children.length === 0) {
-        // Auto-populate default rows based on standard usually, here generic
-        addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
-        addAgendaRow({ day: 'Day 1', time: '09:30 - 10:30', item: 'Site Tour', dept: 'All', auditor: 'All' });
-        addAgendaRow({ day: 'Day 1', time: '16:00 - 17:00', item: 'Closing Meeting', dept: 'Top Management', auditor: 'All' });
-    }
-
-    currentPlanStep = 2;
-}
-
-function goToStep1() {
-    document.getElementById('step-1-content').style.display = 'block';
-    document.getElementById('step-2-content').style.display = 'none';
-
-    document.getElementById('step-indicator-1').style.color = 'var(--primary-color)';
-    document.getElementById('step-indicator-1').style.fontWeight = 'bold';
-    document.querySelector('#step-indicator-1').innerHTML = '1. Plan Details'; // Reset
-
-    document.getElementById('step-indicator-2').style.color = 'var(--text-secondary)';
-    document.getElementById('step-indicator-2').style.fontWeight = 'normal';
-
-    const btnNext = document.getElementById('btn-plan-next');
-    const btnCancel = document.getElementById('btn-plan-cancel');
-
-    if (btnNext) {
-        btnNext.textContent = 'Next: Agenda ->';
-        btnNext.onclick = () => goToStep2();
-    }
-
-    if (btnCancel) {
-        btnCancel.textContent = 'Cancel';
-        btnCancel.onclick = () => renderAuditPlanningEnhanced();
-    }
-
-    currentPlanStep = 1;
-}
+// Wizard logic removed - consolidated to 1 page
 
 function addAgendaRow(data = {}) {
     const tbody = document.getElementById('agenda-tbody');
@@ -1418,8 +1374,6 @@ window.autoCalculateDays = autoCalculateDays;
 window.updateClientDetails = updateClientDetails;
 window.addAgendaRow = addAgendaRow;
 window.saveAuditPlan = saveAuditPlan;
-window.goToStep2 = goToStep2;
-window.goToStep1 = goToStep1;
 window.editAuditPlan = editAuditPlan;
 window.viewAuditPlan = viewAuditPlan;
 window.openChecklistSelectionModal = openChecklistSelectionModal;
@@ -1598,12 +1552,12 @@ function togglePlanningAnalytics() {
 // Note: goToStep2, goToStep1, addAgendaRow, deleteAgendaRow are defined earlier in the file (around lines 1369-1461)
 // The saveAuditPlan function below is the definitive version with proper validation and sanitization
 
-function saveAuditPlan() {
+function saveAuditPlan(shouldPrint = false) {
     // 1. Define Fields
     const fieldIds = {
         client: 'plan-client',
         date: 'plan-date',
-        type: 'plan-type',
+        type: 'plan-audit-type', // Consolidated to use plan-audit-type
         leadAuditor: 'plan-lead-auditor',
         manDays: 'plan-mandays',
         onsiteDays: 'plan-onsite-days'
@@ -1636,7 +1590,7 @@ function saveAuditPlan() {
     // 4. Collect & Sanitize Data
     const clientName = document.getElementById('plan-client').value;
     const date = document.getElementById('plan-date').value;
-    const type = document.getElementById('plan-type').value;
+    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
 
     // Safely map multi-selects
     const standardSelect = document.getElementById('plan-standard');
@@ -1682,8 +1636,7 @@ function saveAuditPlan() {
         });
     }
 
-    // 5.5. Collect ISO 17021-1 Fields (optional fields)
-    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
+    // 5.5. Collect ISO 17021-1 Fields
     const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
     const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
     const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
@@ -1692,7 +1645,7 @@ function saveAuditPlan() {
     const planData = {
         client: clientName,
         date: date,
-        type: type,
+        type: auditType, // Using consolidated auditType
         standard: standard,
         auditors: [],
         team: [leadAuditor, ...team].filter(Boolean),
@@ -1713,7 +1666,7 @@ function saveAuditPlan() {
     };
 
     // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
-    const btnSave = document.getElementById('btn-plan-next');
+    const btnSave = document.getElementById('btn-plan-save');
     const originalText = btnSave ? btnSave.textContent : 'Save Audit Plan';
 
     // Helper to Restore Button State
@@ -1815,7 +1768,15 @@ function saveAuditPlan() {
             window.saveData();
             renderAuditPlanningEnhanced();
             if (window.renderDashboardEnhanced) renderDashboardEnhanced();
+            const finalId = window.editingPlanId || (state.auditPlans[state.auditPlans.length - 1]?.id);
             window.editingPlanId = null;
+
+            // Trigger Print if requested
+            if (shouldPrint) {
+                setTimeout(() => {
+                    if (finalId) window.printAuditPlanDetails(finalId);
+                }, 500);
+            }
 
         } catch (dbError) {
             console.error('Database Save Failed:', dbError);
@@ -1841,7 +1802,7 @@ async function generateAIAgenda() {
         // Collect Context
         const clientName = document.getElementById('plan-client').value;
         const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
-        const type = document.getElementById('plan-type').value;
+        const type = document.getElementById('plan-audit-type').value;
         const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
         const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 
@@ -1889,8 +1850,6 @@ window.generateAIAgenda = generateAIAgenda;
 window.addAgendaRow = addAgendaRow;
 window.deleteAgendaRow = deleteAgendaRow; // Added export
 window.saveAuditPlan = saveAuditPlan;
-window.goToStep2 = goToStep2;
-window.goToStep1 = goToStep1;
 
 window.togglePlanningAnalytics = togglePlanningAnalytics;
 window.renderCreateAuditPlanForm = renderCreateAuditPlanForm;

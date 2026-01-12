@@ -3,7 +3,47 @@
 // ISO 17021-1 Clause 8.5
 // ============================================
 
-// Persist Management Review
+// --------------------------------------------
+// DATA FETCHING (Supabase)
+// --------------------------------------------
+
+window.fetchManagementReviews = async function () {
+    if (!window.SupabaseClient) return;
+
+    try {
+        const { data, error } = await window.SupabaseClient
+            .from('audit_management_reviews')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (error) throw error;
+
+        window.state.managementReviews = (data || []).map(row => ({
+            id: row.id,
+            date: row.date,
+            reviewedBy: row.reviewed_by,
+            attendees: row.attendees || [],
+            inputs: row.inputs || {},
+            outputs: row.outputs || {},
+            actionItems: row.action_items || [],
+            nextReviewDate: row.next_review_date,
+            minutesApprovedBy: row.minutes_approved_by,
+            minutes_approved_date: row.minutes_approved_date
+        }));
+
+        if (document.getElementById('ai-generate-btn')) {
+            renderManagementReviewModule();
+        }
+
+    } catch (err) {
+        console.error('Error fetching Management Reviews:', err);
+    }
+};
+
+// --------------------------------------------
+// PERSISTENCE
+// --------------------------------------------
+
 async function persistManagementReview(review) {
     if (!window.SupabaseClient) return;
     try {
@@ -18,9 +58,27 @@ async function persistManagementReview(review) {
             minutes_approved_by: review.minutesApprovedBy,
             minutes_approved_date: review.minutesApprovedDate
         };
-        await window.SupabaseClient.update('audit_management_reviews', payload, { id: review.id });
+
+        if (review.id && String(review.id).length > 10) {
+            // Update
+            const { error } = await window.SupabaseClient
+                .from('audit_management_reviews')
+                .update(payload)
+                .eq('id', review.id);
+            if (error) throw error;
+        } else {
+            // Insert
+            const { data, error } = await window.SupabaseClient
+                .from('audit_management_reviews')
+                .insert(payload)
+                .select();
+            if (error) throw error;
+            if (data && data[0]) review.id = data[0].id;
+        }
+        await window.fetchManagementReviews();
     } catch (e) {
         console.error('Failed to sync management review:', e);
+        window.showNotification('Failed to sync management review to DB', 'error');
     }
 }
 
@@ -83,6 +141,11 @@ if (!window.state.managementReviews) {
 }
 
 function renderManagementReviewModule() {
+    // Auto-fetch if empty or demo only
+    if (window.state.managementReviews.length <= 1 && window.SupabaseClient) {
+        window.fetchManagementReviews();
+    }
+
     const contentArea = document.getElementById('content-area');
     const reviews = window.state.managementReviews || [];
 
@@ -428,7 +491,6 @@ window.openNewManagementReviewModal = function () {
             .filter(c => c);
 
         const newReview = {
-            id: Date.now(),
             date,
             reviewedBy,
             attendees,
@@ -453,37 +515,7 @@ window.openNewManagementReviewModal = function () {
             minutesApprovedDate: null
         };
 
-        if (!window.state.managementReviews) window.state.managementReviews = [];
-        window.state.managementReviews.unshift(newReview);
-        window.saveData();
-
-        // Persist
-        if (window.SupabaseClient) {
-            (async () => {
-                try {
-                    const payload = {
-                        date: newReview.date,
-                        reviewed_by: newReview.reviewedBy,
-                        attendees: newReview.attendees,
-                        inputs: newReview.inputs,
-                        outputs: newReview.outputs,
-                        action_items: newReview.actionItems,
-                        next_review_date: newReview.nextReviewDate,
-                        minutes_approved_by: newReview.minutesApprovedBy,
-                        minutes_approved_date: newReview.minutesApprovedDate
-                    };
-                    const { data, error } = await window.SupabaseClient.insert('audit_management_reviews', payload);
-                    if (error) throw error;
-                    if (data && data.length > 0) {
-                        newReview.id = data[0].id;
-                        window.saveData();
-                    }
-                    window.showNotification('Review saved to DB', 'success');
-                } catch (e) {
-                    console.error('DB Insert Error:', e);
-                }
-            })();
-        }
+        persistManagementReview(newReview);
 
         window.closeModal();
         renderManagementReviewModule();

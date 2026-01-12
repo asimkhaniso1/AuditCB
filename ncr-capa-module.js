@@ -77,7 +77,7 @@ window.fetchNCRs = async function () {
     }
 };
 
-// Persist Update to Supabase
+// Persist Insert or Update to Supabase
 async function persistNCR(ncr) {
     if (!window.SupabaseClient) return;
 
@@ -105,20 +105,34 @@ async function persistNCR(ncr) {
         verified_by: ncr.verifiedBy,
         verified_date: ncr.verifiedDate,
         effectiveness: ncr.effectiveness,
-        evidence: ncr.evidence
+        evidence: ncr.evidence || []
     };
 
     try {
-        const { error } = await window.SupabaseClient
-            .from('audit_ncrs')
-            .update(dbPayload)
-            .eq('id', ncr.id);
+        if (ncr.id) {
+            // Update
+            const { error } = await window.SupabaseClient
+                .from('audit_ncrs')
+                .update(dbPayload)
+                .eq('id', ncr.id);
+            if (error) throw error;
+        } else {
+            // Insert
+            const { data, error } = await window.SupabaseClient
+                .from('audit_ncrs')
+                .insert(dbPayload)
+                .select();
+            if (error) throw error;
+            if (data && data[0]) ncr.id = data[0].id; // Assign the new DB ID
+        }
 
-        if (error) throw error;
-        // console.log('NCR updated in DB');
+        // Refresh local state and UI
+        await window.fetchNCRs();
+        renderNCRCAPAModule(window.state.ncrContextClientId);
+
     } catch (error) {
         console.error('Failed to sync NCR:', error);
-        window.showNotification('Failed to sync NCR changes to database', 'error');
+        window.showNotification('Failed to sync NCR changes to database: ' + error.message, 'error');
     }
 }
 
@@ -675,21 +689,18 @@ async function saveNewNCR() {
     let clientName = '';
 
     if (level === 'client') {
-        // Handle TEXT IDs properly (no parseInt)
         clientId = document.getElementById('ncr-client').value;
-        // Loose comparison for finding client in state
-        const client = window.state.clients.find(c => c.id == clientId);
+        const client = window.state.clients.find(c => String(c.id) === String(clientId));
         clientName = client ? client.name : 'Unknown';
     } else {
-        // Internal
-        clientId = '999'; // Internal placeholder
-        clientName = 'AuditCB360 - Internal Operations';
+        clientId = 'INTERNAL';
+        clientName = 'Corporate (AuditCB360)';
     }
 
     const ncrData = {
         level: level,
-        clientId: clientId, // This is client_id (TEXT)
-        clientName: clientName, // client_name
+        clientId: clientId,
+        clientName: clientName,
         source: document.getElementById('ncr-source').value,
         standard: document.getElementById('ncr-standard').value,
         clause: document.getElementById('ncr-clause').value,
@@ -702,52 +713,9 @@ async function saveNewNCR() {
         evidence: []
     };
 
-    if (!window.SupabaseClient) {
-        // Fallback for No-DB mode
-        const newId = (Math.max(...window.state.ncrs.map(n => n.id), 0) + 1);
-        ncrData.id = newId;
-        window.state.ncrs.push(ncrData);
-        window.saveData(); // Local storage
-        window.closeModal();
-        renderNCRCAPAModule();
-        return;
-    }
-
-    // DB Insert
-    try {
-        const dbPayload = {
-            client_id: ncrData.clientId,
-            level: ncrData.level,
-            client_name: ncrData.clientName,
-            source: ncrData.source,
-            standard: ncrData.standard,
-            clause: ncrData.clause,
-            severity: ncrData.severity,
-            description: ncrData.description,
-            raised_by: ncrData.raisedBy,
-            raised_date: ncrData.raisedDate,
-            due_date: ncrData.due_date, // Note casing match? No, we used due_date in payload
-            // Re-map to snake_case for DB
-            due_date: ncrData.dueDate,
-            status: ncrData.status
-        };
-
-        const { data, error } = await window.SupabaseClient
-            .from('audit_ncrs')
-            .insert(dbPayload)
-            .select();
-
-        if (error) throw error;
-
-        // Success - Reload Data
-        await window.fetchNCRs();
-        window.closeModal();
-        window.showNotification('NCR Created Successfully', 'success');
-
-    } catch (err) {
-        console.error('Save NCR Error:', err);
-        window.showNotification('Failed to create NCR: ' + err.message, 'error');
-    }
+    await persistNCR(ncrData);
+    window.closeModal();
+    window.showNotification('NCR Created Successfully', 'success');
 }
 
 // ... VIEW DETAILS, EDIT, CAPA (Assuming similar logic structure but mapped key names) ...

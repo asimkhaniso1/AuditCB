@@ -83,7 +83,7 @@ window.fetchAppealsComplaints = async function () {
 // PERSISTENCE
 // --------------------------------------------
 
-// Persist Appeal to Supabase
+// Persist Appeal to Supabase (Insert or Update)
 async function persistAppeal(appeal) {
     if (!window.SupabaseClient) return;
     try {
@@ -99,17 +99,37 @@ async function persistAppeal(appeal) {
             assigned_to: appeal.assignedTo,
             resolution: appeal.resolution,
             date_resolved: appeal.dateResolved || null,
-            history: appeal.history,
+            history: appeal.history || [],
             panel_records: appeal.panelRecords || {}
         };
-        await window.SupabaseClient.from('audit_appeals').update(payload).eq('id', appeal.id);
+
+        if (appeal.id) {
+            // Update
+            const { error } = await window.SupabaseClient
+                .from('audit_appeals')
+                .update(payload)
+                .eq('id', appeal.id);
+            if (error) throw error;
+        } else {
+            // Insert
+            const { data, error } = await window.SupabaseClient
+                .from('audit_appeals')
+                .insert(payload)
+                .select();
+            if (error) throw error;
+            if (data && data[0]) appeal.id = data[0].id;
+        }
+
+        await window.fetchAppealsComplaints();
+        renderAppealsComplaintsModule();
+
     } catch (e) {
         console.error('Failed to sync appeal:', e);
-        window.showNotification('Failed to sync appeal to DB', 'error');
+        window.showNotification('Failed to sync appeal to DB: ' + e.message, 'error');
     }
 }
 
-// Persist Complaint to Supabase
+// Persist Complaint to Supabase (Insert or Update)
 async function persistComplaint(complaint) {
     if (!window.SupabaseClient) return;
     try {
@@ -130,12 +150,32 @@ async function persistComplaint(complaint) {
             corrective_action: complaint.correctiveAction,
             resolution: complaint.resolution,
             date_resolved: complaint.dateResolved || null,
-            history: complaint.history
+            history: complaint.history || []
         };
-        await window.SupabaseClient.from('audit_complaints').update(payload).eq('id', complaint.id);
+
+        if (complaint.id) {
+            // Update
+            const { error } = await window.SupabaseClient
+                .from('audit_complaints')
+                .update(payload)
+                .eq('id', complaint.id);
+            if (error) throw error;
+        } else {
+            // Insert
+            const { data, error } = await window.SupabaseClient
+                .from('audit_complaints')
+                .insert(payload)
+                .select();
+            if (error) throw error;
+            if (data && data[0]) complaint.id = data[0].id;
+        }
+
+        await window.fetchAppealsComplaints();
+        renderAppealsComplaintsModule();
+
     } catch (e) {
         console.error('Failed to sync complaint:', e);
-        window.showNotification('Failed to sync complaint to DB', 'error');
+        window.showNotification('Failed to sync complaint to DB: ' + e.message, 'error');
     }
 }
 
@@ -435,7 +475,6 @@ window.openNewAppealModal = function () {
         }
 
         const newAppeal = {
-            id: (window.state.appeals.length > 0 ? Math.max(...window.state.appeals.map(a => a.id)) : 0) + 1,
             clientId: clientId,
             clientName: clientName,
             type: document.getElementById('appeal-type').value,
@@ -453,46 +492,9 @@ window.openNewAppealModal = function () {
             panelRecords: {}
         };
 
-        // Persist Insert
-        if (window.SupabaseClient) {
-            try {
-                const payload = {
-                    client_id: newAppeal.clientId,
-                    client_name: newAppeal.clientName,
-                    type: newAppeal.type,
-                    subject: newAppeal.subject,
-                    description: newAppeal.description,
-                    date_received: newAppeal.dateReceived,
-                    due_date: newAppeal.dueDate,
-                    status: newAppeal.status,
-                    assigned_to: newAppeal.assignedTo,
-                    resolution: newAppeal.resolution,
-                    date_resolved: newAppeal.dateResolved,
-                    history: newAppeal.history,
-                    panel_records: newAppeal.panelRecords
-                };
-                const { data, error } = await window.SupabaseClient.from('audit_appeals').insert(payload).select();
-                if (error) throw error;
-                if (data && data.length > 0) {
-                    newAppeal.id = data[0].id;
-                }
-
-                await window.fetchAppealsComplaints(); // Refresh all
-                window.closeModal();
-                window.showNotification('Appeal logged and saved to DB', 'success');
-
-            } catch (e) {
-                console.error('Appeal DB Insert Error:', e);
-                window.showNotification('Error saving appeal to DB', 'error');
-            }
-        } else {
-            // Local Fallback
-            window.state.appeals.push(newAppeal);
-            window.saveData();
-            window.closeModal();
-            renderAppealsComplaintsModule();
-            window.showNotification('Appeal logged locally', 'warning');
-        }
+        await persistAppeal(newAppeal);
+        window.closeModal();
+        window.showNotification('Appeal logged successfully', 'success');
     };
 
     window.openModal();
@@ -618,50 +620,9 @@ window.openNewComplaintModal = function () {
             return;
         }
 
-        // Persist
-        if (window.SupabaseClient) {
-            try {
-                const payload = {
-                    source: newComplaint.source,
-                    client_name: newComplaint.clientName,
-                    related_audit_id: newComplaint.relatedAuditId,
-                    type: newComplaint.type,
-                    severity: newComplaint.severity,
-                    auditors_involved: newComplaint.auditorsInvolved,
-                    subject: newComplaint.subject,
-                    description: newComplaint.description,
-                    date_received: newComplaint.dateReceived,
-                    due_date: newComplaint.dueDate,
-                    status: newComplaint.status,
-                    investigator: newComplaint.investigator,
-                    findings: newComplaint.findings,
-                    corrective_action: newComplaint.correctiveAction,
-                    resolution: newComplaint.resolution,
-                    date_resolved: newComplaint.dateResolved,
-                    history: newComplaint.history
-                };
-
-                const { data, error } = await window.SupabaseClient.from('audit_complaints').insert(payload).select();
-                if (error) throw error;
-                if (data && data.length > 0) {
-                    newComplaint.id = data[0].id;
-                }
-
-                await window.fetchAppealsComplaints();
-                window.closeModal();
-                window.showNotification('Complaint saved to DB', 'success');
-
-            } catch (e) {
-                console.error('Complaint DB Insert Error:', e);
-                window.showNotification('Error saving complaint to DB', 'error');
-            }
-        } else {
-            window.state.complaints.push(newComplaint);
-            window.saveData();
-            window.closeModal();
-            renderAppealsComplaintsModule();
-            window.showNotification('Complaint logged locally', 'warning');
-        }
+        await persistComplaint(newComplaint);
+        window.closeModal();
+        window.showNotification('Complaint logged successfully', 'success');
     };
 
     window.openModal();

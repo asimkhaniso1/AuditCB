@@ -3,7 +3,78 @@
 // ISO 17021-1 Clause 5.2
 // ============================================
 
-// Persist Member
+// --------------------------------------------
+// DATA FETCHING (Supabase)
+// --------------------------------------------
+
+window.fetchImpartialityData = async function () {
+    if (!window.SupabaseClient) return;
+
+    try {
+        // Members
+        const { data: members, error: mErr } = await window.SupabaseClient
+            .from('audit_impartiality_members')
+            .select('*')
+            .order('name');
+        if (mErr) throw mErr;
+        window.state.impartialityCommittee.members = (members || []).map(m => ({
+            id: m.id,
+            name: m.name,
+            organization: m.organization,
+            role: m.role,
+            expertise: m.expertise,
+            appointedDate: m.appointed_date,
+            termEnd: m.term_end,
+            status: m.status
+        }));
+
+        // Threats
+        const { data: threats, error: tErr } = await window.SupabaseClient
+            .from('audit_impartiality_threats')
+            .select('*')
+            .order('date', { ascending: false });
+        if (tErr) throw tErr;
+        window.state.impartialityCommittee.threats = (threats || []).map(t => ({
+            id: t.id,
+            date: t.date,
+            type: t.type,
+            description: t.description,
+            client: t.client,
+            safeguard: t.safeguard,
+            identifiedBy: t.identified_by,
+            status: t.status,
+            reviewedByCommittee: t.reviewed_by_committee,
+            committeeDecision: t.committee_decision
+        }));
+
+        // Meetings
+        const { data: meetings, error: mtgErr } = await window.SupabaseClient
+            .from('audit_impartiality_meetings')
+            .select('*')
+            .order('date', { ascending: false });
+        if (mtgErr) throw mtgErr;
+        window.state.impartialityCommittee.meetings = (meetings || []).map(m => ({
+            id: m.id,
+            date: m.date,
+            attendees: m.attendees || [],
+            threatsReviewed: m.threats_reviewed || [],
+            decisions: m.decisions || [],
+            nextMeetingDate: m.next_meeting_date
+        }));
+
+        if (document.getElementById('members')) {
+            renderImpartialityModule();
+        }
+
+    } catch (err) {
+        console.error('Error fetching Impartiality data:', err);
+    }
+};
+
+// --------------------------------------------
+// PERSISTENCE
+// --------------------------------------------
+
 async function persistImpartialityMember(member) {
     if (!window.SupabaseClient) return;
     try {
@@ -16,13 +87,24 @@ async function persistImpartialityMember(member) {
             term_end: member.termEnd,
             status: member.status
         };
-        await window.SupabaseClient.update('audit_impartiality_members', payload, { id: member.id });
+
+        if (member.id && String(member.id).length > 10) { // Check if it's a temp Date.now() ID or DB ID
+            // Update
+            const { error } = await window.SupabaseClient.from('audit_impartiality_members').update(payload).eq('id', member.id);
+            if (error) throw error;
+        } else {
+            // Insert
+            const { data, error } = await window.SupabaseClient.from('audit_impartiality_members').insert(payload).select();
+            if (error) throw error;
+            if (data && data[0]) member.id = data[0].id;
+        }
+        await window.fetchImpartialityData();
     } catch (e) {
         console.error('Failed to sync member:', e);
+        window.showNotification('Failed to sync member to DB', 'error');
     }
 }
 
-// Persist Threat
 async function persistImpartialityThreat(threat) {
     if (!window.SupabaseClient) return;
     try {
@@ -37,13 +119,21 @@ async function persistImpartialityThreat(threat) {
             reviewed_by_committee: threat.reviewedByCommittee,
             committee_decision: threat.committeeDecision || null
         };
-        await window.SupabaseClient.update('audit_impartiality_threats', payload, { id: threat.id });
+
+        if (threat.id && String(threat.id).length > 10) {
+            const { error } = await window.SupabaseClient.from('audit_impartiality_threats').update(payload).eq('id', threat.id);
+            if (error) throw error;
+        } else {
+            const { data, error } = await window.SupabaseClient.from('audit_impartiality_threats').insert(payload).select();
+            if (error) throw error;
+            if (data && data[0]) threat.id = data[0].id;
+        }
+        await window.fetchImpartialityData();
     } catch (e) {
         console.error('Failed to sync threat:', e);
     }
 }
 
-// Persist Meeting
 async function persistImpartialityMeeting(meeting) {
     if (!window.SupabaseClient) return;
     try {
@@ -54,7 +144,16 @@ async function persistImpartialityMeeting(meeting) {
             decisions: meeting.decisions,
             next_meeting_date: meeting.nextMeetingDate
         };
-        await window.SupabaseClient.update('audit_impartiality_meetings', payload, { id: meeting.id });
+
+        if (meeting.id && String(meeting.id).length > 10) {
+            const { error } = await window.SupabaseClient.from('audit_impartiality_meetings').update(payload).eq('id', meeting.id);
+            if (error) throw error;
+        } else {
+            const { data, error } = await window.SupabaseClient.from('audit_impartiality_meetings').insert(payload).select();
+            if (error) throw error;
+            if (data && data[0]) meeting.id = data[0].id;
+        }
+        await window.fetchImpartialityData();
     } catch (e) {
         console.error('Failed to sync meeting:', e);
     }
@@ -120,6 +219,12 @@ if (!window.state.impartialityCommittee) {
 }
 
 function renderImpartialityModule() {
+    // Auto-fetch if empty
+    if (window.state.impartialityCommittee.members.length <= 2 && window.SupabaseClient) {
+        // We check <= 2 because of the hardcoded demo sync
+        window.fetchImpartialityData();
+    }
+
     const contentArea = document.getElementById('content-area');
     const data = window.state.impartialityCommittee;
 
@@ -343,7 +448,6 @@ window.openAddCommitteeMemberModal = function () {
         }
 
         const newMember = {
-            id: Date.now(),
             name,
             organization: org,
             role: document.getElementById('member-role').value,
@@ -353,34 +457,7 @@ window.openAddCommitteeMemberModal = function () {
             status: 'Active'
         };
 
-        window.state.impartialityCommittee.members.push(newMember);
-        window.saveData();
-
-        // Persist
-        if (window.SupabaseClient) {
-            (async () => {
-                try {
-                    const payload = {
-                        name: newMember.name,
-                        organization: newMember.organization,
-                        role: newMember.role,
-                        expertise: newMember.expertise,
-                        appointed_date: newMember.appointedDate,
-                        term_end: newMember.termEnd,
-                        status: newMember.status
-                    };
-                    const { data, error } = await window.SupabaseClient.insert('audit_impartiality_members', payload);
-                    if (error) throw error;
-                    if (data && data.length > 0) {
-                        newMember.id = data[0].id;
-                        window.saveData();
-                    }
-                    window.showNotification('Member saved to DB', 'success');
-                } catch (e) {
-                    console.error('DB Insert Error:', e);
-                }
-            })();
-        }
+        persistImpartialityMember(newMember);
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Committee member added successfully', 'success');
@@ -439,7 +516,6 @@ window.openAddThreatModal = function () {
         }
 
         const newThreat = {
-            id: Date.now(),
             date: new Date().toISOString().split('T')[0],
             type,
             description,
@@ -450,36 +526,7 @@ window.openAddThreatModal = function () {
             reviewedByCommittee: false
         };
 
-        window.state.impartialityCommittee.threats.push(newThreat);
-        window.saveData();
-
-        // Persist
-        if (window.SupabaseClient) {
-            (async () => {
-                try {
-                    const payload = {
-                        date: newThreat.date,
-                        type: newThreat.type,
-                        description: newThreat.description,
-                        client: newThreat.client,
-                        safeguard: newThreat.safeguard,
-                        identified_by: newThreat.identifiedBy,
-                        status: newThreat.status,
-                        reviewed_by_committee: newThreat.reviewedByCommittee,
-                        committee_decision: null
-                    };
-                    const { data, error } = await window.SupabaseClient.insert('audit_impartiality_threats', payload);
-                    if (error) throw error;
-                    if (data && data.length > 0) {
-                        newThreat.id = data[0].id;
-                        window.saveData();
-                    }
-                    window.showNotification('Threat saved to DB', 'success');
-                } catch (e) {
-                    console.error('DB Insert Error:', e);
-                }
-            })();
-        }
+        persistImpartialityThreat(newThreat);
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Threat logged successfully', 'success');
@@ -572,7 +619,6 @@ window.openAddMeetingModal = function () {
         });
 
         const newMeeting = {
-            id: Date.now(),
             date: date,
             attendees: attendees,
             threatsReviewed: threatsReviewed,
@@ -580,32 +626,7 @@ window.openAddMeetingModal = function () {
             nextMeetingDate: document.getElementById('meeting-next').value
         };
 
-        window.state.impartialityCommittee.meetings.push(newMeeting);
-        window.saveData();
-
-        // Persist
-        if (window.SupabaseClient) {
-            (async () => {
-                try {
-                    const payload = {
-                        date: newMeeting.date,
-                        attendees: newMeeting.attendees,
-                        threats_reviewed: newMeeting.threatsReviewed,
-                        decisions: newMeeting.decisions,
-                        next_meeting_date: newMeeting.nextMeetingDate
-                    };
-                    const { data, error } = await window.SupabaseClient.insert('audit_impartiality_meetings', payload);
-                    if (error) throw error;
-                    if (data && data.length > 0) {
-                        newMeeting.id = data[0].id;
-                        window.saveData();
-                    }
-                    window.showNotification('Meeting saved to DB', 'success');
-                } catch (e) {
-                    console.error('DB Insert Error:', e);
-                }
-            })();
-        }
+        persistImpartialityMeeting(newMeeting);
         window.closeModal();
         renderImpartialityModule();
         window.showNotification('Meeting recorded successfully', 'success');
