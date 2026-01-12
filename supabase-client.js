@@ -307,7 +307,9 @@ const SupabaseClient = {
 
             Logger.info('Cloud data loaded:', results);
 
-            // Show success notification
+            // DISABLED: This notification is misleading - it shows data LOADED, not UPLOADED
+            // Users think data is being synced TO cloud when it's actually being loaded FROM cloud
+            /*
             const totalAdded = results.clients.added + results.auditors.added + results.users.added;
             const totalUpdated = results.clients.updated + results.auditors.updated + results.users.updated;
 
@@ -317,6 +319,7 @@ const SupabaseClient = {
                     'success'
                 );
             }
+            */
 
             return results;
         } catch (error) {
