@@ -1455,7 +1455,7 @@ window.renderAddClient = function () {
                         <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-                                ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map((std, i) => `
+                                ${((window.state.settings && window.state.settings.standards) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map((std, i) => `
                                     <label class="standard-checkbox-btn" style="cursor: pointer;">
                                         <input type="checkbox" name="client_standards" value="${std}" style="display: none;" onchange="this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#2563eb' : '#64748b'; this.nextElementSibling.style.background = this.checked ? '#eff6ff' : '#fff';">
                                         <span style="display: inline-block; padding: 0.4rem 0.8rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 0.85rem; color: #64748b; transition: all 0.2s;">
@@ -1810,7 +1810,7 @@ window.renderEditClient = function (clientId) {
                         <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
                              <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-                                ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map((std) => {
+                                ${((window.state.settings && window.state.settings.standards) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map((std) => {
         const isChecked = standards.includes(std);
         return `
                                     <label class="standard-checkbox-btn ${isChecked ? 'active' : ''}" style="cursor: pointer;">
@@ -2169,7 +2169,7 @@ function addSite(clientId) {
                 <div class="form-group">
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
-                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+                        ${((window.state.settings && window.state.settings.standards) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
         `<option value="${std}" ${(client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
     ).join('')}
                     </select>
@@ -2378,7 +2378,7 @@ window.editSite = function (clientId, siteIndex) {
                 <div class="form-group">
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
-                        ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+                        ${((window.state.settings && window.state.settings.standards) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
         `<option value="${std}" ${(site.standards || client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
     ).join('')}
                     </select>

@@ -6,7 +6,7 @@
 // State for filtering
 let checklistFilterStandard = 'all';
 let checklistFilterType = 'all';
-let checklistFilterAuditType = 'all';
+// checklistFilterAuditType removed
 let checklistFilterScope = 'all';
 let checklistSearchTerm = '';
 
@@ -22,19 +22,19 @@ function renderChecklistLibrary() {
     let filtered = checklists.filter(c => {
         const matchStandard = checklistFilterStandard === 'all' || c.standard === checklistFilterStandard;
         const matchType = checklistFilterType === 'all' || c.type === checklistFilterType;
-        const matchAuditType = checklistFilterAuditType === 'all' || c.auditType === checklistFilterAuditType;
+        // Audit Type filter removed
         const matchScope = checklistFilterScope === 'all' || c.auditScope === checklistFilterScope;
         const matchSearch = checklistSearchTerm === '' ||
             c.name.toLowerCase().includes(checklistSearchTerm.toLowerCase()) ||
             c.standard.toLowerCase().includes(checklistSearchTerm.toLowerCase());
-        return matchStandard && matchType && matchAuditType && matchScope && matchSearch;
+        return matchStandard && matchType && matchScope && matchSearch;
     });
 
     // Separate global and custom
     const globalChecklists = filtered.filter(c => c.type === 'global');
     const customChecklists = filtered.filter(c => c.type === 'custom');
 
-    const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const standards = window.state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
@@ -53,10 +53,7 @@ function renderChecklistLibrary() {
                         <option value="global" ${checklistFilterType === 'global' ? 'selected' : ''}>Global</option>
                         <option value="custom" ${checklistFilterType === 'custom' ? 'selected' : ''}>Custom</option>
                     </select>
-                    <select id="checklist-filter-audittype" style="max-width: 160px; margin-bottom: 0;">
-                        <option value="all" ${checklistFilterAuditType === 'all' ? 'selected' : ''}>All Audit Types</option>
-                        ${auditTypes.map(t => `<option value="${window.UTILS.escapeHtml(t)}" ${checklistFilterAuditType === t ? 'selected' : ''}>${window.UTILS.escapeHtml(t)}</option>`).join('')}
-                    </select>
+                    <!-- Audit Type filter removed -->
                     <select id="checklist-filter-scope" style="max-width: 140px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterScope === 'all' ? 'selected' : ''}>All Scopes</option>
                         ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklistFilterScope === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
@@ -230,10 +227,7 @@ function renderChecklistLibrary() {
         renderChecklistLibrary();
     });
 
-    document.getElementById('checklist-filter-audittype')?.addEventListener('change', (e) => {
-        checklistFilterAuditType = e.target.value;
-        renderChecklistLibrary();
-    });
+    // Audit Type listener removed
 
     document.getElementById('checklist-filter-scope')?.addEventListener('change', (e) => {
         checklistFilterScope = e.target.value;
@@ -597,7 +591,7 @@ function renderChecklistEditor(checklistId) {
     const isEdit = !!checklistId;
     const checklist = isEdit ? state.checklists?.find(c => c.id === checklistId) : null;
 
-    const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    const standards = window.state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const userRole = state.currentUser?.role;
     const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
@@ -652,13 +646,7 @@ function renderChecklistEditor(checklistId) {
                                 ${canEditGlobal ? `<option value="global" ${checklist?.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>Audit Type</label>
-                            <select class="form-control" id="checklist-audit-type">
-                                <option value="">-- Select --</option>
-                                ${auditTypes.map(t => `<option value="${window.UTILS.escapeHtml(t)}" ${checklist?.auditType === t ? 'selected' : ''}>${window.UTILS.escapeHtml(t)}</option>`).join('')}
-                            </select>
-                        </div>
+                        <!-- Audit Type field removed -->
                         <div class="form-group">
                             <label>Audit Scope</label>
                             <select class="form-control" id="checklist-audit-scope">
@@ -767,7 +755,7 @@ function saveChecklistFromEditor(checklistId) {
     const name = document.getElementById('checklist-name').value.trim();
     const standard = document.getElementById('checklist-standard').value;
     const type = document.getElementById('checklist-type').value;
-    const auditType = document.getElementById('checklist-audit-type').value;
+    // Audit Type retrieval removed
     const auditScope = document.getElementById('checklist-audit-scope').value;
 
     if (!name) {
@@ -836,7 +824,7 @@ function saveChecklistFromEditor(checklistId) {
                     name: checklistData.name,
                     standard: checklistData.standard,
                     type: checklistData.type,
-                    audit_type: checklistData.auditType,
+                    // audit_type removed
                     audit_scope: checklistData.auditScope,
                     clauses: checklistData.clauses,
                     updated_at: new Date().toISOString()
@@ -847,7 +835,7 @@ function saveChecklistFromEditor(checklistId) {
                     name: checklistData.name,
                     standard: checklistData.standard,
                     type: checklistData.type,
-                    audit_type: checklistData.auditType,
+
                     audit_scope: checklistData.auditScope,
                     clauses: checklistData.clauses,
                     created_by: checklistData.createdBy,
@@ -868,7 +856,7 @@ function saveChecklistFromEditor(checklistId) {
             checklist.name = name;
             checklist.standard = standard;
             checklist.type = type;
-            checklist.auditType = auditType;
+            // checklist.auditType removed
             checklist.auditScope = auditScope;
             checklist.clauses = Object.values(clauseGroups);
             delete checklist.items;
@@ -884,7 +872,7 @@ function saveChecklistFromEditor(checklistId) {
             name,
             standard,
             type,
-            auditType,
+            // auditType removed
             auditScope,
             clauses: Object.values(clauseGroups),
             createdBy: state.currentUser?.name || 'Current User',

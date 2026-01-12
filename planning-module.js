@@ -219,10 +219,10 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                         <!-- Standard -->
                         <div class="form-group">
                             <label>Audit Standard(s)</label>
-                            <select class="form-control" id="plan-standard" multiple style="height: 120px;">
-                                ${["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"].map(std =>
+                                <select class="form-control" id="plan-standard" multiple style="height: 120px;">
+                                    ${(window.state.settings?.standards || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
         `<option value="${std}">${std}</option>`).join('')}
-                            </select>
+                                </select>
                             <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
                         </div>
 
@@ -1733,9 +1733,14 @@ function saveAuditPlan() {
     (async () => {
         try {
             if (window.editingPlanId) {
+                // Find client ID
+                const clientObj = state.clients.find(c => c.name === planData.client);
+                const clientId = clientObj ? String(clientObj.id) : null;
+
                 // Update existing plan
                 const { error } = await window.SupabaseClient.update('audit_plans', {
-                    id: window.editingPlanId,
+                    id: String(window.editingPlanId),
+                    client_id: clientId, // Ensure client_id is saved
                     client_name: planData.client,
                     plan_date: planData.date,
                     type: planData.type,
@@ -1747,7 +1752,7 @@ function saveAuditPlan() {
                 if (error) throw error;
 
                 // Update Local State
-                const index = state.auditPlans.findIndex(p => p.id === window.editingPlanId);
+                const index = state.auditPlans.findIndex(p => String(p.id) === String(window.editingPlanId));
                 if (index !== -1) {
                     state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
                 }
@@ -1755,15 +1760,22 @@ function saveAuditPlan() {
 
             } else {
                 // Insert new plan
-                const newPlanId = Date.now();
+                const newPlanId = String(Date.now()); // Ensure ID is string
+
+                // Find client ID
+                const clientObj = state.clients.find(c => c.name === planData.client);
+                const clientId = clientObj ? String(clientObj.id) : null;
+
                 const newPlan = {
                     id: newPlanId,
+                    clientId: clientId,
                     progress: 0,
                     ...planData
                 };
 
                 const { error } = await window.SupabaseClient.insert('audit_plans', {
                     id: newPlanId,
+                    client_id: clientId, // Ensure client_id is saved
                     client_name: planData.client,
                     plan_date: planData.date,
                     type: planData.type,
