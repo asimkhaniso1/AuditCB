@@ -253,6 +253,43 @@ const SupabaseClient = {
     },
 
     /**
+     * Fluent API Proxy for Database
+     * Allows: window.SupabaseClient.from('table').select()...
+     */
+    from(table) {
+        if (!this.client) {
+            Logger.error('Supabase client not initialized');
+            throw new Error('Supabase not initialized');
+        }
+        return this.client.from(table);
+    },
+
+    /**
+     * Direct Database Proxies
+     * Compatibility for window.SupabaseClient.update('table', id, data)
+     */
+    async insert(table, data) {
+        return this.db.insert(table, data);
+    },
+
+    async update(table, idOrData, data) {
+        // Support both (table, id, data) and (table, {id, ...data})
+        if (data === undefined && typeof idOrData === 'object') {
+            const id = idOrData.id;
+            return this.db.update(table, id, idOrData);
+        }
+        return this.db.update(table, idOrData, data);
+    },
+
+    async delete(table, id) {
+        return this.db.delete(table, id);
+    },
+
+    async select(table, filters) {
+        return this.db.select(table, filters);
+    },
+
+    /**
      * Load all user data from Supabase cloud
      * Called automatically on sign-in to sync data across devices
      */

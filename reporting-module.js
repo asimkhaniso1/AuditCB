@@ -286,9 +286,8 @@ function renderReportSummaryTab(report, tabContent) {
 // Helper for Persistent Update
 async function updateReportInDB(report, message) {
     try {
-        await window.SupabaseClient.update('audit_reports', {
-            id: report.id,
-            plan_id: report.planId,
+        await window.SupabaseClient.db.update('audit_reports', String(report.id), {
+            plan_id: String(report.planId),
             client_name: report.client,
             audit_date: report.date,
             status: report.status,

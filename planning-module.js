@@ -1320,8 +1320,7 @@ function openChecklistSelectionModal(planId) {
                     if (window.SupabaseClient) {
                         // Update just the selected checklists field if possible, or full plan
                         // But since plan structure is complex, we update the data blob and specific fields
-                        await window.SupabaseClient.update('audit_plans', {
-                            id: plan.id,
+                        await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
                             data: plan // Full plan has updated checklist IDs
                         });
                         window.showNotification('Checklists assigned and saved to database.', 'success');
@@ -1725,8 +1724,7 @@ function saveAuditPlan(shouldPrint = false) {
                 const clientId = clientObj ? String(clientObj.id) : null;
 
                 // Update existing plan
-                const { error } = await window.SupabaseClient.update('audit_plans', {
-                    id: String(window.editingPlanId),
+                const { error } = await window.SupabaseClient.db.update('audit_plans', String(window.editingPlanId), {
                     client_id: clientId, // Ensure client_id is saved
                     client_name: planData.client,
                     plan_date: planData.date,
@@ -1760,7 +1758,7 @@ function saveAuditPlan(shouldPrint = false) {
                     ...planData
                 };
 
-                const { error } = await window.SupabaseClient.insert('audit_plans', {
+                const { error } = await window.SupabaseClient.db.insert('audit_plans', {
                     id: newPlanId,
                     client_id: clientId, // Ensure client_id is saved
                     client_name: planData.client,

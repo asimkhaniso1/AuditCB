@@ -1375,9 +1375,8 @@ window.saveChecklist = function (reportId) {
     // Persist to Database (Async)
     (async () => {
         try {
-            await window.SupabaseClient.update('audit_reports', {
-                id: reportId,
-                plan_id: report.planId,
+            await window.SupabaseClient.db.update('audit_reports', String(reportId), {
+                plan_id: String(report.planId),
                 client_name: report.client,
                 audit_date: report.date,
                 status: report.status,

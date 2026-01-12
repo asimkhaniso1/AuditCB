@@ -179,7 +179,22 @@ window.saveAuditorForm = function (auditorId) {
     }
 
     // 5. Persist
-    window.saveData(); // Triggers sync
+    window.saveData(); // Save to LocalStorage
+
+    // Explicit Database Persistence (ensure real-time sync)
+    (async () => {
+        try {
+            if (isEdit) {
+                await window.SupabaseClient.db.update('auditors', String(auditorId), auditor);
+            } else {
+                await window.SupabaseClient.db.insert('auditors', auditor);
+            }
+            window.showNotification(isEdit ? 'Auditor updated in Cloud' : 'Auditor created in Cloud', 'success');
+        } catch (dbError) {
+            console.error('Auditor Cloud Sync Error:', dbError);
+            window.showNotification('Saved locally, but Cloud sync failed', 'warning');
+        }
+    })();
 
     window.showNotification(isEdit ? 'Auditor updated' : 'Auditor created', 'success');
     window.location.hash = '#auditors-list';

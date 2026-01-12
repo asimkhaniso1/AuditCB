@@ -819,23 +819,20 @@ function saveChecklistFromEditor(checklistId) {
     const persistChecklist = async (checklistData, isUpdate) => {
         try {
             if (isUpdate) {
-                await window.SupabaseClient.update('audit_checklists', {
-                    id: checklistData.id,
+                await window.SupabaseClient.db.update('checklists', checklistData.id, {
                     name: checklistData.name,
                     standard: checklistData.standard,
                     type: checklistData.type,
-                    // audit_type removed
                     audit_scope: checklistData.auditScope,
                     clauses: checklistData.clauses,
                     updated_at: new Date().toISOString()
                 });
             } else {
-                await window.SupabaseClient.insert('audit_checklists', {
+                await window.SupabaseClient.db.insert('checklists', {
                     id: checklistData.id,
                     name: checklistData.name,
                     standard: checklistData.standard,
                     type: checklistData.type,
-
                     audit_scope: checklistData.auditScope,
                     clauses: checklistData.clauses,
                     created_by: checklistData.createdBy,
@@ -1081,7 +1078,7 @@ function deleteChecklist(id) {
         (async () => {
             try {
                 if (window.SupabaseClient) {
-                    await window.SupabaseClient.delete('audit_checklists', id);
+                    await window.SupabaseClient.db.delete('checklists', id);
                     window.showNotification('Checklist deleted from Database', 'success');
                 }
             } catch (dbError) {
