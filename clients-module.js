@@ -245,7 +245,7 @@ window.changeClientItemsPerPage = function (val) {
 };
 
 function renderClientDetail(clientId, options = {}) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     // Options: showAccountSetup (default: true), showAnalytics (default: true)
@@ -343,7 +343,7 @@ function renderClientDetail(clientId, options = {}) {
 }
 
 window.switchClientDetailTab = function (clientId, tabName) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -3865,12 +3865,14 @@ getClientOrgSetupHTML.renderWizardStep = function (client, step) {
 
 window.setSetupWizardStep = function (clientId, step) {
     if (step < 1 || step > 7) return;
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client) {
         client._wizardStep = step;
         const tabContent = document.getElementById('tab-content');
         if (tabContent) {
             tabContent.innerHTML = getClientOrgSetupHTML(client);
+            // Re-initialize any components if needed
+            window.saveData(); // Save step progress
         }
     }
 };
@@ -4392,7 +4394,7 @@ window.importClientsFromExcel = function (file) {
 // ============================================
 
 window.openImportAccountSetupModal = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal(
@@ -4520,7 +4522,7 @@ window.processAccountSetupImport = function (clientId, input) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const client = window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
 
             if (!client) throw new Error("Client not found");
 
@@ -4680,7 +4682,7 @@ window.handleClientLogoUpload = function (input, clientId) {
 
     const reader = new FileReader();
     reader.onload = function (e) {
-        const client = window.state.clients.find(c => c.id === clientId);
+        const client = window.state.clients.find(c => String(c.id) === String(clientId));
         if (client) {
             client.logoUrl = e.target.result;
             window.saveData();
@@ -4697,7 +4699,7 @@ window.handleClientLogoUpload = function (input, clientId) {
 };
 
 function updateClientWorkspaceHeader(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     const logoContainer = document.getElementById('cb-logo-display');
@@ -4717,7 +4719,7 @@ window.updateClientWorkspaceHeader = updateClientWorkspaceHeader;
 
 // Open modal to assign an auditor to this client
 window.openClientAuditorAssignmentModal = function (clientId, clientName) {
-    const client = window.state.clients.find(c => c.id == clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     const auditors = window.state.auditors || [];
     const assignments = window.state.auditorAssignments || [];
 
@@ -4779,7 +4781,7 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
             document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
         }, 100);
 
-        const auditor = auditors.find(a => a.id == auditorId);
+        const auditor = auditors.find(a => String(a.id) === String(auditorId));
         window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
     };
 
@@ -4795,8 +4797,8 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
         typeA: typeof auditorId
     });
 
-    const client = window.state.clients.find(c => c.id == clientId);
-    const auditor = window.state.auditors.find(a => a.id == auditorId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
 
     if (!client || !auditor) {
         console.error('[removeClientAuditorAssignment] Client or Auditor not found');
@@ -4944,7 +4946,7 @@ window.deleteClient = function (clientId) {
 };
 
 window.archiveClient = function (clientId) {
-    const client = window.state.clients.find(c => c.id == clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     if (!confirm(`Are you sure you want to archive client '${client.name}'? The client will be hidden from active lists but data is preserved.`)) {

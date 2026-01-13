@@ -2740,7 +2740,7 @@ window.clearAuditorUpcomingFilters = function (auditorId) {
 // ============================================
 
 window.openAuditorUploadModal = function (auditorId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
+    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -2863,7 +2863,7 @@ window.openAuditorUploadModal = function (auditorId) {
 };
 
 window.deleteAuditorDocument = function (auditorId, docId) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
+    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor || !auditor.documents) return;
 
     if (confirm('Are you sure you want to delete this document?')) {
@@ -2884,7 +2884,7 @@ window.deleteAuditorDocument = function (auditorId, docId) {
 
 // Add Witness Audit Record
 window.addWitnessAudit = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Record Witness Audit';
@@ -2969,7 +2969,7 @@ window.addWitnessAudit = function (auditorId) {
 
 // Add Performance Review
 window.addPerformanceReview = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Add Performance Review';
@@ -3050,7 +3050,7 @@ window.addPerformanceReview = function (auditorId) {
 
 // Add Training Record
 window.openAddTrainingModal = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Add Training Record';
@@ -3137,7 +3137,7 @@ window.openAddTrainingModal = function (auditorId) {
 
 // Add Qualification
 window.openAddQualificationModal = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Add Qualification / Academic Degree';
@@ -3316,7 +3316,7 @@ window.openAddQualificationModal = function (auditorId) {
 
 // Add Witness Audit Record
 window.addWitnessAudit = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Record Witness Audit';
@@ -3412,7 +3412,7 @@ window.addWitnessAudit = function (auditorId) {
 
 // Add Performance Review
 window.addPerformanceReview = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Add Performance Review';
@@ -3490,7 +3490,7 @@ window.addPerformanceReview = function (auditorId) {
 
 // Add Report Review (Office-based)
 window.addReportReview = function (auditorId) {
-    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
     document.getElementById('modal-title').textContent = 'Add Report Review';
@@ -3764,7 +3764,7 @@ function renderMultiSiteSamplingCalculator() {
 window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
 
 window.deleteAuditorDocument = async function (auditorId, docIdx) {
-    const auditor = state.auditors.find(a => a.id === auditorId);
+    const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor || !auditor.documents || !auditor.documents[docIdx]) return;
 
     if (!confirm('Are you sure you want to delete this document?')) return;
