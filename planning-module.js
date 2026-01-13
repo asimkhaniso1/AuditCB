@@ -869,63 +869,82 @@ function viewAuditPlan(id) {
             <!-- Stepper -->
             ${stepperHTML}
             
-            <!-- Details Grid (Row 1) -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+            <!-- UNIFIED DETAILS GRID (New Layout) -->
+            <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; margin-bottom: 2rem;">
                 
-                <!-- Client Info -->
+                <!-- 1. Client Context Card -->
                 <div class="card" style="margin: 0;">
-                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Client Information</h4>
-                    <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">${client?.name}</div>
-                    <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                        <div><i class="fa-solid fa-industry" style="width: 20px;"></i> ${client?.industry || 'N/A'}</div>
-                        <div style="margin-top: 0.25rem;"><i class="fa-solid fa-users" style="width: 20px;"></i> ${client?.employees || 0} employees</div>
+                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">
+                        <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i> Client Context
+                    </h4>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 1.25rem; color: #1e293b; margin-bottom: 0.25rem;">${client?.name}</div>
+                            <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                                <i class="fa-solid fa-industry" style="margin-right: 0.5rem; width: 16px;"></i> ${client?.industry || 'N/A'} 
+                                <span style="margin: 0 0.5rem;">•</span>
+                                <i class="fa-solid fa-users" style="margin-right: 0.5rem; width: 16px;"></i> ${client?.employees || 0} Employees
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <!-- Goods & Services -->
+                        <div>
+                            <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Goods & Services</div>
+                            ${(client?.goodsServices && client.goodsServices.length > 0) ? `
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                                    ${client.goodsServices.map(g => `<span class="badge" style="background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;">${g.name}</span>`).join('')}
+                                </div>
+                            ` : `<p style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">Not defined</p>`}
+                        </div>
+                        
+                        <!-- Key Processes -->
+                        <div>
+                            <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Key Processes</div>
+                            ${(client?.keyProcesses && client.keyProcesses.length > 0) ? `
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                                    ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#f0fdf4' : '#f0f9ff'}; color: ${p.category === 'Core' ? '#166534' : '#075985'}; border: 1px solid ${p.category === 'Core' ? '#bbf7d0' : '#bae6fd'};">${p.name}</span>`).join('')}
+                                </div>
+                            ` : `<p style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">Not defined</p>`}
+                        </div>
                     </div>
                 </div>
 
-                <!-- Scope/Sites -->
-                <div class="card" style="margin: 0;">
-                   <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Audit Scope</h4>
-                   <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">${plan.selectedSites?.length || 1} Site(s)</div>
-                   <div style="font-size: 0.9rem; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
-                        ${(plan.selectedSites || []).map(s => `<div>• ${s.name}</div>`).join('') || 'All Sites'}
-                   </div>
-                </div>
-            </div>
-
-            <!-- Client Context Row (from Org Setup) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-                <div class="card" style="margin: 0;">
-                    <h4 style="margin-top: 0; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-boxes-stacked" style="color: #f59e0b;"></i> Goods & Services
+                <!-- 2. Audit Configuration Card -->
+                <div class="card" style="margin: 0; background: #f8fafc; border: 1px solid #e2e8f0;">
+                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.5rem;">
+                        <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem;"></i> Audit Configuration
                     </h4>
-                    ${(client?.goodsServices && client.goodsServices.length > 0) ? `
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            ${client.goodsServices.map(g => `<span class="badge" style="background: #fef3c7; color: #92400e;">${g.name}</span>`).join('')}
-                        </div>
-                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
-                </div>
-                <div class="card" style="margin: 0;">
-                    <h4 style="margin-top: 0; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-diagram-project" style="color: #06b6d4;"></i> Key Processes
-                    </h4>
-                    ${(client?.keyProcesses && client.keyProcesses.length > 0) ? `
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${p.category === 'Core' ? '#065f46' : '#0369a1'};">${p.name}</span>`).join('')}
-                        </div>
-                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
-                </div>
-            </div>
 
-            <!-- Details Grid (Row 2) - Schedule & Checklists -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Standard & Type -->
+                    <div style="margin-bottom: 1.25rem;">
+                         <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <span class="badge" style="background: var(--primary-color); color: white; padding: 4px 8px;">${plan.standard}</span>
+                            <span class="badge" style="background: #e2e8f0; color: #475569;">${plan.type || 'Stage 1'}</span>
+                         </div>
+                    </div>
 
-                <!-- Team -->
-                <div class="card" style="margin: 0;">
-                    <h4 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;">Audit Team</h4>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(m => `
-                             <span style="background: #f1f5f9; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem;">${m}</span>
-                        `).join('')}
+                    <!-- Scope / Sites -->
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Scope & Sites</div>
+                        <div style="background: white; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+                             ${(plan.selectedSites || []).map(s => `<div style="font-size: 0.9rem; color: #334155; margin-bottom: 0.25rem;"><i class="fa-solid fa-map-pin" style="color: var(--danger-color); margin-right: 0.5rem;"></i>${s.name}</div>`).join('') || '<div style="font-size: 0.9rem;">All Sites</div>'}
+                        </div>
+                    </div>
+
+                    <!-- Audit Team -->
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Audit Team</div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map((m, idx) => `
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; background: white; padding: 4px 10px; border-radius: 20px; border: 1px solid #e2e8f0; font-size: 0.85rem;">
+                                        <div style="width: 20px; height: 20px; background: ${idx === 0 ? '#3b82f6' : '#94a3b8'}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem;">${m.charAt(0)}</div>
+                                        ${m} ${idx === 0 ? '<i class="fa-solid fa-star" style="color: #fbbf24; font-size: 0.7rem; margin-left: 2px;" title="Lead Auditor"></i>' : ''}
+                                    </div>
+                            `).join('')}
+                        </div>
                     </div>
                 </div>
             </div>

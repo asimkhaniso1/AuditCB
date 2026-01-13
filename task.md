@@ -50,3 +50,4 @@
 - [x] Fix Start Audit Button (Loose equality for plan ID lookup)
 - [x] Fix Save Plan Error (Removed invalid select argument)
 - [x] Fix Save Progress Error (Created schema script for audit_reports)
+- [x] Implement Audit Image Persistence (Direct upload to Supabase Storage)
