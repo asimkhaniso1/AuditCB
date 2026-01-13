@@ -21,7 +21,8 @@ const SupabaseConfig = {
 
         // Try localStorage (manual configuration)
         const stored = localStorage.getItem('supabase_url');
-        if (stored) {
+        // CRITICAL FIX: Only accept valid Supabase Cloud URLs
+        if (stored && stored.includes('supabase.co')) {
             return stored;
         }
 

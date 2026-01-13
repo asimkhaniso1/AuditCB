@@ -38,3 +38,7 @@
     
 ### Cleanup & Optimization
 - [x] Run CLEANUP_CLIENT_DUPLICATES.sql to remove duplicate columns
+    
+### Urgent Fixes
+- [x] Fix Supabase Connection Config (ignore invalid localStorage)
+- [/] Apply RLS Security Fix (Manual Step Required)
