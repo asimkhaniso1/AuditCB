@@ -1704,6 +1704,11 @@ window.saveNewClient = function () {
     // 6. Save
     window.state.clients.push(newClient);
     window.saveData();
+
+    // Sync to Supabase
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.upsertClient(newClient).catch(err => console.error('Supabase sync failed:', err));
+    }
     window.showNotification('Client created! Redirecting to Workspace...', 'success');
 
     // Redirect to Client Workspace Settings
@@ -2061,6 +2066,11 @@ window.saveAuditClient = function (clientId) {
 
     // 6. Save data
     window.saveData();
+
+    // Sync to Supabase
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+    }
     window.showNotification('Client details updated successfully', 'success');
 
     // Clean up
@@ -2124,6 +2134,11 @@ function addContactPerson(clientId) {
             if (!client.contacts) client.contacts = [];
             client.contacts.push({ name, designation, phone, email });
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             renderClientDetail(clientId);
             window.showNotification('Contact added successfully');
@@ -2219,6 +2234,11 @@ function addSite(clientId) {
             const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
             client.sites.push({ name, address, city, country, geotag, employees, shift, standards });
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             renderClientDetail(clientId);
             window.showNotification('Site added successfully');
@@ -2427,6 +2447,11 @@ window.editSite = function (clientId, siteIndex) {
             const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
             client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift, standards };
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             renderClientDetail(clientId);
             window.showNotification('Site updated successfully');
@@ -2445,6 +2470,11 @@ window.deleteSite = function (clientId, siteIndex) {
     if (confirm('Are you sure you want to delete this site?')) {
         client.sites.splice(siteIndex, 1);
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
         renderClientDetail(clientId);
         window.showNotification('Site deleted');
     }
@@ -2494,6 +2524,11 @@ window.editContact = function (clientId, contactIndex) {
         if (name) {
             client.contacts[contactIndex] = { ...contact, name, designation, phone, email };
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             renderClientDetail(clientId);
             window.showNotification('Contact updated successfully');
@@ -2511,6 +2546,11 @@ window.deleteContact = function (clientId, contactIndex) {
     if (confirm('Are you sure you want to delete this contact?')) {
         client.contacts.splice(contactIndex, 1);
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
         renderClientDetail(clientId);
         window.showNotification('Contact deleted');
     }
@@ -2589,6 +2629,11 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
             }
 
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             window.setSetupWizardStep(clientId, 5);
 
@@ -2656,6 +2701,11 @@ function addDepartment(clientId) {
             client.departments.push(department);
 
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             renderClientDetail(clientId);
             renderClientTab(client, 'departments');
@@ -2697,6 +2747,11 @@ function editDepartment(clientId, deptIndex) {
             };
 
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             renderClientDetail(clientId);
             renderClientTab(client, 'departments');
@@ -2714,6 +2769,11 @@ function deleteDepartment(clientId, deptIndex) {
     if (confirm(`Are you sure you want to delete the department "${dept.name}" ? `)) {
         client.departments.splice(deptIndex, 1);
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
         renderClientDetail(clientId);
         renderClientTab(client, 'departments');
         window.showNotification('Department deleted successfully');
@@ -2792,6 +2852,11 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
             }
 
             window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             window.setSetupWizardStep(clientId, 3);
 

@@ -925,6 +925,46 @@ const SupabaseClient = {
     },
 
     /**
+     * Upsert a single client to Supabase
+     * Handles both Insert (New) and Update (Edit/Add Site/etc)
+     */
+    async upsertClient(client) {
+        if (!this.isInitialized) return;
+
+        try {
+            const clientData = {
+                id: client.id,
+                name: client.name,
+                standard: client.standard,
+                status: client.status,
+                type: client.type,
+                website: client.website || null,
+                employees: client.employees || 0,
+                shifts: client.shifts || 'No',
+                industry: client.industry || null,
+                contacts: client.contacts || [],
+                sites: client.sites || [],
+                // Derived fields if not present
+                contact_person: client.contactPerson || (client.contacts?.[0]?.name) || null,
+                next_audit: client.nextAudit || null,
+                last_audit: client.lastAudit || null,
+                updated_at: new Date().toISOString()
+            };
+
+            const { data, error } = await this.client
+                .from('clients')
+                .upsert(clientData, { onConflict: 'id' })
+                .select();
+
+            if (error) throw error;
+            Logger.info('Client saved to Supabase:', client.name);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to save client:', error);
+        }
+    },
+
+    /**
      * Sync clients to Supabase
      */
     async syncClientsToSupabase(clients) {
