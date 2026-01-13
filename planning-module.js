@@ -1914,8 +1914,8 @@ window.viewAuditPlan = viewAuditPlan;
 
 // Navigation Helpers (Integrated Lifecycle)
 window.navigateToAuditExecution = function (planId) {
-    let report = window.state.auditReports.find(r => r.planId === planId);
-    const plan = window.state.auditPlans.find(p => p.id === planId);
+    let report = window.state.auditReports.find(r => r.planId == planId);
+    const plan = window.state.auditPlans.find(p => p.id == planId);
 
     if (!plan) {
         window.showNotification('Plan not found', 'error');
@@ -1959,7 +1959,7 @@ window.navigateToAuditExecution = function (planId) {
 };
 
 window.navigateToReporting = function (planId) {
-    const report = window.state.auditReports.find(r => r.planId === planId);
+    const report = window.state.auditReports.find(r => r.planId == planId);
     if (!report) {
         window.showNotification('No report data found. Please complete execution first.', 'warning');
         return;
