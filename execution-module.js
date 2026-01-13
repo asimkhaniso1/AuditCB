@@ -1970,18 +1970,27 @@ window.handleEvidenceUpload = function (uniqueId, input) {
                 // 2. Upload to Supabase (if online)
                 if (window.navigator.onLine && window.SupabaseClient) {
                     try {
-                        // Convert DataURL to Blob
-                        const res = await fetch(compressedDataUrl);
-                        const blob = await res.blob();
-                        const uploadFile = new File([blob], file.name, { type: file.type });
+                        // Check if Supabase is initialized
+                        if (!window.SupabaseClient.isInitialized) {
+                            console.warn('Supabase not initialized - image saved locally only');
+                        } else {
+                            // Convert DataURL to Blob
+                            const res = await fetch(compressedDataUrl);
+                            const blob = await res.blob();
+                            const uploadFile = new File([blob], file.name, { type: file.type });
 
-                        const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
-                        if (result && result.url) {
-                            finalUrl = result.url;
-                            isCloud = true;
+                            const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
+                            if (result && result.url) {
+                                finalUrl = result.url;
+                                isCloud = true;
+                                console.log('Image uploaded to cloud:', result.path);
+                            } else {
+                                console.warn('Upload returned no URL - check if audit-images bucket exists');
+                            }
                         }
                     } catch (uploadErr) {
-                        console.warn('Image upload failed, falling back to local base64', uploadErr);
+                        console.error('Image upload failed:', uploadErr);
+                        console.warn('Falling back to local base64 storage');
                     }
                 }
 
