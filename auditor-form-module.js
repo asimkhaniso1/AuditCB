@@ -190,7 +190,7 @@ window.saveAuditorForm = function (auditorId) {
                 name: auditor.name,
                 email: auditor.email,
                 role: auditor.role,
-                standards: Array.isArray(auditor.standards) ? JSON.stringify(auditor.standards) : auditor.standards,
+                standards: auditor.standards, // Pass array directly for text[] column
                 data: auditor // Store full object in data column
             };
 
