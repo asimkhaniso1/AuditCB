@@ -44,3 +44,6 @@
 - [x] Apply RLS Security Fix (Included in schema scripts)
 - [x] Fix Client Save Issue (Added explicit Supabase sync)
 - [x] Fix Auditor Save Issue (Schema update & array literal fix)
+- [x] Fix Plan Save Redirect (Stay on plan view)
+- [x] Fix AI Model Error (Updated to gemini-pro)
+- [x] Fix Checklist Config Button (Added to plan view)

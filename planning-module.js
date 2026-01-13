@@ -452,7 +452,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 }
 
 function editAuditPlan(id) {
-    const plan = state.auditPlans.find(p => p.id === id);
+    const plan = state.auditPlans.find(p => p.id == id);
     if (!plan) return;
 
     renderCreateAuditPlanForm();
@@ -1192,7 +1192,7 @@ window.closeAuditPlan = function (planId) {
 
 // Checklist Selection Modal for Audit Plan
 function openChecklistSelectionModal(planId) {
-    const plan = state.auditPlans.find(p => p.id === planId);
+    const plan = state.auditPlans.find(p => p.id == planId);
     if (!plan) return;
 
     const checklists = state.checklists || [];
