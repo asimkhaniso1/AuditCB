@@ -1159,16 +1159,29 @@ function renderAuditorTab(auditor, tabName) {
                     <h3 style="margin-bottom: 1rem;">Documents & Attachments</h3>
                     ${(auditor.documents && auditor.documents.length > 0) ? `
                         <div style="display: grid; gap: 0.5rem;">
-                            ${auditor.documents.map(d => `
+                            ${auditor.documents.map((d, idx) => `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-color);">
                                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                                         <i class="fa-solid fa-file-${d.type === 'pdf' ? 'pdf' : d.type === 'image' ? 'image' : 'alt'}" style="font-size: 1.5rem; color: ${d.type === 'pdf' ? 'var(--danger-color)' : 'var(--primary-color)'};"></i>
                                         <div>
                                             <p style="font-weight: 500; margin: 0;">${d.name}</p>
-                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Uploaded: ${d.date}</p>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Uploaded: ${d.date} • ${d.size || '-'}</p>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-download"></i></button>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        ${d.cloudUrl ? `
+                                            <button class="btn btn-sm btn-outline-primary" onclick="window.open('${d.cloudUrl}', '_blank')" title="View/Download">
+                                                <i class="fa-solid fa-download"></i>
+                                            </button>
+                                        ` : `
+                                            <button class="btn btn-sm btn-outline-secondary" disabled title="No cloud file">
+                                                <i class="fa-solid fa-download"></i>
+                                            </button>
+                                        `}
+                                        <button class="btn btn-sm btn-outline-danger" onclick="window.deleteAuditorDocument(${auditor.id}, ${idx})" title="Delete">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1176,6 +1189,9 @@ function renderAuditorTab(auditor, tabName) {
                     <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openAuditorUploadModal(${auditor.id})">
                         <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                     </button>
+                    <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        <i class="fa-solid fa-info-circle"></i> ISO 17021-1 Requirement: Maintain records of auditor qualifications, including CVs and certificates.
+                    </p>
                 </div>
             `;
             break;
@@ -2533,7 +2549,7 @@ function openAddTrainingModal(auditorId) {
 
     modalTitle.textContent = 'Add Training Record';
     modalBody.innerHTML = `
-        < form id = "training-form" >
+        <form id="training-form">
             <div class="form-group">
                 <label>Course Name <span style="color: var(--danger-color);">*</span></label>
                 <input type="text" class="form-control" id="training-course" placeholder="e.g. ISO 9001 Lead Auditor" required>
@@ -2547,27 +2563,91 @@ function openAddTrainingModal(auditorId) {
                 <input type="date" class="form-control" id="training-date">
             </div>
             <div class="form-group">
+                <label>CPD Hours</label>
+                <input type="number" class="form-control" id="training-cpd" placeholder="e.g. 16" min="0">
+            </div>
+            <div class="form-group">
                 <label>Certificate Number</label>
                 <input type="text" class="form-control" id="training-certificate" placeholder="e.g. IRCA-12345">
             </div>
-        </form >
+            <div class="form-group">
+                <label>Upload Certificate (PDF/Image)</label>
+                <input type="file" class="form-control" id="training-file" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+        </form>
         `;
 
     window.openModal();
 
-    modalSave.onclick = () => {
+    modalSave.onclick = async () => {
         const course = document.getElementById('training-course').value;
         const provider = document.getElementById('training-provider').value;
         const date = document.getElementById('training-date').value;
+        const cpdHours = parseInt(document.getElementById('training-cpd').value) || 0;
         const certificate = document.getElementById('training-certificate').value;
+        const fileInput = document.getElementById('training-file');
+        const file = fileInput.files[0];
 
         if (course) {
+            modalSave.disabled = true;
+            modalSave.textContent = 'Saving...';
+
+            let cloudUrl = null;
+            let cloudPath = null;
+
+            if (file && window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                try {
+                    const result = await window.SupabaseClient.storage.uploadGenericFile(
+                        file,
+                        'documents',
+                        `auditor-${auditorId}`,
+                        'training'
+                    );
+                    if (result) {
+                        cloudUrl = result.url;
+                        cloudPath = result.path;
+                    }
+                } catch (err) {
+                    console.error('Training file upload failed:', err);
+                }
+            }
+
             if (!auditor.trainings) auditor.trainings = [];
-            auditor.trainings.push({ course, provider, date, certificate });
+
+            const trainingRecord = {
+                course,
+                provider,
+                date,
+                cpdHours,
+                certificate,
+                cloudUrl,
+                cloudPath,
+                fileName: file ? file.name : null
+            };
+
+            auditor.trainings.push(trainingRecord);
+
             window.saveData();
+
+            // Sync to DB
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                try {
+                    await window.SupabaseClient.db.update('auditors', String(auditorId), {
+                        data: auditor
+                    });
+                } catch (dbErr) {
+                    console.error('Failed to sync auditor training to DB:', dbErr);
+                }
+            }
+
             window.closeModal();
             renderAuditorDetail(auditorId);
-            window.showNotification('Training record added successfully');
+            setTimeout(() => {
+                const btn = document.querySelector('.tab-btn[data-tab="qualifications"]');
+                if (btn) btn.click();
+            }, 100);
+
+            window.showNotification('Training record added successfully', 'success');
         } else {
             window.showNotification('Course name is required', 'error');
         }
@@ -2687,7 +2767,6 @@ window.openAuditorUploadModal = function (auditorId) {
                 <div style="border: 2px dashed var(--border-color); padding: 1.5rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
                     <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 0.5rem;"></i>
                     <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">Click to browse files</p>
-                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #94a3b8;">(Simulated upload)</p>
                 </div>
                 <!-- Hidden file input for visual completeness -->
                 <input type="file" id="doc-file" style="display: none;" onchange="if(this.files[0]) { 
@@ -2705,16 +2784,37 @@ window.openAuditorUploadModal = function (auditorId) {
 
     window.openModal();
 
-    modalSave.onclick = () => {
+    modalSave.onclick = async () => {
         const name = document.getElementById('doc-name').value;
         const type = document.getElementById('doc-type').value;
         const fileInput = document.getElementById('doc-file');
+        const file = fileInput.files[0];
 
-        if (name) {
-            // Final validation before save
-            if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
-                alert('File is too large! Max limit is 5MB.');
-                return;
+        if (name && file) {
+            // Processing state
+            modalSave.disabled = true;
+            modalSave.textContent = 'Uploading...';
+
+            let cloudUrl = null;
+            let cloudPath = null;
+
+            // Upload to Supabase if available
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                try {
+                    const result = await window.SupabaseClient.storage.uploadGenericFile(
+                        file,
+                        'documents',
+                        `auditor-${auditorId}`,
+                        'auditor_doc'
+                    );
+
+                    if (result && result.url) {
+                        cloudUrl = result.url;
+                        cloudPath = result.path;
+                    }
+                } catch (uploadErr) {
+                    console.error('Auditor doc upload failed:', uploadErr);
+                }
             }
 
             if (!auditor.documents) auditor.documents = [];
@@ -2724,26 +2824,40 @@ window.openAuditorUploadModal = function (auditorId) {
                 name: name,
                 type: type,
                 date: new Date().toISOString().split('T')[0],
-                size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+                size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+                cloudUrl: cloudUrl,
+                cloudPath: cloudPath,
+                fileName: file.name
             };
 
             auditor.documents.push(newDoc);
 
-            // Note: Since 'state' is global, we just need to re-render.
-            // If there's a specific saveData function (mock), call it.
-            if (window.saveData) window.saveData();
+            // Persist to state and DB
+            window.saveData();
+
+            // Sync auditor object to Supabase
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                try {
+                    await window.SupabaseClient.db.update('auditors', String(auditorId), {
+                        data: auditor
+                    });
+                } catch (dbErr) {
+                    console.error('Failed to sync auditor documents to DB:', dbErr);
+                }
+            }
 
             window.closeModal();
             renderAuditorDetail(auditorId); // Refresh view
-            // Force switch back to documents tab
+
+            // Switch to documents tab
             setTimeout(() => {
                 const btn = document.querySelector('.tab-btn[data-tab="documents"]');
                 if (btn) btn.click();
             }, 100);
 
-            if (window.showNotification) window.showNotification('Document uploaded successfully');
+            if (window.showNotification) window.showNotification('Document uploaded successfully', 'success');
         } else {
-            alert('Please enter a document name');
+            alert('Please enter a document name and select a file');
         }
     };
 };
@@ -3097,30 +3211,58 @@ window.openAddQualificationModal = function (auditorId) {
                                                                                                                     <label>Issue Date</label>
                                                                                                                     <input type="date" id="qual-issue-date" class="form-control" value="${new Date().toISOString().split('T')[0]}">
                                                                                                                 </div>
-                                                                                                                <div class="form-group">
-                                                                                                                    <label>Expiry Date <small>(leave blank if no expiry)</small></label>
-                                                                                                                    <input type="date" id="qual-expiry-date" class="form-control" value="${new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
-                                                                                                                </div>
-                                                                                                            </div>
-                                                                                                            <div style="padding: 0.75rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
-                                                                                                                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
-                                                                                                                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
-                                                                                                                    ISO qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
-                                                                                                                </p>
-                                                                                                            </div>
-                                                                                                        </form>
-                                                                                                        `;
+                                                <div class="form-group">
+                    <label>Expiry Date <small>(leave blank if no expiry)</small></label>
+                    <input type="date" id="qual-expiry-date" class="form-control" value="${new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Upload Certificate (PDF/Image)</label>
+                    <input type="file" class="form-control" id="qual-file" accept=".pdf,.jpg,.jpeg,.png">
+                </div>
+            </div>
+            <div style="padding: 0.75rem; background: #eff6ff; border-radius: 6px; margin-top: 1rem;">
+                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    ISO qualifications require witness audit verification per ISO 17021-1 Clause 7.2.12
+                </p>
+            </div>
+        </form>
+        `;
 
-    document.getElementById('modal-save').onclick = function () {
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.onclick = async function () {
         const standard = document.getElementById('qual-standard').value;
+        const fileInput = document.getElementById('qual-file');
+        const file = fileInput.files[0];
+
+        if (!standard) {
+            window.showNotification('Standard / Degree is required', 'error');
+            return;
+        }
 
         if (!auditor.qualifications) auditor.qualifications = [];
 
-        // Check if standard already exists
-        const exists = auditor.qualifications.some(q => q.standard === standard);
-        if (exists) {
-            if (!confirm('This auditor already has a qualification for ' + standard + '. Add anyway?')) {
-                return;
+        // Loading state
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        let cloudUrl = null;
+        let cloudPath = null;
+
+        if (file && window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                const result = await window.SupabaseClient.storage.uploadGenericFile(
+                    file,
+                    'documents',
+                    `auditor-${auditorId}`,
+                    'qualification'
+                );
+                if (result) {
+                    cloudUrl = result.url;
+                    cloudPath = result.path;
+                }
+            } catch (err) {
+                console.error('Qualification file upload failed:', err);
             }
         }
 
@@ -3132,8 +3274,23 @@ window.openAddQualificationModal = function (auditorId) {
             issuingBody: document.getElementById('qual-issuing-body').value,
             fieldOfStudy: document.getElementById('qual-field').value,
             issueDate: document.getElementById('qual-issue-date').value,
-            expiryDate: document.getElementById('qual-expiry-date').value || null
+            expiryDate: document.getElementById('qual-expiry-date').value || null,
+            cloudUrl,
+            cloudPath,
+            fileName: file ? file.name : null
         });
+
+        window.saveData();
+
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                await window.SupabaseClient.db.update('auditors', String(auditorId), {
+                    data: auditor
+                });
+            } catch (dbErr) {
+                console.error('Failed to sync auditor qualification to DB:', dbErr);
+            }
+        }
 
         // Also add to standards array if not present
         if (!auditor.standards.includes(standard.split(':')[0])) {
@@ -3142,11 +3299,12 @@ window.openAddQualificationModal = function (auditorId) {
 
         window.saveData();
         window.closeModal();
-        window.showNotification('Qualification added successfully', 'success');
         renderAuditorDetail(auditorId);
         setTimeout(() => {
             document.querySelector('.tab-btn[data-tab="qualifications"]')?.click();
         }, 100);
+
+        window.showNotification('Qualification added successfully', 'success');
     };
 
     window.openModal();
@@ -3604,4 +3762,48 @@ function renderMultiSiteSamplingCalculator() {
 }
 // Export function to global scope
 window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
+
+window.deleteAuditorDocument = async function (auditorId, docIdx) {
+    const auditor = state.auditors.find(a => a.id === auditorId);
+    if (!auditor || !auditor.documents || !auditor.documents[docIdx]) return;
+
+    if (!confirm('Are you sure you want to delete this document?')) return;
+
+    const doc = auditor.documents[docIdx];
+
+    // Delete from Supabase Storage if path exists
+    if (doc.cloudPath && window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        try {
+            await window.SupabaseClient.storage.deleteFile('documents', doc.cloudPath);
+        } catch (err) {
+            console.error('Failed to delete file from storage:', err);
+        }
+    }
+
+    // Remove from array
+    auditor.documents.splice(docIdx, 1);
+
+    // Persist
+    window.saveData();
+
+    // Sync to DB
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        try {
+            await window.SupabaseClient.db.update('auditors', String(auditorId), {
+                data: auditor
+            });
+        } catch (dbErr) {
+            console.error('Failed to sync auditor documents after delete:', dbErr);
+        }
+    }
+
+    // Refresh view
+    renderAuditorDetail(auditorId);
+    setTimeout(() => {
+        const btn = document.querySelector('.tab-btn[data-tab="documents"]');
+        if (btn) btn.click();
+    }, 100);
+
+    if (window.showNotification) window.showNotification('Document deleted', 'info');
+};
 

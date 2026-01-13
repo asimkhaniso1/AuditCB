@@ -521,28 +521,30 @@ const SupabaseClient = {
         },
 
         /**
-         * Upload audit image
-         * @param {File} file - The image file
-         * @param {string} context - Context (e.g., 'client-logo', 'ncr-evidence', 'checklist')
-         * @param {string} entityId - Related entity ID
-         * @returns {object} { url, path } or null
+         * Upload generic file (PDF, Doc, Image)
+         * @param {File|Blob} file - The file to upload
+         * @param {string} bucket - Target bucket name
+         * @param {string} folder - Target folder/prefix
+         * @param {string} entityId - Related entity ID (optional)
+         * @returns {object} { url, path, fileName } or null
          */
-        uploadAuditImage: async function (file, context, entityId) {
+        uploadGenericFile: async function (file, bucket, folder, entityId = '') {
             if (!SupabaseClient.isInitialized) {
-                Logger.warn('Supabase not initialized, using base64 fallback');
+                Logger.warn('Supabase not initialized');
                 return null;
             }
 
             try {
                 // Generate unique filename
                 const timestamp = Date.now();
-                const ext = file.name.split('.').pop().toLowerCase();
-                const filename = `${context}_${entityId}_${timestamp}.${ext}`;
-                const path = `${context}/${filename}`;
+                const cleanFileName = file.name ? file.name.replace(/[^a-zA-Z0-9.-]/g, '_') : 'unnamed_file';
+                const prefix = entityId ? `${entityId}_` : '';
+                const filename = `${prefix}${timestamp}_${cleanFileName}`;
+                const path = folder ? `${folder}/${filename}` : filename;
 
-                // Upload to audit-images bucket
+                // Upload
                 const { data, error } = await SupabaseClient.client.storage
-                    .from('audit-images')
+                    .from(bucket)
                     .upload(path, file, {
                         cacheControl: '3600',
                         upsert: true
@@ -550,15 +552,27 @@ const SupabaseClient = {
 
                 if (error) throw error;
 
-                // Get signed URL for the image
-                const url = await this.getSignedUrl('audit-images', path);
+                // Get URL (use public if bucket is public, signed otherwise)
+                // For now, we'll try to get a signed URL by default for security
+                const url = await this.getSignedUrl(bucket, path);
 
-                Logger.info('Audit image uploaded:', path);
-                return { url, path };
+                Logger.info(`File uploaded to ${bucket}:`, path);
+                return { url, path, fileName: file.name || filename };
             } catch (error) {
-                Logger.error('Audit image upload failed:', error);
+                Logger.error('File upload failed:', error);
                 return null;
             }
+        },
+
+        /**
+         * Upload audit image
+         * @param {File} file - The image file
+         * @param {string} context - Context (e.g., 'client-logo', 'ncr-evidence', 'checklist')
+         * @param {string} entityId - Related entity ID
+         * @returns {object} { url, path } or null
+         */
+        uploadAuditImage: async function (file, context, entityId) {
+            return this.uploadGenericFile(file, 'audit-images', context, entityId);
         },
 
         /**

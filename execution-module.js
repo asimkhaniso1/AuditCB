@@ -777,7 +777,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             `;
 
-            // Setup event delegation for section checkboxes
+            // Setup event delegation for section checkboxes & bulk actions
             setTimeout(() => {
                 document.querySelectorAll('.section-checkbox').forEach(checkbox => {
                     checkbox.addEventListener('change', function (e) {
@@ -785,6 +785,41 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         const sectionId = this.getAttribute('data-section-id');
                         window.Logger.debug('Execution', 'Checkbox clicked for section:', sectionId);
                         window.toggleSectionSelection(sectionId, this);
+
+                        // Sync individual item checkboxes
+                        const section = document.getElementById(sectionId);
+                        if (section) {
+                            section.querySelectorAll('.item-checkbox').forEach(cb => {
+                                cb.checked = this.checked;
+                            });
+                        }
+                    });
+                });
+
+                // Item checkbox listener
+                document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', function () {
+                        const uniqueId = this.getAttribute('data-unique-id');
+                        const item = document.getElementById('row-' + uniqueId);
+                        if (this.checked) {
+                            item.classList.add('selected-item');
+                            item.style.background = '#eff6ff';
+                            item.style.borderLeft = '4px solid var(--primary-color)';
+                        } else {
+                            item.classList.remove('selected-item');
+                            item.style.background = '';
+                            item.style.borderLeft = '4px solid #e2e8f0';
+                        }
+                    });
+                });
+
+                // Setup bulk action button listeners
+                document.querySelectorAll('.bulk-action-btn').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        const action = this.getAttribute('data-action');
+                        const reportId = parseInt(this.getAttribute('data-report-id'));
+                        window.Logger.debug('Execution', 'Bulk action clicked:', { action, reportId });
+                        window.bulkUpdateStatus(reportId, action);
                     });
                 });
             }, 100);
@@ -1326,51 +1361,79 @@ window.saveChecklist = function (reportId) {
     // Show indicator immediately
     const indicator = document.getElementById('save-indicator');
     if (indicator) {
-        indicator.textContent = 'Saving to Database...';
+        indicator.textContent = 'Saving Changes...';
         indicator.style.display = 'block';
         indicator.style.background = '#3b82f6'; // Blue for loading
     }
 
+    const statusInputs = document.querySelectorAll('.status-input');
     const checklistData = [];
-    document.querySelectorAll('.status-input').forEach(input => {
-        const uniqueId = input.id.replace('status-', '');
 
-        const status = input.value;
-        const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
-        const ncrDesc = Sanitizer.sanitizeText(document.getElementById('ncr-desc-' + uniqueId)?.value || '');
-        const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
-        const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
+    // Only update checklistProgress if we are on a screen that has checklist inputs
+    if (statusInputs.length > 0) {
+        statusInputs.forEach(input => {
+            const uniqueId = input.id.replace('status-', '');
 
-        // Get evidence image data
-        const evidenceImg = document.getElementById('evidence-img-' + uniqueId);
-        const evidenceData = document.getElementById('evidence-data-' + uniqueId)?.value || '';
-        const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
-        const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
+            const status = input.value;
+            const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
+            const ncrDesc = Sanitizer.sanitizeText(document.getElementById('ncr-desc-' + uniqueId)?.value || '');
+            const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
+            const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
 
-        // Get designation and department
-        const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
-        const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
+            // Get evidence image data
+            const evidenceImg = document.getElementById('evidence-img-' + uniqueId);
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId)?.value || '';
+            const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
+            const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
 
-        // Only save if interacted with or explicitly ncr/ok
-        if (status || comment || ncrDesc || evidenceImage) {
-            checklistData.push({
-                checklistId: input.dataset.checklist,
-                itemIdx: input.dataset.item,
-                isCustom: input.dataset.custom === 'true',
-                status: status,
-                comment: comment,
-                ncrDescription: ncrDesc,
-                transcript: transcript,
-                ncrType: ncrType,
-                evidenceImage: evidenceImage,
-                evidenceSize: evidenceSize,
-                designation: designation,
-                department: department
-            });
-        }
-    });
+            // Get designation and department
+            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
+            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
 
-    report.checklistProgress = checklistData;
+            // Only save if interacted with
+            if (status || comment || ncrDesc || evidenceImage) {
+                checklistData.push({
+                    checklistId: input.dataset.checklist,
+                    itemIdx: input.dataset.item,
+                    isCustom: input.dataset.custom === 'true',
+                    status: status,
+                    comment: comment,
+                    ncrDescription: ncrDesc,
+                    transcript: transcript,
+                    ncrType: ncrType,
+                    evidenceImage: evidenceImage,
+                    evidenceSize: evidenceSize,
+                    designation: designation,
+                    department: department
+                });
+            }
+        });
+        report.checklistProgress = checklistData;
+    }
+
+    // Handle Review & Submit Tab classifications if present
+    const reviewSeverities = document.querySelectorAll('.review-severity');
+    if (reviewSeverities.length > 0) {
+        reviewSeverities.forEach(select => {
+            const findingId = select.dataset.findingId;
+            const newType = select.value;
+            const remarks = document.querySelector(`.review-remarks[data-finding-id="${findingId}"]`)?.value || '';
+
+            if (findingId.startsWith('checklist-')) {
+                const idx = parseInt(findingId.replace('checklist-', ''));
+                if (report.checklistProgress[idx]) {
+                    report.checklistProgress[idx].ncrType = newType;
+                    report.checklistProgress[idx].comment = remarks;
+                }
+            } else if (findingId.startsWith('ncr-')) {
+                const idx = parseInt(findingId.replace('ncr-', ''));
+                if (report.ncrs && report.ncrs[idx]) {
+                    report.ncrs[idx].type = newType;
+                    report.ncrs[idx].description = remarks;
+                }
+            }
+        });
+    }
 
     // Persist to Database (Async)
     (async () => {
@@ -1381,40 +1444,31 @@ window.saveChecklist = function (reportId) {
                 audit_date: report.date,
                 status: report.status,
                 findings_count: report.findings || 0,
-                checklist_data: checklistData, // Store JSON blob
-                data: report // Full report backup
+                checklist_data: report.checklistProgress,
+                data: report
             });
 
             // Success UI
             if (indicator) {
-                indicator.innerHTML = '<i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Saved to Database';
+                indicator.innerHTML = '<i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Changes Saved Successfully';
                 indicator.style.background = '#10b981'; // Green
                 setTimeout(() => {
                     indicator.style.display = 'none';
                 }, 2000);
             }
-            window.showNotification('Checklist progress saved to database', 'success');
+            window.showNotification('Audit progress saved to cloud', 'success');
 
         } catch (dbError) {
-            console.error('Database Save Failed:', dbError);
+            console.error('Database Sync Error:', dbError);
             if (indicator) {
-                indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Save Failed';
+                indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Sync Error';
                 indicator.style.background = '#ef4444'; // Red
             }
-            window.showNotification('Saved locally only. Database error: ' + dbError.message, 'warning');
+            window.showNotification('Saved locally only.', 'warning');
         }
     })();
 
-    window.saveData(); // Local storage backup
-
-    // Queue for offline sync (if needed later)
-    if (window.OfflineManager) {
-        window.OfflineManager.queueAction('SAVE_CHECKLIST', {
-            reportId: reportId,
-            client: report.client,
-            checklistProgress: checklistData
-        });
-    }
+    window.saveData();
 };
 
 // Filter checklist items by status
@@ -1511,44 +1565,29 @@ window.submitToLeadAuditor = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
-    // Save any pending changes from review screen
-    document.querySelectorAll('.review-severity').forEach(select => {
-        const findingId = select.dataset.findingId;
-        const newType = select.value;
+    // Use saveChecklist to gather all UI changes first
+    window.saveChecklist(reportId);
 
-        if (findingId.startsWith('checklist-')) {
-            const idx = parseInt(findingId.split('-')[1]);
-            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
-            if (ncItems[idx]) ncItems[idx].ncrType = newType;
-        } else if (findingId.startsWith('ncr-')) {
-            const idx = parseInt(findingId.split('-')[1]);
-            if (report.ncrs && report.ncrs[idx]) report.ncrs[idx].type = newType;
-        }
-    });
-
-    document.querySelectorAll('.review-remarks').forEach(input => {
-        const findingId = input.dataset.findingId;
-        const remarks = input.value;
-
-        if (findingId.startsWith('checklist-')) {
-            const idx = parseInt(findingId.split('-')[1]);
-            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
-            if (ncItems[idx]) ncItems[idx].remarks = remarks;
-        } else if (findingId.startsWith('ncr-')) {
-            const idx = parseInt(findingId.split('-')[1]);
-            if (report.ncrs && report.ncrs[idx]) report.ncrs[idx].remarks = remarks;
-        }
-    });
-
-    // Update report status to Pending Review
-    report.status = 'Pending Review';
+    // Update report status to In Review (as per CONSTANTS)
+    report.status = window.CONSTANTS.STATUS.IN_REVIEW;
     report.submittedAt = new Date().toISOString();
     report.submittedBy = window.state.currentUser?.name || 'Auditor';
 
-    window.saveData();
+    // Persist to Database
+    (async () => {
+        try {
+            await window.SupabaseClient.db.update('audit_reports', String(reportId), {
+                status: report.status,
+                data: report
+            });
+            window.showNotification('Findings submitted to Lead Auditor for review!', 'success');
+        } catch (err) {
+            console.error('Submission failed:', err);
+            window.showNotification('Submitted locally. Cloud sync pending.', 'warning');
+        }
+    })();
 
-    // Show confirmation
-    window.showNotification('Findings submitted to Lead Auditor for review!', 'success');
+    window.saveData();
 
     // Navigate back to execution list
     setTimeout(() => {
