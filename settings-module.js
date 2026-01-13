@@ -3303,6 +3303,7 @@ window.uploadKnowledgeDoc = function (type) {
         </form>
     `;
 
+
     const saveBtn = document.getElementById('modal-save');
     saveBtn.textContent = 'Upload';
     saveBtn.style.display = 'inline-block';
@@ -3331,6 +3332,35 @@ window.uploadKnowledgeDoc = function (type) {
             console.warn('Could not extract text:', err);
         }
 
+        // Upload file to Supabase Storage
+        let cloudUrl = null;
+        let cloudPath = null;
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                const timestamp = Date.now();
+                const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+                const ext = file.name.split('.').pop().toLowerCase();
+                const filename = `${type}/${sanitizedName}_${timestamp}.${ext}`;
+
+                const { data, error } = await window.SupabaseClient.client.storage
+                    .from('documents')
+                    .upload(filename, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Get public URL
+                cloudUrl = window.SupabaseClient.storage.getPublicUrl('documents', filename);
+                cloudPath = filename;
+                console.log('Document uploaded to cloud:', filename);
+            } catch (uploadErr) {
+                console.error('Failed to upload document to cloud:', uploadErr);
+                window.showNotification('File saved locally (cloud upload failed)', 'warning');
+            }
+        }
+
         const kb = window.state.knowledgeBase;
         const collection = type === 'standard' ? kb.standards : type === 'sop' ? kb.sops : type === 'policy' ? kb.policies : kb.marketing;
 
@@ -3343,6 +3373,8 @@ window.uploadKnowledgeDoc = function (type) {
             status: 'pending',
             fileSize: file.size,
             extractedText: extractedText, // Save content for AI
+            cloudUrl,  // Store cloud URL
+            cloudPath, // Store cloud path
             clauses: []
         };
 
@@ -3351,7 +3383,8 @@ window.uploadKnowledgeDoc = function (type) {
         window.closeModal();
 
         // Show upload notification
-        window.showNotification(`${typeLabel} uploaded. Click "Analyze" to index sections.`, 'info');
+        const statusMsg = cloudUrl ? '(uploaded to cloud)' : '(saved locally)';
+        window.showNotification(`${typeLabel} uploaded ${statusMsg}. Click "Analyze" to index sections.`, 'info');
 
         // Re-render the tab
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
