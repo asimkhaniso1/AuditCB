@@ -416,7 +416,7 @@ function openImportChecklistModal() {
 
     modalSave.textContent = 'Import Checklist';
     modalSave.style.display = 'inline-block';
-    modalSave.onclick = () => {
+    modalSave.onclick = async () => {
         const name = document.getElementById('import-checklist-name').value.trim();
         const standard = document.getElementById('import-checklist-standard').value;
         const type = document.getElementById('import-checklist-type').value;
@@ -433,6 +433,40 @@ function openImportChecklistModal() {
         }
 
         const file = fileInput.files[0];
+
+        // Show processing state
+        modalSave.textContent = 'Processing...';
+        modalSave.disabled = true;
+
+        // Upload file to Supabase Storage
+        let cloudUrl = null;
+        let cloudPath = null;
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                const timestamp = Date.now();
+                const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+                const filename = `${sanitizedName}_${timestamp}.csv`;
+                const path = `checklists/${filename}`;
+
+                const { data, error } = await window.SupabaseClient.client.storage
+                    .from('checklists')
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Get public URL
+                cloudUrl = window.SupabaseClient.storage.getPublicUrl('checklists', path);
+                cloudPath = path;
+                console.log('Checklist uploaded to cloud:', path);
+            } catch (uploadErr) {
+                console.error('Failed to upload checklist to cloud:', uploadErr);
+                window.showNotification('File uploaded locally (cloud upload failed)', 'warning');
+            }
+        }
+
         const reader = new FileReader();
         reader.onload = function (event) {
             const text = event.target.result;
@@ -458,6 +492,8 @@ function openImportChecklistModal() {
 
             if (rawRows.length === 0) {
                 window.showNotification('No valid items found in the CSV file', 'error');
+                modalSave.textContent = 'Import Checklist';
+                modalSave.disabled = false;
                 return;
             }
 
@@ -483,6 +519,9 @@ function openImportChecklistModal() {
                 standard,
                 type,
                 clauses,
+                cloudUrl,  // Store cloud URL
+                cloudPath, // Store cloud path for deletion
+                fileName: file.name,
                 createdBy: state.currentUser?.name || 'Current User',
                 createdAt: new Date().toISOString().split('T')[0],
                 updatedAt: new Date().toISOString().split('T')[0]
@@ -493,7 +532,9 @@ function openImportChecklistModal() {
             window.saveData();
             window.closeModal();
             renderChecklistLibrary();
-            window.showNotification(`Imported checklist "${name}" with ${rawRows.length} items`, 'success');
+
+            const statusMsg = cloudUrl ? 'uploaded to cloud' : 'saved locally';
+            window.showNotification(`Imported checklist "${name}" with ${rawRows.length} items (${statusMsg})`, 'success');
         };
         reader.readAsText(file);
     };
