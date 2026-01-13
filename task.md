@@ -47,3 +47,4 @@
 - [x] Fix Plan Save Redirect (Stay on plan view)
 - [x] Fix AI Model Error (Updated to gemini-pro)
 - [x] Fix Checklist Config Button (Added to plan view)
+- [x] Fix Start Audit Button (Loose equality for plan ID lookup)
