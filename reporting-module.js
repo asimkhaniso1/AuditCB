@@ -1857,5 +1857,7 @@ window.filterReports = function (query) {
     });
 };
 
-// Export
-window.renderReportingModule = renderReportingModule;
+// Export - Ensure it's available globally
+if (typeof window !== 'undefined') {
+    window.renderReportingModule = renderReportingModule;
+}

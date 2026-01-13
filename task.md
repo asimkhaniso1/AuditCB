@@ -51,3 +51,4 @@
 - [x] Fix Save Plan Error (Removed invalid select argument)
 - [x] Fix Save Progress Error (Created schema script for audit_reports)
 - [x] Implement Audit Image Persistence (Direct upload to Supabase Storage)
+- [x] Improve Audit Plan Detail Layout (Redesigned to 2-column grid)

@@ -38,12 +38,17 @@ function renderAuditPlanningEnhanced() {
             </td>
             <td><span class="status-badge status-${(plan.status || 'draft').toLowerCase()}">${window.UTILS.escapeHtml(plan.status)}</span></td>
             <td>
-                ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
-                    <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
-                </button>` : ''}
-                <button class="btn btn-sm" onclick="window.viewAuditPlan(${plan.id})" title="View Details">
-                    <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
+                        <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
+                    </button>` : ''}
+                    <button class="btn btn-sm" onclick="window.viewAuditPlan(${plan.id})" title="View Details">
+                        <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
+                    </button>
+                    ${isManager ? `<button class="btn btn-sm delete-plan-btn" data-plan-id="${plan.id}" title="Delete Plan">
+                        <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                    </button>` : ''}
+                </div>
             </td>
         </tr>
     `).join('');
@@ -176,6 +181,27 @@ function renderAuditPlanningEnhanced() {
             viewAuditPlan(planId);
         });
     });
+
+    document.querySelectorAll('.delete-plan-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const planId = parseInt(btn.getAttribute('data-plan-id'));
+            if (confirm('Are you sure you want to delete this audit plan? This action cannot be undone.')) {
+                deletePlan(planId);
+            }
+        });
+    });
+}
+
+// Delete Plan Function
+function deletePlan(planId) {
+    const index = window.state.auditPlans.findIndex(p => p.id == planId);
+    if (index !== -1) {
+        window.state.auditPlans.splice(index, 1);
+        window.saveData();
+        window.showNotification('Audit plan deleted successfully', 'success');
+        renderAuditPlanningEnhanced();
+    }
 }
 
 // Wizard State
