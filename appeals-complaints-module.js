@@ -70,8 +70,15 @@ window.fetchAppealsComplaints = async function () {
         }));
 
         // Refresh render if active
+        // Refresh render if active - partial update to avoid full re-render loop
         if (document.getElementById('ac-tab-content')) {
-            renderAppealsComplaintsModule();
+            const activeTab = window.state.appealsComplaintsTab || 'appeals';
+            const targetDiv = document.getElementById('ac-tab-content');
+            if (activeTab === 'appeals') {
+                targetDiv.innerHTML = renderAppealsTab(window.state.appeals);
+            } else {
+                targetDiv.innerHTML = renderComplaintsTab(window.state.complaints);
+            }
         }
 
     } catch (err) {
@@ -184,9 +191,12 @@ async function persistComplaint(complaint) {
 // --------------------------------------------
 
 function renderAppealsComplaintsModule() {
-    // Auto-fetch if empty
-    if ((!window.state.appeals.length && !window.state.complaints.length) && window.SupabaseClient) {
-        window.fetchAppealsComplaints();
+    if (!window._fetchedAC && !window._fetchingAC && window.SupabaseClient) {
+        window._fetchingAC = true;
+        window.fetchAppealsComplaints().finally(() => {
+            window._fetchingAC = false;
+            window._fetchedAC = true;
+        });
     }
 
     const state = window.state;

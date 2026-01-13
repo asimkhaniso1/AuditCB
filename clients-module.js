@@ -473,10 +473,15 @@ function getClientSitesHTML(client) {
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
-            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="addSite(${client.id})">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
-                </button>
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites(${client.id})">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.addSite(${client.id})">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
+                    </button>
+                </div>
                 ` : ''}
         </div>
         ${(client.sites && client.sites.length > 0) ? `
@@ -2150,7 +2155,7 @@ function addContactPerson(clientId) {
 
 // Add Site Modal
 function addSite(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -2241,6 +2246,7 @@ function addSite(clientId) {
             }
             window.closeModal();
             renderClientDetail(clientId);
+            window.setSetupWizardStep(clientId, 2); // Ensure they are on sites step
             window.showNotification('Site added successfully');
         } else {
             window.showNotification('Site name is required', 'error');
@@ -2250,7 +2256,7 @@ function addSite(clientId) {
 
 // Upload Document Modal
 window.openUploadDocumentModal = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -2339,7 +2345,7 @@ window.openUploadDocumentModal = function (clientId) {
 
 // Delete Document Helper
 window.deleteDocument = function (clientId, docId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.documents) return;
 
     if (confirm('Are you sure you want to delete this document?')) {
@@ -2363,7 +2369,7 @@ window.addSite = addSite;
 // Edit Site Modal
 window.editSite = function (clientId, siteIndex) {
     if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.sites || !client.sites[siteIndex]) return;
 
     const site = client.sites[siteIndex];
@@ -2464,7 +2470,7 @@ window.editSite = function (clientId, siteIndex) {
 // Delete Site
 window.deleteSite = function (clientId, siteIndex) {
     if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.sites) return;
 
     if (confirm('Are you sure you want to delete this site?')) {
@@ -2480,9 +2486,99 @@ window.deleteSite = function (clientId, siteIndex) {
     }
 };
 
+// Bulk Upload Sites
+window.bulkUploadSites = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+
+    window.openModal(
+        'Bulk Upload Sites',
+        `
+        <div style="margin-bottom: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-info-circle"></i> Paste site list in CSV format (one per line):
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace; background: #f8fafc; padding: 0.5rem; border-radius: 4px;">
+                Site Name, Address, City, Country, Employees, Shift(Yes/No)<br>
+                Main Factory, 123 Industrial Way, Mumbai, India, 150, Yes<br>
+                Regional Office, 45 Business Park, Delhi, India, 30, No
+            </p>
+        </div>
+        <form id="bulk-sites-form">
+            <div class="form-group">
+                <label>Site List (CSV Format)</label>
+                <textarea id="sites-bulk-data" rows="10" placeholder="Factory A, Address 1, City, Country, 100, Yes" style="font-family: monospace;"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+                    <input type="checkbox" id="sites-replace" style="width: auto;">
+                    Replace existing sites (otherwise, append to existing list)
+                </label>
+            </div>
+        </form>
+        `,
+        () => {
+            const bulkData = document.getElementById('sites-bulk-data').value.trim();
+            const replace = document.getElementById('sites-replace').checked;
+
+            if (!bulkData) {
+                window.showNotification('Please enter site data', 'error');
+                return;
+            }
+
+            const lines = bulkData.split('\n').filter(line => line.trim());
+            const newSites = [];
+            let errors = 0;
+
+            lines.forEach((line, index) => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 1 && parts[0]) {
+                    newSites.push({
+                        name: parts[0],
+                        address: parts[1] || '',
+                        city: parts[2] || '',
+                        country: parts[3] || '',
+                        employees: parseInt(parts[4]) || 0,
+                        shift: parts[5]?.toLowerCase() === 'yes' ? 'Yes' : 'No',
+                        standards: client.standard || ''
+                    });
+                } else {
+                    errors++;
+                }
+            });
+
+            if (newSites.length === 0) {
+                window.showNotification('No valid sites found in the data', 'error');
+                return;
+            }
+
+            if (replace) {
+                client.sites = newSites;
+            } else {
+                if (!client.sites) client.sites = [];
+                client.sites.push(...newSites);
+            }
+
+            window.saveData();
+
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
+            window.closeModal();
+            renderClientDetail(clientId);
+            window.setSetupWizardStep(clientId, 2);
+
+            const message = `${newSites.length} site(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+            window.showNotification(message);
+        }
+    );
+};
+
+
 // Edit Contact Modal
 window.editContact = function (clientId, contactIndex) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.contacts || !client.contacts[contactIndex]) return;
 
     const contact = client.contacts[contactIndex];
@@ -2540,7 +2636,7 @@ window.editContact = function (clientId, contactIndex) {
 
 // Delete Contact
 window.deleteContact = function (clientId, contactIndex) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.contacts) return;
 
     if (confirm('Are you sure you want to delete this contact?')) {
@@ -2558,7 +2654,7 @@ window.deleteContact = function (clientId, contactIndex) {
 
 // Bulk Upload Contacts/Personnel
 window.bulkUploadContacts = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal(
@@ -2781,7 +2877,7 @@ function deleteDepartment(clientId, deptIndex) {
 }
 
 function bulkUploadDepartments(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal(
@@ -2877,7 +2973,7 @@ window.bulkUploadDepartments = bulkUploadDepartments;
 // GOODS/SERVICES CRUD FUNCTIONS
 // ============================================
 window.addGoodsService = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal('Add Goods/Service', `
@@ -2903,13 +2999,13 @@ window.addGoodsService = function (clientId) {
         if (!name) { window.showNotification('Name is required', 'error'); return; }
         if (!client.goodsServices) client.goodsServices = [];
         client.goodsServices.push({ name, category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() });
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 2);
+        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 6);
         window.showNotification('Goods/Service added');
     });
 };
 
 window.editGoodsService = function (clientId, index) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.goodsServices || !client.goodsServices[index]) return;
     const item = client.goodsServices[index];
     window.openModal('Edit Goods/Service', `
@@ -2920,20 +3016,20 @@ window.editGoodsService = function (clientId, index) {
         </form>
     `, () => {
         client.goodsServices[index] = { name: document.getElementById('goods-name').value.trim(), category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() };
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 2);
+        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 6);
         window.showNotification('Goods/Service updated');
     });
 };
 
 window.deleteGoodsService = function (clientId, index) {
     if (!confirm('Delete this item?')) return;
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client && client.goodsServices) { client.goodsServices.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 6); window.showNotification('Goods/Service deleted'); }
 };
 
 // Bulk Upload Goods/Services
 window.bulkUploadGoodsServices = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal(
@@ -3017,7 +3113,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
 // KEY PROCESSES CRUD FUNCTIONS
 // ============================================
 window.addKeyProcess = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
     window.openModal('Add Key Process', `
         <form id="process-form">
@@ -3030,13 +3126,13 @@ window.addKeyProcess = function (clientId) {
         if (!name) { window.showNotification('Process name is required', 'error'); return; }
         if (!client.keyProcesses) client.keyProcesses = [];
         client.keyProcesses.push({ name, category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() });
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 3);
+        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 7);
         window.showNotification('Process added');
     });
 };
 
 window.editKeyProcess = function (clientId, index) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
     const proc = client.keyProcesses[index];
     window.openModal('Edit Key Process', `
@@ -3047,20 +3143,20 @@ window.editKeyProcess = function (clientId, index) {
         </form>
     `, () => {
         client.keyProcesses[index] = { name: document.getElementById('process-name').value.trim(), category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() };
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 3);
+        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 7);
         window.showNotification('Process updated');
     });
 };
 
 window.deleteKeyProcess = function (clientId, index) {
     if (!confirm('Delete this process?')) return;
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client && client.keyProcesses) { client.keyProcesses.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 7); window.showNotification('Process deleted'); }
 };
 
 // Bulk Upload Key Processes
 window.bulkUploadKeyProcesses = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal(
@@ -3145,7 +3241,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
 // DESIGNATIONS CRUD FUNCTIONS
 // ============================================
 window.addClientDesignation = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
     const deptOptions = (client.departments || []).map(d => `<option value="${window.UTILS.escapeHtml(d.name)}">${window.UTILS.escapeHtml(d.name)}</option>`).join('');
     window.openModal('Add Designation', `
@@ -3158,20 +3254,20 @@ window.addClientDesignation = function (clientId) {
         if (!title) { window.showNotification('Job title is required', 'error'); return; }
         if (!client.designations) client.designations = [];
         client.designations.push({ title, department: document.getElementById('des-dept').value });
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 6);
+        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 4);
         window.showNotification('Designation added');
     });
 };
 
 window.deleteClientDesignation = function (clientId, index) {
     if (!confirm('Delete this designation?')) return;
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client && client.designations) { client.designations.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 4); window.showNotification('Designation deleted'); }
 };
 
 // Bulk Upload Designations
 window.bulkUploadDesignations = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     window.openModal(
@@ -4019,7 +4115,7 @@ function getClientCertificatesHTML(client) {
 }
 
 window.generateCertificatesFromStandards = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     const allStandards = new Set();
@@ -4055,7 +4151,7 @@ window.generateCertificatesFromStandards = function (clientId) {
 };
 
 window.updateCertField = function (clientId, certIndex, field, value) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client && client.certificates && client.certificates[certIndex]) {
         client.certificates[certIndex][field] = value;
         // Autosave turned off to allow bulk edits, but for single inputs we might want to save?
@@ -4064,7 +4160,7 @@ window.updateCertField = function (clientId, certIndex, field, value) {
 };
 
 window.updateSiteScope = function (clientId, certIndex, siteName, value) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client && client.certificates && client.certificates[certIndex]) {
         if (!client.certificates[certIndex].siteScopes) {
             client.certificates[certIndex].siteScopes = {};
@@ -4751,7 +4847,7 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
 
     document.getElementById('modal-save').style.display = '';
     document.getElementById('modal-save').onclick = function () {
-        const auditorId = parseInt(document.getElementById('client-assign-auditor').value);
+        const auditorId = document.getElementById('client-assign-auditor').value;
 
         if (!auditorId) {
             window.showNotification('Please select an auditor.', 'error');
@@ -4766,7 +4862,7 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
         // Add new assignment (ensure both IDs are integers for consistency)
         window.state.auditorAssignments.push({
             auditorId: parseInt(auditorId),
-            clientId: parseInt(clientId),
+            clientId: String(clientId),
             assignedBy: window.state.currentUser?.name || 'System',
             assignedAt: new Date().toISOString()
         });
@@ -4814,8 +4910,8 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
         // Normalize IDs - compare as both strings and numbers for compatibility
         const cid = String(clientId);
         const aid = String(auditorId);
-        const cidNum = parseInt(clientId);
-        const aidNum = parseInt(auditorId);
+        const cidNum = parseInt(clientId); // Keep for backwards compatibility check below
+        const aidNum = parseInt(auditorId); // Keep for backwards compatibility check below
 
         const initialLength = (window.state.auditorAssignments || []).length;
 
@@ -4882,7 +4978,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
 // ============================================
 
 window.deleteClient = function (clientId) {
-    const clientIndex = window.state.clients.findIndex(c => c.id == clientId);
+    const clientIndex = window.state.clients.findIndex(c => String(c.id) === String(clientId));
     if (clientIndex === -1) return;
 
     const client = window.state.clients[clientIndex];

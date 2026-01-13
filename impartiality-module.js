@@ -62,7 +62,7 @@ window.fetchImpartialityData = async function () {
             nextMeetingDate: m.next_meeting_date
         }));
 
-        if (document.getElementById('members')) {
+        if (document.getElementById('impartiality-tabs')) { // Use a unique ID or just update current tab
             renderImpartialityModule();
         }
 
@@ -219,10 +219,12 @@ if (!window.state.impartialityCommittee) {
 }
 
 function renderImpartialityModule() {
-    // Auto-fetch if empty
-    if (window.state.impartialityCommittee.members.length <= 2 && window.SupabaseClient) {
-        // We check <= 2 because of the hardcoded demo sync
-        window.fetchImpartialityData();
+    if (!window._fetchedImpartiality && !window._fetchingImpartiality && window.SupabaseClient) {
+        window._fetchingImpartiality = true;
+        window.fetchImpartialityData().finally(() => {
+            window._fetchingImpartiality = false;
+            window._fetchedImpartiality = true;
+        });
     }
 
     const contentArea = document.getElementById('content-area');
