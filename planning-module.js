@@ -1711,108 +1711,125 @@ function saveAuditPlan(shouldPrint = false) {
     };
 
     if (btnSave) {
-        btnSave.textContent = 'Saving to Database...';
+        btnSave.textContent = 'Saving...';
         btnSave.disabled = true;
     }
 
     // Wrap DB operations in async function to allow await
     (async () => {
         try {
+            // A. Update Local State FIRST (Optimistic UI)
             if (window.editingPlanId) {
-                // Find client ID
-                const clientObj = state.clients.find(c => c.name === planData.client);
-                const clientId = clientObj ? String(clientObj.id) : null;
-
-                // Update existing plan
-                const { error } = await window.SupabaseClient.db.update('audit_plans', String(window.editingPlanId), {
-                    client_id: clientId, // Ensure client_id is saved
-                    client_name: planData.client,
-                    plan_date: planData.date,
-                    type: planData.type,
-                    lead_auditor: planData.team[0] || null,
-                    status: planData.status,
-                    data: planData // Store full JSON blob
-                });
-
-                if (error) throw error;
-
-                // Update Local State
                 const index = state.auditPlans.findIndex(p => String(p.id) === String(window.editingPlanId));
                 if (index !== -1) {
                     state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
                 }
-                window.showNotification('Audit Plan updated in database', 'success');
-
             } else {
-                // Insert new plan
-                const newPlanId = String(Date.now()); // Ensure ID is string
-
-                // Find client ID
+                const newPlanId = String(Date.now());
                 const clientObj = state.clients.find(c => c.name === planData.client);
                 const clientId = clientObj ? String(clientObj.id) : null;
-
                 const newPlan = {
                     id: newPlanId,
                     clientId: clientId,
                     progress: 0,
                     ...planData
                 };
+                state.auditPlans.push(newPlan);
+                // Temporarily set editingPlanId so we know what to update in DB
+                window.editingPlanId = newPlanId;
+            }
 
-                const { error } = await window.SupabaseClient.db.insert('audit_plans', {
-                    id: newPlanId,
-                    client_id: clientId, // Ensure client_id is saved
-                    client_name: planData.client,
-                    plan_date: planData.date,
-                    type: planData.type,
-                    lead_auditor: planData.team[0] || null,
-                    status: 'Scheduled',
-                    data: newPlan
-                });
+            // Persist to LocalStorage immediately
+            window.saveData();
+
+            // B. Sync to Database (if online)
+            if (window.navigator.onLine && window.SupabaseClient) {
+                if (btnSave) btnSave.textContent = 'Syncing to DB...';
+
+                const planId = window.editingPlanId || String(Date.now()); // Fallback
+                const clientObj = state.clients.find(c => c.name === planData.client);
+                const clientId = clientObj ? String(clientObj.id) : null;
+
+                // Check if plan exists in DB (it might be new locally but not in DB if offline before)
+                const { data: existing } = await window.SupabaseClient.db.select('audit_plans', '*', { id: planId });
+
+                let error;
+                if (existing && existing.length > 0) {
+                    // Update
+                    const res = await window.SupabaseClient.db.update('audit_plans', planId, {
+                        client_id: clientId,
+                        client_name: planData.client,
+                        plan_date: planData.date,
+                        type: planData.type,
+                        lead_auditor: planData.team[0] || null,
+                        status: planData.status,
+                        data: state.auditPlans.find(p => String(p.id) === planId)
+                    });
+                    error = res.error;
+                } else {
+                    // Insert
+                    const res = await window.SupabaseClient.db.insert('audit_plans', {
+                        id: planId,
+                        client_id: clientId,
+                        client_name: planData.client,
+                        plan_date: planData.date,
+                        type: planData.type,
+                        lead_auditor: planData.team[0] || null,
+                        status: 'Scheduled',
+                        data: state.auditPlans.find(p => String(p.id) === planId)
+                    });
+                    error = res.error;
+                }
 
                 if (error) throw error;
+                window.showNotification('Audit Plan saved and synced to database', 'success');
 
-                state.auditPlans.push(newPlan);
-                window.showNotification('Audit Plan saved to database', 'success');
+                // Send Assignment Emails (Async, non-blocking) - Only if online
+                if (window.EmailService && window.state.auditors) {
+                    const teamMembers = [leadAuditor, ...team].filter(Boolean);
+                    teamMembers.forEach(name => {
+                        const auditor = window.state.auditors.find(a => a.name === name);
+                        if (auditor && auditor.email) {
+                            window.EmailService.sendAuditAssignment(
+                                auditor.email,
+                                auditor.name,
+                                clientName,
+                                {
+                                    standard: standard,
+                                    scheduledDate: date,
+                                    role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
+                                    auditId: planId
+                                }
+                            ).catch(e => console.warn('Email failed:', e));
+                        }
+                    });
+                }
+
+            } else {
+                window.showNotification('Audit Plan saved locally (Offline)', 'warning');
             }
 
-            // Send Assignment Emails (Async, non-blocking)
-            if (window.EmailService && window.state.auditors) {
-                const teamMembers = [leadAuditor, ...team].filter(Boolean);
-                teamMembers.forEach(name => {
-                    const auditor = window.state.auditors.find(a => a.name === name);
-                    if (auditor && auditor.email) {
-                        window.EmailService.sendAuditAssignment(
-                            auditor.email,
-                            auditor.name,
-                            clientName,
-                            {
-                                standard: standard,
-                                scheduledDate: date,
-                                role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
-                                auditId: window.editingPlanId || Date.now()
-                            }
-                        ).catch(e => console.warn('Email failed:', e));
-                    }
-                });
-            }
-
-            // Update Local Storage & UI
-            window.saveData();
+            // Update UI
             renderAuditPlanningEnhanced();
             if (window.renderDashboardEnhanced) renderDashboardEnhanced();
-            const finalId = window.editingPlanId || (state.auditPlans[state.auditPlans.length - 1]?.id);
+            const finalId = window.editingPlanId;
             window.editingPlanId = null;
 
             // Trigger Print if requested
-            if (shouldPrint) {
+            if (shouldPrint && finalId) {
                 setTimeout(() => {
-                    if (finalId) window.printAuditPlanDetails(finalId);
+                    window.printAuditPlanDetails(finalId);
                 }, 500);
             }
 
         } catch (dbError) {
-            console.error('Database Save Failed:', dbError);
-            window.showNotification('Failed to save to database: ' + dbError.message, 'error');
+            console.error('Database Sync Failed:', dbError);
+            window.showNotification('Saved locally, but DB sync failed: ' + dbError.message, 'warning');
+
+            // Still render UI since local save worked
+            renderAuditPlanningEnhanced();
+            if (window.renderDashboardEnhanced) renderDashboardEnhanced();
+            window.editingPlanId = null;
         } finally {
             restoreButton();
         }

@@ -184,15 +184,25 @@ window.saveAuditorForm = function (auditorId) {
     // Explicit Database Persistence (ensure real-time sync)
     (async () => {
         try {
+            // Prepare payload for DB (map to columns)
+            const dbPayload = {
+                id: String(auditor.id),
+                name: auditor.name,
+                email: auditor.email,
+                role: auditor.role,
+                standards: Array.isArray(auditor.standards) ? JSON.stringify(auditor.standards) : auditor.standards,
+                data: auditor // Store full object in data column
+            };
+
             if (isEdit) {
-                await window.SupabaseClient.db.update('auditors', String(auditorId), auditor);
+                await window.SupabaseClient.db.update('auditors', String(auditorId), dbPayload);
             } else {
-                await window.SupabaseClient.db.insert('auditors', auditor);
+                await window.SupabaseClient.db.insert('auditors', dbPayload);
             }
             window.showNotification(isEdit ? 'Auditor updated in Cloud' : 'Auditor created in Cloud', 'success');
         } catch (dbError) {
             console.error('Auditor Cloud Sync Error:', dbError);
-            window.showNotification('Saved locally, but Cloud sync failed', 'warning');
+            window.showNotification('Saved locally, but Cloud sync failed: ' + dbError.message, 'warning');
         }
     })();
 

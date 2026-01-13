@@ -58,6 +58,10 @@ Example:
     // Call Vercel Serverless Function
     callProxyAPI: async (prompt) => {
         try {
+            if (!window.navigator.onLine) {
+                throw new Error('You appear to be offline. Please check your internet connection.');
+            }
+
             const response = await fetch('/api/gemini', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -94,7 +98,7 @@ Example:
             return AI_SERVICE.extractTextFromResponse(data);
         } catch (error) {
             console.error('Proxy API Error:', error);
-            throw new Error('Failed to connect to AI Service. Please contact administrator.');
+            throw error; // Re-throw original error to preserve message
         }
     },
 
