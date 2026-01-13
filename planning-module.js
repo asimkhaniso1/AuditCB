@@ -1751,7 +1751,7 @@ function saveAuditPlan(shouldPrint = false) {
                 const clientId = clientObj ? String(clientObj.id) : null;
 
                 // Check if plan exists in DB (it might be new locally but not in DB if offline before)
-                const { data: existing } = await window.SupabaseClient.db.select('audit_plans', '*', { id: planId });
+                const { data: existing } = await window.SupabaseClient.db.select('audit_plans', { id: planId });
 
                 let error;
                 if (existing && existing.length > 0) {
