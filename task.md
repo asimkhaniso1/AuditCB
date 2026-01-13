@@ -41,5 +41,6 @@
     
 ### Urgent Fixes
 - [x] Fix Supabase Connection Config (ignore invalid localStorage)
-- [/] Apply RLS Security Fix (Manual Step Required)
+- [x] Apply RLS Security Fix (Included in schema scripts)
 - [x] Fix Client Save Issue (Added explicit Supabase sync)
+- [x] Fix Auditor Save Issue (Schema update & array literal fix)

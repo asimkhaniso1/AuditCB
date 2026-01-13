@@ -1809,11 +1809,17 @@ function saveAuditPlan(shouldPrint = false) {
                 window.showNotification('Audit Plan saved locally (Offline)', 'warning');
             }
 
-            // Update UI
-            renderAuditPlanningEnhanced();
+            // Update UI - Don't full reload, just view the plan
             if (window.renderDashboardEnhanced) renderDashboardEnhanced();
-            const finalId = window.editingPlanId;
+            const finalId = planId || window.editingPlanId; // Use the actual plan ID we just worked with
             window.editingPlanId = null;
+
+            // Navigate to view mode for this plan
+            if (finalId) {
+                window.viewAuditPlan(finalId);
+            } else {
+                renderAuditPlanningEnhanced();
+            }
 
             // Trigger Print if requested
             if (shouldPrint && finalId) {
