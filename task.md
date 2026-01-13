@@ -48,3 +48,5 @@
 - [x] Fix AI Model Error (Updated to gemini-pro)
 - [x] Fix Checklist Config Button (Added to plan view)
 - [x] Fix Start Audit Button (Loose equality for plan ID lookup)
+- [x] Fix Save Plan Error (Removed invalid select argument)
+- [x] Fix Save Progress Error (Created schema script for audit_reports)

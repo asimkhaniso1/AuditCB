@@ -1936,9 +1936,9 @@ window.handleEvidenceUpload = function (uniqueId, input) {
     }
 
     // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-        window.showNotification('Image exceeds 5MB limit. Please select a smaller image.', 'error');
+        window.showNotification('Image exceeds 5MB limit', 'error');
         input.value = '';
         return;
     }
@@ -1950,40 +1950,72 @@ window.handleEvidenceUpload = function (uniqueId, input) {
         previewDiv.innerHTML = `
             <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); text-align: center;">
                 <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color);"></i>
-                <span style="margin-left: 0.5rem; font-size: 0.85rem;">Compressing image...</span>
+                <span style="margin-left: 0.5rem; font-size: 0.85rem;">Compressing & Uploading...</span>
             </div>
         `;
     }
 
-    // Read and compress the image
     const reader = new FileReader();
     reader.onload = function (e) {
         const img = new Image();
-        img.onload = function () {
-            // Compress the image
-            const compressedDataUrl = compressImage(img, file.type);
-            const compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024); // Approximate KB
+        img.onload = async function () {
+            try {
+                // 1. Compress
+                const compressedDataUrl = compressImage(img, file.type);
+                const compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
 
-            // Update preview
-            if (previewDiv) {
-                previewDiv.style.display = 'block';
-                previewDiv.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
-                        <img id="evidence-img-${uniqueId}" src="${compressedDataUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
-                        <div style="flex: 1;">
-                            <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;"><i class="fa-solid fa-check-circle"></i> Image attached</p>
-                            <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">Compressed: ${compressedSize} KB (original: ${Math.round(file.size / 1024)} KB)</p>
+                let finalUrl = compressedDataUrl;
+                let isCloud = false;
+
+                // 2. Upload to Supabase (if online)
+                if (window.navigator.onLine && window.SupabaseClient) {
+                    try {
+                        // Convert DataURL to Blob
+                        const res = await fetch(compressedDataUrl);
+                        const blob = await res.blob();
+                        const uploadFile = new File([blob], file.name, { type: file.type });
+
+                        const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
+                        if (result && result.url) {
+                            finalUrl = result.url;
+                            isCloud = true;
+                        }
+                    } catch (uploadErr) {
+                        console.warn('Image upload failed, falling back to local base64', uploadErr);
+                    }
+                }
+
+                // 3. Update Preview UI
+                if (previewDiv) {
+                    previewDiv.style.display = 'block';
+                    previewDiv.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
+                            <img id="evidence-img-${uniqueId}" src="${finalUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
+                            <div style="flex: 1;">
+                                <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;">
+                                    <i class="fa-solid fa-check-circle"></i> ${isCloud ? 'Saved to Cloud' : 'Attached Locally'}
+                                </p>
+                                <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">
+                                    ${compressedSize} KB ${isCloud ? '(Synced)' : '(Pending Sync)'}
+                                </p>
+                            </div>
+                            <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
                         </div>
-                        <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                `;
+                    `;
+                }
+
+                // 4. Update Hidden Inputs
+                const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+                if (evidenceData) evidenceData.value = 'attached';
+
+                window.showNotification(isCloud ? 'Image uploaded to cloud' : 'Image saved locally', 'success');
+
+            } catch (err) {
+                console.error('Image processing error:', err);
+                window.showNotification('Error processing image', 'error');
+                if (previewDiv) previewDiv.style.display = 'none';
+                input.value = '';
             }
-
-            // Mark as attached
-            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-            if (evidenceData) evidenceData.value = 'attached';
-
-            window.showNotification('Image attached and compressed successfully', 'success');
         };
         img.src = e.target.result;
     };
