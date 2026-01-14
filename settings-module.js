@@ -3574,18 +3574,43 @@ window.analyzeDocument = async function (type, docId) {
 
 // One-time clause extraction from standard
 async function extractStandardClauses(doc, standardName) {
-    const isEMS = standardName.toLowerCase().includes('14001');
-    const isOHS = standardName.toLowerCase().includes('45001');
-    const systemTerm = isEMS ? 'Environmental Management System (EMS)' : isOHS ? 'OH&S Management System' : 'Quality Management System (QMS)';
-    const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
+    // Detect standard type based on the name
+    const stdLower = standardName.toLowerCase();
+    let systemTerm, abbr;
 
-    console.log(`[KB Analysis] Starting AI extraction for: ${standardName}`);
+    if (stdLower.includes('9001')) {
+        systemTerm = 'Quality Management System (QMS)';
+        abbr = 'QMS';
+    } else if (stdLower.includes('14001')) {
+        systemTerm = 'Environmental Management System (EMS)';
+        abbr = 'EMS';
+    } else if (stdLower.includes('45001')) {
+        systemTerm = 'Occupational Health and Safety Management System';
+        abbr = 'OH&S MS';
+    } else if (stdLower.includes('27001')) {
+        systemTerm = 'Information Security Management System (ISMS)';
+        abbr = 'ISMS';
+    } else if (stdLower.includes('22000')) {
+        systemTerm = 'Food Safety Management System (FSMS)';
+        abbr = 'FSMS';
+    } else if (stdLower.includes('50001')) {
+        systemTerm = 'Energy Management System (EnMS)';
+        abbr = 'EnMS';
+    } else if (stdLower.includes('13485')) {
+        systemTerm = 'Medical Devices Quality Management System';
+        abbr = 'MD-QMS';
+    } else {
+        systemTerm = 'Management System';
+        abbr = 'MS';
+    }
+
+    console.log(`[KB Analysis] Starting AI extraction for: ${standardName} (${abbr})`);
 
     try {
         // Build comprehensive extraction prompt (Synced with reanalyze logic)
         const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
         
-        This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS".
+        This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS" (unless this IS a QMS standard).
 
 For each clause, include:
 - "clause": The clause number (e.g., "4.4.1", "5.1.1")
