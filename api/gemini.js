@@ -42,9 +42,8 @@ export default async function handler(req, res) {
             };
         } else {
             // Default: Generate Content
-            // url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-            // Use gemini-pro as fallback until we find the right one
-            url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+            // Updated to gemini-2.5-flash as confirmed by diagnostics on 2026-01-14
+            url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
             fetchOptions = {
                 method: 'POST',
@@ -86,4 +85,3 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }
-
