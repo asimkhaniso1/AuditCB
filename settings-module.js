@@ -3503,7 +3503,11 @@ window.analyzeDocument = async function (type, docId) {
     // Update status to processing
     doc.status = 'processing';
     window.saveData();
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
 
     window.showNotification(`Analyzing ${doc.name}...`, 'info');
 
@@ -3576,18 +3580,18 @@ async function extractStandardClauses(doc, standardName) {
             throw new Error('AI Service not available');
         }
 
+        // Check if it's EMS or OH&S to guide the AI
+        const isEMS = standardName.toLowerCase().includes('14001');
+        const isOHS = standardName.toLowerCase().includes('45001');
+        const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
+
         // Build comprehensive extraction prompt for detailed sub-clauses
         const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
 
-IMPORTANT: Include ALL levels of sub-clauses, such as:
-- Main clauses: 4, 5, 6, 7, 8, 9, 10
-- First level sub-clauses: 4.1, 4.2, 4.3, 5.1, 5.2, etc.
-- Second level sub-clauses: 4.4.1, 4.4.2, 5.1.1, 5.1.2, 6.1.1, 6.2.1, 8.1.1, 8.5.1, 9.1.1, 10.2.1, etc.
-
-Format: [{"clause": "4.1", "title": "Understanding the organization and its context", "requirement": "The organization shall determine external and internal issues that are relevant to its purpose..."}, ...]
-
-Include ALL clauses from 4 through 10 with ALL their sub-clauses. Each requirement should be detailed (2-3 sentences with the key "shall" statements).
-Return ONLY the JSON array, no markdown or explanation.`;
+        IMPORTANT: This is an ${abbr} standard. Include ALL levels of sub-clauses, such as:
+        Ensure requirements refer to "${abbr}" and not "QMS".
+        Format: [{"clause": "4.1", "title": "...", "requirement": "..."}]
+        Return ONLY the JSON array.`;
 
         const responseText = await window.AI_SERVICE.callProxyAPI(prompt);
 
@@ -3851,11 +3855,19 @@ function getBuiltInClauses(standardName) {
             const specific = iso14001Specific.find(s => s.clause === c.clause);
             if (specific) return specific;
 
-            return {
+            const mapped = {
                 ...c,
                 title: c.title.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace('customer', 'interested party'),
                 requirement: c.requirement.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace(/customer(?!s)/gi, 'interested party')
             };
+
+            if (mapped.subRequirements) {
+                mapped.subRequirements = mapped.subRequirements.map(s =>
+                    s.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace(/customer(?!s)/gi, 'interested party')
+                );
+            }
+
+            return mapped;
         });
     }
 
@@ -3871,11 +3883,19 @@ function getBuiltInClauses(standardName) {
             const specific = iso45001Specific.find(s => s.clause === c.clause);
             if (specific) return specific;
 
-            return {
+            const mapped = {
                 ...c,
                 title: c.title.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S MS').replace('customer', 'worker'),
                 requirement: c.requirement.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S management system').replace(/customer(?!s)/gi, 'worker')
             };
+
+            if (mapped.subRequirements) {
+                mapped.subRequirements = mapped.subRequirements.map(s =>
+                    s.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S management system').replace(/customer(?!s)/gi, 'worker')
+                );
+            }
+
+            return mapped;
         });
     }
 
@@ -3990,7 +4010,11 @@ window.analyzeCustomDocWithAI = async function (doc, type) {
         window.saveData();
 
         // Refresh UI
-        switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        if (typeof switchSettingsSubTab === 'function') {
+            switchSettingsSubTab('knowledge', 'kb');
+        } else {
+            renderSettings();
+        }
         window.showNotification(`${doc.name} analyzed with AI!`, 'success');
         return true;
     } catch (e) {
@@ -4220,8 +4244,16 @@ window.viewKBAnalysis = function (docId) {
 // Re-analyze standard with AI for more detailed extraction
 window.reanalyzeStandard = async function (docId) {
     const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id === docId);
-    if (!doc) return;
+    const doc = kb.standards.find(d => d.id == docId);
+    if (!doc) {
+        console.warn('Document not found for re-analysis:', docId);
+        return;
+    }
+
+    const isEMS = doc.name.toLowerCase().includes('14001');
+    const isOHS = doc.name.toLowerCase().includes('45001');
+    const systemTerm = isEMS ? 'Environmental Management System (EMS)' : isOHS ? 'OH&S Management System' : 'Quality Management System (QMS)';
+    const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
 
     // Close the current modal
     window.closeModal();
@@ -4232,39 +4264,36 @@ window.reanalyzeStandard = async function (docId) {
     // Update status to processing
     doc.status = 'processing';
     window.saveData();
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    }
 
     try {
-        // Enhanced prompt for detailed extraction with sub-requirements
-        const prompt = `You are an ISO standards expert. For the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL clauses with DETAILED sub-requirements.
+        // Enhanced prompt with context-aware examples
+        const prompt = `You are an ISO standards expert. For the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
+        
+        This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS".
 
 For each clause, include:
-- "clause": The clause number (e.g., "4.4.1", "7.1.5.2")
+- "clause": The clause number (e.g., "4.4.1", "5.1.1")
 - "title": The official clause title
 - "requirement": The main requirement statement
-- "subRequirements": An array of the specific bullet points (a, b, c, d, etc.) that the clause contains
+- "subRequirements": An array of the specific bullet points (a, b, c, d, etc.)
 
 Example format:
 [
   {
-    "clause": "4.4.1",
-    "title": "QMS processes - Requirements",
-    "requirement": "The organization shall determine the processes needed for the QMS and shall:",
+    "clause": "5.1.1",
+    "title": "Leadership and commitment - General",
+    "requirement": "Top management shall demonstrate leadership and commitment with respect to the ${abbr} by:",
     "subRequirements": [
-      "a) determine the inputs required and outputs expected",
-      "b) determine the sequence and interaction of processes",
-      "c) determine criteria and methods for effective operation",
-      "d) determine resources needed and ensure availability",
-      "e) assign responsibilities and authorities",
-      "f) address risks and opportunities per 6.1",
-      "g) evaluate and implement changes as needed",
-      "h) improve processes and QMS"
+      "a) taking accountability for the effectiveness of the ${abbr}",
+      "b) ensuring that the policy and objectives are established..."
     ]
   }
 ]
 
-Include ALL clauses from 4 through 10 with ALL sub-clauses (4.4.1, 5.1.1, 7.1.5.2, 8.5.1, 9.2.2, 10.2.1, etc.) and ALL their bullet point sub-requirements.
-Return ONLY the JSON array, no markdown or explanation.`;
+Return ONLY the JSON array.`;
 
         const response = await fetch('/api/gemini', {
             method: 'POST',
@@ -4285,10 +4314,12 @@ Return ONLY the JSON array, no markdown or explanation.`;
                 doc.lastAnalyzed = new Date().toISOString().split('T')[0];
                 window.saveData();
 
-                window.showNotification(`Re-analysis complete! ${newClauses.length} clauses with detailed sub-requirements extracted.`, 'success');
+                window.showNotification(`Re-analysis complete! ${newClauses.length} clauses extracted.`, 'success');
 
                 // Re-render and open the analysis view
-                switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+                if (typeof switchSettingsSubTab === 'function') {
+                    switchSettingsSubTab('knowledge', 'kb');
+                }
                 setTimeout(() => window.viewKBAnalysis(docId), 500);
                 return;
             }
@@ -4304,7 +4335,11 @@ Return ONLY the JSON array, no markdown or explanation.`;
     window.saveData();
 
     window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
     setTimeout(() => window.viewKBAnalysis(docId), 500);
 };
 
