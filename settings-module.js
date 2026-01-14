@@ -3619,30 +3619,29 @@ async function extractStandardClauses(doc, standardName) {
 
     try {
         // Build comprehensive extraction prompt (Synced with reanalyze logic)
-        const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
+        const prompt = `You are an expert Lead Auditor for ISO standards. Your task is to extract every single audit requirement from the provided text for the standard "${standardName}".
         
-        This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS" (unless this IS a QMS standard).
+        CRITICAL INSTRUCTIONS:
+        1. This is a ${systemTerm}. TERMINOLOGY: Use "${abbr}" (e.g., "${abbr} policy", "effectiveness of the ${abbr}").
+        2. SCOPE: Extract ALL requirements from Clause 4 through Clause 10. Do NOT skip any sub-clauses.
+        3. COMPLETENESS: I need the FULL list. Do not summarize. Do not truncate. If there are 150 requirements, list all 150.
+        4. FORMAT: Return a valid JSON array of objects.
+        
+        Source Text:
+        ${docContent}
+        
+        Required JSON Structure:
+        [
+          {
+            "clause": "4.1",
+            "title": "Understanding the organization and its context",
+            "requirement": "The organization shall determine external and internal issues...",
+            "subRequirements": ["a) issue one", "b) issue two"]
+          }
+        ]
+        
+        Return ONLY valid JSON. No markdown formatting.`;
 
-For each clause, include:
-- "clause": The clause number (e.g., "4.4.1", "5.1.1")
-- "title": The official clause title
-- "requirement": The main requirement statement
-- "subRequirements": An array of the specific bullet points (a, b, c, d, etc.)
-
-Example format:
-[
-  {
-    "clause": "5.1.1",
-    "title": "Leadership and commitment - General",
-    "requirement": "Top management shall demonstrate leadership and commitment with respect to the ${abbr} by:",
-    "subRequirements": [
-      "a) taking accountability for the effectiveness of the ${abbr}",
-      "b) ensuring that the policy and objectives are established..."
-    ]
-  }
-]
-
-Return ONLY the JSON array.`;
 
         console.log(`[KB Analysis] Calling AI API...`);
 
@@ -3653,7 +3652,7 @@ Return ONLY the JSON array.`;
             body: JSON.stringify({ prompt })
         });
 
-        console.log(`[KB Analysis] API Response Status: ${response.status}`);
+        console.log(`[KB Analysis] API Response Status: ${response.status} `);
 
         if (response.ok) {
             const data = await response.json();
@@ -3669,21 +3668,21 @@ Return ONLY the JSON array.`;
                 doc.status = 'ready';
                 doc.lastAnalyzed = new Date().toISOString().split('T')[0];
                 window.saveData();
-                console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
+                console.log(`✅[KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
                 return;
             } else {
                 console.warn(`[KB Analysis] No JSON array found in AI response`);
             }
         } else {
             const errorText = await response.text();
-            console.error(`[KB Analysis] API Error: ${response.status} - ${errorText}`);
+            console.error(`[KB Analysis] API Error: ${response.status} - ${errorText} `);
         }
     } catch (error) {
         console.error('[KB Analysis] Exception during AI extraction:', error);
     }
 
     // Fallback: Use built-in clauses if API fails
-    console.warn(`⚠️ [KB Analysis] Falling back to built-in database for ${standardName}`);
+    console.warn(`⚠️[KB Analysis] Falling back to built -in database for ${standardName}`);
     doc.clauses = getBuiltInClauses(standardName);
     doc.status = 'ready';
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
@@ -3994,7 +3993,7 @@ window.lookupClauseText = function (standardName, clauseNumber) {
         c.clause === clauseNumber || c.clause.startsWith(clauseNumber)
     );
 
-    return clause ? `${clause.title}: ${clause.requirement}` : null;
+    return clause ? `${clause.title}: ${clause.requirement} ` : null;
 };
 
 // Update Knowledge Base Section Content (Manual Edit)
@@ -4067,19 +4066,19 @@ window.analyzeCustomDocWithAI = async function (doc, type) {
     const typeLabel = type === 'sop' ? 'Standard Operating Procedure' : type === 'policy' ? 'Policy' : 'Company Profile/Marketing';
     const context = doc.extractedText.substring(0, 15000); // Limit context size
 
-    const prompt = `You are a QA Auditor. Analyze this ${typeLabel} text and extract key sections.
-    Return a JSON array: [{"clause": "1", "title": "Section Title", "requirement": "Summary of content..."}].
-    Extract 6-10 key sections like Purpose, Scope, Responsibilities, or Company Overview, Products, etc.
+    const prompt = `You are a QA Auditor.Analyze this ${typeLabel} text and extract key sections.
+    Return a JSON array: [{ "clause": "1", "title": "Section Title", "requirement": "Summary of content..." }].
+        Extract 6 - 10 key sections like Purpose, Scope, Responsibilities, or Company Overview, Products, etc.
     Keep summaries concise.
-    
-    Text:
+
+        Text:
     ${context}
     
     Return ONLY JSON.`;
 
     try {
         const response = await AI_SERVICE.callProxyAPI(prompt);
-        let validJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+        let validJson = response.replace(/```json / g, '').replace(/```/g, '').trim();
         const tabs = JSON.parse(validJson);
 
         doc.clauses = tabs;
@@ -4392,62 +4391,57 @@ Example format:
   {
     "clause": "5.1.1",
     "title": "Leadership and commitment - General",
-    "requirement": "Top management shall demonstrate leadership and commitment with respect to the ${abbr} by:",
-    "subRequirements": [
-      "a) taking accountability for the effectiveness of the ${abbr}",
-      "b) ensuring that the policy and objectives are established..."
-    ]
+    "requirement": "Top management shall demonstrate leadership and commitment...",
+    "subRequirements": ["a) ...", "b) ..."]
   }
 ]
 
 Return ONLY the JSON array.`;
-
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
+        method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
+        body: JSON.stringify({ prompt })
+    });
 
-        if (response.ok) {
-            const data = await response.json();
-            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (response.ok) {
+        const data = await response.json();
+        const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-            // Parse JSON from response
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                const newClauses = JSON.parse(jsonMatch[0]);
-                doc.clauses = newClauses;
-                doc.status = 'ready';
-                doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-                window.saveData();
+        // Parse JSON from response
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            const newClauses = JSON.parse(jsonMatch[0]);
+            doc.clauses = newClauses;
+            doc.status = 'ready';
+            doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+            window.saveData();
 
-                window.showNotification(`Re-analysis complete! ${newClauses.length} clauses extracted.`, 'success');
+            window.showNotification(`Re-analysis complete! ${newClauses.length} clauses extracted.`, 'success');
 
-                // Re-render and open the analysis view
-                if (typeof switchSettingsSubTab === 'function') {
-                    switchSettingsSubTab('knowledge', 'kb');
-                }
-                setTimeout(() => window.viewKBAnalysis(docId), 500);
-                return;
+            // Re-render and open the analysis view
+            if (typeof switchSettingsSubTab === 'function') {
+                switchSettingsSubTab('knowledge', 'kb');
             }
+            setTimeout(() => window.viewKBAnalysis(docId), 500);
+            return;
         }
-    } catch (error) {
-        console.error('Re-analysis error:', error);
     }
+} catch (error) {
+    console.error('Re-analysis error:', error);
+}
 
-    // Fallback if AI fails - use built-in detailed clauses
-    doc.clauses = getBuiltInClauses(doc.name);
-    doc.status = 'ready';
-    doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-    window.saveData();
+// Fallback if AI fails - use built-in detailed clauses
+doc.clauses = getBuiltInClauses(doc.name);
+doc.status = 'ready';
+doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+window.saveData();
 
-    window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
-    if (typeof switchSettingsSubTab === 'function') {
-        switchSettingsSubTab('knowledge', 'kb');
-    } else {
-        renderSettings();
-    }
-    setTimeout(() => window.viewKBAnalysis(docId), 500);
+window.showNotification(`Re - analysis complete using built-in clause database(${doc.clauses.length} clauses).`, 'info');
+if (typeof switchSettingsSubTab === 'function') {
+    switchSettingsSubTab('knowledge', 'kb');
+} else {
+    renderSettings();
+}
+setTimeout(() => window.viewKBAnalysis(docId), 500);
 };
 
 // ============================================
@@ -4474,7 +4468,7 @@ function getAssignmentsHTML() {
     });
 
     return `
-        <div class="fade-in">
+            < div class="fade-in" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
                     <h3 style="color: var(--primary-color); margin: 0;">
@@ -4491,7 +4485,7 @@ function getAssignmentsHTML() {
                 </button>
             </div>
 
-            <!-- Info Box -->
+            <!--Info Box-- >
             <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
                 <div style="display: flex; gap: 1rem; align-items: start;">
                     <i class="fa-solid fa-info-circle" style="font-size: 1.25rem; color: #2563eb; margin-top: 2px;"></i>
@@ -4505,7 +4499,7 @@ function getAssignmentsHTML() {
                 </div>
             </div>
 
-            <!-- Assignment Cards by Auditor -->
+            <!--Assignment Cards by Auditor-- >
             <div style="display: grid; gap: 1.5rem;">
                 ${auditors.map(auditor => {
         const data = auditorAssignmentMap[auditor.id];
@@ -4556,7 +4550,7 @@ function getAssignmentsHTML() {
     }).join('')}
             </div>
 
-            <!-- Summary Stats -->
+            <!--Summary Stats-- >
             <div style="margin-top: 2rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
                 <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; text-align: center;">
                     <div style="font-size: 2rem; font-weight: bold; color: #16a34a;">${auditors.length}</div>
@@ -4571,8 +4565,8 @@ function getAssignmentsHTML() {
                     <div style="font-size: 0.85rem; color: #92400e;">Active Assignments</div>
                 </div>
             </div>
-        </div>
-    `;
+        </div >
+            `;
 }
 
 // Add new assignment modal
@@ -4582,7 +4576,7 @@ window.openAddAssignmentModal = function () {
 
     document.getElementById('modal-title').textContent = 'Create New Assignment';
     document.getElementById('modal-body').innerHTML = `
-        <form id="assignment-form">
+            < form id = "assignment-form" >
             <div class="form-group">
                 <label>Auditor <span style="color: var(--danger-color);">*</span></label>
                 <select id="assign-auditor" class="form-control" required>
@@ -4601,8 +4595,8 @@ window.openAddAssignmentModal = function () {
                 <label>Notes (optional)</label>
                 <textarea id="assign-notes" class="form-control" rows="2" placeholder="Any notes about this assignment..."></textarea>
             </div>
-        </form>
-    `;
+        </form >
+            `;
 
     document.getElementById('modal-save').style.display = '';
     document.getElementById('modal-save').onclick = saveAssignment;
@@ -4621,17 +4615,17 @@ window.openQuickAssignModal = function (auditorId, auditorName) {
         return;
     }
 
-    document.getElementById('modal-title').textContent = `Assign Client to ${auditorName}`;
+    document.getElementById('modal-title').textContent = `Assign Client to ${auditorName} `;
     document.getElementById('modal-body').innerHTML = `
-        <input type="hidden" id="assign-auditor" value="${auditorId}">
-        <div class="form-group">
-            <label>Select Client to Assign</label>
-            <select id="assign-client" class="form-control" required>
-                <option value="">-- Select Client --</option>
-                ${unassignedClients.map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)} (${c.industry || 'N/A'})</option>`).join('')}
-            </select>
-        </div>
-    `;
+            < input type = "hidden" id = "assign-auditor" value = "${auditorId}" >
+                <div class="form-group">
+                    <label>Select Client to Assign</label>
+                    <select id="assign-client" class="form-control" required>
+                        <option value="">-- Select Client --</option>
+                        ${unassignedClients.map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)} (${c.industry || 'N/A'})</option>`).join('')}
+                    </select>
+                </div>
+        `;
 
     document.getElementById('modal-save').style.display = '';
     document.getElementById('modal-save').onclick = saveAssignment;
@@ -4697,7 +4691,7 @@ function getActivityLogHTML() {
     const recentLogs = logs.slice(0, 50);
 
     return `
-        <div class="fade-in">
+            < div class="fade-in" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-history" style="margin-right: 0.5rem;"></i>
@@ -4749,8 +4743,8 @@ function getActivityLogHTML() {
                     </div>
                 `}
             </div>
-        </div>
-    `;
+        </div >
+            `;
 }
 
 // Remove assignment
@@ -4758,9 +4752,9 @@ window.removeAssignment = async function (auditorId, clientId) {
     const auditor = window.state.auditors.find(a => a.id == auditorId);
     const client = window.state.clients.find(c => c.id == clientId);
 
-    const confirmMsg = `Remove "${client?.name || 'client'}" from ${auditor?.name || 'auditor'}'s assignments?
+    const confirmMsg = `Remove "${client?.name || 'client'}" from ${auditor?.name || 'auditor'} 's assignments?
 
-Note: All audit history, records, and reports involving this auditor will be RETAINED. The auditor will still have access to past audits they participated in.
+        Note: All audit history, records, and reports involving this auditor will be RETAINED.The auditor will still have access to past audits they participated in.
 
 This only removes future access to new client data.`;
 
@@ -4795,7 +4789,7 @@ function getUsageAnalyticsHTML() {
     const tracker = window.APIUsageTracker;
     if (!tracker) {
         return `
-            <div class="fade-in">
+            < div class="fade-in" >
                 <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
                     <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
                     Usage Analytics
@@ -4804,8 +4798,8 @@ function getUsageAnalyticsHTML() {
                     <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
                     API Usage Tracker module not loaded. Please refresh the page.
                 </div>
-            </div>
-        `;
+            </div >
+            `;
     }
 
     const summary = tracker.getSummary();
@@ -4814,7 +4808,7 @@ function getUsageAnalyticsHTML() {
     const features = Object.entries(summary.byFeature || {});
 
     return `
-        <div class="fade-in">
+            < div class="fade-in" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
@@ -4830,7 +4824,7 @@ function getUsageAnalyticsHTML() {
                 </div>
             </div>
 
-            <!-- Pricing Info Banner -->
+            <!--Pricing Info Banner-- >
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <i class="fa-solid fa-circle-info" style="font-size: 1.5rem;"></i>
@@ -4843,7 +4837,7 @@ function getUsageAnalyticsHTML() {
                 </div>
             </div>
 
-            <!-- Summary Cards -->
+            <!--Summary Cards-- >
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
                 <!-- Total Calls -->
                 <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
@@ -4890,7 +4884,7 @@ function getUsageAnalyticsHTML() {
                 </div>
             </div>
 
-            <!-- Usage by Feature -->
+            <!--Usage by Feature-- >
             <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                 <h4 style="margin: 0 0 1rem 0; color: #374151;">
                     <i class="fa-solid fa-layer-group" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
@@ -4943,7 +4937,7 @@ function getUsageAnalyticsHTML() {
                 `}
             </div>
 
-            <!-- Cost Projection -->
+            <!--Cost Projection-- >
             <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color);">
                 <h4 style="margin: 0 0 1rem 0; color: #374151;">
                     <i class="fa-solid fa-calculator" style="margin-right: 0.5rem; color: #7c3aed;"></i>
@@ -4972,8 +4966,8 @@ function getUsageAnalyticsHTML() {
                     * Projections based on average of 3.5 AI calls per audit with ~3,000 tokens each
                 </p>
             </div>
-        </div>
-    `;
+        </div >
+            `;
 }
 
 // Reset usage data with confirmation
@@ -5043,7 +5037,7 @@ window.testAIConnection = async function () {
         }
 
         if (response.ok) {
-            resultDiv.innerHTML = `<span style="color: green; font-weight: bold;">✅ Success (Status ${status})</span><br>Response: ${JSON.stringify(data, null, 2)}`;
+            resultDiv.innerHTML = `< span style = "color: green; font-weight: bold;" >✅ Success(Status ${status})</span > <br>Response: ${JSON.stringify(data, null, 2)}`;
         } else {
             resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Failed (Status ${status})</span><br>Error: ${JSON.stringify(data, null, 2)}`;
         }
