@@ -110,7 +110,7 @@ async function persistImpartialityThreat(threat) {
     if (!window.SupabaseClient) return;
     try {
         const payload = {
-            date: threat.date,
+            date: threat.date || null, // Convert empty string to null for date fields
             type: threat.type,
             description: threat.description,
             client: threat.client,
@@ -141,11 +141,11 @@ async function persistImpartialityMeeting(meeting) {
     if (!window.SupabaseClient) return;
     try {
         const payload = {
-            date: meeting.date,
+            date: meeting.date || null, // Convert empty string to null for date fields
             attendees: meeting.attendees,
             threats_reviewed: meeting.threatsReviewed,
             decisions: meeting.decisions,
-            next_meeting_date: meeting.nextMeetingDate
+            next_meeting_date: meeting.nextMeetingDate || null
         };
 
         if (meeting.id && !String(meeting.id).startsWith('demo-')) {

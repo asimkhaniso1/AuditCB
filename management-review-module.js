@@ -54,9 +54,9 @@ async function persistManagementReview(review) {
             inputs: review.inputs,
             outputs: review.outputs,
             action_items: review.actionItems,
-            next_review_date: review.nextReviewDate,
-            minutes_approved_by: review.minutesApprovedBy,
-            minutes_approved_date: review.minutesApprovedDate
+            next_review_date: review.nextReviewDate || null,
+            minutes_approved_by: review.minutesApprovedBy || null,
+            minutes_approved_date: review.minutesApprovedDate || null
         };
 
         if (review.id && !String(review.id).startsWith('demo-')) {
