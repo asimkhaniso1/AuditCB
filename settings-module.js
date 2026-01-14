@@ -5030,7 +5030,7 @@ window.testAIConnection = async function () {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                prompt: "Hello, reply with 'Connection Successful'"
+                mode: 'list'
             })
         });
 

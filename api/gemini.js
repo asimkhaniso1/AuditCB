@@ -24,27 +24,43 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Server configuration error: API Key not found' });
     }
 
-    const { prompt } = req.body;
+    const { prompt, mode } = req.body;
 
-    if (!prompt) {
+    if (!prompt && mode !== 'list') {
         return res.status(400).json({ error: 'Prompt is required' });
     }
 
     try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+        let url;
+        let fetchOptions;
+
+        if (mode === 'list') {
+            url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+            fetchOptions = {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            };
+        } else {
+            // Default: Generate Content
+            // url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+            // Use gemini-pro as fallback until we find the right one
+            url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+
+            fetchOptions = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: prompt }]
+                    }]
+                })
+            };
+        }
 
         // Using native fetch (Node 18+)
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
-            })
-        });
+        const response = await fetch(url, fetchOptions);
 
         const data = await response.json();
 
