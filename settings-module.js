@@ -3617,6 +3617,14 @@ async function extractStandardClauses(doc, standardName) {
 
     console.log(`[KB Analysis] Starting AI extraction for: ${standardName} (${abbr})`);
 
+    // Fix: Define docContent from the document object
+    const docContent = doc.extractedText || '';
+
+    if (!docContent || docContent.length < 100) {
+        console.warn('[KB Analysis] Document text appears empty or too short. PDF text extraction might have failed.');
+        window.showNotification('Warning: PDF text extraction returned little or no text. AI might fail.', 'warning');
+    }
+
     try {
         // Build comprehensive extraction prompt
         const prompt = `You are an expert Lead Auditor for ISO standards. Your task is to extract every single audit requirement from the provided text for the standard "${standardName}".
