@@ -199,7 +199,7 @@ function renderClientsEnhanced() {
     document.querySelectorAll('.view-client, .client-row').forEach(el => {
         el.addEventListener('click', (e) => {
             if (!e.target.closest('.edit-client')) {
-                const clientId = parseInt(el.getAttribute('data-client-id'));
+                const clientId = el.getAttribute('data-client-id');
                 window.location.hash = `client/${clientId}`;
             }
         });
@@ -208,7 +208,7 @@ function renderClientsEnhanced() {
     document.querySelectorAll('.edit-client').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const clientId = parseInt(btn.getAttribute('data-client-id'));
+            const clientId = btn.getAttribute('data-client-id');
             window.renderEditClient(clientId);
         });
     });
@@ -246,7 +246,7 @@ Logger.info('Clients List module loaded (split version with bug fixes)');
 // ============================================
 
 window.deleteClient = async function (clientId) {
-    const clientIndex = window.state.clients.findIndex(c => c.id == clientId);
+    const clientIndex = window.state.clients.findIndex(c => String(c.id) === String(clientId));
     if (clientIndex === -1) {
         console.error('Client not found for deletion:', clientId);
         return;
@@ -349,7 +349,7 @@ window.deleteClient = async function (clientId) {
 };
 
 window.archiveClient = function (clientId) {
-    const client = window.state.clients.find(c => c.id == clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
     if (!confirm(`Are you sure you want to archive client '${client.name}'? The client will be hidden from active lists but data is preserved.`)) {

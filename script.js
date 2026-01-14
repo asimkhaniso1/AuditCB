@@ -530,12 +530,16 @@ function getVisiblePlans() {
         String(a.name || '').toLowerCase() === String(user.name || '').toLowerCase()
     );
 
-    // Get visible client names for current assignments
+    // Get visible client IDs for current assignments
     const visibleClients = getVisibleClients();
-    const visibleClientNames = visibleClients.map(c => c.name);
+    const visibleClientIds = visibleClients.map(c => String(c.id));
 
     return allPlans.filter(p => {
         // Show if client is currently assigned
+        if (p.clientId && visibleClientIds.includes(String(p.clientId))) return true;
+
+        // Fallback to name if clientId missing (for legacy data)
+        const visibleClientNames = visibleClients.map(c => c.name);
         if (visibleClientNames.includes(p.client)) return true;
 
         // Also show if auditor was on the team (historical records)
@@ -574,15 +578,19 @@ function getVisibleReports() {
         String(a.name || '').toLowerCase() === String(user.name || '').toLowerCase()
     );
 
-    // Get visible client names for current assignments
+    // Get visible client IDs for current assignments
     const visibleClients = getVisibleClients();
-    const visibleClientNames = visibleClients.map(c => c.name);
+    const visibleClientIds = visibleClients.map(c => String(c.id));
 
     // Get visible plans to check team membership
     const allPlans = window.state.auditPlans || [];
 
     return allReports.filter(r => {
         // Show if client is currently assigned
+        if (r.clientId && visibleClientIds.includes(String(r.clientId))) return true;
+
+        // Fallback to name if clientId missing
+        const visibleClientNames = visibleClients.map(c => c.name);
         if (visibleClientNames.includes(r.client)) return true;
 
         // Also show if auditor was on the plan's team (historical records)
