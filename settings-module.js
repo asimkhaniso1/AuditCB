@@ -4135,10 +4135,17 @@ window.deleteKnowledgeDoc = async function (type, id) {
         try {
             // Delete from storage if cloudPath exists
             if (doc.cloudPath) {
-                await window.SupabaseClient.client.storage
+                console.log('[Delete] Attempting to delete from storage:', doc.cloudPath);
+                const { data, error } = await window.SupabaseClient.client.storage
                     .from('documents')
                     .remove([doc.cloudPath]);
-                console.log('Deleted file from storage:', doc.cloudPath);
+                if (error) {
+                    console.error('[Delete] Storage deletion error:', error);
+                } else {
+                    console.log('[Delete] Successfully deleted file from storage:', doc.cloudPath, data);
+                }
+            } else {
+                console.warn('[Delete] No cloudPath found for document:', doc);
             }
 
             // Delete from documents table
