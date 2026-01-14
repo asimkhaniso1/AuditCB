@@ -28,7 +28,7 @@ window.fetchManagementReviews = async function () {
             actionItems: row.action_items || [],
             nextReviewDate: row.next_review_date,
             minutesApprovedBy: row.minutes_approved_by,
-            minutes_approved_date: row.minutes_approved_date
+            minutesApprovedDate: row.minutes_approved_date
         }));
 
         if (document.getElementById('ai-generate-btn')) {
@@ -76,6 +76,7 @@ async function persistManagementReview(review) {
             if (data && data[0]) review.id = data[0].id;
         }
         await window.fetchManagementReviews();
+        window.showNotification('Management review saved successfully', 'success');
     } catch (e) {
         console.error('Failed to sync management review:', e);
         window.showNotification('Failed to sync management review to DB', 'error');
@@ -461,7 +462,7 @@ window.openNewManagementReviewModal = function () {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const date = document.getElementById('review-date').value;
         const reviewedBy = document.getElementById('reviewed-by').value.trim();
 
@@ -515,11 +516,10 @@ window.openNewManagementReviewModal = function () {
             minutesApprovedDate: null
         };
 
-        persistManagementReview(newReview);
+        await persistManagementReview(newReview);
 
         window.closeModal();
         renderManagementReviewModule();
-        window.showNotification('Management review created successfully', 'success');
     };
 
     window.openModal();
@@ -653,7 +653,7 @@ window.generateManagementReviewInputs = async function () {
 
 Return JSON: {"internalAuditResults":"","customerFeedback":"","processPerformance":"","nonconformities":"","changes":"","resourceNeeds":"","improvementOpportunities":[],"resourceDecisions":[],"systemChanges":[]}`;
 
-        const response = await window.callGeminiAPI(prompt);
+        const response = await window.AI_SERVICE.callProxyAPI(prompt);
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         const reviewData = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 

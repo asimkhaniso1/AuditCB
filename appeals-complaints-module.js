@@ -128,6 +128,7 @@ async function persistAppeal(appeal) {
         }
 
         await window.fetchAppealsComplaints();
+        window.showNotification('Appeal saved successfully', 'success');
         renderAppealsComplaintsModule();
 
     } catch (e) {
@@ -178,6 +179,7 @@ async function persistComplaint(complaint) {
         }
 
         await window.fetchAppealsComplaints();
+        window.showNotification('Complaint saved successfully', 'success');
         renderAppealsComplaintsModule();
 
     } catch (e) {

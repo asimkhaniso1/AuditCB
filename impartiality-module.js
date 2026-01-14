@@ -62,7 +62,7 @@ window.fetchImpartialityData = async function () {
             nextMeetingDate: m.next_meeting_date
         }));
 
-        if (document.getElementById('impartiality-tabs')) { // Use a unique ID or just update current tab
+        if (document.getElementById('impartiality-root')) { // Use a reliable ID that actually exists
             renderImpartialityModule();
         }
 
@@ -83,8 +83,8 @@ async function persistImpartialityMember(member) {
             organization: member.organization,
             role: member.role,
             expertise: member.expertise,
-            appointed_date: member.appointedDate,
-            term_end: member.termEnd,
+            appointed_date: member.appointedDate || null,
+            term_end: member.termEnd || null,
             status: member.status
         };
 
@@ -99,9 +99,10 @@ async function persistImpartialityMember(member) {
             if (data && data[0]) member.id = data[0].id;
         }
         await window.fetchImpartialityData();
+        window.showNotification('Committee member saved successfully', 'success');
     } catch (e) {
         console.error('Failed to sync member:', e);
-        window.showNotification('Failed to sync member to DB', 'error');
+        window.showNotification('Failed to sync member to DB: ' + e.message, 'error');
     }
 }
 
@@ -129,8 +130,10 @@ async function persistImpartialityThreat(threat) {
             if (data && data[0]) threat.id = data[0].id;
         }
         await window.fetchImpartialityData();
+        window.showNotification('Threat logged/updated successfully', 'success');
     } catch (e) {
         console.error('Failed to sync threat:', e);
+        window.showNotification('Failed to sync threat: ' + e.message, 'error');
     }
 }
 
@@ -154,8 +157,10 @@ async function persistImpartialityMeeting(meeting) {
             if (data && data[0]) meeting.id = data[0].id;
         }
         await window.fetchImpartialityData();
+        window.showNotification('Meeting record saved successfully', 'success');
     } catch (e) {
         console.error('Failed to sync meeting:', e);
+        window.showNotification('Failed to sync meeting: ' + e.message, 'error');
     }
 }
 
@@ -231,7 +236,7 @@ function renderImpartialityModule() {
     const data = window.state.impartialityCommittee;
 
     contentArea.innerHTML = `
-        <div class="fade-in">
+        <div class="fade-in" id="impartiality-root">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
                     <h2 style="margin-bottom: 0.5rem;">
@@ -266,7 +271,7 @@ function renderImpartialityModule() {
             </div>
 
             <!-- Tabs -->
-            <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+            <div id="impartiality-tabs" style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" onclick="switchImpartialityTab(this, 'members')">Committee Members</button>
                 <button class="tab-btn" onclick="switchImpartialityTab(this, 'meetings')">Meetings</button>
                 <button class="tab-btn" onclick="switchImpartialityTab(this, 'threats')">Threat Register</button>
@@ -298,7 +303,7 @@ function renderImpartialityModule() {
                                         <td>${window.UTILS.escapeHtml(m.appointedDate)} - ${window.UTILS.escapeHtml(m.termEnd)}</td>
                                         <td><span class="badge ${m.status === 'Active' ? 'bg-green' : 'bg-gray'}">${window.UTILS.escapeHtml(m.status)}</span></td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" onclick="editCommitteeMember(${m.id})" title="Edit">
+                                            <button class="btn btn-sm btn-icon" onclick="window.editCommitteeMember('${m.id}')" title="Edit">
                                                 <i class="fa-solid fa-edit"></i>
                                             </button>
                                         </td>
@@ -340,7 +345,7 @@ function renderImpartialityModule() {
                                         <td>${mtg.decisions.length} decisions</td>
                                         <td>${window.UTILS.escapeHtml(mtg.nextMeetingDate || 'TBD')}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" onclick="viewMeeting(${mtg.id})" title="View Details">
+                                            <button class="btn btn-sm btn-icon" onclick="window.viewMeeting('${mtg.id}')" title="View Details">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
                                         </td>
@@ -440,7 +445,7 @@ window.openAddCommitteeMemberModal = function () {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const name = document.getElementById('member-name').value.trim();
         const org = document.getElementById('member-org').value.trim();
 
@@ -459,10 +464,9 @@ window.openAddCommitteeMemberModal = function () {
             status: 'Active'
         };
 
-        persistImpartialityMember(newMember);
+        await persistImpartialityMember(newMember);
         window.closeModal();
         renderImpartialityModule();
-        window.showNotification('Committee member added successfully', 'success');
     };
 
     window.openModal();
@@ -507,7 +511,7 @@ window.openAddThreatModal = function () {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const type = document.getElementById('threat-type').value;
         const description = document.getElementById('threat-description').value.trim();
         const safeguard = document.getElementById('threat-safeguard').value.trim();
@@ -528,10 +532,9 @@ window.openAddThreatModal = function () {
             reviewedByCommittee: false
         };
 
-        persistImpartialityThreat(newThreat);
+        await persistImpartialityThreat(newThreat);
         window.closeModal();
         renderImpartialityModule();
-        window.showNotification('Threat logged successfully', 'success');
     };
 
     window.openModal();
@@ -592,7 +595,7 @@ window.openAddMeetingModal = function () {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const date = document.getElementById('meeting-date').value;
         const decisionsRaw = document.getElementById('meeting-decisions').value.trim();
 
@@ -628,17 +631,16 @@ window.openAddMeetingModal = function () {
             nextMeetingDate: document.getElementById('meeting-next').value
         };
 
-        persistImpartialityMeeting(newMeeting);
+        await persistImpartialityMeeting(newMeeting);
         window.closeModal();
         renderImpartialityModule();
-        window.showNotification('Meeting recorded successfully', 'success');
     };
 
     window.openModal();
 };
 
 window.editCommitteeMember = function (id) {
-    const member = window.state.impartialityCommittee.members.find(m => m.id === id);
+    const member = window.state.impartialityCommittee.members.find(m => String(m.id) === String(id));
     if (!member) return;
 
     document.getElementById('modal-title').textContent = 'Edit Committee Member';
@@ -684,7 +686,7 @@ window.editCommitteeMember = function (id) {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = () => {
+    document.getElementById('modal-save').onclick = async () => {
         const name = document.getElementById('member-name').value.trim();
         const org = document.getElementById('member-org').value.trim();
 
@@ -702,11 +704,83 @@ window.editCommitteeMember = function (id) {
         member.status = document.getElementById('member-status').value;
 
         window.saveData();
-        persistImpartialityMember(member);
+        await persistImpartialityMember(member);
         window.closeModal();
         renderImpartialityModule();
-        window.showNotification('Committee member updated successfully', 'success');
     };
 
     window.openModal();
+};
+
+window.viewMeeting = function (id) {
+    const meeting = window.state.impartialityCommittee.meetings.find(m => String(m.id) === String(id));
+    if (!meeting) return;
+
+    const members = window.state.impartialityCommittee.members;
+    const attendeeNames = meeting.attendees.map(aid => {
+        const m = members.find(member => String(member.id) === String(aid));
+        return m ? m.name : 'Unknown';
+    });
+
+    document.getElementById('modal-title').textContent = 'Meeting Details - ' + meeting.date;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="display: grid; gap: 1rem;">
+            <div>
+                <label style="font-weight: bold; color: var(--text-secondary);">Date</label>
+                <p>${window.UTILS.escapeHtml(meeting.date)}</p>
+            </div>
+            <div>
+                <label style="font-weight: bold; color: var(--text-secondary);">Attendees</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;">
+                    ${attendeeNames.map(name => `<span class="badge bg-blue">${window.UTILS.escapeHtml(name)}</span>`).join('')}
+                </div>
+            </div>
+            <div>
+                <label style="font-weight: bold; color: var(--text-secondary);">Decisions</label>
+                <ul style="margin-top: 0.25rem; padding-left: 1.25rem;">
+                    ${meeting.decisions.map(d => `<li>${window.UTILS.escapeHtml(d)}</li>`).join('')}
+                </ul>
+            </div>
+            <div>
+                <label style="font-weight: bold; color: var(--text-secondary);">Threats Reviewed</label>
+                <div class="table-container" style="margin-top: 0.5rem;">
+                    <table style="font-size: 0.85rem;">
+                        <thead>
+                            <tr>
+                                <th>Threat</th>
+                                <th>Client</th>
+                                <th>Decision</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${meeting.threatsReviewed.map(tr => `
+                                <tr>
+                                    <td>${window.UTILS.escapeHtml(tr.threat)}</td>
+                                    <td>${window.UTILS.escapeHtml(tr.client || '-')}</td>
+                                    <td><span class="badge bg-green">${window.UTILS.escapeHtml(tr.decision)}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            ${meeting.nextMeetingDate ? `
+                <div>
+                    <label style="font-weight: bold; color: var(--text-secondary);">Next Meeting</label>
+                    <p>${window.UTILS.escapeHtml(meeting.nextMeetingDate)}</p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
+
+window.viewThreat = function (id) {
+    const threat = window.state.impartialityCommittee.threats.find(t => String(t.id) === String(id));
+    if (!threat) return;
+
+    // Simple alert for now, can expand to modal if needed
+    alert(`Threat: ${threat.type}\nStatus: ${threat.status}\nDecision: ${threat.committeeDecision || 'Pending'}`);
 };
