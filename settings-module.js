@@ -3675,12 +3675,15 @@ async function extractStandardClauses(doc, standardName) {
         } else {
             const errorText = await response.text();
             console.error(`[KB Analysis] API Error: ${response.status} - ${errorText}`);
+            window.showNotification(`AI Extraction Failed: ${response.status} - ${errorText.substring(0, 50)}`, 'error');
         }
     } catch (error) {
         console.error('[KB Analysis] Exception during AI extraction:', error);
+        window.showNotification(`AI Error: ${error.message}`, 'error');
     }
 
     // Fallback: Use built-in clauses if API fails
+    window.showNotification('Switching to offline fallback mode...', 'warning');
     console.warn(`⚠️ [KB Analysis] Falling back to built-in database for ${standardName}`);
     doc.clauses = getBuiltInClauses(standardName);
     doc.status = 'ready';
