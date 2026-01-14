@@ -2992,6 +2992,17 @@ function getKnowledgeBaseHTML() {
                 </button>
             </div>
             
+            <!-- AI Diagnostics (Added for debugging) -->
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h5 style="margin: 0; color: #475569;"><i class="fa-solid fa-stethoscope"></i> AI Connection Diagnostics</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.testAIConnection()">
+                        Test API Connection
+                    </button>
+                </div>
+                <div id="ai-diagnostic-result" style="margin-top: 10px; font-family: monospace; font-size: 0.85rem; display: none; padding: 10px; background: #e2e8f0; border-radius: 4px;"></div>
+            </div>
+
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <i class="fa-solid fa-lightbulb" style="font-size: 1.5rem;"></i>
@@ -5005,6 +5016,39 @@ window.reSyncKnowledgeBase = async function () {
     } catch (e) {
         console.error('KB Re-sync failed:', e);
         window.showNotification('Refresh failed. Please check connection.', 'error');
+    }
+};
+
+// Test AI Connection Diagnostic
+window.testAIConnection = async function () {
+    const resultDiv = document.getElementById('ai-diagnostic-result');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing connection to Gemini API...';
+
+    try {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: "Hello, reply with 'Connection Successful'"
+            })
+        });
+
+        const status = response.status;
+        let data;
+        try {
+            data = await response.json();
+        } catch (e) {
+            data = { error: 'Could not parse JSON response' };
+        }
+
+        if (response.ok) {
+            resultDiv.innerHTML = `<span style="color: green; font-weight: bold;">✅ Success (Status ${status})</span><br>Response: ${JSON.stringify(data, null, 2)}`;
+        } else {
+            resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Failed (Status ${status})</span><br>Error: ${JSON.stringify(data, null, 2)}`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Network Error</span><br>${error.message}`;
     }
 };
 
