@@ -3574,43 +3574,70 @@ window.analyzeDocument = async function (type, docId) {
 
 // One-time clause extraction from standard
 async function extractStandardClauses(doc, standardName) {
+    const isEMS = standardName.toLowerCase().includes('14001');
+    const isOHS = standardName.toLowerCase().includes('45001');
+    const systemTerm = isEMS ? 'Environmental Management System (EMS)' : isOHS ? 'OH&S Management System' : 'Quality Management System (QMS)';
+    const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
+
     try {
-        // Use AI_SERVICE for robust proxy calls
-        if (!window.AI_SERVICE) {
-            throw new Error('AI Service not available');
-        }
-
-        // Check if it's EMS or OH&S to guide the AI
-        const isEMS = standardName.toLowerCase().includes('14001');
-        const isOHS = standardName.toLowerCase().includes('45001');
-        const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
-
-        // Build comprehensive extraction prompt for detailed sub-clauses
+        // Build comprehensive extraction prompt (Synced with reanalyze logic)
         const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
+        
+        This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS".
 
-        IMPORTANT: This is an ${abbr} standard. Include ALL levels of sub-clauses, such as:
-        Ensure requirements refer to "${abbr}" and not "QMS".
-        Format: [{"clause": "4.1", "title": "...", "requirement": "..."}]
-        Return ONLY the JSON array.`;
+For each clause, include:
+- "clause": The clause number (e.g., "4.4.1", "5.1.1")
+- "title": The official clause title
+- "requirement": The main requirement statement
+- "subRequirements": An array of the specific bullet points (a, b, c, d, etc.)
 
-        const responseText = await window.AI_SERVICE.callProxyAPI(prompt);
+Example format:
+[
+  {
+    "clause": "5.1.1",
+    "title": "Leadership and commitment - General",
+    "requirement": "Top management shall demonstrate leadership and commitment with respect to the ${abbr} by:",
+    "subRequirements": [
+      "a) taking accountability for the effectiveness of the ${abbr}",
+      "b) ensuring that the policy and objectives are established..."
+    ]
+  }
+]
 
-        // Parse JSON from response
-        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            doc.clauses = JSON.parse(jsonMatch[0]);
-            doc.status = 'ready';
-            window.saveData();
-            console.log(`Extracted ${doc.clauses.length} clauses from ${standardName}`);
-            return;
+Return ONLY the JSON array.`;
+
+        // Direct fetch to proxy for consistent behavior across modules
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            // Parse JSON from response
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const newClauses = JSON.parse(jsonMatch[0]);
+                doc.clauses = newClauses;
+                doc.status = 'ready';
+                doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+                window.saveData();
+                console.log(`Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
+                return;
+            }
         }
     } catch (error) {
         console.error('Clause extraction error:', error);
     }
 
     // Fallback: Use built-in clauses if API fails
-    doc.clauses = getBuiltInClauses(doc.name);
+    console.warn(`Falling back to built-in database for ${standardName}`);
+    doc.clauses = getBuiltInClauses(standardName);
     doc.status = 'ready';
+    doc.lastAnalyzed = new Date().toISOString().split('T')[0];
     window.saveData();
 }
 
