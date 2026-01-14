@@ -3579,6 +3579,8 @@ async function extractStandardClauses(doc, standardName) {
     const systemTerm = isEMS ? 'Environmental Management System (EMS)' : isOHS ? 'OH&S Management System' : 'Quality Management System (QMS)';
     const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
 
+    console.log(`[KB Analysis] Starting AI extraction for: ${standardName}`);
+
     try {
         // Build comprehensive extraction prompt (Synced with reanalyze logic)
         const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
@@ -3606,6 +3608,8 @@ Example format:
 
 Return ONLY the JSON array.`;
 
+        console.log(`[KB Analysis] Calling AI API...`);
+
         // Direct fetch to proxy for consistent behavior across modules
         const response = await fetch('/api/gemini', {
             method: 'POST',
@@ -3613,9 +3617,13 @@ Return ONLY the JSON array.`;
             body: JSON.stringify({ prompt })
         });
 
+        console.log(`[KB Analysis] API Response Status: ${response.status}`);
+
         if (response.ok) {
             const data = await response.json();
             const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            console.log(`[KB Analysis] AI Response received, length: ${text.length} chars`);
 
             // Parse JSON from response
             const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -3625,20 +3633,26 @@ Return ONLY the JSON array.`;
                 doc.status = 'ready';
                 doc.lastAnalyzed = new Date().toISOString().split('T')[0];
                 window.saveData();
-                console.log(`Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
+                console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
                 return;
+            } else {
+                console.warn(`[KB Analysis] No JSON array found in AI response`);
             }
+        } else {
+            const errorText = await response.text();
+            console.error(`[KB Analysis] API Error: ${response.status} - ${errorText}`);
         }
     } catch (error) {
-        console.error('Clause extraction error:', error);
+        console.error('[KB Analysis] Exception during AI extraction:', error);
     }
 
     // Fallback: Use built-in clauses if API fails
-    console.warn(`Falling back to built-in database for ${standardName}`);
+    console.warn(`⚠️ [KB Analysis] Falling back to built-in database for ${standardName}`);
     doc.clauses = getBuiltInClauses(standardName);
     doc.status = 'ready';
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
     window.saveData();
+    console.log(`[KB Analysis] Fallback complete: ${doc.clauses.length} clauses loaded`);
 }
 
 // Built-in clause database for common standards (fallback) - COMPREHENSIVE with sub-clauses and bullet points
@@ -4062,18 +4076,24 @@ window.handleReanalyze = function (docId, docType) {
 };
 
 // Delete Knowledge Document
-window.deleteKnowledgeDoc = function (type, id) {
+window.deleteKnowledgeDoc = async function (type, id) {
     if (!confirm('Are you sure you want to delete this document from the Knowledge Base?')) return;
 
     const kb = window.state.knowledgeBase;
+    let doc = null;
 
+    // Find the document
     if (type === 'standard') {
+        doc = kb.standards.find(d => d.id == id);
         kb.standards = kb.standards.filter(d => d.id != id);
     } else if (type === 'sop') {
+        doc = kb.sops.find(d => d.id == id);
         kb.sops = kb.sops.filter(d => d.id != id);
     } else if (type === 'policy') {
+        doc = kb.policies.find(d => d.id == id);
         kb.policies = kb.policies.filter(d => d.id != id);
     } else {
+        doc = kb.marketing.find(d => d.id == id);
         kb.marketing = kb.marketing.filter(d => d.id != id);
     }
 
@@ -4085,12 +4105,29 @@ window.deleteKnowledgeDoc = function (type, id) {
     }
     window.showNotification('Document removed from Knowledge Base', 'success');
 
-    // Sync removal to cloud
-    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+    // Delete from Supabase (storage + database)
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized && doc) {
         try {
-            window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
+            // Delete from storage if cloudPath exists
+            if (doc.cloudPath) {
+                await window.SupabaseClient.client.storage
+                    .from('documents')
+                    .remove([doc.cloudPath]);
+                console.log('Deleted file from storage:', doc.cloudPath);
+            }
+
+            // Delete from documents table
+            await window.SupabaseClient.client
+                .from('documents')
+                .delete()
+                .eq('id', id);
+            console.log('Deleted document metadata from database:', id);
+
+            // Sync settings (KB metadata)
+            await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
         } catch (e) {
-            console.warn('Metadata sync failed:', e);
+            console.error('Cloud deletion failed:', e);
+            window.showNotification('Document deleted locally, but cloud sync failed', 'warning');
         }
     }
 };
