@@ -2987,6 +2987,9 @@ function getKnowledgeBaseHTML() {
                     <i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>
                     Knowledge Base
                 </h3>
+                <button class="btn btn-sm" onclick="window.reSyncKnowledgeBase()" title="Pull latest documents from cloud">
+                    <i class="fa-solid fa-sync"></i> Re-sync Cloud Data
+                </button>
             </div>
             
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
@@ -3346,6 +3349,9 @@ window.uploadKnowledgeDoc = function (type) {
 
         const file = fileInput.files[0];
         let extractedText = null;
+        let docId = null;
+        let cloudUrl = null;
+        let cloudPath = null;
 
         // Extract text for analysis
         try {
@@ -3354,33 +3360,25 @@ window.uploadKnowledgeDoc = function (type) {
             console.warn('Could not extract text:', err);
         }
 
-        // Upload file to Supabase Storage
-        let cloudUrl = null;
-        let cloudPath = null;
+        // Upload Document via standard client (Handles Storage + DB Metadata)
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
             try {
-                const timestamp = Date.now();
-                const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
-                const ext = file.name.split('.').pop().toLowerCase();
-                const filename = `${type}/${sanitizedName}_${timestamp}.${ext}`;
+                const uploadResult = await window.SupabaseClient.uploadDocument(file, {
+                    name: name,
+                    folder: type,
+                    uploadedBy: window.state.currentUser?.email
+                });
 
-                const { data, error } = await window.SupabaseClient.client.storage
-                    .from('documents')
-                    .upload(filename, file, {
-                        cacheControl: '3600',
-                        upsert: true
-                    });
-
-                if (error) throw error;
-
-                // Get public URL
-                cloudUrl = window.SupabaseClient.storage.getPublicUrl('documents', filename);
-                cloudPath = filename;
-                console.log('Document uploaded to cloud:', filename);
+                cloudUrl = uploadResult.url;
+                cloudPath = uploadResult.path;
+                docId = uploadResult.id;
             } catch (uploadErr) {
                 console.error('Failed to upload document to cloud:', uploadErr);
                 window.showNotification('File saved locally (cloud upload failed)', 'warning');
+                docId = Date.now();
             }
+        } else {
+            docId = Date.now();
         }
 
         const kb = window.state.knowledgeBase;
@@ -3388,7 +3386,7 @@ window.uploadKnowledgeDoc = function (type) {
 
         // Create document entry with pending status
         const newDoc = {
-            id: Date.now(),
+            id: docId,
             name: name,
             fileName: file.name,
             uploadDate: new Date().toISOString().split('T')[0],
@@ -3411,7 +3409,7 @@ window.uploadKnowledgeDoc = function (type) {
         // Re-render the tab
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
 
-        // Sync to cloud
+        // Sync metadata to settings table
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
             try {
                 await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
@@ -4831,4 +4829,35 @@ window.resetUsageData = function () {
         }
     }
 };
+
+// Re-sync Knowledge Base from Cloud
+window.reSyncKnowledgeBase = async function () {
+    if (!window.SupabaseClient || !window.SupabaseClient.isInitialized) {
+        window.showNotification('Supabase not initialized', 'error');
+        return;
+    }
+
+    try {
+        window.showNotification('Refreshing documents from cloud...', 'info');
+
+        // This will call syncDocumentsFromSupabase which now includes KB auto-population logic
+        const result = await window.SupabaseClient.syncDocumentsFromSupabase();
+
+        // Force refresh UI
+        if (typeof switchSettingsTab === 'function') {
+            switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        }
+
+        if (result.added > 0 || result.updated > 0) {
+            window.showNotification(`Found ${result.added} new documents in cloud.`, 'success');
+        } else {
+            window.showNotification('Knowledge Base is up to date.', 'info');
+        }
+    } catch (e) {
+        console.error('KB Re-sync failed:', e);
+        window.showNotification('Refresh failed. Please check connection.', 'error');
+    }
+};
+
+Logger.info('Settings module extensions loaded');
 

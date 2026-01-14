@@ -310,54 +310,38 @@ const SupabaseClient = {
             const results = {
                 clients: { added: 0, updated: 0 },
                 auditors: { added: 0, updated: 0 },
-                users: { added: 0, updated: 0 }
+                users: { added: 0, updated: 0 },
+                settings: false,
+                documents: { added: 0, updated: 0 }
             };
 
-            // Load clients
-            try {
-                results.clients = await this.syncClientsFromSupabase();
-            } catch (error) {
-                Logger.warn('Failed to sync clients:', error.message);
-            }
+            // 1. Load basic entities
+            try { results.clients = await this.syncClientsFromSupabase(); } catch (e) { Logger.warn('Clients sync failed:', e); }
+            try { results.auditors = await this.syncAuditorsFromSupabase(); } catch (e) { Logger.warn('Auditors sync failed:', e); }
+            try { results.users = await this.syncUsersFromSupabase(); } catch (e) { Logger.warn('Users sync failed:', e); }
 
-            // Load auditors
+            // 2. Load Settings & Knowledge Base (CRITICAL for the reported issue)
             try {
-                results.auditors = await this.syncAuditorsFromSupabase();
-            } catch (error) {
-                Logger.warn('Failed to sync auditors:', error.message);
-            }
+                const settingsResult = await this.syncSettingsFromSupabase();
+                results.settings = settingsResult.updated;
+            } catch (e) { Logger.warn('Settings sync failed:', e); }
 
-            // Load users
-            try {
-                results.users = await this.syncUsersFromSupabase();
-            } catch (error) {
-                Logger.warn('Failed to sync users:', error.message);
-            }
+            // 3. Load Documents (Includes Knowledge Base files)
+            try { results.documents = await this.syncDocumentsFromSupabase(); } catch (e) { Logger.warn('Documents sync failed:', e); }
+
+            // 4. Load Operational data
+            try { await this.syncAuditPlansFromSupabase(); } catch (e) { Logger.warn('Audit Plans sync failed:', e); }
+            try { await this.syncAuditReportsFromSupabase(); } catch (e) { Logger.warn('Audit Reports sync failed:', e); }
+            try { await this.syncChecklistsFromSupabase(); } catch (e) { Logger.warn('Checklists sync failed:', e); }
+            try { await this.syncCertificationDecisionsFromSupabase(); } catch (e) { Logger.warn('Certification Decisions sync failed:', e); }
 
             // CRITICAL: Save to localStorage directly (don't call saveData - it triggers upload!)
-            // This prevents re-uploading data we just downloaded from database
             localStorage.setItem('auditCB360State', JSON.stringify(window.state));
 
             // Mark that data is fully loaded from cloud
-            // This allows subsequent saves to sync to cloud
             window._dataFullyLoaded = true;
 
-            Logger.info('Cloud data loaded:', results);
-
-            // DISABLED: This notification is misleading - it shows data LOADED, not UPLOADED
-            // Users think data is being synced TO cloud when it's actually being loaded FROM cloud
-            /*
-            const totalAdded = results.clients.added + results.auditors.added + results.users.added;
-            const totalUpdated = results.clients.updated + results.auditors.updated + results.users.updated;
-
-            if (totalAdded > 0 || totalUpdated > 0) {
-                window.showNotification(
-                    `Data synced: ${totalAdded} new, ${totalUpdated} updated`,
-                    'success'
-                );
-            }
-            */
-
+            Logger.info('Cloud data load complete:', results);
             return results;
         } catch (error) {
             Logger.error('Failed to load user data from cloud:', error);
@@ -1746,26 +1730,62 @@ const SupabaseClient = {
             let added = 0, updated = 0;
 
             data.forEach(doc => {
-                const existing = localDocs.find(d => d.id === doc.id);
+                const existing = localDocs.find(d => String(d.id) === String(doc.id));
+                const mappedDoc = {
+                    id: doc.id,
+                    name: doc.name,
+                    type: doc.type,
+                    url: doc.url,
+                    storagePath: doc.storage_path,
+                    folder: doc.folder,
+                    fileSize: doc.file_size,
+                    uploadedBy: doc.uploaded_by,
+                    uploadedAt: doc.uploaded_at,
+                    uploadDate: doc.uploaded_at ? new Date(doc.uploaded_at).toISOString().split('T')[0] : null
+                };
+
                 if (existing) {
-                    Object.assign(existing, {
-                        name: doc.name,
-                        type: doc.type,
-                        url: doc.url,
-                        uploadedBy: doc.uploaded_by,
-                        uploadedAt: doc.uploaded_at
-                    });
+                    Object.assign(existing, mappedDoc);
                     updated++;
                 } else {
-                    localDocs.push({
-                        id: doc.id,
-                        name: doc.name,
-                        type: doc.type,
-                        url: doc.url,
-                        uploadedBy: doc.uploaded_by,
-                        uploadedAt: doc.uploaded_at
-                    });
+                    localDocs.push(mappedDoc);
                     added++;
+                }
+
+                // AUTO-POPULATE KNOWLEDGE BASE
+                // If the document is in a KB folder, ensure it's in the KB state
+                const kbFolders = ['standard', 'sop', 'policy', 'marketing'];
+                if (doc.folder && kbFolders.includes(doc.folder)) {
+                    if (!window.state.knowledgeBase) {
+                        window.state.knowledgeBase = { standards: [], sops: [], policies: [], marketing: [] };
+                    }
+
+                    const kb = window.state.knowledgeBase;
+                    let collection;
+                    if (doc.folder === 'standard') collection = kb.standards;
+                    else if (doc.folder === 'sop') collection = kb.sops;
+                    else if (doc.folder === 'policy') collection = kb.policies;
+                    else if (doc.folder === 'marketing') collection = kb.marketing;
+
+                    if (collection) {
+                        const docId = String(doc.id);
+                        const inKB = collection.some(k => String(k.id) === docId || k.cloudPath === doc.storage_path);
+
+                        if (!inKB) {
+                            collection.push({
+                                id: doc.id,
+                                name: doc.name,
+                                fileName: doc.name, // Fallback to name
+                                uploadDate: mappedDoc.uploadDate,
+                                status: 'pending', // Needs analysis
+                                fileSize: doc.file_size,
+                                cloudUrl: doc.url,
+                                cloudPath: doc.storage_path,
+                                clauses: []
+                            });
+                            Logger.info(`Auto-added document to Knowledge Base: ${doc.name}`);
+                        }
+                    }
                 }
             });
 
