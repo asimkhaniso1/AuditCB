@@ -59,8 +59,8 @@ USING (
   is_admin_or_cert_manager() OR 
   EXISTS (
     SELECT 1 FROM public.auditor_assignments 
-    WHERE auditor_id = get_my_auditor_id() 
-    AND client_id = public.clients.id::TEXT
+    WHERE auditor_id::TEXT = get_my_auditor_id()::TEXT 
+    AND client_id::TEXT = public.clients.id::TEXT
   )
 )
 WITH CHECK (
@@ -90,17 +90,16 @@ USING (
   is_admin_or_cert_manager() OR 
   EXISTS (
     SELECT 1 FROM public.auditor_assignments 
-    WHERE auditor_id = get_my_auditor_id() 
-    AND client_id = public.audit_plans.client_id
+    WHERE auditor_id::TEXT = get_my_auditor_id()::TEXT 
+    AND client_id::TEXT = public.audit_plans.client_id::TEXT
   )
 )
 WITH CHECK (
   is_admin_or_cert_manager() OR 
   EXISTS (
     SELECT 1 FROM public.auditor_assignments 
-    WHERE auditor_id = get_my_auditor_id() 
-    AND client_id = public.audit_plans.client_id
-    -- Auditors can only edit plans if they are assigned to that client
+    WHERE auditor_id::TEXT = get_my_auditor_id()::TEXT 
+    AND client_id::TEXT = public.audit_plans.client_id::TEXT
   )
 );
 
@@ -113,16 +112,16 @@ USING (
   is_admin_or_cert_manager() OR 
   EXISTS (
     SELECT 1 FROM public.auditor_assignments 
-    WHERE auditor_id = get_my_auditor_id() 
-    AND client_id = public.audit_reports.client_id
+    WHERE auditor_id::TEXT = get_my_auditor_id()::TEXT 
+    AND client_id::TEXT = public.audit_reports.client_id::TEXT
   )
 )
 WITH CHECK (
   is_admin_or_cert_manager() OR 
   EXISTS (
     SELECT 1 FROM public.auditor_assignments 
-    WHERE auditor_id = get_my_auditor_id() 
-    AND client_id = public.audit_reports.client_id
+    WHERE auditor_id::TEXT = get_my_auditor_id()::TEXT 
+    AND client_id::TEXT = public.audit_reports.client_id::TEXT
   )
 );
 
@@ -133,7 +132,7 @@ CREATE POLICY "Auditor assignments access" ON public.auditor_assignments
 FOR SELECT TO authenticated
 USING (
   is_admin_or_cert_manager() OR 
-  auditor_id = get_my_auditor_id()
+  auditor_id::TEXT = get_my_auditor_id()::TEXT
 );
 
 DROP POLICY IF EXISTS "Auditor assignments manage" ON public.auditor_assignments ;
