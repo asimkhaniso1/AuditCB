@@ -3618,7 +3618,7 @@ async function extractStandardClauses(doc, standardName) {
     console.log(`[KB Analysis] Starting AI extraction for: ${standardName} (${abbr})`);
 
     try {
-        // Build comprehensive extraction prompt (Synced with reanalyze logic)
+        // Build comprehensive extraction prompt
         const prompt = `You are an expert Lead Auditor for ISO standards. Your task is to extract every single audit requirement from the provided text for the standard "${standardName}".
         
         CRITICAL INSTRUCTIONS:
@@ -3642,17 +3642,16 @@ async function extractStandardClauses(doc, standardName) {
         
         Return ONLY valid JSON. No markdown formatting.`;
 
-
         console.log(`[KB Analysis] Calling AI API...`);
 
-        // Direct fetch to proxy for consistent behavior across modules
+        // Direct fetch to proxy
         const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt })
         });
 
-        console.log(`[KB Analysis] API Response Status: ${response.status} `);
+        console.log(`[KB Analysis] API Response Status: ${response.status}`);
 
         if (response.ok) {
             const data = await response.json();
@@ -3668,21 +3667,21 @@ async function extractStandardClauses(doc, standardName) {
                 doc.status = 'ready';
                 doc.lastAnalyzed = new Date().toISOString().split('T')[0];
                 window.saveData();
-                console.log(`✅[KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
+                console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
                 return;
             } else {
                 console.warn(`[KB Analysis] No JSON array found in AI response`);
             }
         } else {
             const errorText = await response.text();
-            console.error(`[KB Analysis] API Error: ${response.status} - ${errorText} `);
+            console.error(`[KB Analysis] API Error: ${response.status} - ${errorText}`);
         }
     } catch (error) {
         console.error('[KB Analysis] Exception during AI extraction:', error);
     }
 
     // Fallback: Use built-in clauses if API fails
-    console.warn(`⚠️[KB Analysis] Falling back to built -in database for ${standardName}`);
+    console.warn(`⚠️ [KB Analysis] Falling back to built-in database for ${standardName}`);
     doc.clauses = getBuiltInClauses(standardName);
     doc.status = 'ready';
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
@@ -4078,7 +4077,7 @@ window.analyzeCustomDocWithAI = async function (doc, type) {
 
     try {
         const response = await AI_SERVICE.callProxyAPI(prompt);
-        let validJson = response.replace(/```json / g, '').replace(/```/g, '').trim();
+        let validJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
         const tabs = JSON.parse(validJson);
 
         doc.clauses = tabs;
@@ -4437,7 +4436,7 @@ Return ONLY the JSON array.`;
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
     window.saveData();
 
-    window.showNotification(`Re - analysis complete using built-in clause database(${doc.clauses.length} clauses).`, 'info');
+    window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
     if (typeof switchSettingsSubTab === 'function') {
         switchSettingsSubTab('knowledge', 'kb');
     } else {
