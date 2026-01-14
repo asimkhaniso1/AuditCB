@@ -3410,6 +3410,15 @@ window.uploadKnowledgeDoc = function (type) {
 
         // Re-render the tab
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+
+        // Sync to cloud
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
+            } catch (e) {
+                console.warn('Metadata sync failed:', e);
+            }
+        }
     };
 
     window.openModal();
@@ -3441,6 +3450,15 @@ window.analyzeStandard = async function (docId) {
         window.showNotification(`${doc.name} analysis complete! ${doc.clauses ? doc.clauses.length : 0} clauses indexed.`, 'success');
     } else {
         window.showNotification(`Analysis complete. Using fallback clause data.`, 'info');
+    }
+
+    // Sync metadata
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        try {
+            await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
+        } catch (e) {
+            console.warn('Metadata sync failed:', e);
+        }
     }
 };
 
@@ -3524,9 +3542,18 @@ window.analyzeDocument = async function (type, docId) {
     window.saveData();
 
     // Small delay for visual feedback
-    setTimeout(() => {
+    setTimeout(async () => {
         switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
         window.showNotification(`${doc.name} analyzed! ${doc.clauses.length} sections indexed.`, 'success');
+
+        // Sync metadata
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            try {
+                await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
+            } catch (e) {
+                console.warn('Metadata sync failed:', e);
+            }
+        }
     }, 300);
 };
 
@@ -3534,45 +3561,40 @@ window.analyzeDocument = async function (type, docId) {
 // One-time clause extraction from standard
 async function extractStandardClauses(doc, standardName) {
     try {
+        // Use AI_SERVICE for robust proxy calls
+        if (!window.AI_SERVICE) {
+            throw new Error('AI Service not available');
+        }
+
         // Build comprehensive extraction prompt for detailed sub-clauses
         const prompt = `You are an ISO standards expert. For the standard "${standardName}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
 
 IMPORTANT: Include ALL levels of sub-clauses, such as:
 - Main clauses: 4, 5, 6, 7, 8, 9, 10
 - First level sub-clauses: 4.1, 4.2, 4.3, 5.1, 5.2, etc.
-- Second level sub-clauses: 4.4.1, 4.4.2, 5.1.1, 5.1.2, 6.1.1, 6.2.1, 6.2.2, 7.1.1, 7.1.2, 7.1.3, 7.1.4, 7.1.5, 7.1.6, 7.5.1, 7.5.2, 7.5.3, 8.2.1, 8.2.2, 8.2.3, 8.3.1, 8.3.2, 8.3.3, 8.3.4, 8.3.5, 8.3.6, 8.4.1, 8.4.2, 8.4.3, 8.5.1, 8.5.2, 8.5.3, 8.5.4, 8.5.5, 8.5.6, 8.7.1, 8.7.2, 9.1.1, 9.1.2, 9.1.3, 9.2.1, 9.2.2, 9.3.1, 9.3.2, 9.3.3, 10.2.1, 10.2.2, etc.
-- Third level sub-clauses where applicable: 7.1.5.1, 7.1.5.2, 7.5.3.1, 7.5.3.2, 8.2.3.1, 8.2.3.2, etc.
+- Second level sub-clauses: 4.4.1, 4.4.2, 5.1.1, 5.1.2, 6.1.1, 6.2.1, 8.1.1, 8.5.1, 9.1.1, 10.2.1, etc.
 
-Format: [{"clause": "4.1", "title": "Understanding the organization and its context", "requirement": "The organization shall determine external and internal issues that are relevant to its purpose and strategic direction..."}, ...]
+Format: [{"clause": "4.1", "title": "Understanding the organization and its context", "requirement": "The organization shall determine external and internal issues that are relevant to its purpose..."}, ...]
 
 Include ALL clauses from 4 through 10 with ALL their sub-clauses. Each requirement should be detailed (2-3 sentences with the key "shall" statements).
 Return ONLY the JSON array, no markdown or explanation.`;
 
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
+        const responseText = await window.AI_SERVICE.callProxyAPI(prompt);
 
-        if (response.ok) {
-            const data = await response.json();
-            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            // Parse JSON from response
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                doc.clauses = JSON.parse(jsonMatch[0]);
-                doc.status = 'ready';
-                window.saveData();
-                console.log(`Extracted ${doc.clauses.length} clauses from ${standardName}`);
-                return;
-            }
+        // Parse JSON from response
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            doc.clauses = JSON.parse(jsonMatch[0]);
+            doc.status = 'ready';
+            window.saveData();
+            console.log(`Extracted ${doc.clauses.length} clauses from ${standardName}`);
+            return;
         }
     } catch (error) {
         console.error('Clause extraction error:', error);
     }
 
-    // Fallback: Use built-in ISO 9001 clauses if API fails
+    // Fallback: Use built-in clauses if API fails
     doc.clauses = getBuiltInClauses(doc.name);
     doc.status = 'ready';
     window.saveData();
@@ -3807,22 +3829,44 @@ function getBuiltInClauses(standardName) {
         { clause: "10.3", title: "Continual improvement", requirement: "The organization shall continually improve the suitability, adequacy and effectiveness of the quality management system. The organization shall consider the results of analysis and evaluation, and the outputs from management review, to determine if there are needs or opportunities that shall be addressed as part of continual improvement." }
     ];
 
-    // ISO 14001 Environmental Management System clauses
+    // ISO 14001 Environmental Management System clauses (Unique sections)
     if (standardName.includes('14001')) {
-        return iso9001Clauses.map(c => ({
-            ...c,
-            title: c.title.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace('customer', 'interested party'),
-            requirement: c.requirement.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace(/customer(?!s)/gi, 'interested party')
-        }));
+        const iso14001Specific = [
+            { clause: "6.1.2", title: "Environmental aspects", requirement: "The organization shall determine the environmental aspects of its activities, products and services that it can control and those that it can influence, and their associated environmental impacts, considering a life cycle perspective." },
+            { clause: "6.1.3", title: "Compliance obligations", requirement: "The organization shall determine and have access to the compliance obligations related to its environmental aspects." },
+            { clause: "8.2", title: "Emergency preparedness and response", requirement: "The organization shall establish, implement and maintain the processes needed to prepare for and respond to potential emergency situations." }
+        ];
+
+        return iso9001Clauses.map(c => {
+            const specific = iso14001Specific.find(s => s.clause === c.clause);
+            if (specific) return specific;
+
+            return {
+                ...c,
+                title: c.title.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace('customer', 'interested party'),
+                requirement: c.requirement.replace(/quality/gi, 'environmental').replace(/QMS/g, 'EMS').replace(/customer(?!s)/gi, 'interested party')
+            };
+        });
     }
 
-    // ISO 45001 Occupational Health and Safety clauses
+    // ISO 45001 Occupational Health and Safety clauses (Unique sections)
     if (standardName.includes('45001')) {
-        return iso9001Clauses.map(c => ({
-            ...c,
-            title: c.title.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S MS').replace('customer', 'worker'),
-            requirement: c.requirement.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S management system').replace(/customer(?!s)/gi, 'worker')
-        }));
+        const iso45001Specific = [
+            { clause: "5.4", title: "Consultation and participation of workers", requirement: "The organization shall establish, implement and maintain a process for consultation and participation of workers at all applicable levels and functions." },
+            { clause: "6.1.2", title: "Hazard identification and assessment of risks and opportunities", requirement: "The organization shall establish, implement and maintain a process for hazard identification that is ongoing and proactive." },
+            { clause: "8.1.2", title: "Eliminating hazards and reducing OH&S risks", requirement: "The organization shall establish, implement and maintain a process for the elimination of hazards and reduction of OH&S risks using the hierarchy of controls." }
+        ];
+
+        return iso9001Clauses.map(c => {
+            const specific = iso45001Specific.find(s => s.clause === c.clause);
+            if (specific) return specific;
+
+            return {
+                ...c,
+                title: c.title.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S MS').replace('customer', 'worker'),
+                requirement: c.requirement.replace(/quality/gi, 'OH&S').replace(/QMS/g, 'OH&S management system').replace(/customer(?!s)/gi, 'worker')
+            };
+        });
     }
 
     if (standardName.includes('9001')) return iso9001Clauses;
@@ -3975,6 +4019,15 @@ window.deleteKnowledgeDoc = function (type, id) {
     window.saveData();
     switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
     window.showNotification('Document removed from Knowledge Base', 'success');
+
+    // Sync removal to cloud
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        try {
+            window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
+        } catch (e) {
+            console.warn('Metadata sync failed:', e);
+        }
+    }
 };
 
 // ============================================

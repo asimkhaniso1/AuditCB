@@ -129,7 +129,7 @@ async function persistAppeal(appeal) {
 
         await window.fetchAppealsComplaints();
         window.showNotification('Appeal saved successfully', 'success');
-        renderAppealsComplaintsModule();
+        if (typeof renderAppealsComplaintsModule === 'function') renderAppealsComplaintsModule();
 
     } catch (e) {
         console.error('Failed to sync appeal:', e);
@@ -180,7 +180,7 @@ async function persistComplaint(complaint) {
 
         await window.fetchAppealsComplaints();
         window.showNotification('Complaint saved successfully', 'success');
-        renderAppealsComplaintsModule();
+        if (typeof renderAppealsComplaintsModule === 'function') renderAppealsComplaintsModule();
 
     } catch (e) {
         console.error('Failed to sync complaint:', e);
@@ -344,9 +344,17 @@ function renderAppealsTab(appeals) {
                             <td>${window.UTILS.escapeHtml(a.dueDate || '-')}</td>
                             <td><span class="badge" style="background: ${getStatusColor(a.status)}; color: white;">${window.UTILS.escapeHtml(a.status)}</span></td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="window.viewAppealDetail(${a.id})">
-                                    <i class="fa-solid fa-eye"></i> View
-                                </button>
+                                <div style="display: flex; gap: 0.25rem;">
+                                    <button class="btn btn-sm btn-icon" onclick="window.viewAppealDetail(${a.id})" title="View Details">
+                                        <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="window.editAppeal(${a.id})" title="Edit Appeal">
+                                        <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="window.deleteAppeal(${a.id})" title="Delete Appeal">
+                                        <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     `).join('')}
@@ -404,9 +412,17 @@ function renderComplaintsTab(complaints) {
                             <td>${window.UTILS.escapeHtml(c.dueDate || '-')}</td>
                             <td><span class="badge" style="background: ${getStatusColor(c.status)}; color: white;">${window.UTILS.escapeHtml(c.status)}</span></td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="window.viewComplaintDetail(${c.id})">
-                                    <i class="fa-solid fa-eye"></i> View
-                                </button>
+                                <div style="display: flex; gap: 0.25rem;">
+                                    <button class="btn btn-sm btn-icon" onclick="window.viewComplaintDetail(${c.id})" title="View Details">
+                                        <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="window.editComplaint(${c.id})" title="Edit Complaint">
+                                        <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-icon" onclick="window.deleteComplaint(${c.id})" title="Delete Complaint">
+                                        <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     `).join('')}
@@ -761,10 +777,206 @@ window.updateComplaintStatus = function (id) {
     window.openModal();
 };
 
-// ... Print and Panel Records remain largely the same, mostly UI ...
+// --- PRINT REGISTER ---
 window.printACRegister = function (type) {
-    // (Placeholder for Print Logic for brevity)
-    alert('Print feature called for ' + type);
+    const data = type === 'appeals' ? window.state.appeals : window.state.complaints;
+    const title = type === 'appeals' ? 'Appeals Register' : 'Complaints Register';
+
+    const printWindow = window.open('', '', 'width=900,height=700');
+    let tableHTML = '';
+
+    if (type === 'appeals') {
+        tableHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Client</th>
+                        <th>Type</th>
+                        <th>Subject</th>
+                        <th>Received</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(a => `
+                        <tr>
+                            <td>APP-${String(a.id).padStart(3, '0')}</td>
+                            <td>${a.clientName || '-'}</td>
+                            <td>${a.type}</td>
+                            <td>${a.subject}</td>
+                            <td>${a.dateReceived}</td>
+                            <td>${a.dueDate || '-'}</td>
+                            <td>${a.status}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } else {
+        tableHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Source</th>
+                        <th>Client</th>
+                        <th>Subject</th>
+                        <th>Received</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(c => `
+                        <tr>
+                            <td>CMP-${String(c.id).padStart(3, '0')}</td>
+                            <td>${c.source}</td>
+                            <td>${c.clientName || '-'}</td>
+                            <td>${c.subject}</td>
+                            <td>${c.dateReceived}</td>
+                            <td>${c.severity}</td>
+                            <td>${c.status}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>${title}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { text-align: center; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <h1>${title}</h1>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+            ${tableHTML}
+            <div class="footer">
+                ISO 17021-1 Governance Record - Confidential
+            </div>
+            <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
+
+// --- EDIT & DELETE HELPERS ---
+window.editAppeal = function (id) {
+    const appeal = window.state.appeals.find(a => String(a.id) === String(id));
+    if (!appeal) return;
+
+    // Reuse existing modal but with edit logic
+    window.openNewAppealModal();
+    document.getElementById('modal-title').textContent = 'Edit Appeal';
+
+    // Fill form
+    document.getElementById('appeal-client').value = appeal.clientId;
+    document.getElementById('appeal-type').value = appeal.type;
+    document.getElementById('appeal-subject').value = appeal.subject;
+    document.getElementById('appeal-description').value = appeal.description;
+    document.getElementById('appeal-date').value = appeal.dateReceived;
+    document.getElementById('appeal-due').value = appeal.dueDate;
+    document.getElementById('appeal-assigned').value = appeal.assignedTo;
+
+    // Override save
+    document.getElementById('modal-save').onclick = async function () {
+        const clientSelect = document.getElementById('appeal-client');
+        appeal.clientId = clientSelect.value;
+        appeal.clientName = clientSelect.options[clientSelect.selectedIndex]?.dataset?.name || '';
+        appeal.type = document.getElementById('appeal-type').value;
+        appeal.subject = document.getElementById('appeal-subject').value;
+        appeal.description = document.getElementById('appeal-description').value;
+        appeal.dateReceived = document.getElementById('appeal-date').value;
+        appeal.dueDate = document.getElementById('appeal-due').value;
+        appeal.assignedTo = document.getElementById('appeal-assigned').value;
+
+        await persistAppeal(appeal);
+        window.closeModal();
+    };
+};
+
+window.deleteAppeal = async function (id) {
+    if (!confirm('Are you sure you want to delete this appeal record?')) return;
+    try {
+        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient.from('audit_appeals').delete().eq('id', id);
+            if (error) throw error;
+        }
+        window.state.appeals = window.state.appeals.filter(a => String(a.id) !== String(id));
+        window.saveData();
+        renderAppealsComplaintsModule();
+        window.showNotification('Appeal deleted', 'success');
+    } catch (e) {
+        window.showNotification('Delete failed: ' + e.message, 'error');
+    }
+};
+
+window.editComplaint = function (id) {
+    const complaint = window.state.complaints.find(c => String(c.id) === String(id));
+    if (!complaint) return;
+
+    window.openNewComplaintModal();
+    document.getElementById('modal-title').textContent = 'Edit Complaint';
+
+    document.getElementById('complaint-source').value = complaint.source;
+    document.getElementById('complaint-client').value = complaint.clientName;
+    document.getElementById('complaint-type').value = complaint.type;
+    document.getElementById('complaint-severity').value = complaint.severity;
+    document.getElementById('complaint-subject').value = complaint.subject;
+    document.getElementById('complaint-description').value = complaint.description;
+    document.getElementById('complaint-date').value = complaint.dateReceived;
+    document.getElementById('complaint-due').value = complaint.dueDate;
+    document.getElementById('complaint-investigator').value = complaint.investigator;
+
+    // Select auditors
+    const audSelect = document.getElementById('complaint-auditors');
+    Array.from(audSelect.options).forEach(opt => {
+        opt.selected = (complaint.auditorsInvolved || []).includes(opt.value);
+    });
+
+    document.getElementById('modal-save').onclick = async function () {
+        complaint.source = document.getElementById('complaint-source').value;
+        complaint.clientName = document.getElementById('complaint-client').value;
+        complaint.type = document.getElementById('complaint-type').value;
+        complaint.severity = document.getElementById('complaint-severity').value;
+        complaint.subject = document.getElementById('complaint-subject').value;
+        complaint.description = document.getElementById('complaint-description').value;
+        complaint.dateReceived = document.getElementById('complaint-date').value;
+        complaint.dueDate = document.getElementById('complaint-due').value;
+        complaint.investigator = document.getElementById('complaint-investigator').value;
+        complaint.auditorsInvolved = Array.from(audSelect.selectedOptions).map(opt => opt.value);
+
+        await persistComplaint(complaint);
+        window.closeModal();
+    };
+};
+
+window.deleteComplaint = async function (id) {
+    if (!confirm('Are you sure you want to delete this complaint record?')) return;
+    try {
+        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient.from('audit_complaints').delete().eq('id', id);
+            if (error) throw error;
+        }
+        window.state.complaints = window.state.complaints.filter(c => String(c.id) !== String(id));
+        window.saveData();
+        renderAppealsComplaintsModule();
+        window.showNotification('Complaint deleted', 'success');
+    } catch (e) {
+        window.showNotification('Delete failed: ' + e.message, 'error');
+    }
 };
 
 window.managePanelRecords = function (appealId) {

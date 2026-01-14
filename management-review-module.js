@@ -231,7 +231,13 @@ function renderManagementReviewModule() {
                                         </td>
                                         <td>
                                             <button class="btn btn-sm btn-icon" onclick="viewManagementReview('${review.id}')" title="View Details">
-                                                <i class="fa-solid fa-eye"></i>
+                                                <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-icon" onclick="editManagementReview('${review.id}')" title="Edit Review">
+                                                <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-icon" onclick="deleteManagementReview('${review.id}')" title="Delete Review">
+                                                <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                             </button>
                                             <button class="btn btn-sm btn-icon" onclick="printManagementReview('${review.id}')" title="Print Minutes">
                                                 <i class="fa-solid fa-print"></i>
@@ -378,8 +384,9 @@ window.viewManagementReview = function (reviewId) {
     window.openModal();
 };
 
-window.openNewManagementReviewModal = function () {
-    document.getElementById('modal-title').textContent = 'New Management Review';
+window.openNewManagementReviewModal = function (editData = null) {
+    const isEdit = !!editData;
+    document.getElementById('modal-title').textContent = isEdit ? 'Edit Management Review' : 'New Management Review';
     document.getElementById('modal-body').innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px;">
             <div style="flex: 1;">
@@ -457,10 +464,26 @@ window.openNewManagementReviewModal = function () {
 
             <div class="form-group">
                 <label>Next Review Date</label>
-                <input type="date" class="form-control" id="next-review-date">
+                <input type="date" class="form-control" id="next-review-date" value="${isEdit ? editData.nextReviewDate || '' : ''}">
             </div>
         </form>
     `;
+
+    // Fill data if editing
+    if (isEdit) {
+        document.getElementById('review-date').value = editData.date || '';
+        document.getElementById('reviewed-by').value = editData.reviewedBy || '';
+        document.getElementById('attendees').value = (editData.attendees || []).join(', ');
+        document.getElementById('input-audits').value = editData.inputs?.internalAuditResults || '';
+        document.getElementById('input-feedback').value = editData.inputs?.customerFeedback || '';
+        document.getElementById('input-performance').value = editData.inputs?.processPerformance || '';
+        document.getElementById('input-ncrs').value = editData.inputs?.nonconformities || '';
+        document.getElementById('input-changes').value = editData.inputs?.changes || '';
+        document.getElementById('input-resources').value = editData.inputs?.resourceNeeds || '';
+        document.getElementById('output-improvements').value = (editData.outputs?.improvementOpportunities || []).join('\n');
+        document.getElementById('output-resources').value = (editData.outputs?.resourceDecisions || []).join('\n');
+        document.getElementById('output-changes').value = (editData.outputs?.systemChanges || []).join('\n');
+    }
 
     document.getElementById('modal-save').onclick = async () => {
         const date = document.getElementById('review-date').value;
@@ -492,6 +515,7 @@ window.openNewManagementReviewModal = function () {
             .filter(c => c);
 
         const newReview = {
+            id: isEdit ? editData.id : null,
             date,
             reviewedBy,
             attendees,
@@ -500,9 +524,9 @@ window.openNewManagementReviewModal = function () {
                 customerFeedback: document.getElementById('input-feedback').value,
                 processPerformance: document.getElementById('input-performance').value,
                 nonconformities: document.getElementById('input-ncrs').value,
-                followUpActions: '',
+                followUpActions: isEdit ? editData.inputs?.followUpActions || '' : '',
                 changes: document.getElementById('input-changes').value,
-                recommendations: '',
+                recommendations: isEdit ? editData.inputs?.recommendations || '' : '',
                 resourceNeeds: document.getElementById('input-resources').value
             },
             outputs: {
@@ -510,11 +534,14 @@ window.openNewManagementReviewModal = function () {
                 resourceDecisions: resourceDecisions,
                 systemChanges: systemChanges
             },
-            actionItems: [],
+            actionItems: isEdit ? editData.actionItems || [] : [],
             nextReviewDate: document.getElementById('next-review-date').value,
-            minutesApprovedBy: null,
-            minutesApprovedDate: null
+            minutesApprovedBy: isEdit ? editData.minutesApprovedBy : null,
+            minutesApprovedDate: isEdit ? editData.minutesApprovedDate : null
         };
+
+        document.getElementById('modal-save').disabled = true;
+        document.getElementById('modal-save').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
         await persistManagementReview(newReview);
 
@@ -609,6 +636,34 @@ window.printManagementReview = function (reviewId) {
         </html>
     `);
     printWindow.document.close();
+};
+
+window.editManagementReview = function (reviewId) {
+    const review = window.state.managementReviews.find(r => String(r.id) === String(reviewId));
+    if (!review) return;
+    window.openNewManagementReviewModal(review);
+};
+
+window.deleteManagementReview = async function (reviewId) {
+    if (!confirm('Are you sure you want to delete this Management Review record? This action cannot be undone.')) return;
+
+    try {
+        if (window.SupabaseClient && !String(reviewId).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient
+                .from('audit_management_reviews')
+                .delete()
+                .eq('id', reviewId);
+            if (error) throw error;
+        }
+
+        window.state.managementReviews = window.state.managementReviews.filter(r => String(r.id) !== String(reviewId));
+        window.saveData();
+        renderManagementReviewModule();
+        window.showNotification('Management Review deleted', 'success');
+    } catch (err) {
+        console.error('Error deleting Management Review:', err);
+        window.showNotification('Failed to delete record', 'error');
+    }
 };
 
 // ============================================

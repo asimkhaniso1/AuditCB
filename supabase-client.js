@@ -1626,6 +1626,7 @@ const SupabaseClient = {
                 cb_settings: window.state.cbSettings || {},
                 organization: window.state.orgStructure || [],
                 policies: window.state.cbPolicies || {},
+                knowledge_base: window.state.knowledgeBase || {},
                 updated_at: new Date().toISOString()
             };
 
@@ -1677,6 +1678,7 @@ const SupabaseClient = {
                 if (data.cb_settings) window.state.cbSettings = data.cb_settings;
                 if (data.organization) window.state.orgStructure = data.organization;
                 if (data.policies) window.state.cbPolicies = data.policies;
+                if (data.knowledge_base) window.state.knowledgeBase = data.knowledge_base;
 
                 window.saveState();
                 Logger.info('Synced settings from Supabase');

@@ -210,10 +210,16 @@ function getNCRRegisterHTML() {
                     <i class="fa-solid fa-clipboard-list" style="margin-right: 0.5rem;"></i>
                     NCR Register
                 </h3>
-                <button class="btn btn-primary" onclick="openNewNCRModal()">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
-                    New NCR
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-primary" onclick="window.printNCRRegister()">
+                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>
+                        Print Register
+                    </button>
+                    <button class="btn btn-primary" onclick="openNewNCRModal()">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
+                        New NCR
+                    </button>
+                </div>
             </div>
 
             <!-- Filters -->
@@ -326,6 +332,9 @@ function renderNCRTable(ncrs) {
                                 </button>
                                 <button class="btn btn-sm btn-icon" onclick="editNCR('${ncr.id}')" title="Edit">
                                     <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
+                                </button>
+                                <button class="btn btn-sm btn-icon" onclick="deleteNCR('${ncr.id}')" title="Delete">
+                                    <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                 </button>
                                 ${ncr.status === 'Open' ? `
                                 <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" onclick="openAddCAPAModal('${ncr.id}')" title="Add CAPA">
@@ -795,11 +804,12 @@ window.openAddCAPAModal = function (ncrId) {
 
     document.getElementById('modal-title').textContent = 'Add CAPA';
     document.getElementById('modal-body').innerHTML = `
-        <form>
+        <form id="capa-form">
             <div class="form-group"><label>Root Cause</label><textarea id="capa-rc" class="form-control">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea></div>
             <div class="form-group"><label>Corrective Action</label><textarea id="capa-ca" class="form-control">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea></div>
         </form>
     `;
+
     document.getElementById('modal-save').style.display = 'block';
     document.getElementById('modal-save').onclick = async () => {
         ncr.rootCause = document.getElementById('capa-rc').value;
@@ -810,7 +820,84 @@ window.openAddCAPAModal = function (ncrId) {
         renderNCRCAPAModule(window.state.ncrContextClientId);
     };
     window.openModal();
-}
+};
+
+// --- DELETE NCR ---
+window.deleteNCR = async function (id) {
+    if (!confirm('Are you sure you want to delete this NCR record?')) return;
+    try {
+        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient.from('audit_ncrs').delete().eq('id', id);
+            if (error) throw error;
+        }
+        window.state.ncrs = window.state.ncrs.filter(n => String(n.id) !== String(id));
+        window.saveData();
+        renderNCRCAPAModule(window.state.ncrContextClientId);
+        window.showNotification('NCR deleted', 'success');
+    } catch (e) {
+        window.showNotification('Delete failed: ' + e.message, 'error');
+    }
+};
+
+// --- PRINT NCR REGISTER ---
+window.printNCRRegister = function () {
+    const ncrs = window.state.ncrs || [];
+    const printWindow = window.open('', '', 'width=1000,height=700');
+
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>NCR Register</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { text-align: center; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; }
+                th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <h1>NCR Register</h1>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>NCR#</th>
+                        <th>Client</th>
+                        <th>Standard</th>
+                        <th>Clause</th>
+                        <th>Severity</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Due Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ncrs.map(n => `
+                        <tr>
+                            <td>NCR-${String(n.id).padStart(3, '0')}</td>
+                            <td>${n.clientName || '-'}</td>
+                            <td>${n.standard || '-'}</td>
+                            <td>${n.clause || '-'}</td>
+                            <td>${n.severity}</td>
+                            <td>${n.description}</td>
+                            <td>${n.status}</td>
+                            <td>${n.dueDate || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="footer">
+                ISO 17021-1 Governance Record - Confidential
+            </div>
+            <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
+
 
 window.verifyCAPA = function (ncrId) {
     const ncr = window.state.ncrs.find(n => n.id === ncrId);
@@ -818,14 +905,14 @@ window.verifyCAPA = function (ncrId) {
 
     document.getElementById('modal-title').textContent = 'Verify CAPA';
     document.getElementById('modal-body').innerHTML = `
-        <div class="form-group"><label>Verification Method</label><textarea id="ver-method" class="form-control">${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</textarea></div>
+    <div class="form-group"><label>Verification Method</label><textarea id="ver-method" class="form-control">${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</textarea></div>
         <div class="form-group"><label>Effectiveness</label>
             <select id="ver-eff" class="form-control">
                 <option value="Effective">Effective</option>
                 <option value="Not Effective">Not Effective</option>
             </select>
         </div>
-    `;
+`;
     document.getElementById('modal-save').style.display = 'block';
     document.getElementById('modal-save').onclick = async () => {
         ncr.verificationMethod = document.getElementById('ver-method').value;
