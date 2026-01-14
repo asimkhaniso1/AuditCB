@@ -611,10 +611,10 @@ function updateClientDetails(clientName) {
             siteGroup.style.display = 'block';
             if (noSitesMessage) noSitesMessage.style.display = 'none';
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
-                <div style="padding: 0.5rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem;">
-                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer;">
-                    <div style="min-width: 0;">
-                        <div style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${s.name}">${s.name}</div>
+                <div style="padding: 0.75rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem;">
+                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; flex-shrink: 0;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px;" title="${s.name}">${s.name}</div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${s.city || ''}</div>
                     </div>
                 </div>
