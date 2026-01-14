@@ -4397,51 +4397,53 @@ Example format:
 ]
 
 Return ONLY the JSON array.`;
-        method: 'POST',
+
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-    });
+            body: JSON.stringify({ prompt })
+        });
 
-    if (response.ok) {
-        const data = await response.json();
-        const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (response.ok) {
+            const data = await response.json();
+            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-        // Parse JSON from response
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            const newClauses = JSON.parse(jsonMatch[0]);
-            doc.clauses = newClauses;
-            doc.status = 'ready';
-            doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-            window.saveData();
+            // Parse JSON from response
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const newClauses = JSON.parse(jsonMatch[0]);
+                doc.clauses = newClauses;
+                doc.status = 'ready';
+                doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+                window.saveData();
 
-            window.showNotification(`Re-analysis complete! ${newClauses.length} clauses extracted.`, 'success');
+                window.showNotification(`Re-analysis complete! ${newClauses.length} clauses extracted.`, 'success');
 
-            // Re-render and open the analysis view
-            if (typeof switchSettingsSubTab === 'function') {
-                switchSettingsSubTab('knowledge', 'kb');
+                // Re-render and open the analysis view
+                if (typeof switchSettingsSubTab === 'function') {
+                    switchSettingsSubTab('knowledge', 'kb');
+                }
+                setTimeout(() => window.viewKBAnalysis(docId), 500);
+                return;
             }
-            setTimeout(() => window.viewKBAnalysis(docId), 500);
-            return;
         }
+    } catch (error) {
+        console.error('Re-analysis error:', error);
     }
-} catch (error) {
-    console.error('Re-analysis error:', error);
-}
 
-// Fallback if AI fails - use built-in detailed clauses
-doc.clauses = getBuiltInClauses(doc.name);
-doc.status = 'ready';
-doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-window.saveData();
+    // Fallback if AI fails - use built-in detailed clauses
+    doc.clauses = getBuiltInClauses(doc.name);
+    doc.status = 'ready';
+    doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+    window.saveData();
 
-window.showNotification(`Re - analysis complete using built-in clause database(${doc.clauses.length} clauses).`, 'info');
-if (typeof switchSettingsSubTab === 'function') {
-    switchSettingsSubTab('knowledge', 'kb');
-} else {
-    renderSettings();
-}
-setTimeout(() => window.viewKBAnalysis(docId), 500);
+    window.showNotification(`Re - analysis complete using built-in clause database(${doc.clauses.length} clauses).`, 'info');
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
+    setTimeout(() => window.viewKBAnalysis(docId), 500);
 };
 
 // ============================================
