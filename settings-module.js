@@ -3407,7 +3407,11 @@ window.uploadKnowledgeDoc = function (type) {
         window.showNotification(`${typeLabel} uploaded ${statusMsg}. Click "Analyze" to index sections.`, 'info');
 
         // Re-render the tab
-        switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        if (typeof switchSettingsSubTab === 'function') {
+            switchSettingsSubTab('knowledge', 'kb');
+        } else {
+            renderSettings();
+        }
 
         // Sync metadata to settings table
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
@@ -3434,7 +3438,11 @@ window.analyzeStandard = async function (docId) {
     // Update status to processing
     doc.status = 'processing';
     window.saveData();
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
 
     window.showNotification(`Analyzing ${doc.name}...`, 'info');
 
@@ -3442,7 +3450,11 @@ window.analyzeStandard = async function (docId) {
     await extractStandardClauses(doc, doc.name);
 
     // Re-render
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
 
     if (doc.status === 'ready') {
         window.showNotification(`${doc.name} analysis complete! ${doc.clauses ? doc.clauses.length : 0} clauses indexed.`, 'success');
@@ -4015,7 +4027,11 @@ window.deleteKnowledgeDoc = function (type, id) {
     }
 
     window.saveData();
-    switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
     window.showNotification('Document removed from Knowledge Base', 'success');
 
     // Sync removal to cloud
@@ -4844,8 +4860,10 @@ window.reSyncKnowledgeBase = async function () {
         const result = await window.SupabaseClient.syncDocumentsFromSupabase();
 
         // Force refresh UI
-        if (typeof switchSettingsTab === 'function') {
-            switchSettingsTab('knowledgebase', document.querySelector('.tab-btn:last-child'));
+        if (typeof switchSettingsSubTab === 'function') {
+            switchSettingsSubTab('knowledge', 'kb');
+        } else {
+            renderSettings();
         }
 
         if (result.added > 0 || result.updated > 0) {
