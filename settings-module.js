@@ -1909,16 +1909,25 @@ window.openAuditorAssignmentModal = function () {
 window.assignAuditorToClient = function (auditorId, clientId, role) {
     if (!window.state.auditorAssignments) window.state.auditorAssignments = [];
 
-    window.state.auditorAssignments.push({
+    const assignment = {
         id: Date.now(),
-        auditorId: parseInt(auditorId),
-        clientId: parseInt(clientId),
+        auditorId: String(auditorId),
+        clientId: String(clientId),
         role: role,
         assignedAt: new Date().toISOString(),
-        assignedBy: window.state.currentUser.name
-    });
+        assignedBy: window.state.currentUser?.name || 'Admin'
+    };
+
+    window.state.auditorAssignments.push(assignment);
 
     window.saveData();
+
+    // Sync to Supabase
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
+            .then(() => console.log('Auditor assignment synced to Supabase'))
+            .catch(e => console.error('Auditor assignment sync failed:', e));
+    }
     window.showNotification('Access assigned successfully', 'success');
 
     // Refresh view if on the tab
@@ -1939,9 +1948,22 @@ window.assignAuditorToClient = function (auditorId, clientId, role) {
 };
 
 window.removeAuditorClientAssignment = function (index) {
-    if (confirm("Are you sure you want to revoke this auditor's access to the client?")) {
+    const assignment = window.state.auditorAssignments[index];
+    if (!assignment) return;
+
+    if (confirm(`Are you sure you want to revoke access?`)) {
+        const { auditorId, clientId } = assignment;
+
         window.state.auditorAssignments.splice(index, 1);
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId)
+                .then(() => console.log('Auditor assignment removed from Supabase'))
+                .catch(e => console.error('Auditor assignment removal failed:', e));
+        }
+
         window.showNotification('Access revoked', 'success');
         switchSettingsSubTab('organization', 'auditor-access');
     }
