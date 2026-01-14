@@ -175,24 +175,24 @@ function renderDocuments() {
             </td>
             <td><span class="status-badge status-${(doc.status || '').toLowerCase()}">${window.UTILS.escapeHtml(doc.status)}</span></td>
             <td>
-                <button class="btn btn-sm btn-icon" onclick="viewDocumentHistory(${doc.id})" title="Revision History">
+                <button class="btn btn-sm btn-icon" onclick="viewDocumentHistory('${doc.id}')" title="Revision History">
                     <i class="fa-solid fa-clock-rotate-left" style="color: #7c3aed;"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" onclick="viewDocumentDetails(${doc.id})" title="Document Details">
+                <button class="btn btn-sm btn-icon" onclick="viewDocumentDetails('${doc.id}')" title="Document Details">
                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                 </button>
                 ${doc.status === 'Draft' ? `
-                    <button class="btn btn-sm btn-success" onclick="approveDocument(${doc.id})" title="Approve">
+                    <button class="btn btn-sm btn-success" onclick="approveDocument('${doc.id}')" title="Approve">
                         <i class="fa-solid fa-check"></i>
                     </button>
                 ` : ''}
-                <button class="btn btn-sm btn-icon" onclick="createNewRevision(${doc.id})" title="New Revision">
+                <button class="btn btn-sm btn-icon" onclick="createNewRevision('${doc.id}')" title="New Revision">
                     <i class="fa-solid fa-code-branch" style="color: #0284c7;"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" onclick="downloadDocument(${doc.id})" title="Download">
+                <button class="btn btn-sm btn-icon" onclick="downloadDocument('${doc.id}')" title="Download">
                     <i class="fa-solid fa-download" style="color: var(--primary-color);"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" onclick="deleteDocument(${doc.id})" title="Delete">
+                <button class="btn btn-sm btn-icon" onclick="deleteDocument('${doc.id}')" title="Delete">
                     <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                 </button>
             </td>
@@ -438,7 +438,7 @@ function openUploadModal() {
                 <label>Related Client</label>
                 <select class="form-control" id="doc-client" ${window.state.activeClientId ? 'disabled' : ''}>
                     <option value="">-- Select Client --</option>
-                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${String(window.state.activeClientId) === String(c.id) ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -491,7 +491,7 @@ function downloadDocument(id) {
 
 function deleteDocument(id) {
     if (confirm('Are you sure you want to delete this document?')) {
-        state.documents = state.documents.filter(d => d.id !== id);
+        state.documents = state.documents.filter(d => String(d.id) !== String(id));
         saveData();
         renderDocuments();
         showNotification('Document deleted');
@@ -503,7 +503,7 @@ function deleteDocument(id) {
 // ============================================
 
 window.viewDocumentHistory = function (docId) {
-    const doc = state.documents.find(d => d.id === docId);
+    const doc = state.documents.find(d => String(d.id) === String(docId));
     if (!doc) return;
 
     const history = doc.revisionHistory || [];
@@ -566,7 +566,7 @@ window.viewDocumentHistory = function (docId) {
 };
 
 window.approveDocument = function (docId) {
-    const doc = state.documents.find(d => d.id === docId);
+    const doc = state.documents.find(d => String(d.id) === String(docId));
     if (!doc) return;
 
     document.getElementById('modal-title').textContent = 'Approve Document';
@@ -624,7 +624,7 @@ window.approveDocument = function (docId) {
 };
 
 window.createNewRevision = function (docId) {
-    const doc = state.documents.find(d => d.id === docId);
+    const doc = state.documents.find(d => String(d.id) === String(docId));
     if (!doc) return;
 
     document.getElementById('modal-title').textContent = 'Create New Revision';
@@ -701,7 +701,7 @@ window.switchDocumentTab = function (tabName) {
 };
 
 window.viewDocumentDetails = function (docId) {
-    const doc = state.documents.find(d => d.id === docId);
+    const doc = state.documents.find(d => String(d.id) === String(docId));
     if (!doc) return;
 
     document.getElementById('modal-title').textContent = `Document Details - ${doc.title}`;

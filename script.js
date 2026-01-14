@@ -476,22 +476,23 @@ function getVisibleClients() {
     if (filteredRoles.includes(user.role)) {
         // Find matching auditor profile
         const auditor = window.state.auditors.find(a =>
-            a.name === user.name || a.email === user.email
+            String(a.email || '').toLowerCase() === String(user.email || '').toLowerCase() ||
+            String(a.name || '').toLowerCase() === String(user.name || '').toLowerCase()
         );
 
         if (!auditor) {
-            console.warn('Current user has auditor role but no matching auditor profile found.');
+            console.warn('Current user has auditor role but no matching auditor profile found:', user.email);
             return [];
         }
 
         // Get assignments for this auditor
         const assignments = window.state.auditorAssignments || [];
         const assignedClientIds = assignments
-            .filter(a => a.auditorId === auditor.id)
-            .map(a => a.clientId);
+            .filter(a => String(a.auditorId) === String(auditor.id))
+            .map(a => String(a.clientId));
 
         // Filter clients based on assignments
-        return allClients.filter(client => assignedClientIds.includes(client.id));
+        return allClients.filter(client => assignedClientIds.includes(String(client.id)));
     }
 
     // Client Role sees ONLY their own organization
@@ -525,7 +526,8 @@ function getVisiblePlans() {
 
     // Find auditor profile for the current user
     const auditor = window.state.auditors.find(a =>
-        a.email === user.email || a.name === user.name
+        String(a.email || '').toLowerCase() === String(user.email || '').toLowerCase() ||
+        String(a.name || '').toLowerCase() === String(user.name || '').toLowerCase()
     );
 
     // Get visible client names for current assignments
@@ -541,7 +543,7 @@ function getVisiblePlans() {
             if (p.team.includes(auditor.name)) return true;
         }
         if (auditor && p.auditors && Array.isArray(p.auditors)) {
-            if (p.auditors.includes(auditor.id)) return true;
+            if (p.auditors.map(id => String(id)).includes(String(auditor.id))) return true;
         }
 
         return false;
@@ -568,7 +570,8 @@ function getVisibleReports() {
 
     // Find auditor profile for the current user
     const auditor = window.state.auditors.find(a =>
-        a.email === user.email || a.name === user.name
+        String(a.email || '').toLowerCase() === String(user.email || '').toLowerCase() ||
+        String(a.name || '').toLowerCase() === String(user.name || '').toLowerCase()
     );
 
     // Get visible client names for current assignments
@@ -584,10 +587,10 @@ function getVisibleReports() {
 
         // Also show if auditor was on the plan's team (historical records)
         if (auditor && r.planId) {
-            const plan = allPlans.find(p => p.id === r.planId);
+            const plan = allPlans.find(p => String(p.id) === String(r.planId));
             if (plan) {
                 if (plan.team && Array.isArray(plan.team) && plan.team.includes(auditor.name)) return true;
-                if (plan.auditors && Array.isArray(plan.auditors) && plan.auditors.includes(auditor.id)) return true;
+                if (plan.auditors && Array.isArray(plan.auditors) && plan.auditors.map(id => String(id)).includes(String(auditor.id))) return true;
             }
         }
 
@@ -763,7 +766,7 @@ function migrateChecklistsToHierarchy() {
         }
 
         // Check if this is a default checklist that should use new hierarchical data
-        const defaultVersion = defaultHierarchicalChecklists.find(d => d.id === checklist.id);
+        const defaultVersion = defaultHierarchicalChecklists.find(d => String(d.id) === String(checklist.id));
         if (defaultVersion && defaultVersion.clauses) {
             needsUpdate = true;
             return {
@@ -805,7 +808,7 @@ function migrateChecklistsToHierarchy() {
 
     // IMPORTANT: Restore any missing default checklists
     defaultHierarchicalChecklists.forEach(defaultChecklist => {
-        const exists = state.checklists.find(c => c.id === defaultChecklist.id);
+        const exists = state.checklists.find(c => String(c.id) === String(defaultChecklist.id));
         if (!exists) {
             window.Logger.info('Core', 'Restoring missing default checklist: ' + defaultChecklist.name);
             state.checklists.push(defaultChecklist);
@@ -996,7 +999,7 @@ function addRecord(collection, data) {
 }
 
 function updateRecord(collection, id, data) {
-    const index = state[collection].findIndex(item => item.id === id);
+    const index = state[collection].findIndex(item => String(item.id) === String(id));
     if (index !== -1) {
         state[collection][index] = { ...state[collection][index], ...data };
         saveState();
@@ -1006,7 +1009,7 @@ function updateRecord(collection, id, data) {
 }
 
 function deleteRecord(collection, id) {
-    const index = state[collection].findIndex(item => item.id === id);
+    const index = state[collection].findIndex(item => String(item.id) === String(id));
     if (index !== -1) {
         state[collection].splice(index, 1);
         saveState();
@@ -1056,13 +1059,13 @@ function handleRouteChange() {
     if (!baseHash || baseHash === 'dashboard') {
         renderModule('dashboard', false);
         updateActiveNavItem('dashboard');
-    } else if (baseHash.startsWith('client/')) {
-        const parts = baseHash.split('/');
-        const clientId = parseInt(parts[1]);
+    } else if (hash.startsWith('client/')) {
+        const parts = hash.split('/');
+        const clientId = parts[1]; // KEEP AS STRING for Snowflake ID robustness
         const subModule = parts[2] || 'overview';
         if (typeof window.selectClient === 'function') {
-            // If already in client workspace, just switch tab (use loose equality for ID type mismatch)
-            if (window.state.activeClientId == clientId) {
+            // If already in client workspace, just switch tab
+            if (String(window.state.activeClientId) === String(clientId)) {
                 window.renderClientModule(clientId, subModule);
             } else {
                 window.selectClient(clientId);

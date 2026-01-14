@@ -299,7 +299,7 @@ window.openIssueCertificateModal = function (reportId) {
 
     // Find report data
     if (reportId) {
-        const report = state.auditReports.find(r => r.id == reportId);
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (report) {
             prefillClient = report.client;
             auditDate = report.date;
@@ -481,7 +481,7 @@ window.openIssueCertificateModal = function (reportId) {
 };
 
 window.viewCertificate = function (certId) {
-    const cert = state.certifications.find(c => c.id === certId);
+    const cert = state.certifications.find(c => String(c.id) === String(certId));
     if (!cert) return;
 
     const printWindow = window.open('', '_blank');
@@ -560,7 +560,7 @@ window.viewCertificate = function (certId) {
 };
 
 window.openCertActionModal = function (certId) {
-    const cert = state.certifications.find(c => c.id === certId);
+    const cert = state.certifications.find(c => String(c.id) === String(certId));
     if (!cert) return;
 
     document.getElementById('modal-title').textContent = 'Suspend/Withdraw Certificate';
@@ -654,7 +654,7 @@ window.openCertActionModal = function (certId) {
 };
 
 window.restoreCertificate = function (certId) {
-    const cert = state.certifications.find(c => c.id === certId);
+    const cert = state.certifications.find(c => String(c.id) === String(certId));
     if (confirm('Are you sure you want to restore this certificate to Valid status?')) {
         cert.status = window.CONSTANTS.CERT_STATUS.VALID;
         cert.history.push({ date: new Date().toISOString().split('T')[0], action: 'Restored', user: 'Admin' });
@@ -664,7 +664,7 @@ window.restoreCertificate = function (certId) {
 };
 
 window.editCertificate = function (certId) {
-    const cert = state.certifications.find(c => c.id === certId);
+    const cert = state.certifications.find(c => String(c.id) === String(certId));
     if (!cert) return;
 
     document.getElementById('modal-title').textContent = 'Edit Certificate Details';

@@ -88,7 +88,7 @@ async function persistImpartialityMember(member) {
             status: member.status
         };
 
-        if (member.id && String(member.id).length > 10) { // Check if it's a temp Date.now() ID or DB ID
+        if (member.id && !String(member.id).startsWith('demo-')) {
             // Update
             const { error } = await window.SupabaseClient.from('audit_impartiality_members').update(payload).eq('id', member.id);
             if (error) throw error;
@@ -120,7 +120,7 @@ async function persistImpartialityThreat(threat) {
             committee_decision: threat.committeeDecision || null
         };
 
-        if (threat.id && String(threat.id).length > 10) {
+        if (threat.id && !String(threat.id).startsWith('demo-')) {
             const { error } = await window.SupabaseClient.from('audit_impartiality_threats').update(payload).eq('id', threat.id);
             if (error) throw error;
         } else {
@@ -145,7 +145,7 @@ async function persistImpartialityMeeting(meeting) {
             next_meeting_date: meeting.nextMeetingDate
         };
 
-        if (meeting.id && String(meeting.id).length > 10) {
+        if (meeting.id && !String(meeting.id).startsWith('demo-')) {
             const { error } = await window.SupabaseClient.from('audit_impartiality_meetings').update(payload).eq('id', meeting.id);
             if (error) throw error;
         } else {
@@ -164,7 +164,7 @@ if (!window.state.impartialityCommittee) {
     window.state.impartialityCommittee = {
         members: [
             {
-                id: 1,
+                id: 'demo-1',
                 name: 'Dr. Sarah Mitchell',
                 organization: 'Independent Quality Consultant',
                 role: 'Chairperson',
@@ -174,7 +174,7 @@ if (!window.state.impartialityCommittee) {
                 status: 'Active'
             },
             {
-                id: 2,
+                id: 'demo-2',
                 name: 'John Anderson',
                 organization: 'Industry Association Representative',
                 role: 'Member',
@@ -186,9 +186,9 @@ if (!window.state.impartialityCommittee) {
         ],
         meetings: [
             {
-                id: 1,
+                id: 'demo-1',
                 date: '2024-03-15',
-                attendees: [1, 2],
+                attendees: ['demo-1', 'demo-2'],
                 threatsReviewed: [
                     {
                         threat: 'Auditor previously worked for client',
@@ -203,7 +203,7 @@ if (!window.state.impartialityCommittee) {
         ],
         threats: [
             {
-                id: 1,
+                id: 'demo-1',
                 date: '2024-02-10',
                 type: 'Self-Interest',
                 description: 'Auditor has financial interest in client company',
@@ -601,11 +601,11 @@ window.openAddMeetingModal = function () {
             return;
         }
 
-        const attendees = Array.from(document.querySelectorAll('.meeting-attendee:checked')).map(cb => parseInt(cb.value));
-        const threatsReviewedIds = Array.from(document.querySelectorAll('.meeting-threat:checked')).map(cb => parseInt(cb.value));
+        const attendees = Array.from(document.querySelectorAll('.meeting-attendee:checked')).map(cb => cb.value);
+        const threatsReviewedIds = Array.from(document.querySelectorAll('.meeting-threat:checked')).map(cb => cb.value);
 
         const threatsReviewed = window.state.impartialityCommittee.threats
-            .filter(t => threatsReviewedIds.includes(t.id))
+            .filter(t => threatsReviewedIds.includes(String(t.id)))
             .map(t => ({
                 threat: t.type + ' - ' + t.description,
                 client: t.client,
@@ -615,7 +615,7 @@ window.openAddMeetingModal = function () {
 
         // Mark threats as reviewed
         window.state.impartialityCommittee.threats.forEach(t => {
-            if (threatsReviewedIds.includes(t.id)) {
+            if (threatsReviewedIds.includes(String(t.id))) {
                 t.reviewedByCommittee = true;
             }
         });

@@ -265,10 +265,10 @@ function openCreateReportModal() {
         const status = document.getElementById('report-status')?.value || window.CONSTANTS.STATUS.IN_PROGRESS;
 
         if (planId && date) {
-            const plan = state.auditPlans.find(p => p.id == planId);
+            const plan = state.auditPlans.find(p => String(p.id) === String(planId));
             const newReport = {
-                id: Date.now(),
-                planId: plan.id, // Link to plan
+                id: String(Date.now()),
+                planId: String(plan.id), // Link to plan
                 client: plan.client,
                 date: date,
                 findings: 0,
@@ -279,7 +279,7 @@ function openCreateReportModal() {
             state.auditReports.push(newReport);
 
             // Mark plan as executed
-            plan.reportId = newReport.id;
+            plan.reportId = String(newReport.id);
 
             window.saveData();
             window.closeModal();
@@ -293,7 +293,7 @@ function openCreateReportModal() {
 
 
 function openEditReportModal(reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -341,13 +341,13 @@ function openEditReportModal(reportId) {
 }
 
 function renderExecutionDetail(reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     // Calculate Progress
     // Calculate Progress
     // Fetch Data & Calculate Progress
-    const plan = report.planId ? state.auditPlans.find(p => p.id == report.planId) : state.auditPlans.find(p => p.client === report.client);
+    const plan = report.planId ? state.auditPlans.find(p => String(p.id) === String(report.planId)) : state.auditPlans.find(p => p.client === report.client);
 
     // Fetch Client Departments/Sites
     const clientData = state.clients.find(c => c.name === report.client);
@@ -355,7 +355,7 @@ function renderExecutionDetail(reportId) {
 
     const planChecklists = plan?.selectedChecklists || [];
     const checklists = state.checklists || [];
-    const assignedChecklists = planChecklists.map(clId => checklists.find(c => c.id === clId)).filter(c => c);
+    const assignedChecklists = planChecklists.map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
     const customItems = report.customItems || [];
 
     // Create lookup
@@ -1313,7 +1313,7 @@ window.updateAccordionCounter = function (changedId) {
 };
 
 window.addCustomQuestion = function (reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -1355,7 +1355,7 @@ window.addCustomQuestion = function (reportId) {
 };
 
 window.saveChecklist = function (reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     // Show indicator immediately
@@ -1562,7 +1562,7 @@ window.bulkUpdateStatus = function (reportId, status) {
 
 // Submit findings to Lead Auditor for review
 window.submitToLeadAuditor = function (reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     // Use saveChecklist to gather all UI changes first
@@ -1661,7 +1661,7 @@ window.startDictation = function (uniqueId) {
 };
 
 function createNCR(reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     const modalTitle = document.getElementById('modal-title');
@@ -1839,7 +1839,7 @@ function createNCR(reportId) {
 }
 
 function createCAPA(reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     const ncrs = report.ncrs || [];
@@ -1903,7 +1903,7 @@ function createCAPA(reportId) {
 }
 
 function saveObservations(reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     report.positiveObservations = document.getElementById('positive-observations')?.value || '';
@@ -1915,7 +1915,7 @@ function saveObservations(reportId) {
 
 // Save Opening/Closing Meeting Records (ISO 17021-1 Clause 9.4.7)
 window.saveMeetingRecords = function (reportId) {
-    const report = window.state.auditReports.find(r => r.id === reportId);
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     report.openingMeeting = {

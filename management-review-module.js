@@ -59,7 +59,7 @@ async function persistManagementReview(review) {
             minutes_approved_date: review.minutesApprovedDate
         };
 
-        if (review.id && String(review.id).length > 10) {
+        if (review.id && !String(review.id).startsWith('demo-')) {
             // Update
             const { error } = await window.SupabaseClient
                 .from('audit_management_reviews')
@@ -86,7 +86,7 @@ async function persistManagementReview(review) {
 if (!window.state.managementReviews) {
     window.state.managementReviews = [
         {
-            id: 1,
+            id: 'demo-1',
             date: '2024-01-15',
             reviewedBy: 'Top Management',
             attendees: ['CEO', 'Quality Manager', 'Operations Manager', 'Certification Manager'],
@@ -229,10 +229,10 @@ function renderManagementReviewModule() {
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" onclick="viewManagementReview(${review.id})" title="View Details">
+                                            <button class="btn btn-sm btn-icon" onclick="viewManagementReview('${review.id}')" title="View Details">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" onclick="printManagementReview(${review.id})" title="Print Minutes">
+                                            <button class="btn btn-sm btn-icon" onclick="printManagementReview('${review.id}')" title="Print Minutes">
                                                 <i class="fa-solid fa-print"></i>
                                             </button>
                                         </td>
@@ -261,7 +261,7 @@ function renderManagementReviewModule() {
 }
 
 window.viewManagementReview = function (reviewId) {
-    const review = window.state.managementReviews.find(r => r.id === reviewId);
+    const review = window.state.managementReviews.find(r => String(r.id) === String(reviewId));
     if (!review) return;
 
     document.getElementById('modal-title').textContent = `Management Review - ${review.date}`;
@@ -526,7 +526,7 @@ window.openNewManagementReviewModal = function () {
 };
 
 window.printManagementReview = function (reviewId) {
-    const review = window.state.managementReviews.find(r => r.id === reviewId);
+    const review = window.state.managementReviews.find(r => String(r.id) === String(reviewId));
     if (!review) return;
 
     const printWindow = window.open('', '', 'width=800,height=600');

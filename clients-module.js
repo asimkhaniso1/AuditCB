@@ -205,9 +205,9 @@ function renderClientsEnhanced() {
     document.querySelectorAll('.view-client, .client-row').forEach(el => {
         el.addEventListener('click', (e) => {
             if (!e.target.closest('.edit-client')) {
-                const clientId = parseInt(el.getAttribute('data-client-id'));
+                const clientId = el.getAttribute('data-client-id');
                 // Navigate directly to Client Workspace (no intermediate page)
-                window.location.hash = `client / ${clientId} `;
+                window.location.hash = `client/${clientId}`;
             }
         });
     });
@@ -216,7 +216,7 @@ function renderClientsEnhanced() {
     document.querySelectorAll('.edit-client').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const clientId = parseInt(btn.getAttribute('data-client-id'));
+            const clientId = btn.getAttribute('data-client-id');
             window.renderEditClient(clientId);
         });
     });
@@ -4859,9 +4859,9 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
             window.state.auditorAssignments = [];
         }
 
-        // Add new assignment (ensure both IDs are integers for consistency)
+        // Add new assignment (Standardized IDs as strings)
         window.state.auditorAssignments.push({
-            auditorId: parseInt(auditorId),
+            auditorId: String(auditorId),
             clientId: String(clientId),
             assignedBy: window.state.currentUser?.name || 'System',
             assignedAt: new Date().toISOString()
@@ -4907,11 +4907,9 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
 Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
 
     if (confirm(confirmMsg)) {
-        // Normalize IDs - compare as both strings and numbers for compatibility
+        // Normalize IDs to strings for robust comparison
         const cid = String(clientId);
         const aid = String(auditorId);
-        const cidNum = parseInt(clientId); // Keep for backwards compatibility check below
-        const aidNum = parseInt(auditorId); // Keep for backwards compatibility check below
 
         const initialLength = (window.state.auditorAssignments || []).length;
 
@@ -4927,11 +4925,8 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
         });
 
         window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
-            // Match if either string comparison OR number comparison matches OR loose equality
-            const stringMatch = (String(a.clientId) === cid && String(a.auditorId) === aid);
-            const numberMatch = (parseInt(a.clientId) === cidNum && parseInt(a.auditorId) === aidNum);
-            const looseMatch = (a.clientId == clientId && a.auditorId == auditorId); // Fallback with type coercion
-            const match = stringMatch || numberMatch || looseMatch;
+            // Match using robust string comparison
+            const match = (String(a.clientId) === cid && String(a.auditorId) === aid);
 
             console.log('[removeClientAuditorAssignment] Checking assignment:', {
                 assignment: a,

@@ -1375,7 +1375,7 @@ window.generateAuditReport = function (reportId) {
     // Save current state first to ensure all changes are captured
     window.saveData();
 
-    const report = state.auditReports.find(r => r.id === reportId);
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;

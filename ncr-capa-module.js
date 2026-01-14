@@ -199,8 +199,8 @@ function getNCRRegisterHTML() {
 
     // Filter by Context (if viewing a specific client)
     if (window.state.ncrContextClientId) {
-        // ID comparison: Loose equality to handle string/number mismatch
-        ncrs = ncrs.filter(n => n.clientId == window.state.ncrContextClientId);
+        // ID comparison: Robust string comparison
+        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
     return `
@@ -321,18 +321,18 @@ function renderNCRTable(ncrs) {
                                 </span>
                             </td>
                             <td style="white-space: nowrap;">
-                                <button class="btn btn-sm btn-icon" onclick="viewNCRDetails(${ncr.id})" title="View Details">
+                                <button class="btn btn-sm btn-icon" onclick="viewNCRDetails('${ncr.id}')" title="View Details">
                                     <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon" onclick="editNCR(${ncr.id})" title="Edit">
+                                <button class="btn btn-sm btn-icon" onclick="editNCR('${ncr.id}')" title="Edit">
                                     <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                 </button>
                                 ${ncr.status === 'Open' ? `
-                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" onclick="openAddCAPAModal(${ncr.id})" title="Add CAPA">
+                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" onclick="openAddCAPAModal('${ncr.id}')" title="Add CAPA">
                                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA
                                 </button>` : ''}
                                 ${ncr.status === 'In Progress' && ncr.capaImplementedDate ? `
-                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" onclick="verifyCAPA(${ncr.id})" title="Verify CAPA">
+                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" onclick="verifyCAPA('${ncr.id}')" title="Verify CAPA">
                                     <i class="fa-solid fa-check"></i> Verify
                                 </button>` : ''}
                             </td>
@@ -354,7 +354,7 @@ function filterNCRs() {
 
     // Always apply context filter first
     if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => n.clientId == window.state.ncrContextClientId);
+        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
     let filtered = ncrs.filter(ncr => {
@@ -380,7 +380,7 @@ function filterNCRs() {
 function getCAPATrackerHTML() {
     let ncrs = window.state.ncrs || [];
     if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => n.clientId == window.state.ncrContextClientId);
+        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
     const showClosed = window.state.showClosedCAPAs || false;
@@ -432,7 +432,7 @@ function getCAPATrackerHTML() {
                                 <td>${window.UTILS.escapeHtml(ncr.capaResponsible || 'Not assigned')}</td>
                                 <td>${ncr.dueDate || '-'}</td>
                                 <td>
-                                    <button class="btn btn-sm" onclick="updateCAPAProgress(${ncr.id})">
+                                    <button class="btn btn-sm" onclick="updateCAPAProgress('${ncr.id}')">
                                         <i class="fa-solid fa-edit"></i> Update
                                     </button>
                                 </td>
@@ -452,7 +452,7 @@ function getCAPATrackerHTML() {
 function getVerificationHTML() {
     let ncrs = window.state.ncrs || [];
     if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => n.clientId == window.state.ncrContextClientId);
+        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
     // Filter for items ready for verification
@@ -487,7 +487,7 @@ function getVerificationHTML() {
                                 <td>${ncr.capaImplementedDate || 'Not yet implemented'}</td>
                                 <td>${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-primary" onclick="verifyCAPA(${ncr.id})">
+                                    <button class="btn btn-sm btn-primary" onclick="verifyCAPA('${ncr.id}')">
                                         <i class="fa-solid fa-check"></i> Verify
                                     </button>
                                 </td>
@@ -508,7 +508,7 @@ function getVerificationHTML() {
 function getAnalyticsHTML() {
     let ncrs = window.state.ncrs || [];
     if (window.state.ncrContextClientId) {
-        ncrs = ncrs.filter(n => n.clientId == window.state.ncrContextClientId);
+        ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
     const total = ncrs.length;
@@ -602,7 +602,7 @@ window.openNewNCRModal = function () {
                 <label>Client <span style="color: var(--danger-color);">*</span></label>
                 <select class="form-control" id="ncr-client" required ${contextClientId ? 'disabled' : ''}>
                     <option value="">Select Client...</option>
-                    ${window.state.clients.map(c => `<option value="${c.id}" ${c.id == contextClientId ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                    ${window.state.clients.map(c => `<option value="${c.id}" ${String(c.id) === String(contextClientId) ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -725,7 +725,7 @@ async function saveNewNCR() {
 // EDIT NCR needs to be checked.
 
 window.viewNCRDetails = function (ncrId) {
-    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
 
     document.getElementById('modal-title').textContent = `NCR Details`;
@@ -753,7 +753,7 @@ window.viewNCRDetails = function (ncrId) {
 window.editNCR = function (ncrId) {
     // Keep existing simplified or full edit logic? 
     // For brevity in this fix, I'll alert that editing utilizes the same persist loop.
-    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     // ... (Full Edit Form Logic would go here - ensuring it calls persistNCR) ...
     // To ensure functionality, I should copy the Edit logic but ensure it uses persistNCR.
     // For now, I will assume the previous implementation of Edit works because it modifies the object reference 
@@ -790,7 +790,7 @@ window.editNCR = function (ncrId) {
 };
 
 window.openAddCAPAModal = function (ncrId) {
-    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
 
     document.getElementById('modal-title').textContent = 'Add CAPA';

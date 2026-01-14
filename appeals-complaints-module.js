@@ -110,7 +110,7 @@ async function persistAppeal(appeal) {
             panel_records: appeal.panelRecords || {}
         };
 
-        if (appeal.id) {
+        if (appeal.id && !String(appeal.id).startsWith('demo-')) {
             // Update
             const { error } = await window.SupabaseClient
                 .from('audit_appeals')
@@ -160,7 +160,7 @@ async function persistComplaint(complaint) {
             history: complaint.history || []
         };
 
-        if (complaint.id) {
+        if (complaint.id && !String(complaint.id).startsWith('demo-')) {
             // Update
             const { error } = await window.SupabaseClient
                 .from('audit_complaints')
@@ -598,7 +598,7 @@ window.openNewComplaintModal = function () {
         const selectedAuditorIds = Array.from(auditorSelect.selectedOptions).map(opt => opt.value); // TEXT ID
 
         const newComplaint = {
-            id: (window.state.complaints.length > 0 ? Math.max(...window.state.complaints.map(c => c.id)) : 0) + 1,
+            // ID will be assigned by Supabase on insert
             source: document.getElementById('complaint-source').value,
             clientName: document.getElementById('complaint-client').value || '',
             relatedAuditId: null,

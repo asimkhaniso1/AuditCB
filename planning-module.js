@@ -168,7 +168,7 @@ function renderAuditPlanningEnhanced() {
     document.querySelectorAll('.view-plan-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const planId = parseInt(btn.getAttribute('data-plan-id'));
+            const planId = btn.getAttribute('data-plan-id');
             viewAuditPlan(planId);
         });
     });
@@ -177,7 +177,7 @@ function renderAuditPlanningEnhanced() {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const planId = parseInt(link.getAttribute('data-plan-id'));
+            const planId = link.getAttribute('data-plan-id');
             viewAuditPlan(planId);
         });
     });
@@ -185,7 +185,7 @@ function renderAuditPlanningEnhanced() {
     document.querySelectorAll('.delete-plan-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const planId = parseInt(btn.getAttribute('data-plan-id'));
+            const planId = btn.getAttribute('data-plan-id');
             if (confirm('Are you sure you want to delete this audit plan? This action cannot be undone.')) {
                 deletePlan(planId);
             }
@@ -195,7 +195,7 @@ function renderAuditPlanningEnhanced() {
 
 // Delete Plan Function
 function deletePlan(planId) {
-    const index = window.state.auditPlans.findIndex(p => p.id == planId);
+    const index = window.state.auditPlans.findIndex(p => String(p.id) === String(planId));
     if (index !== -1) {
         window.state.auditPlans.splice(index, 1);
         window.saveData();
@@ -470,7 +470,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
             // But if specific name passed, we just use it.
         }
     } else if (window.state.activeClientId) {
-        const client = state.clients.find(c => c.id === window.state.activeClientId);
+        const client = state.clients.find(c => String(c.id) === String(window.state.activeClientId));
         if (client) {
             updateClientDetails(client.name);
         }
@@ -478,7 +478,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 }
 
 function editAuditPlan(id) {
-    const plan = state.auditPlans.find(p => p.id == id);
+    const plan = state.auditPlans.find(p => String(p.id) === String(id));
     if (!plan) return;
 
     renderCreateAuditPlanForm();
@@ -769,7 +769,7 @@ function viewAuditPlan(id) {
         return;
     }
 
-    const plan = state.auditPlans.find(p => p.id == id);
+    const plan = state.auditPlans.find(p => String(p.id) === String(id));
     if (!plan) {
         alert('Plan not found with ID: ' + id);
         return;
@@ -778,7 +778,7 @@ function viewAuditPlan(id) {
     const client = state.clients.find(c => c.name === plan.client);
     const checklists = state.checklists || [];
     const planChecklists = plan.selectedChecklists || [];
-    const report = (state.auditReports || []).find(r => r.planId === plan.id);
+    const report = (state.auditReports || []).find(r => String(r.planId) === String(plan.id));
 
     // Calculate Progress
     let progress = 0;
@@ -787,7 +787,7 @@ function viewAuditPlan(id) {
 
     // Sum total items from assigned checklists (support both old and new formats)
     planChecklists.forEach(clId => {
-        const cl = checklists.find(c => c.id === clId);
+        const cl = checklists.find(c => String(c.id) === String(clId));
         if (cl) {
             if (cl.clauses && Array.isArray(cl.clauses)) {
                 // New format: clauses with subClauses
@@ -1062,14 +1062,14 @@ function viewAuditPlan(id) {
 window.printAuditChecklist = function (planId) {
     try {
         window.Logger.debug('Planning', 'Printing Plan ID:', planId);
-        const plan = state.auditPlans.find(p => p.id == planId);
+        const plan = state.auditPlans.find(p => String(p.id) === String(planId));
         if (!plan) {
             alert("Error: Audit Plan not found for ID: " + planId);
             return;
         }
 
-        // Use loose equality as planId might be string
-        const report = (state.auditReports || []).find(r => r.planId == planId);
+        // Use robust equality
+        const report = (state.auditReports || []).find(r => String(r.planId) === String(planId));
         const checklists = state.checklists || [];
         const planChecklists = plan.selectedChecklists || [];
 
