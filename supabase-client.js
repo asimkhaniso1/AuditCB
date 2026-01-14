@@ -1204,6 +1204,7 @@ const SupabaseClient = {
                 const data = {
                     auditor_id: assignment.auditorId,
                     client_id: assignment.clientId,
+                    role: assignment.role || 'Auditor',
                     assigned_by: assignment.assignedBy,
                     assigned_at: assignment.assignedAt || new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -1251,6 +1252,7 @@ const SupabaseClient = {
                 const mapped = {
                     auditorId: remote.auditor_id,
                     clientId: remote.client_id,
+                    role: remote.role || 'Auditor',
                     assignedBy: remote.assigned_by,
                     assignedAt: remote.assigned_at
                 };

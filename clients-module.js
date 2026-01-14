@@ -930,9 +930,9 @@ function getClientAuditTeamHTML(client) {
 
     // Get auditors assigned to this client
     const assignedAuditorIds = assignments
-        .filter(a => a.clientId == client.id)
-        .map(a => a.auditorId);
-    const assignedAuditors = auditors.filter(a => assignedAuditorIds.includes(a.id));
+        .filter(a => String(a.clientId) === String(client.id))
+        .map(a => String(a.auditorId));
+    const assignedAuditors = auditors.filter(a => assignedAuditorIds.includes(String(a.id)));
 
     return `
     <div class="card">
@@ -963,7 +963,7 @@ function getClientAuditTeamHTML(client) {
         ${assignedAuditors.length > 0 ? `
             <div style="display: grid; gap: 1rem;">
                 ${assignedAuditors.map(auditor => {
-        const assignment = assignments.find(a => a.clientId == client.id && a.auditorId == auditor.id);
+        const assignment = assignments.find(a => String(a.clientId) === String(client.id) && String(a.auditorId) === String(auditor.id));
         return `
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
                         <div style="display: flex; align-items: center; gap: 1rem;">
@@ -4821,9 +4821,9 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
 
     // Get auditors not yet assigned to this client
     const assignedAuditorIds = assignments
-        .filter(a => a.clientId == clientId)
-        .map(a => a.auditorId);
-    const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(a.id));
+        .filter(a => String(a.clientId) === String(clientId))
+        .map(a => String(a.auditorId));
+    const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(String(a.id)));
 
     if (availableAuditors.length === 0) {
         window.showNotification('All auditors are already assigned to this client.', 'info');
@@ -4859,19 +4859,30 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
             window.state.auditorAssignments = [];
         }
 
-        // Add new assignment (Standardized IDs as strings)
-        window.state.auditorAssignments.push({
+        const assignment = {
+            id: Date.now(),
             auditorId: String(auditorId),
             clientId: String(clientId),
+            role: 'Auditor', // Default role
             assignedBy: window.state.currentUser?.name || 'System',
             assignedAt: new Date().toISOString()
-        });
+        };
+
+        // Add new assignment
+        window.state.auditorAssignments.push(assignment);
 
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
+                .then(() => console.log('Auditor assignment synced to Supabase'))
+                .catch(e => console.error('Auditor assignment sync failed:', e));
+        }
+
         window.closeModal();
 
         // Refresh the wizard step to show updated team
-        // Refresh the view and switch to Audit Team tab
         renderClientDetail(clientId);
         setTimeout(() => {
             document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
@@ -4907,56 +4918,31 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
 Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
 
     if (confirm(confirmMsg)) {
-        // Normalize IDs to strings for robust comparison
         const cid = String(clientId);
         const aid = String(auditorId);
 
         const initialLength = (window.state.auditorAssignments || []).length;
 
-        console.log('[removeClientAuditorAssignment] Before filter:', {
-            totalAssignments: initialLength,
-            lookingFor: { cid, aid, cidNum, aidNum },
-            allAssignments: window.state.auditorAssignments.map(a => ({
-                clientId: a.clientId,
-                auditorId: a.auditorId,
-                clientIdType: typeof a.clientId,
-                auditorIdType: typeof a.auditorId
-            }))
-        });
-
         window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
-            // Match using robust string comparison
             const match = (String(a.clientId) === cid && String(a.auditorId) === aid);
-
-            console.log('[removeClientAuditorAssignment] Checking assignment:', {
-                assignment: a,
-                stringMatch,
-                numberMatch,
-                looseMatch,
-                finalMatch: match
-            });
-
-            if (match) {
-                console.log('[removeClientAuditorAssignment] ✓ Found matching assignment to remove:', a);
-            }
-            return !match; // Keep if NOT matching
+            return !match;
         });
 
-        const newLength = window.state.auditorAssignments.length;
-        const removedCount = initialLength - newLength;
-
-        console.log('[removeClientAuditorAssignment] After filter:', {
-            removed: removedCount,
-            remaining: newLength
-        });
+        const removedCount = initialLength - window.state.auditorAssignments.length;
 
         if (removedCount === 0) {
-            console.warn('[removeClientAuditorAssignment] No assignment found to remove!');
-            window.showNotification('Could not find assignment to remove. Please refresh and try again.', 'error');
-            return;
+            console.warn('[removeClientAuditorAssignment] No assignment found to remove locally');
+            // We still attempt to delete from Supabase just in case
         }
 
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.deleteAuditorAssignment(aid, cid)
+                .then(() => console.log('Auditor assignment removed from Supabase'))
+                .catch(e => console.error('Auditor assignment removal failed:', e));
+        }
 
         // Refresh the view and switch to Audit Team tab
         renderClientDetail(clientId);
