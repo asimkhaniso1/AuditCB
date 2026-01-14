@@ -3370,7 +3370,7 @@ window.uploadKnowledgeDoc = function (type) {
                 });
 
                 cloudUrl = uploadResult.url;
-                cloudPath = uploadResult.path;
+                cloudPath = uploadResult.storage_path; // Correct property name from DB
                 docId = uploadResult.id;
             } catch (uploadErr) {
                 console.error('Failed to upload document to cloud:', uploadErr);
