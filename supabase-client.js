@@ -1876,7 +1876,7 @@ const SupabaseClient = {
 
             // Upload file to storage bucket
             const { data, error } = await this.client.storage
-                .from('Documents') // Using existing bucket
+                .from('documents') // Using existing bucket (lowercase)
                 .upload(filePath, file, {
                     cacheControl: '3600',
                     upsert: false
@@ -1886,7 +1886,7 @@ const SupabaseClient = {
 
             // Get public URL
             const { data: urlData } = this.client.storage
-                .from('Documents')
+                .from('documents')
                 .getPublicUrl(filePath);
 
             Logger.info('File uploaded successfully:', filePath);
