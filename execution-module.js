@@ -1469,8 +1469,7 @@ window.saveChecklist = function (reportId) {
                 date: report.date,
                 status: report.status,
                 findings: report.findings || 0,
-                checklist_data: report.checklistProgress || [],
-                checklist_progress: report.checklistProgress || [],  // Also save to this column
+                checklist_progress: report.checklistProgress || [],  // Standardized column name
                 data: report || {},
                 custom_items: report.customItems || [],
                 opening_meeting: report.openingMeeting || {},

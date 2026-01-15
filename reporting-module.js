@@ -289,10 +289,10 @@ async function updateReportInDB(report, message) {
         await window.SupabaseClient.db.update('audit_reports', String(report.id), {
             plan_id: String(report.planId),
             client_name: report.client,
-            audit_date: report.date,
+            date: report.date,
             status: report.status,
-            findings_count: report.findings || 0,
-            checklist_data: report.checklistProgress || [],
+            findings: report.findings || 0,
+            checklist_progress: report.checklistProgress || [],
             data: report // Store full JSON blob
         });
         if (message) window.showNotification(message, 'success');
