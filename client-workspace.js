@@ -938,8 +938,14 @@ function renderClientExecution(client) {
                                     </td>
                                     <td>${r.recommendation || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report">
+                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;">
                                             <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-icon" onclick="window.openEditReportModal && window.openEditReportModal(${r.id})" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;">
+                                            <i class="fa-solid fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-icon" onclick="window.deleteAuditReport && window.deleteAuditReport(${r.id})" title="Delete Report" style="color: var(--danger-color);">
+                                            <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>
                                 </tr>

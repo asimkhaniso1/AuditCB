@@ -470,6 +470,10 @@ function deleteAuditReport(reportId) {
     renderAuditExecutionEnhanced();
 }
 
+// Export functions for use in other modules (e.g., client-workspace.js)
+window.deleteAuditReport = deleteAuditReport;
+window.openEditReportModal = openEditReportModal;
+
 function renderExecutionDetail(reportId) {
     const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
