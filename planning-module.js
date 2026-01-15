@@ -215,8 +215,8 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
         <div class="fade-in">
              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary btn-sm" onclick="renderAuditPlanningEnhanced()" title="Back">
-                        <i class="fa-solid fa-arrow-left"></i>
+                    <button class="btn btn-secondary btn-sm" onclick="renderAuditPlanningEnhanced()">
+                        <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <h2 id="plan-form-title" style="margin: 0; font-size: 1.5rem;">Create Audit Plan</h2>
                 </div>
@@ -888,7 +888,7 @@ function viewAuditPlan(id) {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
-                        <i class="fa-solid fa-arrow-left"></i>
+                        <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <div>
                         <h2 style="margin: 0; font-size: 1.5rem;">${plan.client}</h2>

@@ -138,7 +138,11 @@ function renderReportSummaryTab(report, tabContent) {
                     <h3 style="margin: 0;">Audit Report Drafting</h3>
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review findings and finalize report content.</p>
                 </div>
-                ${(window.state.currentUser?.role === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER || window.state.currentUser?.role === 'Admin') ? `
+                ${(function () {
+            const role = (window.state.currentUser?.role || '').toLowerCase();
+            const allowed = ['admin', 'administrator', 'certification manager'];
+            return allowed.includes(role);
+        })() ? `
                 <button id="btn-ai-draft-${report.id}" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onclick="window.generateAIConclusion('${report.id}')">
                     <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> Auto-Draft with AI
                 </button>
@@ -1463,7 +1467,7 @@ window.openReportingDetail = function (reportId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" onclick="window.renderReportingModule()">
+                <button class="btn btn-secondary" onclick="window.handleBackToReporting()">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reporting Dashboard
                 </button>
             </div>
@@ -1475,6 +1479,25 @@ window.openReportingDetail = function (reportId) {
     // Render the existing summary tab into the container
     const container = document.getElementById('reporting-detail-container');
     window.renderReportSummaryTab(report, container);
+};
+
+// Robust Back Navigation Helper
+window.handleBackToReporting = function () {
+    console.log('Navigating back to Reporting Dashboard...');
+    try {
+        if (typeof window.renderReportingModule === 'function') {
+            window.renderReportingModule();
+        } else {
+            console.warn('renderReportingModule not found, reloading module...');
+            // Fallback: Try to find the nav button and click it to reload context
+            const navBtn = document.querySelector('button[onclick*="renderModule(\'reporting\')"]');
+            if (navBtn) navBtn.click();
+            else window.location.reload();
+        }
+    } catch (e) {
+        console.error('Navigation error:', e);
+        window.location.reload();
+    }
 };
 
 // Export
