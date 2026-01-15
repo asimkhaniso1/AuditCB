@@ -497,8 +497,13 @@ function editAuditPlan(id) {
 
         document.getElementById('plan-audit-type').value = plan.type || 'Surveillance';
         document.getElementById('plan-date').value = plan.date;
-        if (document.getElementById('plan-mandays')) document.getElementById('plan-mandays').value = plan.manDays || '';
-        if (document.getElementById('plan-onsite-days')) document.getElementById('plan-onsite-days').value = plan.onsiteDays || '';
+
+        // Critical Fix: Load ManDays from various possible sources
+        const savedManDays = plan.manDays || plan.man_days || '';
+        const savedOnsiteDays = plan.onsiteDays || plan.onsite_days || '';
+
+        if (document.getElementById('plan-mandays')) document.getElementById('plan-mandays').value = savedManDays;
+        if (document.getElementById('plan-onsite-days')) document.getElementById('plan-onsite-days').value = savedOnsiteDays;
 
         // Trigger client details load
         updateClientDetails(plan.client);
@@ -610,14 +615,13 @@ function updateClientDetails(clientName) {
         if (siteGroup && siteCheckboxes && client.sites && client.sites.length > 0) {
             siteGroup.style.display = 'block';
             if (noSitesMessage) noSitesMessage.style.display = 'none';
-            siteCheckboxes.innerHTML = client.sites.map((s, i) => `
-                <div style="padding: 0.75rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; align-items: start; gap: 0.75rem;">
-                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; flex-shrink: 0; margin-top: 4px;">
-                    <div style="flex: 1; min-width: 0; text-align: left;">
-                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; color: #1e293b; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;" title="${s.name}">${s.name || 'Unnamed Site'}</div>
-                        <div style="font-size: 0.75rem; color: #64748b; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;">${s.city || 'No Location'}</div>
+            <div style="padding: 10px; background: #fff; border-radius: 4px; border: 1px solid #e2e8f0; display: flex; align-items: flex-start; gap: 10px; width: 100%; box-sizing: border-box;">
+                <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; margin-top: 3px; flex-shrink: 0;">
+                    <div style="flex: 1; overflow: hidden;">
+                        <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b; white-space: normal; line-height: 1.4;">${s.name || 'Unnamed Site'}</div>
+                        <div style="font-size: 0.8rem; color: #64748b; white-space: normal; line-height: 1.4;">${s.city || 'No Location'}</div>
                     </div>
-                </div>
+            </div>
             `).join('');
 
             // Add event listener to update site count when checkboxes change
@@ -645,25 +649,27 @@ function updateClientDetails(clientName) {
         if (clientInfoPanel) {
             const primaryContact = (client.contacts && client.contacts[0]) || {};
             clientInfoPanel.innerHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+                < div style = "display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;" >
                     <div><strong>Industry:</strong> ${client.industry || '-'}</div>
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
                     <div><strong>Total Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
                     <div><strong>Contact:</strong> ${primaryContact.name || '-'}</div>
                     <div><strong>Status:</strong> <span style="color: ${client.status === 'Active' ? 'var(--success-color)' : 'var(--danger-color)'}; font-weight: 600;">${client.status || 'Draft'}</span></div>
-                </div>
-            `;
+                </div >
+                `;
             clientInfoPanel.style.display = 'block';
         }
         // Populate auditee dropdown with client contacts
         const auditeeSelect = document.getElementById('plan-auditee');
         if (auditeeSelect && client.contacts && client.contacts.length > 0) {
             auditeeSelect.innerHTML = `
-                <option value="">-- Select Contact Person --</option>
-                ${client.contacts.map(contact => `
+                < option value = "" > --Select Contact Person--</option >
+                    ${
+                        client.contacts.map(contact => `
                     <option value="${contact.name}">${contact.name}${contact.designation ? ` - ${contact.designation}` : ''}</option>
-                `).join('')}
+                `).join('')
+            }
             `;
             // Auto-select first contact if available
             if (client.contacts.length > 0) {
@@ -730,7 +736,7 @@ function autoCalculateDays() {
 
         document.getElementById('plan-mandays').value = simpleDays.toFixed(1);
         document.getElementById('plan-onsite-days').value = (simpleDays * 0.8).toFixed(1);
-        window.showNotification(`Calculated ${simpleDays.toFixed(1)} days for ${totalEmployees} employees at ${siteCount} site(s)`, 'success');
+        window.showNotification(`Calculated ${ simpleDays.toFixed(1) } days for ${ totalEmployees } employees at ${ siteCount } site(s)`, 'success');
         return;
     }
 
@@ -749,7 +755,7 @@ function autoCalculateDays() {
         document.getElementById('plan-mandays').value = days.toFixed(1);
         document.getElementById('plan-onsite-days').value = (days * 0.8).toFixed(1);
 
-        window.showNotification(`Calculated ${days.toFixed(1)} man-days for ${totalEmployees} employees at ${siteCount} site(s)${hasShiftWork ? ' (with shift work)' : ''}`, 'success');
+        window.showNotification(`Calculated ${ days.toFixed(1) } man - days for ${ totalEmployees } employees at ${ siteCount } site(s)${ hasShiftWork ? ' (with shift work)' : '' } `, 'success');
     } else {
         window.showNotification('No employee data available for selected sites. Please verify client/site information.', 'warning');
     }
@@ -823,7 +829,7 @@ function viewAuditPlan(id) {
         if (!cl) return '';
         const itemCount = getChecklistItemCount(cl);
         return `
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
+                < div style = "display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;" >
                 <div>
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${itemCount} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
@@ -831,8 +837,8 @@ function viewAuditPlan(id) {
                 <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
                     <i class="fa-solid fa-eye"></i>
                 </button>
-            </div>
-    `;
+            </div >
+                `;
     }).join('') : '<p style="color: var(--text-secondary); font-style: italic;">No checklists assigned.</p>';
 
     // --- UI REDESIGN ---
@@ -852,15 +858,16 @@ function viewAuditPlan(id) {
     if (plan.status === 'Completed') activeStep = 4;
 
     const stepperHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative;">
-            <div style="position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: #e2e8f0; z-index: 0;"></div>
-            ${['Plan Created', 'Checklists Ready', 'Execution', 'Reporting', 'Audit Closed'].map((step, index) => {
-        const isActive = index <= activeStep;
-        const isCurrent = index === activeStep;
-        const color = isActive ? 'var(--primary-color)' : '#94a3b8';
-        const bgColor = isActive ? 'var(--primary-color)' : '#e2e8f0';
+                < div style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative;" >
+                    <div style="position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: #e2e8f0; z-index: 0;"></div>
+            ${
+                ['Plan Created', 'Checklists Ready', 'Execution', 'Reporting', 'Audit Closed'].map((step, index) => {
+                    const isActive = index <= activeStep;
+                    const isCurrent = index === activeStep;
+                    const color = isActive ? 'var(--primary-color)' : '#94a3b8';
+                    const bgColor = isActive ? 'var(--primary-color)' : '#e2e8f0';
 
-        return `
+                    return `
                 <div style="position: relative; z-index: 1; text-align: center; flex: 1;">
                     <div style="width: 30px; height: 30px; border-radius: 50%; background: ${bgColor}; color: ${isActive ? 'white' : '#64748b'}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-weight: bold; font-size: 0.9rem; border: 4px solid white;">
                         ${isActive ? '<i class="fa-solid fa-check"></i>' : index + 1}
@@ -868,13 +875,14 @@ function viewAuditPlan(id) {
                     <div style="margin-top: 0.5rem; font-size: 0.85rem; font-weight: ${isCurrent ? 'bold' : 'normal'}; color: ${isCurrent ? 'var(--primary-color)' : '#64748b'};">${step}</div>
                 </div>
                 `;
-    }).join('')}
-        </div>
-    `;
+                }).join('')
+            }
+        </div >
+                `;
 
     const html = `
-    <div class="fade-in">
-            <!-- Header -->
+                < div class="fade-in" >
+            < !--Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
@@ -892,10 +900,10 @@ function viewAuditPlan(id) {
                 </div>
             </div>
 
-            <!-- Stepper -->
-            ${stepperHTML}
+            <!--Stepper -->
+                ${ stepperHTML }
             
-            <!-- UNIFIED DETAILS GRID (New Layout) -->
+            < !--UNIFIED DETAILS GRID(New Layout)-- >
             <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; margin-bottom: 2rem;">
                 
                 <!-- 1. Client Context Card -->
@@ -975,84 +983,84 @@ function viewAuditPlan(id) {
                 </div>
             </div>
 
-            <!-- Workflow Stages Grid (Row 2) -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
-                
-                <!-- 1. Configuration -->
-                <div class="card" style="margin: 0; display: flex; flex-direction: column;">
-                    <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Checklist Config</h3>
-                    <div style="flex: 1; margin-bottom: 1rem;">
-                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Assign and customize checklists for this audit.</p>
-                        <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
-                    </div>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditChecklist('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
-                        <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="openChecklistSelectionModal(${plan.id})">Configure</button>
-                    </div>
-                </div>
+            <!--Workflow Stages Grid(Row 2)-- >
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
 
-                <!-- 2. Execution -->
-                <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid var(--success-color);">
-                     <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-play" style="margin-right: 0.5rem; color: var(--success-color);"></i> Execution</h3>
-                     <div style="flex: 1; margin-bottom: 1rem;">
-                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Verify items, raise NCRs.</p>
-                        <!-- Mini Progress -->
-                        <div style="margin-top: 0.5rem;">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
-                                <span>Progress</span>
-                                <span>${progress}%</span>
-                            </div>
-                            <div style="height: 6px; background: #e2e8f0; border-radius: 3px;">
-                                <div style="width: ${progress}%; background: var(--success-color); height: 100%; border-radius: 3px;"></div>
+                    <!-- 1. Configuration -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Checklist Config</h3>
+                        <div style="flex: 1; margin-bottom: 1rem;">
+                            <p style="font-size: 0.9rem; color: var(--text-secondary);">Assign and customize checklists for this audit.</p>
+                            <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditChecklist('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
+                            <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="openChecklistSelectionModal(${plan.id})">Configure</button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Execution -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid var(--success-color);">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-play" style="margin-right: 0.5rem; color: var(--success-color);"></i> Execution</h3>
+                        <div style="flex: 1; margin-bottom: 1rem;">
+                            <p style="font-size: 0.9rem; color: var(--text-secondary);">Verify items, raise NCRs.</p>
+                            <!-- Mini Progress -->
+                            <div style="margin-top: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
+                                    <span>Progress</span>
+                                    <span>${progress}%</span>
+                                </div>
+                                <div style="height: 6px; background: #e2e8f0; border-radius: 3px;">
+                                    <div style="width: ${progress}%; background: var(--success-color); height: 100%; border-radius: 3px;"></div>
+                                </div>
                             </div>
                         </div>
-                     </div>
-                     <button class="btn btn-primary" style="width: 100%;" onclick="window.navigateToAuditExecution(${plan.id})">
-                        ${report ? 'Continue Audit' : 'Start Audit'}
-                     </button>
-                </div>
-
-                <!-- 3. Reporting -->
-                <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid orange;">
-                    <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-edit" style="margin-right: 0.5rem; color: orange;"></i> Reporting</h3>
-                    <div style="flex: 1; margin-bottom: 1rem;">
-                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: center;">
-                            <div style="background: #fef2f2; padding: 0.5rem; border-radius: 4px;">
-                                <div style="font-weight: bold; color: var(--danger-color);">${report?.ncrs?.length || 0}</div>
-                                <div style="font-size: 0.75rem;">NCRs</div>
-                            </div>
-                            <div style="background: #fffbeb; padding: 0.5rem; border-radius: 4px;">
-                                <div style="font-weight: bold; color: var(--warning-color);">${report?.capas?.length || 0}</div>
-                                <div style="font-size: 0.75rem;">CAPAs</div>
-                            </div>
-                         </div>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="window.navigateToAuditExecution(${plan.id})">
+                            ${report ? 'Continue Audit' : 'Start Audit'}
+                        </button>
                     </div>
-                    ${report ? `
+
+                    <!-- 3. Reporting -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid orange;">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-edit" style="margin-right: 0.5rem; color: orange;"></i> Reporting</h3>
+                        <div style="flex: 1; margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: center;">
+                                <div style="background: #fef2f2; padding: 0.5rem; border-radius: 4px;">
+                                    <div style="font-weight: bold; color: var(--danger-color);">${report?.ncrs?.length || 0}</div>
+                                    <div style="font-size: 0.75rem;">NCRs</div>
+                                </div>
+                                <div style="background: #fffbeb; padding: 0.5rem; border-radius: 4px;">
+                                    <div style="font-weight: bold; color: var(--warning-color);">${report?.capas?.length || 0}</div>
+                                    <div style="font-size: 0.75rem;">CAPAs</div>
+                                </div>
+                            </div>
+                        </div>
+                        ${report ? `
                     <button class="${report.status === 'Finalized' ? 'btn btn-secondary' : 'btn btn-primary'}" style="width: 100%;" onclick="window.navigateToReporting(${plan.id})">
                         ${report.status === 'Finalized' ? 'View Final Report' :
-                report.status === 'Approved' ? 'Publish Report' :
-                    report.status === 'In Review' ? 'Review / Approve' : 'Draft Report'}
+                                report.status === 'Approved' ? 'Publish Report' :
+                                    report.status === 'In Review' ? 'Review / Approve' : 'Draft Report'}
                     </button>
                     ` : '<div style="text-align:center; font-size:0.8rem; color:#aaa;">Pending Execution</div>'}
-                </div>
+                    </div>
 
-                <!-- 4. Closing -->
-                <div class="card" style="margin: 0; display: flex; flex-direction: column;">
-                     <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-flag-checkered" style="margin-right: 0.5rem; color: #64748b;"></i> Closing</h3>
-                     <div style="flex: 1; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
-                        ${plan.status === 'Completed' ?
-            '<div style="text-align: center; color: var(--success-color);"><i class="fa-solid fa-certificate" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Certified</div></div>' :
-            '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>'
-        }
-                     </div>
-                     <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} onclick="closeAuditPlan(${plan.id})" style="width: 100%;">
-                        ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
-                     </button>
-                </div>
+                    <!-- 4. Closing -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column;">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-flag-checkered" style="margin-right: 0.5rem; color: #64748b;"></i> Closing</h3>
+                        <div style="flex: 1; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
+                            ${plan.status === 'Completed' ?
+                                '<div style="text-align: center; color: var(--success-color);"><i class="fa-solid fa-certificate" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Certified</div></div>' :
+                                '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>'
+                            }
+                        </div>
+                        <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} onclick="closeAuditPlan(${plan.id})" style="width: 100%;">
+                            ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
+                        </button>
+                    </div>
 
-            </div>
-    </div>
-    `;
+                </div>
+    </div >
+                `;
     window.contentArea.innerHTML = html;
 }
 
@@ -1094,7 +1102,7 @@ window.printAuditChecklist = function (planId) {
         if (report && report.checklistProgress) {
             report.checklistProgress.forEach(p => {
                 // Normalized key: ID-Idx (String)
-                progressMap[`${p.checklistId} -${p.itemIdx} `] = p;
+                progressMap[`${ p.checklistId } -${ p.itemIdx } `] = p;
             });
         }
 
@@ -1103,7 +1111,7 @@ window.printAuditChecklist = function (planId) {
 
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
 
-        let content = `
+            let content = `
             <html>
             <head>
                 <title>Audit Checklist Report - ${plan.client}</title>
@@ -1130,11 +1138,11 @@ window.printAuditChecklist = function (planId) {
                 </div>
         `;
 
-        planChecklists.forEach(clId => {
-            const cl = checklists.find(c => c.id == clId);
-            if (!cl) return; // Skip if checklist not found
+            planChecklists.forEach(clId => {
+                const cl = checklists.find(c => c.id == clId);
+                if (!cl) return; // Skip if checklist not found
 
-            content += `
+                content += `
                 <div class="section">
                     <h2>${cl.name}</h2>
                     <table>
@@ -1149,17 +1157,17 @@ window.printAuditChecklist = function (planId) {
                         <tbody>
             `;
 
-            if (cl.clauses) {
-                // Hierarchical
-                cl.clauses.forEach(clause => {
-                    content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
-                    clause.subClauses.forEach((item, subIdx) => {
-                        const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
-                        const prog = progressMap[key] || {};
-                        const s = prog.status || '';
-                        const c = prog.comment || '-';
+                if (cl.clauses) {
+                    // Hierarchical
+                    cl.clauses.forEach(clause => {
+                        content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
+                        clause.subClauses.forEach((item, subIdx) => {
+                            const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
+                            const prog = progressMap[key] || {};
+                            const s = prog.status || '';
+                            const c = prog.comment || '-';
 
-                        content += `
+                            content += `
                             <tr>
                                 <td>${item.clause || ''}</td>
                                 <td>${item.requirement || ''}</td>
@@ -1167,17 +1175,17 @@ window.printAuditChecklist = function (planId) {
                                 <td>${c}</td>
                             </tr>
                          `;
+                        });
                     });
-                });
-            } else if (cl.items) {
-                // Flat
-                cl.items.forEach((item, idx) => {
-                    const key = `${cl.id}-${idx}`;
-                    const prog = progressMap[key] || {};
-                    const s = prog.status || '';
-                    const c = prog.comment || '-';
+                } else if (cl.items) {
+                    // Flat
+                    cl.items.forEach((item, idx) => {
+                        const key = `${cl.id}-${idx}`;
+                        const prog = progressMap[key] || {};
+                        const s = prog.status || '';
+                        const c = prog.comment || '-';
 
-                    content += `
+                        content += `
                         <tr>
                             <td>${item.clause || ''}</td>
                             <td>${item.requirement || ''}</td>
@@ -1185,111 +1193,111 @@ window.printAuditChecklist = function (planId) {
                             <td>${c}</td>
                         </tr>
                     `;
+                    });
+                }
+
+                content += `</tbody></table></div>`;
+            });
+
+            if (report && report.ncrs && report.ncrs.length > 0) {
+                content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
+                report.ncrs.forEach(ncr => {
+                    content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
                 });
+                content += `</ul></div>`;
             }
 
-            content += `</tbody></table></div>`;
-        });
-
-        if (report && report.ncrs && report.ncrs.length > 0) {
-            content += `<div class="section"><h2>Audit Findings (NCRs)</h2><ul>`;
-            report.ncrs.forEach(ncr => {
-                content += `<li><strong>${ncr.type} (${ncr.clause}):</strong> ${ncr.description}</li>`;
-            });
-            content += `</ul></div>`;
-        }
-
-        content += `
+            content += `
             <div style="margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 1rem;">
                 Generated by AuditCB360 on ${new Date().toLocaleDateString()}
             </div>
             </body></html>
         `;
 
-        // Use specific window name to avoid some blockers
-        const win = window.open('', 'PrintChecklist', 'width=1000,height=800');
-        if (win) {
-            win.document.open();
-            win.document.write(content);
-            win.document.close();
-            win.focus();
-            setTimeout(() => win.print(), 500);
-        } else {
-            alert("Pop-up blocker prevented printing. Please check your browser settings and try again.");
+            // Use specific window name to avoid some blockers
+            const win = window.open('', 'PrintChecklist', 'width=1000,height=800');
+            if (win) {
+                win.document.open();
+                win.document.write(content);
+                win.document.close();
+                win.focus();
+                setTimeout(() => win.print(), 500);
+            } else {
+                alert("Pop-up blocker prevented printing. Please check your browser settings and try again.");
+            }
+        } catch (err) {
+            console.error("Print function error:", err);
+            alert("An error occurred while trying to print: " + err.message);
         }
-    } catch (err) {
-        console.error("Print function error:", err);
-        alert("An error occurred while trying to print: " + err.message);
-    }
-};
-
-window.closeAuditPlan = function (planId) {
-    const plan = state.auditPlans.find(p => p.id === planId);
-    if (!plan) return;
-
-    if (confirm('Are you sure you want to close this audit? This represents the completion of the audit cycle and issuance of the certificate.')) {
-        plan.status = 'Completed';
-        window.saveData();
-        viewAuditPlan(planId);
-        window.showNotification('Audit closed and certificate issued successfully.');
-    }
-};
-
-// Checklist Selection Modal for Audit Plan
-function openChecklistSelectionModal(planId) {
-    const plan = state.auditPlans.find(p => p.id == planId);
-    if (!plan) return;
-
-    const checklists = state.checklists || [];
-
-    // Get client's standards (from client record - stored as comma-separated string)
-    const client = state.clients.find(c => c.name === plan.client);
-    const clientStandardsStr = client?.standard || '';
-    const clientStandards = clientStandardsStr ? clientStandardsStr.split(', ').map(s => s.trim()).filter(s => s) : [];
-
-    // Combine plan standard and client standards
-    let allStandards = [];
-    if (plan.standard) {
-        allStandards = allStandards.concat(plan.standard.split(', ').map(s => s.trim()));
-    }
-    if (clientStandards.length > 0) {
-        allStandards = allStandards.concat(clientStandards);
-    }
-    // Remove duplicates and convert to lowercase for matching
-    const uniqueStandards = [...new Set(allStandards)];
-    const planStandards = uniqueStandards.map(s => s.toLowerCase());
-
-    // Improved matching: check if standard contains any of the plan/client standards
-    const matchingChecklists = checklists.filter(c => {
-        if (!c.standard) return true; // If no standard specified, include it
-        const checklistStandard = c.standard.toLowerCase();
-        return planStandards.some(ps =>
-            checklistStandard.includes(ps.split(':')[0]) || // Check base standard (e.g., "iso 9001")
-            ps.includes(checklistStandard.split(':')[0])
-        );
-    });
-
-    const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
-    const customChecklists = matchingChecklists.filter(c => c.type === 'custom' || !c.type);
-    const selectedIds = plan.selectedChecklists || [];
-
-    // Helper function to count items in a checklist (supports both flat and hierarchical)
-    const getItemCount = (cl) => {
-        if (cl.clauses && cl.clauses.length > 0) {
-            return cl.clauses.reduce((sum, clause) => sum + (clause.subClauses?.length || 0), 0);
-        }
-        return cl.items?.length || 0;
     };
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+    window.closeAuditPlan = function (planId) {
+        const plan = state.auditPlans.find(p => p.id === planId);
+        if (!plan) return;
 
-    // Display standards text
-    const standardsDisplay = uniqueStandards.length > 0 ? uniqueStandards.join(', ') : 'All Standards';
+        if (confirm('Are you sure you want to close this audit? This represents the completion of the audit cycle and issuance of the certificate.')) {
+            plan.status = 'Completed';
+            window.saveData();
+            viewAuditPlan(planId);
+            window.showNotification('Audit closed and certificate issued successfully.');
+        }
+    };
 
-    modalTitle.textContent = 'Configure Checklists for Audit';
-    modalBody.innerHTML = `
+    // Checklist Selection Modal for Audit Plan
+    function openChecklistSelectionModal(planId) {
+        const plan = state.auditPlans.find(p => p.id == planId);
+        if (!plan) return;
+
+        const checklists = state.checklists || [];
+
+        // Get client's standards (from client record - stored as comma-separated string)
+        const client = state.clients.find(c => c.name === plan.client);
+        const clientStandardsStr = client?.standard || '';
+        const clientStandards = clientStandardsStr ? clientStandardsStr.split(', ').map(s => s.trim()).filter(s => s) : [];
+
+        // Combine plan standard and client standards
+        let allStandards = [];
+        if (plan.standard) {
+            allStandards = allStandards.concat(plan.standard.split(', ').map(s => s.trim()));
+        }
+        if (clientStandards.length > 0) {
+            allStandards = allStandards.concat(clientStandards);
+        }
+        // Remove duplicates and convert to lowercase for matching
+        const uniqueStandards = [...new Set(allStandards)];
+        const planStandards = uniqueStandards.map(s => s.toLowerCase());
+
+        // Improved matching: check if standard contains any of the plan/client standards
+        const matchingChecklists = checklists.filter(c => {
+            if (!c.standard) return true; // If no standard specified, include it
+            const checklistStandard = c.standard.toLowerCase();
+            return planStandards.some(ps =>
+                checklistStandard.includes(ps.split(':')[0]) || // Check base standard (e.g., "iso 9001")
+                ps.includes(checklistStandard.split(':')[0])
+            );
+        });
+
+        const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
+        const customChecklists = matchingChecklists.filter(c => c.type === 'custom' || !c.type);
+        const selectedIds = plan.selectedChecklists || [];
+
+        // Helper function to count items in a checklist (supports both flat and hierarchical)
+        const getItemCount = (cl) => {
+            if (cl.clauses && cl.clauses.length > 0) {
+                return cl.clauses.reduce((sum, clause) => sum + (clause.subClauses?.length || 0), 0);
+            }
+            return cl.items?.length || 0;
+        };
+
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        // Display standards text
+        const standardsDisplay = uniqueStandards.length > 0 ? uniqueStandards.join(', ') : 'All Standards';
+
+        modalTitle.textContent = 'Configure Checklists for Audit';
+        modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin: 0;">
                 Select checklists to use during this audit. Showing checklists for <strong>${standardsDisplay}</strong>.
@@ -1347,78 +1355,78 @@ function openChecklistSelectionModal(planId) {
         </div>
     `;
 
-    // Open modal first
-    window.openModal(
-        'Configure Checklists for Audit',
-        modalBody.innerHTML,
-        () => {
-            const selected = [];
-            document.querySelectorAll('.checklist-select-cb:checked').forEach(cb => {
-                selected.push(parseInt(cb.getAttribute('data-id')));
-            });
+        // Open modal first
+        window.openModal(
+            'Configure Checklists for Audit',
+            modalBody.innerHTML,
+            () => {
+                const selected = [];
+                document.querySelectorAll('.checklist-select-cb:checked').forEach(cb => {
+                    selected.push(parseInt(cb.getAttribute('data-id')));
+                });
 
-            plan.selectedChecklists = selected;
+                plan.selectedChecklists = selected;
 
-            // Persist to DB immediately
-            (async () => {
-                try {
-                    if (window.SupabaseClient) {
-                        // Update just the selected checklists field if possible, or full plan
-                        // But since plan structure is complex, we update the data blob and specific fields
-                        await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
-                            data: plan // Full plan has updated checklist IDs
-                        });
-                        window.showNotification('Checklists assigned and saved to database.', 'success');
+                // Persist to DB immediately
+                (async () => {
+                    try {
+                        if (window.SupabaseClient) {
+                            // Update just the selected checklists field if possible, or full plan
+                            // But since plan structure is complex, we update the data blob and specific fields
+                            await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
+                                data: plan // Full plan has updated checklist IDs
+                            });
+                            window.showNotification('Checklists assigned and saved to database.', 'success');
+                        }
+                    } catch (e) {
+                        console.error('DB Save Checklists Error:', e);
+                        window.showNotification('Checklists updated locally (DB Error)', 'warning');
                     }
-                } catch (e) {
-                    console.error('DB Save Checklists Error:', e);
-                    window.showNotification('Checklists updated locally (DB Error)', 'warning');
-                }
-            })();
+                })();
 
-            window.saveData();
-            window.closeModal();
-            viewAuditPlan(planId);
-        }
-    );
+                window.saveData();
+                window.closeModal();
+                viewAuditPlan(planId);
+            }
+        );
 
-    // Update summary on checkbox change (Post-render)
-    setTimeout(() => {
-        const checkboxes = document.querySelectorAll('.checklist-select-cb');
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', () => {
-                const count = document.querySelectorAll('.checklist-select-cb:checked').length;
-                const summary = document.getElementById('checklist-selection-summary');
-                if (summary) summary.innerHTML = `<strong>${count}</strong> checklist(s) selected`;
+        // Update summary on checkbox change (Post-render)
+        setTimeout(() => {
+            const checkboxes = document.querySelectorAll('.checklist-select-cb');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const count = document.querySelectorAll('.checklist-select-cb:checked').length;
+                    const summary = document.getElementById('checklist-selection-summary');
+                    if (summary) summary.innerHTML = `<strong>${count}</strong> checklist(s) selected`;
+                });
             });
-        });
 
-        // Ensure save button text is correct
-        const btnSave = document.getElementById('modal-save');
-        if (btnSave) {
-            btnSave.textContent = 'Save Configuration';
-            btnSave.style.display = 'inline-block'; // Ensure it's visible
-            btnSave.disabled = false;
-        }
-    }, 100);
-}
+            // Ensure save button text is correct
+            const btnSave = document.getElementById('modal-save');
+            if (btnSave) {
+                btnSave.textContent = 'Save Configuration';
+                btnSave.style.display = 'inline-block'; // Ensure it's visible
+                btnSave.disabled = false;
+            }
+        }, 100);
+    }
 
-// Wizard logic removed - consolidated to 1 page
+    // Wizard logic removed - consolidated to 1 page
 
-function addAgendaRow(data = {}) {
-    const tbody = document.getElementById('agenda-tbody');
-    const row = document.createElement('tr');
+    function addAgendaRow(data = {}) {
+        const tbody = document.getElementById('agenda-tbody');
+        const row = document.createElement('tr');
 
-    // Get Auditors for dropdown
-    const leadVal = document.getElementById('plan-lead-auditor').value;
-    const teamSelect = document.getElementById('plan-team');
-    const teamVals = Array.from(teamSelect.selectedOptions).map(o => o.value);
-    const allAuditors = [leadVal, ...teamVals].filter(Boolean);
-    const uniqueAuditors = [...new Set(allAuditors)];
+        // Get Auditors for dropdown
+        const leadVal = document.getElementById('plan-lead-auditor').value;
+        const teamSelect = document.getElementById('plan-team');
+        const teamVals = Array.from(teamSelect.selectedOptions).map(o => o.value);
+        const allAuditors = [leadVal, ...teamVals].filter(Boolean);
+        const uniqueAuditors = [...new Set(allAuditors)];
 
-    const auditorOptions = uniqueAuditors.map(a => `<option value="${a}" ${data.auditor === a ? 'selected' : ''}>${a}</option>`).join('');
+        const auditorOptions = uniqueAuditors.map(a => `<option value="${a}" ${data.auditor === a ? 'selected' : ''}>${a}</option>`).join('');
 
-    row.innerHTML = `
+        row.innerHTML = `
         <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.day || 'Day 1')}" placeholder="Day"></td>
         <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.time || '')}" placeholder="Time"></td>
         <td><input type="text" class="form-control" style="padding: 4px;" value="${window.UTILS.escapeHtml(data.item || '')}" placeholder="Activity/Clause"></td>
@@ -1435,53 +1443,53 @@ function addAgendaRow(data = {}) {
         </td>
     `;
 
-    tbody.appendChild(row);
-}
+        tbody.appendChild(row);
+    }
 
-// Delete a row from the agenda table
-function deleteAgendaRow(btn) {
-    btn.closest('tr').remove();
-}
+    // Delete a row from the agenda table
+    function deleteAgendaRow(btn) {
+        btn.closest('tr').remove();
+    }
 
-// Note: saveAuditPlan is defined later in the file (around line 1600) with proper validation and sanitization
+    // Note: saveAuditPlan is defined later in the file (around line 1600) with proper validation and sanitization
 
-// Export functions
-window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
+    // Export functions
+    window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
 
-window.autoCalculateDays = autoCalculateDays;
-window.updateClientDetails = updateClientDetails;
-window.addAgendaRow = addAgendaRow;
-window.saveAuditPlan = saveAuditPlan;
-window.editAuditPlan = editAuditPlan;
-window.viewAuditPlan = viewAuditPlan;
-window.openChecklistSelectionModal = openChecklistSelectionModal;
+    window.autoCalculateDays = autoCalculateDays;
+    window.updateClientDetails = updateClientDetails;
+    window.addAgendaRow = addAgendaRow;
+    window.saveAuditPlan = saveAuditPlan;
+    window.editAuditPlan = editAuditPlan;
+    window.viewAuditPlan = viewAuditPlan;
+    window.openChecklistSelectionModal = openChecklistSelectionModal;
 
-window.printAuditPlanDetails = function (planId) {
-    const plan = state.auditPlans.find(p => p.id == planId);
-    if (!plan) return;
+    window.printAuditPlanDetails = function (planId) {
+        const plan = state.auditPlans.find(p => p.id == planId);
+        if (!plan) return;
 
-    const client = state.clients.find(c => c.name === plan.client);
+        const client = state.clients.find(c => c.name === plan.client);
 
-    // Resolve team names
-    const teamNames = ((plan.team && Array.isArray(plan.team))
-        ? plan.team
-        : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown'));
+        // Resolve team names
+        const teamNames = ((plan.team && Array.isArray(plan.team))
+            ? plan.team
+            : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown'));
 
-    const leadAuditor = teamNames[0] || 'Unknown';
-    const otherMembers = teamNames.slice(1);
+        const leadAuditor = teamNames[0] || 'Unknown';
+        const otherMembers = teamNames.slice(1);
 
-    // Calculate breakdowns
-    let totalEmployees = 0;
-    const siteDetails = (plan.selectedSites || []).map(s => {
-        const siteData = (client?.sites || []).find(cs => cs.name === s.name);
-        const emps = siteData?.employees || 0;
-        totalEmployees += emps;
-        return { ...s, employees: emps, address: siteData?.address || '' };
-    });
+        // Calculate breakdowns
+        let totalEmployees = 0;
+        const siteDetails = (plan.selectedSites || []).map(s => {
+            const siteData = (client?.sites || []).find(cs => cs.name === s.name);
+            const emps = siteData?.employees || 0;
+            totalEmployees += emps;
+            return { ...s, employees: emps, address: siteData?.address || '' };
+        });
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`PLAN-${plan.id}|${plan.client}|${plan.date}`)}`;
 
-    let content = `
+        let content = `
         <html>
         <head>
             <title>Audit Plan - ${plan.client}</title>
@@ -1540,17 +1548,17 @@ window.printAuditPlanDetails = function (planId) {
                 </thead>
                 <tbody>
                     ${siteDetails.map((site, index) => {
-        let allocatedDays = 0;
-        if (totalEmployees > 0) {
-            allocatedDays = (site.employees / totalEmployees) * plan.manDays;
-        } else {
-            allocatedDays = plan.manDays / siteDetails.length;
-        }
+            let allocatedDays = 0;
+            if (totalEmployees > 0) {
+                allocatedDays = (site.employees / totalEmployees) * plan.manDays;
+            } else {
+                allocatedDays = plan.manDays / siteDetails.length;
+            }
 
-        // Simple distribution logic: Lead Auditor on first/largest site, others distributed
-        const auditorAssigned = index === 0 ? `<b>${leadAuditor}</b>` : (otherMembers[index - 1] || 'Assigned Team');
+            // Simple distribution logic: Lead Auditor on first/largest site, others distributed
+            const auditorAssigned = index === 0 ? `<b>${leadAuditor}</b>` : (otherMembers[index - 1] || 'Assigned Team');
 
-        return `
+            return `
                         <tr>
                             <td>${window.UTILS.escapeHtml(site.name)} ${site.geotag ? '<span style="font-size:0.8em; color:#64748b;">(GPS)</span>' : ''}</td>
                             <td>${site.address || '-'}</td>
@@ -1559,7 +1567,7 @@ window.printAuditPlanDetails = function (planId) {
                             <td style="text-align: right; font-weight: bold;">${allocatedDays.toFixed(2)}</td>
                         </tr>
                         `;
-    }).join('')}
+        }).join('')}
                     <tr style="background: #f8fafc; font-weight: bold;">
                         <td colspan="2">TOTAL</td>
                         <td style="text-align: right;">${totalEmployees}</td>
@@ -1614,413 +1622,413 @@ window.printAuditPlanDetails = function (planId) {
         </html>
     `;
 
-    const printWin = window.open('', '', 'width=900,height=800');
-    printWin.document.write(content);
-    printWin.document.close();
-};
-
-// Toggle Planning Analytics Dashboard
-function togglePlanningAnalytics() {
-    const state = window.state;
-    state.showPlanningAnalytics = state.showPlanningAnalytics === false ? true : false;
-    window.saveData();
-    renderAuditPlanningEnhanced();
-}
-
-// Note: goToStep2, goToStep1, addAgendaRow, deleteAgendaRow are defined earlier in the file (around lines 1369-1461)
-// The saveAuditPlan function below is the definitive version with proper validation and sanitization
-
-function saveAuditPlan(shouldPrint = false) {
-    // 1. Define Fields
-    const fieldIds = {
-        client: 'plan-client',
-        date: 'plan-date',
-        type: 'plan-audit-type', // Consolidated to use plan-audit-type
-        leadAuditor: 'plan-lead-auditor',
-        manDays: 'plan-mandays',
-        onsiteDays: 'plan-onsite-days'
-        // Standard & Team are multi-selects handled separately or via generic rules if we mapped them
+        const printWin = window.open('', '', 'width=900,height=800');
+        printWin.document.write(content);
+        printWin.document.close();
     };
 
-    // 2. Define Rules
-    const rules = {
-        client: [{ rule: 'required', fieldName: 'Client' }],
-        date: [{ rule: 'required', fieldName: 'Date' }],
-        manDays: [
-            { rule: 'required', fieldName: 'Man-Days' },
-            { rule: 'number', fieldName: 'Man-Days' },
-            { rule: 'range', min: 0, max: 1000, fieldName: 'Man-Days' }
-        ],
-        onsiteDays: [
-            { rule: 'number', fieldName: 'Onsite Days' }
-        ]
-    };
-
-    // 3. Validate Step 1
-    const result = Validator.validateFormElements(fieldIds, rules);
-    if (!result.valid) {
-        Validator.displayErrors(result.errors, fieldIds);
-        window.showNotification('Please fix the form errors', 'error');
-        return;
-    }
-    Validator.clearErrors(fieldIds);
-
-    // 4. Collect & Sanitize Data
-    const clientName = document.getElementById('plan-client').value;
-    const date = document.getElementById('plan-date').value;
-    const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
-
-    // Safely map multi-selects
-    const standardSelect = document.getElementById('plan-standard');
-    const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
-
-    // Validate Leads/Team
-    const leadAuditor = document.getElementById('plan-lead-auditor').value;
-    const teamSelect = document.getElementById('plan-team');
-    const team = Array.from(teamSelect.selectedOptions).map(o => o.value);
-
-    if (!leadAuditor) {
-        window.showNotification('Lead Auditor is required', 'error');
-        return;
+    // Toggle Planning Analytics Dashboard
+    function togglePlanningAnalytics() {
+        const state = window.state;
+        state.showPlanningAnalytics = state.showPlanningAnalytics === false ? true : false;
+        window.saveData();
+        renderAuditPlanningEnhanced();
     }
 
-    const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
-    const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
+    // Note: goToStep2, goToStep1, addAgendaRow, deleteAgendaRow are defined earlier in the file (around lines 1369-1461)
+    // The saveAuditPlan function below is the definitive version with proper validation and sanitization
 
-    const selectedSites = [];
-    document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
-        selectedSites.push({
-            name: cb.dataset.name, // Usually safe as it comes from dataset, but...
-            geotag: cb.dataset.geotag || null
-        });
-    });
+    function saveAuditPlan(shouldPrint = false) {
+        // 1. Define Fields
+        const fieldIds = {
+            client: 'plan-client',
+            date: 'plan-date',
+            type: 'plan-audit-type', // Consolidated to use plan-audit-type
+            leadAuditor: 'plan-lead-auditor',
+            manDays: 'plan-mandays',
+            onsiteDays: 'plan-onsite-days'
+            // Standard & Team are multi-selects handled separately or via generic rules if we mapped them
+        };
 
-    // 5. Collect & Sanitize Agenda (Step 2)
-    const agenda = [];
-    const agendaRows = document.querySelectorAll('#agenda-tbody tr');
+        // 2. Define Rules
+        const rules = {
+            client: [{ rule: 'required', fieldName: 'Client' }],
+            date: [{ rule: 'required', fieldName: 'Date' }],
+            manDays: [
+                { rule: 'required', fieldName: 'Man-Days' },
+                { rule: 'number', fieldName: 'Man-Days' },
+                { rule: 'range', min: 0, max: 1000, fieldName: 'Man-Days' }
+            ],
+            onsiteDays: [
+                { rule: 'number', fieldName: 'Onsite Days' }
+            ]
+        };
 
-    for (const row of agendaRows) {
-        const inputs = row.querySelectorAll('input, select');
-
-        // Manual validation for agenda rows?
-        // Let's just sanitize them for now
-
-        agenda.push({
-            day: Sanitizer.sanitizeText(inputs[0].value),
-            time: Sanitizer.sanitizeText(inputs[1].value),
-            item: Sanitizer.sanitizeText(inputs[2].value), // Critical: Activity description
-            dept: Sanitizer.sanitizeText(inputs[3].value),
-            auditor: inputs[4].value // Select value
-        });
-    }
-
-    // 5.5. Collect ISO 17021-1 Fields
-    const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
-    const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
-    const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
-
-    // 6. Construct Plan Object
-    const planData = {
-        client: clientName,
-        date: date,
-        type: auditType, // Using consolidated auditType
-        standard: standard,
-        auditors: [],
-        team: [leadAuditor, ...team].filter(Boolean),
-        manDays: manDays,
-        onsiteDays: onsiteDays,
-        selectedSites: selectedSites,
-        agenda: agenda,
-        status: 'Scheduled',
-        // ISO 17021-1 Compliance Fields
-        auditType: auditType,
-        auditMethod: auditMethod,
-        impartialityAssessment: {
-            risk: impartialityRisk,
-            notes: impartialityNotes,
-            assessedBy: window.state.currentUser?.name || 'System',
-            assessedDate: new Date().toISOString().split('T')[0]
+        // 3. Validate Step 1
+        const result = Validator.validateFormElements(fieldIds, rules);
+        if (!result.valid) {
+            Validator.displayErrors(result.errors, fieldIds);
+            window.showNotification('Please fix the form errors', 'error');
+            return;
         }
-    };
+        Validator.clearErrors(fieldIds);
 
-    // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
-    const btnSave = document.getElementById('btn-plan-save');
-    const originalText = btnSave ? btnSave.textContent : 'Save Audit Plan';
-
-    // Helper to Restore Button State
-    const restoreButton = () => {
-        if (btnSave) {
-            btnSave.textContent = originalText;
-            btnSave.disabled = false;
-        }
-    };
-
-    if (btnSave) {
-        btnSave.textContent = 'Saving...';
-        btnSave.disabled = true;
-    }
-
-    // Wrap DB operations in async function to allow await
-    (async () => {
-        try {
-            // A. Update Local State FIRST (Optimistic UI)
-            if (window.editingPlanId) {
-                const index = state.auditPlans.findIndex(p => String(p.id) === String(window.editingPlanId));
-                if (index !== -1) {
-                    state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
-                }
-            } else {
-                const newPlanId = String(Date.now());
-                const clientObj = state.clients.find(c => c.name === planData.client);
-                const clientId = clientObj ? String(clientObj.id) : null;
-                const newPlan = {
-                    id: newPlanId,
-                    clientId: clientId,
-                    progress: 0,
-                    ...planData
-                };
-                state.auditPlans.push(newPlan);
-                // Temporarily set editingPlanId so we know what to update in DB
-                window.editingPlanId = newPlanId;
-            }
-
-            // Persist to LocalStorage immediately
-            window.saveData();
-
-            // B. Sync to Database (if online)
-            const planId = window.editingPlanId || String(Date.now()); // Declare here so it's accessible later
-
-            if (window.navigator.onLine && window.SupabaseClient) {
-                if (btnSave) btnSave.textContent = 'Syncing to DB...';
-
-                const clientObj = state.clients.find(c => c.name === planData.client);
-                const clientId = clientObj ? String(clientObj.id) : null;
-
-                // Check if plan exists in DB (it might be new locally but not in DB if offline before)
-                // Use UPSERT to handle both cases
-                const planToSave = state.auditPlans.find(p => String(p.id) === planId);
-
-                const { error } = await window.SupabaseClient.db.upsert('audit_plans', {
-                    id: planId,
-                    client_id: clientId,
-                    client_name: planData.client,
-                    date: planData.date,
-                    standard: planData.standard,
-                    type: planData.type,
-                    lead_auditor: planData.team[0] || null,
-                    status: planData.status,
-
-                    // Added fields for persistence
-                    man_days: planData.manDays || 0,
-                    onsite_days: planData.onsiteDays || 0,
-                    team: planData.team || [],
-                    agenda: planData.agenda || [],
-                    selected_sites: planData.selectedSites || [],
-
-                    data: planToSave // Backup catch-all
-                });
-
-                if (error) throw error;
-                window.showNotification('Audit Plan saved and synced to database', 'success');
-
-                // Send Assignment Emails (Async, non-blocking) - Only if online
-                if (window.EmailService && window.state.auditors) {
-                    const teamMembers = [leadAuditor, ...team].filter(Boolean);
-                    teamMembers.forEach(name => {
-                        const auditor = window.state.auditors.find(a => a.name === name);
-                        if (auditor && auditor.email) {
-                            window.EmailService.sendAuditAssignment(
-                                auditor.email,
-                                auditor.name,
-                                clientName,
-                                {
-                                    standard: standard,
-                                    scheduledDate: date,
-                                    role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
-                                    auditId: planId
-                                }
-                            ).catch(e => console.warn('Email failed:', e));
-                        }
-                    });
-                }
-
-            } else {
-                window.showNotification('Audit Plan saved locally (Offline)', 'warning');
-            }
-
-            // Update UI - Don't full reload, just view the plan
-            if (window.renderDashboardEnhanced) renderDashboardEnhanced();
-            const finalId = planId || window.editingPlanId; // Use the actual plan ID we just worked with
-            window.editingPlanId = null;
-
-            // Navigate to view mode for this plan
-            if (finalId) {
-                window.viewAuditPlan(finalId);
-            } else {
-                renderAuditPlanningEnhanced();
-            }
-
-            // Trigger Print if requested
-            if (shouldPrint && finalId) {
-                setTimeout(() => {
-                    window.printAuditPlanDetails(finalId);
-                }, 500);
-            }
-
-        } catch (dbError) {
-            console.error('Database Sync Failed:', dbError);
-            window.showNotification('Saved locally, but DB sync failed: ' + dbError.message, 'warning');
-
-            // Still render UI since local save worked
-            renderAuditPlanningEnhanced();
-            if (window.renderDashboardEnhanced) renderDashboardEnhanced();
-            window.editingPlanId = null;
-        } finally {
-            restoreButton();
-        }
-    })();
-}
-
-async function generateAIAgenda() {
-    if (!window.AI_SERVICE) {
-        window.showNotification('AI Service not loaded', 'error');
-        return;
-    }
-
-    const btn = document.getElementById('btn-ai-generate');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
-    btn.disabled = true;
-
-    try {
-        // Collect Context
+        // 4. Collect & Sanitize Data
         const clientName = document.getElementById('plan-client').value;
-        const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
-        const type = document.getElementById('plan-audit-type').value;
+        const date = document.getElementById('plan-date').value;
+        const auditType = document.getElementById('plan-audit-type')?.value || 'Stage 2';
+
+        // Safely map multi-selects
+        const standardSelect = document.getElementById('plan-standard');
+        const standard = Array.from(standardSelect.selectedOptions).map(o => o.value).join(', ');
+
+        // Validate Leads/Team
+        const leadAuditor = document.getElementById('plan-lead-auditor').value;
+        const teamSelect = document.getElementById('plan-team');
+        const team = Array.from(teamSelect.selectedOptions).map(o => o.value);
+
+        if (!leadAuditor) {
+            window.showNotification('Lead Auditor is required', 'error');
+            return;
+        }
+
         const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
         const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 
         const selectedSites = [];
         document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
-            selectedSites.push({ name: cb.dataset.name });
+            selectedSites.push({
+                name: cb.dataset.name, // Usually safe as it comes from dataset, but...
+                geotag: cb.dataset.geotag || null
+            });
         });
 
-        const leadAuditor = document.getElementById('plan-lead-auditor').value;
-        const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
-        const fullTeam = [leadAuditor, ...team].filter(Boolean);
+        // 5. Collect & Sanitize Agenda (Step 2)
+        const agenda = [];
+        const agendaRows = document.querySelectorAll('#agenda-tbody tr');
 
-        const context = {
+        for (const row of agendaRows) {
+            const inputs = row.querySelectorAll('input, select');
+
+            // Manual validation for agenda rows?
+            // Let's just sanitize them for now
+
+            agenda.push({
+                day: Sanitizer.sanitizeText(inputs[0].value),
+                time: Sanitizer.sanitizeText(inputs[1].value),
+                item: Sanitizer.sanitizeText(inputs[2].value), // Critical: Activity description
+                dept: Sanitizer.sanitizeText(inputs[3].value),
+                auditor: inputs[4].value // Select value
+            });
+        }
+
+        // 5.5. Collect ISO 17021-1 Fields
+        const auditMethod = document.getElementById('plan-audit-method')?.value || 'On-site';
+        const impartialityRisk = document.getElementById('plan-impartiality-risk')?.value || 'None';
+        const impartialityNotes = document.getElementById('plan-impartiality-notes')?.value || '';
+
+        // 6. Construct Plan Object
+        const planData = {
             client: clientName,
+            date: date,
+            type: auditType, // Using consolidated auditType
             standard: standard,
-            type: type,
+            auditors: [],
+            team: [leadAuditor, ...team].filter(Boolean),
             manDays: manDays,
             onsiteDays: onsiteDays,
-            sites: selectedSites,
-            team: fullTeam
+            selectedSites: selectedSites,
+            agenda: agenda,
+            status: 'Scheduled',
+            // ISO 17021-1 Compliance Fields
+            auditType: auditType,
+            auditMethod: auditMethod,
+            impartialityAssessment: {
+                risk: impartialityRisk,
+                notes: impartialityNotes,
+                assessedBy: window.state.currentUser?.name || 'System',
+                assessedDate: new Date().toISOString().split('T')[0]
+            }
         };
 
-        const agenda = await window.AI_SERVICE.generateAuditAgenda(context);
+        // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
+        const btnSave = document.getElementById('btn-plan-save');
+        const originalText = btnSave ? btnSave.textContent : 'Save Audit Plan';
 
-        // Clear existing rows
-        const tbody = document.getElementById('agenda-tbody');
-        tbody.innerHTML = '';
-
-        agenda.forEach(item => {
-            addAgendaRow(item);
-        });
-
-        window.showNotification('Agenda generated successfully!', 'success');
-
-    } catch (error) {
-        window.showNotification(error.message, 'error');
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-}
-
-// Exports
-window.generateAIAgenda = generateAIAgenda;
-window.addAgendaRow = addAgendaRow;
-window.deleteAgendaRow = deleteAgendaRow; // Added export
-window.saveAuditPlan = saveAuditPlan;
-
-window.togglePlanningAnalytics = togglePlanningAnalytics;
-window.renderCreateAuditPlanForm = renderCreateAuditPlanForm;
-window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
-window.editAuditPlan = editAuditPlan;
-window.viewAuditPlan = viewAuditPlan;
-
-// Navigation Helpers (Integrated Lifecycle)
-window.navigateToAuditExecution = function (planId) {
-    let report = window.state.auditReports.find(r => r.planId == planId);
-    const plan = window.state.auditPlans.find(p => p.id == planId);
-
-    if (!plan) {
-        window.showNotification('Plan not found', 'error');
-        return;
-    }
-
-    // If no report exists, create one automatically
-    if (!report) {
-        report = {
-            id: Date.now(),
-            planId: plan.id,
-            client: plan.client,
-            date: new Date().toISOString().split('T')[0],
-            findings: 0,
-            status: window.CONSTANTS.STATUS.IN_PROGRESS
+        // Helper to Restore Button State
+        const restoreButton = () => {
+            if (btnSave) {
+                btnSave.textContent = originalText;
+                btnSave.disabled = false;
+            }
         };
 
-        if (!window.state.auditReports) window.state.auditReports = [];
-        window.state.auditReports.push(report);
-
-        // Mark plan as executed
-        plan.reportId = report.id;
-        plan.status = 'In Progress';
-
-        window.saveData();
-        window.showNotification('Audit started! Loading checklist...', 'success');
-    }
-
-    // Switch to execution tab
-    const tab = document.querySelector('[data-module="audit-execution"]');
-    if (tab) tab.click();
-
-    setTimeout(() => {
-        // Open specific audit
-        if (window.renderExecutionDetail) {
-            window.renderExecutionDetail(report.id);
-        } else if (window.renderAuditExecutionEnhanced) {
-            window.renderAuditExecutionEnhanced(report.id);
+        if (btnSave) {
+            btnSave.textContent = 'Saving...';
+            btnSave.disabled = true;
         }
-    }, 200);
-};
 
-window.navigateToReporting = function (planId) {
-    const report = window.state.auditReports.find(r => r.planId == planId);
-    if (!report) {
-        window.showNotification('No report data found. Please complete execution first.', 'warning');
-        return;
+        // Wrap DB operations in async function to allow await
+        (async () => {
+            try {
+                // A. Update Local State FIRST (Optimistic UI)
+                if (window.editingPlanId) {
+                    const index = state.auditPlans.findIndex(p => String(p.id) === String(window.editingPlanId));
+                    if (index !== -1) {
+                        state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
+                    }
+                } else {
+                    const newPlanId = String(Date.now());
+                    const clientObj = state.clients.find(c => c.name === planData.client);
+                    const clientId = clientObj ? String(clientObj.id) : null;
+                    const newPlan = {
+                        id: newPlanId,
+                        clientId: clientId,
+                        progress: 0,
+                        ...planData
+                    };
+                    state.auditPlans.push(newPlan);
+                    // Temporarily set editingPlanId so we know what to update in DB
+                    window.editingPlanId = newPlanId;
+                }
+
+                // Persist to LocalStorage immediately
+                window.saveData();
+
+                // B. Sync to Database (if online)
+                const planId = window.editingPlanId || String(Date.now()); // Declare here so it's accessible later
+
+                if (window.navigator.onLine && window.SupabaseClient) {
+                    if (btnSave) btnSave.textContent = 'Syncing to DB...';
+
+                    const clientObj = state.clients.find(c => c.name === planData.client);
+                    const clientId = clientObj ? String(clientObj.id) : null;
+
+                    // Check if plan exists in DB (it might be new locally but not in DB if offline before)
+                    // Use UPSERT to handle both cases
+                    const planToSave = state.auditPlans.find(p => String(p.id) === planId);
+
+                    const { error } = await window.SupabaseClient.db.upsert('audit_plans', {
+                        id: planId,
+                        client_id: clientId,
+                        client_name: planData.client,
+                        date: planData.date,
+                        standard: planData.standard,
+                        type: planData.type,
+                        lead_auditor: planData.team[0] || null,
+                        status: planData.status,
+
+                        // Added fields for persistence
+                        man_days: planData.manDays || 0,
+                        onsite_days: planData.onsiteDays || 0,
+                        team: planData.team || [],
+                        agenda: planData.agenda || [],
+                        selected_sites: planData.selectedSites || [],
+
+                        data: planToSave // Backup catch-all
+                    });
+
+                    if (error) throw error;
+                    window.showNotification('Audit Plan saved and synced to database', 'success');
+
+                    // Send Assignment Emails (Async, non-blocking) - Only if online
+                    if (window.EmailService && window.state.auditors) {
+                        const teamMembers = [leadAuditor, ...team].filter(Boolean);
+                        teamMembers.forEach(name => {
+                            const auditor = window.state.auditors.find(a => a.name === name);
+                            if (auditor && auditor.email) {
+                                window.EmailService.sendAuditAssignment(
+                                    auditor.email,
+                                    auditor.name,
+                                    clientName,
+                                    {
+                                        standard: standard,
+                                        scheduledDate: date,
+                                        role: name === leadAuditor ? 'Lead Auditor' : 'Team Member',
+                                        auditId: planId
+                                    }
+                                ).catch(e => console.warn('Email failed:', e));
+                            }
+                        });
+                    }
+
+                } else {
+                    window.showNotification('Audit Plan saved locally (Offline)', 'warning');
+                }
+
+                // Update UI - Don't full reload, just view the plan
+                if (window.renderDashboardEnhanced) renderDashboardEnhanced();
+                const finalId = planId || window.editingPlanId; // Use the actual plan ID we just worked with
+                window.editingPlanId = null;
+
+                // Navigate to view mode for this plan
+                if (finalId) {
+                    window.viewAuditPlan(finalId);
+                } else {
+                    renderAuditPlanningEnhanced();
+                }
+
+                // Trigger Print if requested
+                if (shouldPrint && finalId) {
+                    setTimeout(() => {
+                        window.printAuditPlanDetails(finalId);
+                    }, 500);
+                }
+
+            } catch (dbError) {
+                console.error('Database Sync Failed:', dbError);
+                window.showNotification('Saved locally, but DB sync failed: ' + dbError.message, 'warning');
+
+                // Still render UI since local save worked
+                renderAuditPlanningEnhanced();
+                if (window.renderDashboardEnhanced) renderDashboardEnhanced();
+                window.editingPlanId = null;
+            } finally {
+                restoreButton();
+            }
+        })();
     }
 
-    // Switch to reporting tab
-    const tab = document.querySelector('[data-module="audit-reporting"]');
-    if (tab) tab.click();
+    async function generateAIAgenda() {
+        if (!window.AI_SERVICE) {
+            window.showNotification('AI Service not loaded', 'error');
+            return;
+        }
 
-    setTimeout(() => {
-        if (window.openReportingDetail) window.openReportingDetail(report.id);
-    }, 200);
-};
-window.updateClientDetails = updateClientDetails;
-window.autoCalculateDays = autoCalculateDays;
+        const btn = document.getElementById('btn-ai-generate');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+        btn.disabled = true;
 
-// ============================================
-// MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
-// ============================================
+        try {
+            // Collect Context
+            const clientName = document.getElementById('plan-client').value;
+            const standard = Array.from(document.getElementById('plan-standard').selectedOptions).map(o => o.value).join(', ');
+            const type = document.getElementById('plan-audit-type').value;
+            const manDays = parseFloat(document.getElementById('plan-mandays').value) || 0;
+            const onsiteDays = parseFloat(document.getElementById('plan-onsite-days').value) || 0;
 
-function renderMultiSiteSamplingCalculator() {
-    const html = `
+            const selectedSites = [];
+            document.querySelectorAll('.site-checkbox:checked').forEach(cb => {
+                selectedSites.push({ name: cb.dataset.name });
+            });
+
+            const leadAuditor = document.getElementById('plan-lead-auditor').value;
+            const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
+            const fullTeam = [leadAuditor, ...team].filter(Boolean);
+
+            const context = {
+                client: clientName,
+                standard: standard,
+                type: type,
+                manDays: manDays,
+                onsiteDays: onsiteDays,
+                sites: selectedSites,
+                team: fullTeam
+            };
+
+            const agenda = await window.AI_SERVICE.generateAuditAgenda(context);
+
+            // Clear existing rows
+            const tbody = document.getElementById('agenda-tbody');
+            tbody.innerHTML = '';
+
+            agenda.forEach(item => {
+                addAgendaRow(item);
+            });
+
+            window.showNotification('Agenda generated successfully!', 'success');
+
+        } catch (error) {
+            window.showNotification(error.message, 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Exports
+    window.generateAIAgenda = generateAIAgenda;
+    window.addAgendaRow = addAgendaRow;
+    window.deleteAgendaRow = deleteAgendaRow; // Added export
+    window.saveAuditPlan = saveAuditPlan;
+
+    window.togglePlanningAnalytics = togglePlanningAnalytics;
+    window.renderCreateAuditPlanForm = renderCreateAuditPlanForm;
+    window.renderAuditPlanningEnhanced = renderAuditPlanningEnhanced;
+    window.editAuditPlan = editAuditPlan;
+    window.viewAuditPlan = viewAuditPlan;
+
+    // Navigation Helpers (Integrated Lifecycle)
+    window.navigateToAuditExecution = function (planId) {
+        let report = window.state.auditReports.find(r => r.planId == planId);
+        const plan = window.state.auditPlans.find(p => p.id == planId);
+
+        if (!plan) {
+            window.showNotification('Plan not found', 'error');
+            return;
+        }
+
+        // If no report exists, create one automatically
+        if (!report) {
+            report = {
+                id: Date.now(),
+                planId: plan.id,
+                client: plan.client,
+                date: new Date().toISOString().split('T')[0],
+                findings: 0,
+                status: window.CONSTANTS.STATUS.IN_PROGRESS
+            };
+
+            if (!window.state.auditReports) window.state.auditReports = [];
+            window.state.auditReports.push(report);
+
+            // Mark plan as executed
+            plan.reportId = report.id;
+            plan.status = 'In Progress';
+
+            window.saveData();
+            window.showNotification('Audit started! Loading checklist...', 'success');
+        }
+
+        // Switch to execution tab
+        const tab = document.querySelector('[data-module="audit-execution"]');
+        if (tab) tab.click();
+
+        setTimeout(() => {
+            // Open specific audit
+            if (window.renderExecutionDetail) {
+                window.renderExecutionDetail(report.id);
+            } else if (window.renderAuditExecutionEnhanced) {
+                window.renderAuditExecutionEnhanced(report.id);
+            }
+        }, 200);
+    };
+
+    window.navigateToReporting = function (planId) {
+        const report = window.state.auditReports.find(r => r.planId == planId);
+        if (!report) {
+            window.showNotification('No report data found. Please complete execution first.', 'warning');
+            return;
+        }
+
+        // Switch to reporting tab
+        const tab = document.querySelector('[data-module="audit-reporting"]');
+        if (tab) tab.click();
+
+        setTimeout(() => {
+            if (window.openReportingDetail) window.openReportingDetail(report.id);
+        }, 200);
+    };
+    window.updateClientDetails = updateClientDetails;
+    window.autoCalculateDays = autoCalculateDays;
+
+    // ============================================
+    // MULTI-SITE SAMPLING CALCULATOR (IAF MD 1)
+    // ============================================
+
+    function renderMultiSiteSamplingCalculator() {
+        const html = `
         <div class="fade-in">
             <h2 style="margin-bottom: 1.5rem; color: var(--primary-color);">
                 <i class="fa-solid fa-sitemap" style="margin-right: 0.5rem;"></i>
@@ -2100,52 +2108,52 @@ function renderMultiSiteSamplingCalculator() {
         </div>
     `;
 
-    window.contentArea.innerHTML = html;
+        window.contentArea.innerHTML = html;
 
-    // Initial Calc
-    calculateSampling();
-}
-
-window.calculateSampling = function () {
-    const n = parseInt(document.getElementById('ms-total-sites').value) || 0;
-    const stage = document.getElementById('ms-stage').value;
-    const risk = document.getElementById('ms-risk').value;
-
-    if (n < 1) {
-        document.getElementById('ms-result').innerText = '0';
-        return;
+        // Initial Calc
+        calculateSampling();
     }
 
-    let y = 0;
-    let formula = '';
+    window.calculateSampling = function () {
+        const n = parseInt(document.getElementById('ms-total-sites').value) || 0;
+        const stage = document.getElementById('ms-stage').value;
+        const risk = document.getElementById('ms-risk').value;
 
-    if (stage === 'initial') {
-        y = Math.sqrt(n);
-        formula = 'y = √n';
-    } else if (stage === 'surveillance') {
-        y = 0.6 * Math.sqrt(n);
-        formula = 'y = 0.6 × √n';
-    } else if (stage === 'recertification') {
-        y = 0.8 * Math.sqrt(n);
-        formula = 'y = 0.8 × √n';
-    }
+        if (n < 1) {
+            document.getElementById('ms-result').innerText = '0';
+            return;
+        }
 
-    if (risk === 'medium') {
-        y = y * 1.25;
-        formula += ' × 1.25 (Risk)';
-    } else if (risk === 'high') {
-        y = y * 1.5;
-        formula += ' × 1.5 (Risk)';
-    }
+        let y = 0;
+        let formula = '';
 
-    let result = Math.ceil(y);
-    if (result > n) result = n;
-    if (result < 1) result = 1;
+        if (stage === 'initial') {
+            y = Math.sqrt(n);
+            formula = 'y = √n';
+        } else if (stage === 'surveillance') {
+            y = 0.6 * Math.sqrt(n);
+            formula = 'y = 0.6 × √n';
+        } else if (stage === 'recertification') {
+            y = 0.8 * Math.sqrt(n);
+            formula = 'y = 0.8 × √n';
+        }
 
-    document.getElementById('ms-result').innerText = result;
-    document.getElementById('ms-formula').innerText = formula;
-    document.getElementById('ms-sampled-count').innerText = Math.max(0, result - 1);
-};
+        if (risk === 'medium') {
+            y = y * 1.25;
+            formula += ' × 1.25 (Risk)';
+        } else if (risk === 'high') {
+            y = y * 1.5;
+            formula += ' × 1.5 (Risk)';
+        }
 
-window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
+        let result = Math.ceil(y);
+        if (result > n) result = n;
+        if (result < 1) result = 1;
+
+        document.getElementById('ms-result').innerText = result;
+        document.getElementById('ms-formula').innerText = formula;
+        document.getElementById('ms-sampled-count').innerText = Math.max(0, result - 1);
+    };
+
+    window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
 
