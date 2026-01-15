@@ -862,9 +862,52 @@ function renderClientExecution(client) {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Execution & Reports</h3>
                     <button class="btn btn-sm btn-primary" onclick="window.renderCreateAuditPlanForm('${client.name}')">
-                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Audit
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Plan New Audit
                     </button>
                 </div>
+
+                <!-- Scheduled Plans (Ready to Start) -->
+                ${(function () {
+            const scheduledPlans = (window.state.auditPlans || []).filter(p =>
+                (p.client === client.name) &&
+                (!p.reportId) &&
+                (p.status !== 'Completed')
+            );
+
+            if (scheduledPlans.length === 0) return '';
+
+            return `
+                    <div style="margin-bottom: 2rem; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; background: #f8fafc;">
+                        <h4 style="margin-top: 0; color: var(--primary-color);"><i class="fa-solid fa-clock" style="margin-right: 0.5rem;"></i> Scheduled Audits (Ready to Start)</h4>
+                        <table class="table" style="margin-bottom: 0;">
+                            <thead>
+                                <tr>
+                                    <th>Ref</th>
+                                    <th>Date</th>
+                                    <th>Standard</th>
+                                    <th>Type</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${scheduledPlans.map(p => `
+                                    <tr>
+                                        <td><strong>PLN-${p.id}</strong></td>
+                                        <td>${p.date}</td>
+                                        <td>${p.standard}</td>
+                                        <td>${p.type}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-success" onclick="window.navigateToAuditExecution(${p.id})">
+                                                <i class="fa-solid fa-play" style="margin-right: 0.25rem;"></i> Start Audit
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    `;
+        })()}
                 <div class="table-container">
                     <table>
                         <thead>
@@ -879,10 +922,10 @@ function renderClientExecution(client) {
                         </thead>
                         <tbody>
                             ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
-        const findingsCount = (r.ncrs || r.findings || []).length;
-        const openNCs = (r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
+            const findingsCount = (r.ncrs || r.findings || []).length;
+            const openNCs = (r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
 
-        return `
+            return `
                                 <tr>
                                     <td>${r.date || '-'}</td>
                                     <td>${r.type || 'Audit'}</td>

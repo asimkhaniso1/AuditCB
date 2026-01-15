@@ -276,6 +276,22 @@ function openCreateReportModal() {
             };
 
             if (!state.auditReports) state.auditReports = [];
+
+            // Check if report already exists for this plan
+            const existingReport = state.auditReports.find(r => String(r.planId) === String(planId));
+            if (existingReport) {
+                window.showNotification('Report already exists for this plan. Opening existing report.', 'info');
+                // Ensure plan is linked
+                if (!plan.reportId) {
+                    plan.reportId = existingReport.id;
+                    plan.status = 'Completed';
+                    window.saveData();
+                }
+                window.closeModal();
+                renderAuditExecutionEnhanced();
+                return;
+            }
+
             state.auditReports.push(newReport);
 
             // Mark plan as executed
@@ -427,7 +443,7 @@ function renderExecutionDetail(reportId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" onclick="renderAuditExecutionEnhanced()">
+                <button class="btn btn-secondary" onclick="if(window.state.activeClientId) { window.location.hash = 'client/' + window.state.activeClientId + '/execution'; } else { renderAuditExecutionEnhanced(); }">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reports
                 </button>
             </div>

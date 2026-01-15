@@ -140,7 +140,7 @@ function renderReportSummaryTab(report, tabContent) {
                 </div>
                 ${(function () {
             const role = (window.state.currentUser?.role || '').toLowerCase();
-            const allowed = ['admin', 'administrator', 'certification manager'];
+            const allowed = ['admin', 'administrator', 'certification manager', 'lead auditor'];
             return allowed.includes(role);
         })() ? `
                 <button id="btn-ai-draft-${report.id}" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onclick="window.generateAIConclusion('${report.id}')">
@@ -1485,14 +1485,10 @@ window.openReportingDetail = function (reportId) {
 window.handleBackToReporting = function () {
     console.log('Navigating back to Reporting Dashboard...');
     try {
-        if (typeof window.renderReportingModule === 'function') {
-            window.renderReportingModule();
+        if (window.state.activeClientId) {
+            window.location.hash = 'client/' + window.state.activeClientId + '/reporting';
         } else {
-            console.warn('renderReportingModule not found, reloading module...');
-            // Fallback: Try to find the nav button and click it to reload context
-            const navBtn = document.querySelector('button[onclick*="renderModule(\'reporting\')"]');
-            if (navBtn) navBtn.click();
-            else window.location.reload();
+            window.location.hash = 'audit-reporting';
         }
     } catch (e) {
         console.error('Navigation error:', e);
