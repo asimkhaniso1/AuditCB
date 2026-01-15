@@ -1412,23 +1412,22 @@ window.saveChecklist = function (reportId) {
             const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
             const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
 
-            // Only save if interacted with
-            if (status || comment || ncrDesc || evidenceImage) {
-                checklistData.push({
-                    checklistId: input.dataset.checklist,
-                    itemIdx: input.dataset.item,
-                    isCustom: input.dataset.custom === 'true',
-                    status: status,
-                    comment: comment,
-                    ncrDescription: ncrDesc,
-                    transcript: transcript,
-                    ncrType: ncrType,
-                    evidenceImage: evidenceImage,
-                    evidenceSize: evidenceSize,
-                    designation: designation,
-                    department: department
-                });
-            }
+            // Save ALL items (not just ones with status/comment)
+            // This ensures Conform/NC/NA selections persist even without comments
+            checklistData.push({
+                checklistId: input.dataset.checklist,
+                itemIdx: input.dataset.item,
+                isCustom: input.dataset.custom === 'true',
+                status: status,
+                comment: comment,
+                ncrDescription: ncrDesc,
+                transcript: transcript,
+                ncrType: ncrType,
+                evidenceImage: evidenceImage,
+                evidenceSize: evidenceSize,
+                designation: designation,
+                department: department
+            });
         });
         report.checklistProgress = checklistData;
     }
