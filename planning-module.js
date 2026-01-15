@@ -1788,10 +1788,11 @@ function saveAuditPlan(shouldPrint = false) {
             window.saveData();
 
             // B. Sync to Database (if online)
+            const planId = window.editingPlanId || String(Date.now()); // Declare here so it's accessible later
+
             if (window.navigator.onLine && window.SupabaseClient) {
                 if (btnSave) btnSave.textContent = 'Syncing to DB...';
 
-                const planId = window.editingPlanId || String(Date.now()); // Fallback
                 const clientObj = state.clients.find(c => c.name === planData.client);
                 const clientId = clientObj ? String(clientObj.id) : null;
 
