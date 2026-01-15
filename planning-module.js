@@ -615,12 +615,15 @@ function updateClientDetails(clientName) {
         if (siteGroup && siteCheckboxes && client.sites && client.sites.length > 0) {
             siteGroup.style.display = 'block';
             if (noSitesMessage) noSitesMessage.style.display = 'none';
+            // Debugging
+            console.log('Rendering sites:', client.sites);
+
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
-                <div style="padding: 10px; background: #fff; border-radius: 4px; border: 1px solid #e2e8f0; display: flex; align-items: flex-start; gap: 10px; width: 100%; box-sizing: border-box;">
-                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; margin-top: 3px; flex-shrink: 0;">
-                    <div style="flex: 1; overflow: hidden;">
-                        <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b; white-space: normal; line-height: 1.4;">${s.name || 'Unnamed Site'}</div>
-                        <div style="font-size: 0.8rem; color: #64748b; white-space: normal; line-height: 1.4;">${s.city || 'No Location'}</div>
+                <div style="padding: 10px; background: #fff; border-radius: 4px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; width: 100%; box-sizing: border-box;">
+                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; margin-top: 4px; width: 16px; height: 16px;">
+                    <div style="overflow: hidden;">
+                        <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b; line-height: 1.4; margin-bottom: 2px;">${s.name || 'Unnamed Site'}</div>
+                        <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">${s.city || 'No Location'}</div>
                     </div>
                 </div>
             `).join('');
