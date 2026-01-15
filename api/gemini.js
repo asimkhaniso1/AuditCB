@@ -41,9 +41,9 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' }
             };
         } else {
-            // Default: Generate Content
-            // Updated to gemini-1.5-flash-001 (specific version) to resolve "model not found"
-            url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${apiKey}`;
+            // Dynamic model selection with fallback default
+            const modelName = req.body.model || 'gemini-1.5-flash';
+            url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
             fetchOptions = {
                 method: 'POST',

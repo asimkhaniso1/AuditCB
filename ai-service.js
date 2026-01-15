@@ -55,51 +55,63 @@ Example:
 `;
     },
 
-    // Call Vercel Serverless Function
+    // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt) => {
-        try {
-            if (!window.navigator.onLine) {
-                throw new Error('You appear to be offline. Please check your internet connection.');
-            }
+        const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
+        let lastError;
 
-            const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
-            });
+        if (!window.navigator.onLine) {
+            throw new Error('You appear to be offline. Please check your internet connection.');
+        }
 
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                // Log failed API call
+        for (const model of models) {
+            try {
+                console.log(`Attempting AI generation with model: ${model}`);
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, model })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    // Special handling for 404 (Not Found) or 400 (Bad Request) which might indicate model issues
+                    if (response.status === 404 || response.status === 400) {
+                        console.warn(`Model ${model} failed: ${data.error || response.statusText}. Retrying with next model...`);
+                        lastError = new Error(data.error || `Model ${model} unavailable`);
+                        continue; // Try next model
+                    }
+                    // For other errors (500, etc), might still be worth retrying or throwing immediate?
+                    // Let's retry for robustness
+                    lastError = new Error(data.error || 'AI Service Unavailable');
+                    continue;
+                }
+
+                const data = await response.json();
+
+                // Success!
                 if (window.APIUsageTracker) {
+                    const usage = data.usage || {};
                     window.APIUsageTracker.logUsage({
-                        feature: 'agenda-generation',
-                        inputTokens: window.APIUsageTracker.estimateTokens(prompt),
-                        outputTokens: 0,
-                        success: false
+                        feature: 'ai-generation',
+                        inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
+                        outputTokens: usage.candidatesTokenCount || 0,
+                        success: true,
+                        model: model
                     });
                 }
-                throw new Error(data.error || 'AI Service Unavailable (Server Proxy)');
+
+                return AI_SERVICE.extractTextFromResponse(data);
+
+            } catch (error) {
+                console.error(`Error with model ${model}:`, error);
+                lastError = error;
+                // If network error, might affect all. But checking next model doesn't hurt.
             }
-
-            const data = await response.json();
-
-            // Log successful API call with actual token usage
-            if (window.APIUsageTracker) {
-                const usage = data.usage || {};
-                window.APIUsageTracker.logUsage({
-                    feature: 'agenda-generation',
-                    inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
-                    outputTokens: usage.candidatesTokenCount || 0,
-                    success: true
-                });
-            }
-
-            return AI_SERVICE.extractTextFromResponse(data);
-        } catch (error) {
-            console.error('Proxy API Error:', error);
-            throw error; // Re-throw original error to preserve message
         }
+
+        // If loop finishes without return, all failed
+        throw lastError || new Error('All AI models are currently unavailable. Please try again later.');
     },
 
     // Helper: Extract text from Gemini JSON response
