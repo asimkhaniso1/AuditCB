@@ -42,8 +42,9 @@ function renderAuditExecutionEnhanced() {
                 report.status === 'In Review' ? 'var(--warning-color)' :
                     '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
             <td>
-                <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
-                <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
+                <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report"><i class="fa-solid fa-eye"></i></button>
+                <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn btn-sm delete-execution" data-report-id="${report.id}" style="color: var(--danger-color);" title="Delete Report"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>
     `).join('');
@@ -158,6 +159,15 @@ function renderAuditExecutionEnhanced() {
             openEditReportModal(reportId);
         });
     });
+
+    document.querySelectorAll('.delete-execution').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const reportId = parseInt(btn.getAttribute('data-report-id'));
+            deleteAuditReport(reportId);
+        });
+    });
+
 
 
     // Helper for toggle
@@ -398,6 +408,66 @@ function openEditReportModal(reportId) {
             window.showNotification('Report info updated successfully');
         }
     };
+}
+
+function deleteAuditReport(reportId) {
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
+    if (!report) {
+        window.showNotification('Report not found', 'error');
+        return;
+    }
+
+    // Confirm deletion
+    const clientName = report.client || 'Unknown Client';
+    const reportDate = report.date || 'N/A';
+
+    if (!confirm(`Are you sure you want to delete this audit report?\n\nClient: ${clientName}\nDate: ${reportDate}\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    // Find and update the related audit plan
+    const relatedPlan = state.auditPlans.find(p => String(p.reportId) === String(reportId));
+    if (relatedPlan) {
+        relatedPlan.reportId = null;
+        relatedPlan.status = 'Scheduled'; // Reset to scheduled
+    }
+
+    // Remove from state
+    const index = state.auditReports.findIndex(r => String(r.id) === String(reportId));
+    if (index > -1) {
+        state.auditReports.splice(index, 1);
+    }
+
+    // Save to local storage
+    window.saveData();
+
+    // Delete from Supabase if online
+    if (window.navigator.onLine && window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        (async () => {
+            try {
+                // Delete the report
+                await window.SupabaseClient.db.delete('audit_reports', String(reportId));
+
+                // Update the plan if exists
+                if (relatedPlan) {
+                    await window.SupabaseClient.db.update('audit_plans', String(relatedPlan.id), {
+                        report_id: null,
+                        status: 'Scheduled'
+                    });
+                }
+
+                window.showNotification('Audit report deleted successfully', 'success');
+            } catch (error) {
+                console.error('Failed to delete from database:', error);
+                window.showNotification('Report deleted locally, but cloud sync failed', 'warning');
+            }
+        })();
+    } else {
+        window.showNotification('Audit report deleted (local only - offline)', 'success');
+    }
+
+    // Refresh the view
+    renderAuditExecutionEnhanced();
 }
 
 function renderExecutionDetail(reportId) {
