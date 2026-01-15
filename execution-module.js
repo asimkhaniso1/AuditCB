@@ -2,6 +2,28 @@
 // AUDIT EXECUTION MODULE - Enhanced with Tabs
 // ============================================
 
+// Navigation Helper: Back to Execution List
+window.handleBackToExecutionList = function () {
+    if (window.state.activeClientId) {
+        // Force navigation to client execution view
+        const currentHash = window.location.hash;
+        const targetHash = '#client/' + window.state.activeClientId + '/execution';
+
+        // If already on the target hash, force a reload by going through temp hash
+        if (currentHash === targetHash || currentHash.startsWith(targetHash)) {
+            window.location.hash = '#temp-redirect';
+            setTimeout(() => {
+                window.location.hash = targetHash.substring(1); // Remove leading #
+            }, 10);
+        } else {
+            window.location.hash = targetHash.substring(1);
+        }
+    } else {
+        // Global context - just render the list
+        renderAuditExecutionEnhanced();
+    }
+};
+
 function renderAuditExecutionEnhanced() {
     const state = window.state;
     const searchTerm = state.executionSearchTerm || '';
@@ -443,7 +465,7 @@ function renderExecutionDetail(reportId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" onclick="if(window.state.activeClientId) { window.location.hash = 'client/' + window.state.activeClientId + '/execution'; } else { renderAuditExecutionEnhanced(); }">
+                <button class="btn btn-secondary" onclick="window.handleBackToExecutionList()">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reports
                 </button>
             </div>
