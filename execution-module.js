@@ -844,6 +844,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         window.bulkUpdateStatus(reportId, action);
                     });
                 });
+
+                // CRITICAL: Restore saved status to buttons after render
+                document.querySelectorAll('.status-input').forEach(input => {
+                    const uniqueId = input.id.replace('status-', '');
+                    const savedStatus = input.value; // 'conform', 'nc', 'na', or ''
+
+                    if (savedStatus) {
+                        // Apply active state to the corresponding button
+                        window.setChecklistStatus(uniqueId, savedStatus);
+                    }
+                });
             }, 100);
 
             break;
