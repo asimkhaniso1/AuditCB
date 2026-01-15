@@ -7,7 +7,7 @@ function renderAuditExecutionEnhanced() {
     const searchTerm = state.executionSearchTerm || '';
 
     let filteredReports = state.auditReports.filter(report => {
-        return report.client.toLowerCase().includes(searchTerm.toLowerCase());
+        return (report.client || '').toLowerCase().includes(searchTerm.toLowerCase());
     });
 
     const rows = filteredReports.map(report => `
@@ -1465,11 +1465,11 @@ window.saveChecklist = function (reportId) {
                 date: report.date,
                 status: report.status,
                 findings: report.findings || 0,
-                checklist_data: report.checklistProgress,
-                data: report,
-                custom_items: report.customItems,
-                opening_meeting: report.openingMeeting,
-                closing_meeting: report.closingMeeting
+                checklist_data: report.checklistProgress || [],
+                data: report || {},
+                custom_items: report.customItems || [],
+                opening_meeting: report.openingMeeting || {},
+                closing_meeting: report.closingMeeting || {}
             });
 
             // Success UI
