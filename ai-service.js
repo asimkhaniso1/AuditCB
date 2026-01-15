@@ -110,8 +110,74 @@ Example:
             }
         }
 
+        // If all hardcoded models fail, try to dynamically fetch available models
+        try {
+            console.log('Standard models failed. Fetching available models from API...');
+            const availableModels = await AI_SERVICE.getAvailableModels();
+
+            // Filter for content generation models and sort by preference (Gemini 1.5 > 1.0 > Pro)
+            const viableModels = availableModels
+                .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                .map(m => m.name.replace('models/', '')) // Remove prefix if present
+                .filter(name => !models.includes(name)); // Avoid re-trying failed ones
+
+            console.log('Found viable models:', viableModels);
+
+            if (viableModels.length === 0) {
+                throw new Error('No compatible AI models found for your API Key.');
+            }
+
+            // Try the dynamically found models
+            for (const model of viableModels) {
+                try {
+                    console.log(`Attempting dynamic model: ${model}`);
+                    const response = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt, model })
+                    });
+
+                    if (!response.ok) continue;
+
+                    const data = await response.json();
+                    if (window.APIUsageTracker) {
+                        window.APIUsageTracker.logUsage({
+                            feature: 'ai-generation-dynamic',
+                            inputTokens: window.APIUsageTracker.estimateTokens(prompt),
+                            outputTokens: 0,
+                            success: true,
+                            model: model
+                        });
+                    }
+                    return AI_SERVICE.extractTextFromResponse(data);
+                } catch (e) {
+                    console.error(`Dynamic model ${model} failed:`, e);
+                }
+            }
+
+        } catch (listError) {
+            console.error('Failed to list models:', listError);
+            // Fall through to final error
+        }
+
         // If loop finishes without return, all failed
-        throw lastError || new Error('All AI models are currently unavailable. Please try again later.');
+        throw lastError || new Error('All AI models are currently unavailable. Please check your API Key and Region.');
+    },
+
+    // Get list of available models from Proxy
+    getAvailableModels: async () => {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'list' })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch model list');
+        }
+
+        const data = await response.json();
+        return data.models || [];
     },
 
     // Helper: Extract text from Gemini JSON response

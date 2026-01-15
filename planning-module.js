@@ -613,9 +613,9 @@ function updateClientDetails(clientName) {
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
                 <div style="padding: 0.75rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; align-items: start; gap: 0.75rem;">
                     <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; flex-shrink: 0; margin-top: 4px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; white-space: normal; overflow-wrap: break-word;" title="${s.name}">${s.name}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${s.city || ''}</div>
+                    <div style="flex: 1; text-align: left;">
+                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; text-align: left;" title="${s.name}">${s.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-align: left;">${s.city || ''}</div>
                     </div>
                 </div>
             `).join('');
