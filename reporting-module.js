@@ -139,7 +139,7 @@ function renderReportSummaryTab(report, tabContent) {
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review findings and finalize report content.</p>
                 </div>
                 ${(window.state.currentUser?.role === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER || window.state.currentUser?.role === 'Admin') ? `
-                <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onclick="window.generateAIConclusion(${report.id})">
+                <button id="btn-ai-draft-${report.id}" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onclick="window.generateAIConclusion('${report.id}')">
                     <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> Auto-Draft with AI
                 </button>
                 ` : `
@@ -1866,13 +1866,18 @@ if (typeof window !== 'undefined') {
 // AI REPORT GENERATION
 // ============================================
 window.generateAIConclusion = async function (reportId) {
+    console.log('[AI Draft] Triggered for Report ID:', reportId);
+
     if (!window.AI_SERVICE) {
+        console.error('[AI Draft] AI_SERVICE not found on window');
         window.showNotification('AI Service not initialized.', 'error');
         return;
     }
 
-    const report = window.state.auditReports.find(r => r.id === reportId);
+    // Use loose comparison or string conversion to handle Number vs String ID
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) {
+        console.error('[AI Draft] Report not found for ID:', reportId);
         window.showNotification('Report not found.', 'error');
         return;
     }
@@ -1895,7 +1900,7 @@ window.generateAIConclusion = async function (reportId) {
     const findingsText = findings.length > 0 ? findings.join('; ') : 'No Non-Conformities found. The audit was seamless.';
 
     // Show Loading
-    const btn = document.querySelector(`button[onclick="window.generateAIConclusion(${reportId})"]`);
+    const btn = document.getElementById(`btn-ai-draft-${reportId}`);
     const originalText = btn ? btn.innerHTML : '';
     if (btn) {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
