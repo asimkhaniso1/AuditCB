@@ -1484,11 +1484,26 @@ window.saveChecklist = function (reportId) {
 
         } catch (dbError) {
             console.error('Database Sync Error:', dbError);
+
+            // Attempt Fallback: Save BASIC info only (in case schema is missing new columns)
+            try {
+                console.warn('Attempting fallback save (basic info only)...');
+                await window.SupabaseClient.db.update('audit_reports', String(reportId), {
+                    client: report.client,
+                    date: report.date,
+                    status: report.status,
+                    findings: report.findings || 0
+                });
+                window.showNotification('Schema Mismatch: Saved basic info, but checklist details only saved locally. Run the provided SQL script!', 'warning');
+            } catch (fallbackError) {
+                console.error('Fallback save also failed:', fallbackError);
+                window.showNotification(`Sync Failed: ${dbError.message || dbError.error_description || 'Unknown error'}`, 'error');
+            }
+
             if (indicator) {
                 indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Sync Error';
                 indicator.style.background = '#ef4444'; // Red
             }
-            window.showNotification('Saved locally only.', 'warning');
         }
     })();
 
