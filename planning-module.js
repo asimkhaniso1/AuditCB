@@ -269,7 +269,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </button>
                             </div>
                             <div id="site-selection-group" style="display: none;">
-                                <div id="site-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; max-height: 250px; overflow-y: auto; padding: 2px;">
+                                <div id="site-checkboxes" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 250px; overflow-y: auto; padding: 2px;">
                                     <!-- Sites populate here -->
                                 </div>
                                 <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-secondary);">
@@ -1809,7 +1809,15 @@ function saveAuditPlan(shouldPrint = false) {
                     type: planData.type,
                     lead_auditor: planData.team[0] || null,
                     status: planData.status,
-                    data: planToSave
+
+                    // Added fields for persistence
+                    man_days: planData.manDays || 0,
+                    onsite_days: planData.onsiteDays || 0,
+                    team: planData.team || [],
+                    agenda: planData.agenda || [],
+                    selected_sites: planData.selectedSites || [],
+
+                    data: planToSave // Backup catch-all
                 });
 
                 if (error) throw error;
