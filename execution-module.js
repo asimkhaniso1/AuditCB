@@ -280,11 +280,32 @@ function openCreateReportModal() {
 
             // Mark plan as executed
             plan.reportId = String(newReport.id);
+            plan.status = 'Completed'; // Optional: Mark plan as completed/executed
 
             window.saveData();
             window.closeModal();
             renderAuditExecutionEnhanced();
             window.showNotification('Audit Initiated! Checklist loaded from Plan.', 'success');
+
+            // Persist to Cloud
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                // 1. Insert Report
+                window.SupabaseClient.db.insert('audit_reports', {
+                    id: parseInt(newReport.id),
+                    plan_id: parseInt(plan.id),
+                    client: newReport.client,
+                    date: newReport.date,
+                    status: newReport.status,
+                    findings: 0,
+                    data: newReport
+                }).catch(err => console.error('Failed to insert report to cloud:', err));
+
+                // 2. Update Plan
+                window.SupabaseClient.db.update('audit_plans', parseInt(plan.id), {
+                    report_id: parseInt(newReport.id),
+                    status: 'Completed'
+                }).catch(err => console.error('Failed to update plan in cloud:', err));
+            }
         } else {
             window.showNotification('Please select an Audit Plan from the list', 'error');
         }
@@ -1439,13 +1460,16 @@ window.saveChecklist = function (reportId) {
     (async () => {
         try {
             await window.SupabaseClient.db.update('audit_reports', String(reportId), {
-                plan_id: String(report.planId),
-                client_name: report.client,
-                audit_date: report.date,
+                plan_id: report.planId ? parseInt(report.planId) : null,
+                client: report.client,
+                date: report.date,
                 status: report.status,
-                findings_count: report.findings || 0,
+                findings: report.findings || 0,
                 checklist_data: report.checklistProgress,
-                data: report
+                data: report,
+                custom_items: report.customItems,
+                opening_meeting: report.openingMeeting,
+                closing_meeting: report.closingMeeting
             });
 
             // Success UI
