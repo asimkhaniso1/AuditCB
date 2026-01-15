@@ -1796,37 +1796,20 @@ function saveAuditPlan(shouldPrint = false) {
                 const clientId = clientObj ? String(clientObj.id) : null;
 
                 // Check if plan exists in DB (it might be new locally but not in DB if offline before)
-                const { data: existing } = await window.SupabaseClient.db.select('audit_plans', { id: planId });
+                // Use UPSERT to handle both cases
+                const planToSave = state.auditPlans.find(p => String(p.id) === planId);
 
-                let error;
-                if (existing && existing.length > 0) {
-                    // Update
-                    const res = await window.SupabaseClient.db.update('audit_plans', planId, {
-                        client_id: clientId,
-                        client_name: planData.client,
-                        plan_date: planData.date,
-                        standard: planData.standard,
-                        type: planData.type,
-                        lead_auditor: planData.team[0] || null,
-                        status: planData.status,
-                        data: state.auditPlans.find(p => String(p.id) === planId)
-                    });
-                    error = res.error;
-                } else {
-                    // Insert
-                    const res = await window.SupabaseClient.db.insert('audit_plans', {
-                        id: planId,
-                        client_id: clientId,
-                        client_name: planData.client,
-                        plan_date: planData.date,
-                        standard: planData.standard,
-                        type: planData.type,
-                        lead_auditor: planData.team[0] || null,
-                        status: 'Scheduled',
-                        data: state.auditPlans.find(p => String(p.id) === planId)
-                    });
-                    error = res.error;
-                }
+                const { error } = await window.SupabaseClient.db.upsert('audit_plans', {
+                    id: planId,
+                    client_id: clientId,
+                    client_name: planData.client,
+                    date: planData.date,
+                    standard: planData.standard,
+                    type: planData.type,
+                    lead_auditor: planData.team[0] || null,
+                    status: planData.status,
+                    data: planToSave
+                });
 
                 if (error) throw error;
                 window.showNotification('Audit Plan saved and synced to database', 'success');
