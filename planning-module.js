@@ -650,14 +650,14 @@ function updateClientDetails(clientName) {
         if (clientInfoPanel) {
             const primaryContact = (client.contacts && client.contacts[0]) || {};
             clientInfoPanel.innerHTML = `
-                < div style = "display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;" >
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
                     <div><strong>Industry:</strong> ${client.industry || '-'}</div>
                     <div><strong>Employees:</strong> ${client.employees || 0}</div>
                     <div><strong>Total Sites:</strong> ${sitesCount}</div>
                     <div><strong>Shifts:</strong> ${client.shifts || 'No'}</div>
                     <div><strong>Contact:</strong> ${primaryContact.name || '-'}</div>
                     <div><strong>Status:</strong> <span style="color: ${client.status === 'Active' ? 'var(--success-color)' : 'var(--danger-color)'}; font-weight: 600;">${client.status || 'Draft'}</span></div>
-                </div >
+                </div>
                 `;
             clientInfoPanel.style.display = 'block';
         }
@@ -665,7 +665,7 @@ function updateClientDetails(clientName) {
         const auditeeSelect = document.getElementById('plan-auditee');
         if (auditeeSelect && client.contacts && client.contacts.length > 0) {
             auditeeSelect.innerHTML = `
-                < option value = "" > --Select Contact Person--</option >
+                <option value="">--Select Contact Person--</option>
                     ${client.contacts.map(contact => `
                     <option value="${contact.name}">${contact.name}${contact.designation ? ` - ${contact.designation}` : ''}</option>
                 `).join('')
@@ -829,7 +829,7 @@ function viewAuditPlan(id) {
         if (!cl) return '';
         const itemCount = getChecklistItemCount(cl);
         return `
-                < div style = "display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;" >
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 3px solid ${cl.type === 'global' ? '#0369a1' : '#059669'}; margin-bottom: 0.5rem;">
                 <div>
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${itemCount} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
@@ -837,7 +837,7 @@ function viewAuditPlan(id) {
                 <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
                     <i class="fa-solid fa-eye"></i>
                 </button>
-            </div >
+            </div>
                 `;
     }).join('') : '<p style="color: var(--text-secondary); font-style: italic;">No checklists assigned.</p>';
 
@@ -858,7 +858,7 @@ function viewAuditPlan(id) {
     if (plan.status === 'Completed') activeStep = 4;
 
     const stepperHTML = `
-                < div style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative;" >
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative;">
                     <div style="position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: #e2e8f0; z-index: 0;"></div>
             ${['Plan Created', 'Checklists Ready', 'Execution', 'Reporting', 'Audit Closed'].map((step, index) => {
         const isActive = index <= activeStep;
@@ -876,12 +876,12 @@ function viewAuditPlan(id) {
                 `;
     }).join('')
         }
-        </div >
+        </div>
                 `;
 
     const html = `
-                < div class="fade-in" >
-            < !--Header -->
+                <div class="fade-in">
+            <!--Header-->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
@@ -899,10 +899,10 @@ function viewAuditPlan(id) {
                 </div>
             </div>
 
-            <!--Stepper -->
+            <!--Stepper-->
                 ${stepperHTML}
             
-            < !--UNIFIED DETAILS GRID(New Layout)-- >
+            <!--UNIFIED DETAILS GRID(New Layout)-->
             <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; margin-bottom: 2rem;">
                 
                 <!-- 1. Client Context Card -->
@@ -982,7 +982,7 @@ function viewAuditPlan(id) {
                 </div>
             </div>
 
-            <!--Workflow Stages Grid(Row 2)-- >
+            <!--Workflow Stages Grid(Row 2)-->
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
 
                     <!-- 1. Configuration -->
@@ -1058,7 +1058,7 @@ function viewAuditPlan(id) {
                     </div>
 
                 </div>
-    </div >
+    </div>
                 `;
     window.contentArea.innerHTML = html;
 }
@@ -1101,7 +1101,7 @@ window.printAuditChecklist = function (planId) {
         if (report && report.checklistProgress) {
             report.checklistProgress.forEach(p => {
                 // Normalized key: ID-Idx (String)
-                progressMap[`${p.checklistId} -${p.itemIdx} `] = p;
+                progressMap[`${p.checklistId}-${p.itemIdx}`] = p;
             });
         }
 
