@@ -1566,7 +1566,7 @@ window.printAuditPlanDetails = function (planId) {
                             <td>${site.address || '-'}</td>
                             <td style="text-align: right;">${site.employees}</td>
                             <td style="text-align: right;">${auditorAssigned}</td>
-                            <td style="text-align: right; font-weight: bold;">${allocatedDays.toFixed(2)}</td>
+                            <td style="text-align: right; font-weight: bold;">${(allocatedDays || 0).toFixed(2)}</td>
                         </tr>
                         `;
     }).join('')}
@@ -1574,7 +1574,7 @@ window.printAuditPlanDetails = function (planId) {
                         <td colspan="2">TOTAL</td>
                         <td style="text-align: right;">${totalEmployees}</td>
                         <td style="text-align: right;">-</td>
-                        <td style="text-align: right;">${plan.manDays.toFixed(2)}</td>
+                        <td style="text-align: right;">${(plan.manDays || 0).toFixed(2)}</td>
                     </tr>
                 </tbody>
             </table>
