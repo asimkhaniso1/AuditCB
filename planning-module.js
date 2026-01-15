@@ -614,8 +614,8 @@ function updateClientDetails(clientName) {
                 <div style="padding: 0.75rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; align-items: start; gap: 0.75rem;">
                     <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; flex-shrink: 0; margin-top: 4px;">
                     <div style="flex: 1; min-width: 0; text-align: left;">
-                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;" title="${s.name}">${s.name}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); white-space: normal; overflow-wrap: anywhere; line-height: 1.3;">${s.city || ''}</div>
+                        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; color: #1e293b; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;" title="${s.name}">${s.name || 'Unnamed Site'}</div>
+                        <div style="font-size: 0.75rem; color: #64748b; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;">${s.city || 'No Location'}</div>
                     </div>
                 </div>
             `).join('');
