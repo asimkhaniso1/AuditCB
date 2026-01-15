@@ -291,9 +291,10 @@ function openCreateReportModal() {
             if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
                 // 1. Insert Report
                 window.SupabaseClient.db.insert('audit_reports', {
-                    id: parseInt(newReport.id),
-                    plan_id: parseInt(plan.id),
-                    client: newReport.client,
+                    id: String(newReport.id),  // DB uses TEXT for id
+                    plan_id: String(plan.id),
+                    client_name: newReport.client,  // DB column is client_name
+                    client_id: plan.clientId || null,
                     date: newReport.date,
                     status: newReport.status,
                     findings: 0,
@@ -1459,18 +1460,22 @@ window.saveChecklist = function (reportId) {
     // Persist to Database (Async)
     (async () => {
         try {
+            // Use correct DB column names (client_name, not client)
             await window.SupabaseClient.db.upsert('audit_reports', {
-                id: parseInt(reportId),
-                plan_id: report.planId ? parseInt(report.planId) : null,
-                client: report.client,
+                id: String(reportId),  // DB uses TEXT for id
+                plan_id: report.planId ? String(report.planId) : null,
+                client_name: report.client,  // DB column is client_name, not client
+                client_id: report.clientId || null,
                 date: report.date,
                 status: report.status,
                 findings: report.findings || 0,
                 checklist_data: report.checklistProgress || [],
+                checklist_progress: report.checklistProgress || [],  // Also save to this column
                 data: report || {},
                 custom_items: report.customItems || [],
                 opening_meeting: report.openingMeeting || {},
-                closing_meeting: report.closingMeeting || {}
+                closing_meeting: report.closingMeeting || {},
+                ncrs: report.ncrs || []
             });
 
             // Success UI
@@ -1486,16 +1491,17 @@ window.saveChecklist = function (reportId) {
         } catch (dbError) {
             console.error('Database Sync Error:', JSON.stringify(dbError, null, 2));
 
-            // Attempt Fallback: Save BASIC info only (in case schema is missing new columns)
+            // Attempt Fallback: Save BASIC info only
             try {
                 console.warn('Attempting fallback save (basic info only)...');
-                await window.SupabaseClient.db.update('audit_reports', String(reportId), {
-                    client: report.client,
+                await window.SupabaseClient.db.upsert('audit_reports', {
+                    id: String(reportId),
+                    client_name: report.client,
                     date: report.date,
                     status: report.status,
                     findings: report.findings || 0
                 });
-                window.showNotification('Schema Mismatch: Saved basic info, but checklist details only saved locally. Run the provided SQL script!', 'warning');
+                window.showNotification('Partial save: Basic info saved. Full data saved locally.', 'warning');
             } catch (fallbackError) {
                 console.error('Fallback save also failed:', fallbackError);
                 window.showNotification(`Sync Failed: ${dbError.message || dbError.error_description || 'Unknown error'}`, 'error');

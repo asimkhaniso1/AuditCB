@@ -1484,24 +1484,28 @@ const SupabaseClient = {
 
                 const mappedReport = {
                     id: report.id,
-                    planId: report.plan_id,
-                    client: report.client,  // Fixed: was 'client_id'
-                    date: report.date,
+                    planId: report.plan_id || report.audit_plan_id,
+                    clientId: report.client_id,
+                    client: report.client_name || fullData.client,  // DB uses client_name
+                    date: report.date || report.audit_date,
                     status: report.status,
-                    findings: report.findings || 0,
+                    auditType: report.audit_type || report.auditType,
+                    leadAuditor: report.lead_auditor || report.leadAuditor,
+                    findings: report.findings || report.findings_count || 0,
+                    conformities: report.conformities || 0,
                     conclusion: report.conclusion,
                     recommendation: report.recommendation,
-                    // Load execution data
-                    checklistProgress: report.checklist_data || fullData.checklistProgress || [],
+                    // Load execution data from BOTH possible column names
+                    checklistProgress: report.checklist_progress || report.checklist_data || fullData.checklistProgress || [],
                     customItems: report.custom_items || fullData.customItems || [],
                     openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
                     closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
-                    ncrs: fullData.ncrs || [],
+                    ncrs: report.ncrs || fullData.ncrs || [],
                     // Preserve any other fields from the full data object
                     ...fullData,
-                    // But ensure ID and core fields use DB values
+                    // Ensure core fields use DB values
                     id: report.id,
-                    client: report.client,
+                    client: report.client_name || fullData.client,
                     status: report.status
                 };
 
