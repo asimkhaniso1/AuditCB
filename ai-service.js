@@ -41,7 +41,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 4. Assign specific auditors from the team to specific activities.
 5. Cover specific ISO clauses relevant to ${ctx.standard}.
 6. Ensure multiple sites are visited if applicable.
-7. In the "Activity / Clause" column, you MUST include the Clause Number, Title, AND a brief summary of the standard requirement text (e.g., "5.1 Leadership: Top management shall demonstrate leadership and commitment...").
+7. In the "Activity / Clause" column, provide ONLY the Clause Number and Title (e.g., "5.1 Leadership"). Do NOT include the full requirement text or summaries. Keep it a single line.
 8. Times should be in "HH:MM - HH:MM" format.
 
 **Output Format:**
