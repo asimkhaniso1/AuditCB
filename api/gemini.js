@@ -42,8 +42,8 @@ export default async function handler(req, res) {
             };
         } else {
             // Default: Generate Content
-            // Updated to gemini-1.5-flash as confirmed by diagnostics
-            url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            // Updated to gemini-1.5-flash-001 (specific version) to resolve "model not found"
+            url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${apiKey}`;
 
             fetchOptions = {
                 method: 'POST',
