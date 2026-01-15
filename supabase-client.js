@@ -1413,6 +1413,8 @@ const SupabaseClient = {
 
             data.forEach(plan => {
                 // Map snake_case DB fields to camelCase app fields
+                const fullData = plan.data || {};
+
                 const mappedPlan = {
                     id: plan.id,
                     client: plan.client_name || plan.client,  // Map client_name to client
@@ -1426,11 +1428,19 @@ const SupabaseClient = {
                     objectives: plan.objectives,
                     manDays: plan.man_days,
                     auditors: plan.auditor_ids || [],  // Map auditor_ids to auditors
+                    // CRITICAL: Load checklist configuration
+                    checklistIds: plan.selected_checklists || fullData.checklistIds || [],
                     selectedChecklists: plan.selected_checklists || [],
+                    checklistConfig: plan.checklist_config || fullData.checklistConfig || [],
                     startDate: plan.start_date,
                     endDate: plan.end_date,
                     leadAuditor: plan.lead_auditor,
-                    auditTeam: plan.audit_team || []
+                    auditTeam: plan.audit_team || [],
+                    // Preserve other fields from data column
+                    ...fullData,
+                    // Ensure core fields use DB values
+                    id: plan.id,
+                    status: plan.status
                 };
 
                 const existing = localPlans.find(p => String(p.id) === String(plan.id));
