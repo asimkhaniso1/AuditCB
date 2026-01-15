@@ -106,7 +106,16 @@ Example:
             } catch (error) {
                 console.error(`Error with model ${model}:`, error);
                 lastError = error;
-                // If network error, might affect all. But checking next model doesn't hurt.
+
+                // Check if this is a network/fetch error indicating the API isn't available
+                if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+                    // Likely running locally without proper API setup
+                    throw new Error(
+                        'AI Service Unavailable: The Gemini API endpoint is not accessible. ' +
+                        'This feature requires deployment to Vercel or a local development server with serverless function support. ' +
+                        'Please ensure the app is deployed to Vercel with GEMINI_API_KEY configured in environment variables.'
+                    );
+                }
             }
         }
 
