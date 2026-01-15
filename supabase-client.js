@@ -1479,20 +1479,30 @@ const SupabaseClient = {
 
             data.forEach(report => {
                 // Map snake_case DB fields to camelCase app fields
+                // Use 'data' field as base if available (contains full report object)
+                const fullData = report.data || {};
+
                 const mappedReport = {
                     id: report.id,
-                    clientId: report.client_id,
+                    planId: report.plan_id,
+                    client: report.client,  // Fixed: was 'client_id'
                     date: report.date,
-                    scope: report.scope,
-                    standard: report.standard,
-                    auditType: report.audit_type,
-                    leadAuditor: report.lead_auditor,
-                    summary: report.summary,
+                    status: report.status,
+                    findings: report.findings || 0,
                     conclusion: report.conclusion,
-                    ncrs: report.ncrs || [],
-                    findings: report.findings,
-                    createdAt: report.created_at,
-                    updatedAt: report.updated_at
+                    recommendation: report.recommendation,
+                    // Load execution data
+                    checklistProgress: report.checklist_data || fullData.checklistProgress || [],
+                    customItems: report.custom_items || fullData.customItems || [],
+                    openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
+                    closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
+                    ncrs: fullData.ncrs || [],
+                    // Preserve any other fields from the full data object
+                    ...fullData,
+                    // But ensure ID and core fields use DB values
+                    id: report.id,
+                    client: report.client,
+                    status: report.status
                 };
 
                 const existing = localReports.find(r => String(r.id) === String(report.id));
@@ -1506,7 +1516,6 @@ const SupabaseClient = {
             });
 
             window.state.auditReports = localReports;
-            window.saveState();
             Logger.info(`Synced audit reports from Supabase: ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
