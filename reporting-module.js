@@ -1861,3 +1861,119 @@ window.filterReports = function (query) {
 if (typeof window !== 'undefined') {
     window.renderReportingModule = renderReportingModule;
 }
+
+// ============================================
+// AI REPORT GENERATION
+// ============================================
+window.generateAIConclusion = async function (reportId) {
+    if (!window.AI_SERVICE) {
+        window.showNotification('AI Service not initialized.', 'error');
+        return;
+    }
+
+    const report = window.state.auditReports.find(r => r.id === reportId);
+    if (!report) {
+        window.showNotification('Report not found.', 'error');
+        return;
+    }
+
+    const client = window.state.clients.find(c => c.name === report.client);
+
+    // Gather Findings
+    const findings = [];
+    // 1. Checklist Findings
+    (report.checklistProgress || []).forEach(item => {
+        if (item.status === 'Non-Conformity' || item.status === 'NC') {
+            findings.push(`[${item.ncrType || 'Minor'}] ${item.comment || item.ncrDescription || 'Checklist Finding'}`);
+        }
+    });
+    // 2. Manual NCRs
+    (report.ncrs || []).forEach(ncr => {
+        findings.push(`[${ncr.type || 'Minor'}] ${ncr.description} (Clause: ${ncr.clause})`);
+    });
+
+    const findingsText = findings.length > 0 ? findings.join('; ') : 'No Non-Conformities found. The audit was seamless.';
+
+    // Show Loading
+    const btn = document.querySelector(`button[onclick="window.generateAIConclusion(${reportId})"]`);
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+        btn.disabled = true;
+    }
+
+    window.showNotification('AI is drafting the report summary... please wait.', 'info');
+
+    const prompt = `
+    You are an expert ISO Lead Auditor. Write a professional Audit Report Summary (JSON format) for:
+    
+    Client: ${report.client}
+    Industry: ${client ? client.industry : 'N/A'}
+    Standard: ${report.standard || 'ISO 9001:2015'}
+    Audit Type: Stage 2 / Surveillance
+    
+    Findings: ${findingsText}
+    
+    Please generate:
+    1. Executive Summary (Professional overview of the audit outcome).
+    2. Key Strengths (Positive observations, at least 2-3).
+    3. Areas for Improvement (Constructive feedback or OFIs).
+    4. Final Conclusion (Certification recommendation statement).
+    
+    Format: JSON Object with keys: "executiveSummary", "strengths", "improvements", "conclusion".
+    Do NOT use Markdown.
+    `;
+
+    try {
+        const responseText = await window.AI_SERVICE.callProxyAPI(prompt);
+
+        // Parse JSON
+        let data;
+        try {
+            const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            data = JSON.parse(cleanText);
+        } catch (e) {
+            console.error('JSON Parse Error', e);
+            // Fallback if AI returns plain text
+            window.showNotification('AI returned invalid format. Please try again.', 'error');
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+            return;
+        }
+
+        // Populate Fields
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = val;
+                // Trigger change for autosave if applicable, or manually update report object
+                report[id === 'exec-summary' ? 'execSummary' : id] = val;
+            }
+        };
+
+        if (data.executiveSummary) setVal('exec-summary', data.executiveSummary);
+        if (data.strengths) setVal('strengths', data.strengths);
+        if (data.improvements) setVal('improvements', data.improvements);
+        if (data.conclusion) setVal('conclusion', data.conclusion);
+
+        window.showNotification('Audit Report drafted successfully!', 'success');
+
+        // Verify we update the DB with these new drafts
+        // We can trigger a save if we have a save function exposed, or just rely on the user clicking "Save Draft"
+        // Ideally, we run saveReportDraft logic.
+        if (window.saveReportDraft) {
+            window.saveReportDraft(reportId, true); // true = silent save
+        }
+
+    } catch (err) {
+        console.error('AI Draft Error:', err);
+        window.showNotification('Failed to generate draft: ' + err.message, 'error');
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+};
