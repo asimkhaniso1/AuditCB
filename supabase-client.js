@@ -377,8 +377,28 @@ const SupabaseClient = {
         },
 
         /**
-         * Update data
+         * Upsert data
          */
+        upsert: async function (table, data) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                const { data: result, error } = await SupabaseClient.client
+                    .from(table)
+                    .upsert(data)
+                    .select();
+
+                if (error) throw error;
+                return result;
+            } catch (error) {
+                Logger.error(`Upsert to ${table} failed:`, error);
+                throw error;
+            }
+        },
+
         update: async function (table, id, data) {
             if (!SupabaseClient.isInitialized) {
                 Logger.warn('Supabase not initialized, using localStorage');

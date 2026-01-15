@@ -1459,7 +1459,8 @@ window.saveChecklist = function (reportId) {
     // Persist to Database (Async)
     (async () => {
         try {
-            await window.SupabaseClient.db.update('audit_reports', String(reportId), {
+            await window.SupabaseClient.db.upsert('audit_reports', {
+                id: parseInt(reportId),
                 plan_id: report.planId ? parseInt(report.planId) : null,
                 client: report.client,
                 date: report.date,
@@ -1483,7 +1484,7 @@ window.saveChecklist = function (reportId) {
             window.showNotification('Audit progress saved to cloud', 'success');
 
         } catch (dbError) {
-            console.error('Database Sync Error:', dbError);
+            console.error('Database Sync Error:', JSON.stringify(dbError, null, 2));
 
             // Attempt Fallback: Save BASIC info only (in case schema is missing new columns)
             try {
