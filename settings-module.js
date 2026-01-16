@@ -969,15 +969,7 @@ window.deleteGlobalDesignation = async function (id) {
 // ============================================
 
 function getUsersHTML() {
-    // Ensure mock users exist if none are present (state demo)
-    if (!window.state.users || window.state.users.length === 0) {
-        // Fallback to demo users if empty
-        window.state.users = [
-            { id: 1, name: 'Admin User', email: 'admin@companycertification.com', role: 'Admin', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff' },
-            { id: 2, name: 'Cert Manager', email: 'manager@companycertification.com', role: 'Certification Manager', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Cert+Manager&background=6b21a8&color=fff' },
-            { id: 3, name: 'Lead Auditor', email: 'auditor@companycertification.com', role: 'Lead Auditor', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=Lead+Auditor&background=0369a1&color=fff' }
-        ];
-    }
+    // No demo users - users must come from Supabase or be added manually
     const users = window.state.users || [];
 
     return `

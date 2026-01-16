@@ -67,97 +67,11 @@ const AuthManager = {
      * Demo login (for development/testing)
      */
     loginDemo: function (username, password) {
-        // DEMO USERS - Only used when Supabase is not configured
-        const demoUsers = [
-            {
-                id: 1,
-                username: 'admin',
-                password: 'admin123', // TODO: NEVER store passwords in plain text!
-                name: 'Admin User',
-                email: 'admin@companycertification.com',
-                role: 'Admin',
-                permissions: ['all']
-            },
-            {
-                id: 2,
-                username: 'manager',
-                password: 'manager123',
-                name: 'Certification Manager',
-                email: 'manager@companycertification.com',
-                role: 'Certification Manager',
-                permissions: ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors']
-            },
-            {
-                id: 3,
-                username: 'auditor',
-                password: 'auditor123',
-                name: 'Lead Auditor',
-                email: 'auditor@companycertification.com',
-                role: 'Lead Auditor',
-                permissions: ['view_assigned', 'edit_reports', 'create_ncr']
-            },
-            {
-                id: 4,
-                username: 'viewer',
-                password: 'viewer123',
-                name: 'Report Viewer',
-                email: 'viewer@companycertification.com',
-                role: 'Auditor',
-                permissions: ['view_assigned']
-            }
-        ];
-
-        // Find user
-        const user = demoUsers.find(u =>
-            u.username === username && u.password === password
-        );
-
-        if (!user) {
-            Logger.warn('Login failed: Invalid credentials');
-            window.showNotification('Invalid username or password', 'error');
-            return null;
-        }
-
-        // Check if user exists in state.users and verify account status
-        const stateUser = (window.state.users || []).find(u => u.email === user.email);
-        if (stateUser) {
-            if (stateUser.status === 'Pending') {
-                Logger.warn('Login failed: Account pending approval');
-                window.showNotification('Your account is pending admin approval. Please contact an administrator.', 'warning');
-                return null;
-            }
-            if (stateUser.status === 'Inactive') {
-                Logger.warn('Login failed: Account inactive');
-                window.showNotification('Your account has been deactivated. Please contact an administrator.', 'warning');
-                return null;
-            }
-        }
-
-        // Create session
-        const session = {
-            user: {
-                id: user.id,
-                username: user.username,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                permissions: user.permissions
-            },
-            loginTime: Date.now(),
-            expiresAt: Date.now() + this.SESSION_TIMEOUT,
-            token: this.generateToken() // Simple token for demo
-        };
-
-        // Save session
-        this.saveSession(session);
-
-        // Update app state
-        window.state.currentUser = session.user;
-
-        Logger.info('Demo login successful for:', user.name);
-        window.showNotification(`Welcome, ${user.name}!`, 'success');
-
-        return session.user;
+        // Demo users removed - use Supabase authentication
+        // If you reach this code, Supabase is not configured
+        Logger.warn('Demo authentication disabled - please configure Supabase');
+        window.showNotification('Please configure Supabase for authentication or contact admin', 'error');
+        return null;
     },
 
     /**
@@ -476,12 +390,10 @@ const AuthManager = {
                     </button>
                 </form>
 
-                <div style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85rem;">
-                    <strong>Demo Accounts:</strong><br>
-                    <code>admin / admin123</code> - Full access<br>
-                    <code>manager / manager123</code> - Certification Manager<br>
-                    <code>auditor / auditor123</code> - Lead Auditor<br>
-                    <code>viewer / viewer123</code> - View only
+                <div style="margin-top: 2rem; padding: 1rem; background: #eff6ff; border-radius: 4px; font-size: 0.85rem; border: 1px solid #bfdbfe;">
+                    <i class="fa-solid fa-info-circle" style="color: #3b82f6; margin-right: 0.5rem;"></i>
+                    <strong>Login:</strong> Use your registered email and password.<br>
+                    <span style="color: #64748b;">Contact admin if you need an account.</span>
                 </div>
             </div>
         `;
