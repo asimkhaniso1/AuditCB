@@ -457,6 +457,9 @@ function renderClientOverview(client) {
                 </div>
             </div>
 
+            <!-- Certification Cycle Timeline (Embedded) -->
+            ${renderCertificationCycleWidget(client)}
+
             <!-- Main Content: Charts + Sidebar -->
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
                 <!-- Charts Column -->
@@ -636,6 +639,126 @@ window.switchClientOverviewTab = function (element, tabId, clientId) {
         if (window.initClientDashboardCharts) window.initClientDashboardCharts(clientId);
     }
 };
+
+// Compact Certification Cycle Widget for Overview Dashboard
+function renderCertificationCycleWidget(client) {
+    const certs = client.certificates || [];
+    const latestCert = certs
+        .filter(c => c.initialDate || c.currentIssue)
+        .sort((a, b) => {
+            const dateA = new Date(a.currentIssue || a.initialDate);
+            const dateB = new Date(b.currentIssue || b.currentIssue);
+            return dateB - dateA;
+        })[0];
+
+    if (!latestCert || (!latestCert.initialDate && !latestCert.currentIssue)) {
+        return `
+            \u003cdiv class=\"card\" style=\"margin-bottom: 1.5rem; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #3b82f6;\"\u003e
+                \u003cdiv style=\"display: flex; justify-content: space-between; align-items: center; padding: 0.5rem;\"\u003e
+                    \u003cdiv style=\"display: flex; align-items: center; gap: 1rem;\"\u003e
+                        \u003ci class=\"fa-solid fa-certificate\" style=\"font-size: 2rem; color: #3b82f6;\"\u003e\u003c/i\u003e
+                        \u003cdiv\u003e
+                            \u003ch4 style=\"margin: 0; color: #1e40af;\"\u003eCertification Cycle\u003c/h4\u003e
+                            \u003cp style=\"margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;\"\u003eNo certification cycle started yet\u003c/p\u003e
+                        \u003c/div\u003e
+                    \u003c/div\u003e
+                    \u003cbutton class=\"btn btn-primary\" onclick=\"window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);\" style=\"white-space: nowrap;\"\u003e
+                        \u003ci class=\"fa-solid fa-cog\" style=\"margin-right: 0.5rem;\"\u003e\u003c/i\u003eSet Up Cycle
+                    \u003c/button\u003e
+                \u003c/div\u003e
+            \u003c/div\u003e
+        `;
+    }
+
+    const issueDate = new Date(latestCert.currentIssue || latestCert.initialDate);
+    const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
+    const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
+    const expiry = latestCert.expiryDate ? new Date(latestCert.expiryDate) : (() => {
+        const exp = new Date(issueDate);
+        exp.setFullYear(exp.getFullYear() + 3);
+        return exp;
+    })();
+    const recertAudit = new Date(expiry);
+    recertAudit.setDate(recertAudit.getDate() - 60);
+
+    const today = new Date();
+    let currentStage = "Initial Certification";
+    let nextAudit = surv1;
+    let progress = 0;
+
+    if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; progress = 33; }
+    if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; progress = 66; }
+    if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = expiry; progress = 90; }
+    if (today > expiry) { currentStage = "Expired"; nextAudit = null; progress = 100; }
+
+    const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
+    const isUrgent = daysToNext > 0 && daysToNext <= 60;
+
+    return `
+        \u003cdiv class=\"card\" style=\"margin-bottom: 1.5rem; background: linear-gradient(135deg, ${today > expiry ? '#fee2e2' : '#f0f9ff'} 0%, ${today > expiry ? '#fecaca' : '#e0f2fe'} 100%); border-left: 4px solid ${today > expiry ? '#dc2626' : '#3b82f6'};\"\u003e
+            \u003cdiv style=\"display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;\"\u003e
+                \u003cdiv style=\"flex: 1;\"\u003e
+                    \u003cdiv style=\"display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;\"\u003e
+                        \u003ci class=\"fa-solid fa-certificate\" style=\"font-size: 1.5rem; color: #3b82f6;\"\u003e\u003c/i\u003e
+                        \u003cdiv\u003e
+                            \u003ch4 style=\"margin: 0; color: #1e40af;\"\u003eCertification Cycle - ${latestCert.standard || 'ISO'}\u003c/h4\u003e
+                            \u003cp style=\"margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;\"\u003eCert #: ${latestCert.certificateNo || 'Not assigned'} • Rev: ${latestCert.revision || '00'}\u003c/p\u003e
+                        \u003c/div\u003e
+                    \u003c/div\u003e
+                    
+                    \u003c!-- Progress Bar --\u003e
+                    \u003cdiv style=\"background: rgba(255,255,255,0.6); border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 0.75rem;\"\u003e
+                        \u003cdiv style=\"background: ${today > expiry ? '#dc2626' : progress >= 66 ? '#f59e0b' : '#3b82f6'}; height: 100%; width: ${progress}%; transition: width 0.3s ease;\"\u003e\u003c/div\u003e
+                    \u003c/div\u003e
+                    
+                    \u003c!-- Current Stage Info --\u003e
+                    \u003cdiv style=\"display: flex; gap: 2rem; flex-wrap: wrap;\"\u003e
+                        \u003cdiv\u003e
+                            \u003cdiv style=\"font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;\"\u003eCurrent Stage\u003c/div\u003e
+                            \u003cdiv style=\"font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-top: 0.25rem;\"\u003e${currentStage}\u003c/div\u003e
+                        \u003c/div\u003e
+                        ${nextAudit ? `
+                        \u003cdiv\u003e
+                            \u003cdiv style=\"font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;\"\u003eNext Audit\u003c/div\u003e
+                            \u003cdiv style=\"font-size: 1.1rem; font-weight: 600; color: ${isUrgent ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;\"\u003e
+                                ${nextAudit.toLocaleDateString()}
+                                ${isUrgent ? `\u003cspan style=\"font-size: 0.75rem; color: #dc2626; margin-left: 0.5rem;\"\u003e(${daysToNext} days!)\u003c/span\u003e` : ''}
+                            \u003c/div\u003e
+                        \u003c/div\u003e
+                        ` : ''}
+                        \u003cdiv\u003e
+                            \u003cdiv style=\"font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;\"\u003eExpiry Date\u003c/div\u003e
+                            \u003cdiv style=\"font-size: 1.1rem; font-weight: 600; color: ${today > expiry ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;\"\u003e${expiry.toLocaleDateString()}\u003c/div\u003e
+                        \u003c/div\u003e
+                    \u003c/div\u003e
+                \u003c/div\u003e
+                
+                \u003c!-- Mini Timeline --\u003e
+                \u003cdiv style=\"display: flex; gap: 0.5rem; align-items: center;\"\u003e
+                    \u003cdiv style=\"text-align: center;\"\u003e
+                        \u003cdiv style=\"width: 32px; height: 32px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;\"\u003e✓\u003c/div\u003e
+                        \u003cdiv style=\"font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;\"\u003eCert\u003c/div\u003e
+                    \u003c/div\u003e
+                    \u003cdiv style=\"width: 20px; height: 2px; background: ${today > surv1 ? '#10b981' : '#cbd5e1'};\"\u003e\u003c/div\u003e
+                    \u003cdiv style=\"text-align: center;\"\u003e
+                        \u003cdiv style=\"width: 32px; height: 32px; background: ${today > surv1 ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;\"\u003e${today > surv1 ? '✓' : '1'}\u003c/div\u003e
+                        \u003cdiv style=\"font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;\"\u003eS1\u003c/div\u003e
+                    \u003c/div\u003e
+                    \u003cdiv style=\"width: 20px; height: 2px; background: ${today > surv2 ? '#10b981' : '#cbd5e1'};\"\u003e\u003c/div\u003e
+                    \u003cdiv style=\"text-align: center;\"\u003e
+                        \u003cdiv style=\"width: 32px; height: 32px; background: ${today > surv2 ? '#10b981' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;\"\u003e${today > surv2 ? '✓' : '2'}\u003c/div\u003e
+                        \u003cdiv style=\"font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;\"\u003eS2\u003c/div\u003e
+                    \u003c/div\u003e
+                    \u003cdiv style=\"width: 20px; height: 2px; background: ${today > recertAudit ? '#f59e0b' : '#cbd5e1'};\"\u003e\u003c/div\u003e
+                    \u003cdiv style=\"text-align: center;\"\u003e
+                        \u003cdiv style=\"width: 32px; height: 32px; background: ${today > recertAudit ? '#f59e0b' : '#cbd5e1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;\"\u003e↻\u003c/div\u003e
+                        \u003cdiv style=\"font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;\"\u003eRecert\u003c/div\u003e
+                    \u003c/div\u003e
+                \u003c/div\u003e
+            \u003c/div\u003e
+        \u003c/div\u003e
+    `;
+}
 
 // Audit cycle timeline - UNIFIED with Settings → Scopes
 function renderAuditCycleTimeline(client) {
