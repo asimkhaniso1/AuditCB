@@ -32,22 +32,37 @@ function renderAuditExecutionEnhanced() {
         return (report.client || '').toLowerCase().includes(searchTerm.toLowerCase());
     });
 
-    const rows = filteredReports.map(report => `
+    const rows = filteredReports.map(report => {
+        const planRef = report.planId ? `PLN-${report.planId}` : '-';
+        const clientId = state.clients.find(c => c.name === report.client)?.id;
+
+        return `
         <tr class="execution-row" data-report-id="${report.id}" style="cursor: pointer;">
+            <td>
+                ${report.planId ?
+                `<span class="badge" style="background: #3b82f6; color: white; cursor: pointer; font-weight: 600;" 
+                           onclick="event.stopPropagation(); window.location.hash = 'client/${clientId}/plans';" 
+                           title="View linked audit plan">
+                        <i class="fa-solid fa-link" style="margin-right: 0.25rem;"></i>${planRef}
+                    </span>` :
+                `<span style="color: var(--text-secondary); font-size: 0.85rem;">No Plan</span>`
+            }
+            </td>
             <td>${report.client}</td>
             <td>${report.date}</td>
             <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.findings}</span></td>
             <td><span style="background: ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'var(--success-color)' :
-            report.status === 'Approved' ? '#7c3aed' :
-                report.status === 'In Review' ? 'var(--warning-color)' :
-                    '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
+                report.status === 'Approved' ? '#7c3aed' :
+                    report.status === 'In Review' ? 'var(--warning-color)' :
+                        '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
             <td>
                 <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report"><i class="fa-solid fa-eye"></i></button>
                 <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn btn-sm delete-execution" data-report-id="${report.id}" style="color: var(--danger-color);" title="Delete Report"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 
     const html = `
         <div class="fade-in">
@@ -120,6 +135,7 @@ function renderAuditExecutionEnhanced() {
                 <table>
                     <thead>
                         <tr>
+                            <th>Plan Ref</th>
                             <th>Client</th>
                             <th>Audit Date</th>
                             <th>Findings (NCs)</th>
@@ -128,7 +144,7 @@ function renderAuditExecutionEnhanced() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows || '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No reports found</td></tr>'}
+                        ${rows || '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No reports found</td></tr>'}
                     </tbody>
                 </table>
             </div>
