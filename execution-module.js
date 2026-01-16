@@ -140,9 +140,14 @@ function renderAuditExecutionEnhanced() {
     // Event listeners with EventManager (prevents memory leaks)
     const searchInput = document.getElementById('execution-search');
     if (searchInput) {
-        EventManager.add(searchInput, 'input', (e) => {
-            state.executionSearchTerm = e.target.value;
+        // Debounced search handler (300ms delay)
+        const debouncedSearch = debounce((value) => {
+            state.executionSearchTerm = value;
             renderAuditExecutionEnhanced();
+        }, 300);
+
+        EventManager.add(searchInput, 'input', (e) => {
+            debouncedSearch(e.target.value);
         }, 'execution-search-input');
     }
 

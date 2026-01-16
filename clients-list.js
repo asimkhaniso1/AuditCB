@@ -194,9 +194,14 @@ function renderClientsEnhanced() {
 
     const searchInput = document.getElementById('client-search');
     if (searchInput) {
-        EventManager.add(searchInput, 'input', (e) => {
-            window.state.clientSearchTerm = e.target.value;
+        // Debounced search handler (300ms delay)  
+        const debouncedSearch = debounce((value) => {
+            window.state.clientSearchTerm = value;
             renderClientsEnhanced();
+        }, 300);
+
+        EventManager.add(searchInput, 'input', (e) => {
+            debouncedSearch(e.target.value);
         }, 'client-search-input');
     }
 
