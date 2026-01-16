@@ -1102,7 +1102,10 @@ function renderUsersList(users) {
                             <img src="${user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}" 
                                  style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color);">
                         </td>
-                        <td><strong>${window.UTILS.escapeHtml(user.name)}</strong></td>
+                        <td>
+                            <strong>${window.UTILS.escapeHtml(user.name)}</strong>
+                            ${user.isLocal && !user.supabaseId ? '<span style="font-size:0.65rem; color:#94a3b8; margin-left:4px; background:#f1f5f9; padding:1px 4px; border-radius:3px;" title="Created locally, not synced to Supabase">(local)</span>' : ''}
+                        </td>
                         <td>${window.UTILS.escapeHtml(user.email)}</td>
                         <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(user.role)}</span></td>
                         <td>
@@ -1112,17 +1115,17 @@ function renderUsersList(users) {
                         </td>
                         <td>
                             ${user.status === 'Pending' && window.state.currentUser?.role === 'Admin' ? `
-                            <button class="btn btn-sm btn-success" onclick="approveUser(${user.id})" title="Approve User" style="margin-right: 0.25rem;">
+                            <button class="btn btn-sm btn-success" onclick="approveUser('${user.id}')" title="Approve User" style="margin-right: 0.25rem;">
                                 <i class="fa-solid fa-check"></i> Approve
                             </button>
                             ` : ''}
                             ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                            <button class="btn btn-sm btn-icon" onclick="editUser(${user.id})" title="Edit">
+                            <button class="btn btn-sm btn-icon" onclick="editUser('${user.id}')" title="Edit">
                                 <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                             </button>
                             ` : ''}
                             ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                            <button class="btn btn-sm btn-icon" onclick="toggleUserStatus(${user.id})" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
+                            <button class="btn btn-sm btn-icon" onclick="toggleUserStatus('${user.id}')" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
                                 <i class="fa-solid ${user.status === 'Active' ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color: ${user.status === 'Active' ? '#16a34a' : '#cbd5e1'}; font-size: 1.2rem;"></i>
                             </button>
                             ` : ''}
@@ -1143,7 +1146,7 @@ window.openAddUserModal = function (userId = null) {
     const isEdit = !!userId;
     let user = {};
     if (isEdit) {
-        user = window.state.users.find(u => u.id === userId) || {};
+        user = window.state.users.find(u => String(u.id) === String(userId)) || {};
     }
 
     document.getElementById('modal-title').textContent = isEdit ? 'Edit User' : 'Add New User';
@@ -1204,12 +1207,30 @@ window.openAddUserModal = function (userId = null) {
 
 window.saveUser = async function (userId) {
     const name = document.getElementById('user-name').value.trim();
-    const email = document.getElementById('user-email').value.trim();
+    const email = document.getElementById('user-email').value.trim().toLowerCase();
     const role = document.getElementById('user-role').value;
 
     if (!name || (!userId && !email)) {
         window.showNotification('Please fill in all required fields', 'error');
         return;
+    }
+
+    // Email validation for new users
+    if (!userId) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            window.showNotification('Please enter a valid email address', 'error');
+            return;
+        }
+
+        // Check for duplicate email (case-insensitive)
+        const existingUser = window.state.users?.find(u =>
+            u.email?.toLowerCase() === email.toLowerCase()
+        );
+        if (existingUser) {
+            window.showNotification('A user with this email already exists', 'warning');
+            return;
+        }
     }
 
     if (userId) {
@@ -1275,11 +1296,12 @@ window.saveUser = async function (userId) {
     } else {
         // Create new user
         const newUser = {
-            id: Date.now(),
+            id: `usr_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             name: name,
             email: email,
             role: role,
             status: 'Active',
+            isLocal: true, // Mark as locally created (not from Supabase auth)
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
         };
 
@@ -1323,7 +1345,7 @@ window.editUser = function (userId) {
 };
 
 window.toggleUserStatus = function (userId) {
-    const user = window.state.users.find(u => u.id === userId);
+    const user = window.state.users.find(u => String(u.id) === String(userId));
     if (!user) return;
 
     if (user.id === 1 || user.role === 'Admin') {
@@ -1347,7 +1369,7 @@ window.approveUser = function (userId) {
         return;
     }
 
-    const user = window.state.users.find(u => u.id === userId);
+    const user = window.state.users.find(u => String(u.id) === String(userId));
     if (!user) return;
 
     if (user.status !== 'Pending') {
