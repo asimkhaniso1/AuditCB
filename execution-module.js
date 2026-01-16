@@ -137,11 +137,14 @@ function renderAuditExecutionEnhanced() {
 
     window.contentArea.innerHTML = html;
 
-    // Event listeners
-    document.getElementById('execution-search')?.addEventListener('input', (e) => {
-        state.executionSearchTerm = e.target.value;
-        renderAuditExecutionEnhanced();
-    });
+    // Event listeners with EventManager (prevents memory leaks)
+    const searchInput = document.getElementById('execution-search');
+    if (searchInput) {
+        EventManager.add(searchInput, 'input', (e) => {
+            state.executionSearchTerm = e.target.value;
+            renderAuditExecutionEnhanced();
+        }, 'execution-search-input');
+    }
 
     document.querySelectorAll('.view-execution, .execution-row').forEach(el => {
         el.addEventListener('click', (e) => {

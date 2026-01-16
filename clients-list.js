@@ -176,25 +176,37 @@ function renderClientsEnhanced() {
 
     window.contentArea.innerHTML = html;
 
-    // Event listeners
-    document.getElementById('btn-new-client')?.addEventListener('click', window.renderAddClient);
+    // Event listeners with EventManager (prevents memory leaks)
+    const newClientBtn = document.getElementById('btn-new-client');
+    if (newClientBtn) {
+        EventManager.add(newClientBtn, 'click', window.renderAddClient, 'btn-new-client');
+    }
 
-    document.getElementById('client-import-file')?.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            importClientsFromExcel(e.target.files[0]);
-            e.target.value = '';
-        }
-    });
+    const importFile = document.getElementById('client-import-file');
+    if (importFile) {
+        EventManager.add(importFile, 'change', (e) => {
+            if (e.target.files.length > 0) {
+                importClientsFromExcel(e.target.files[0]);
+                e.target.value = '';
+            }
+        }, 'client-import-file');
+    }
 
-    document.getElementById('client-search')?.addEventListener('input', (e) => {
-        window.state.clientSearchTerm = e.target.value;
-        renderClientsEnhanced();
-    });
+    const searchInput = document.getElementById('client-search');
+    if (searchInput) {
+        EventManager.add(searchInput, 'input', (e) => {
+            window.state.clientSearchTerm = e.target.value;
+            renderClientsEnhanced();
+        }, 'client-search-input');
+    }
 
-    document.getElementById('client-filter')?.addEventListener('change', (e) => {
-        window.state.clientFilterStatus = e.target.value;
-        renderClientsEnhanced();
-    });
+    const filterSelect = document.getElementById('client-filter');
+    if (filterSelect) {
+        EventManager.add(filterSelect, 'change', (e) => {
+            window.state.clientFilterStatus = e.target.value;
+            renderClientsEnhanced();
+        }, 'client-filter-select');
+    }
 
     document.querySelectorAll('.view-client, .client-row').forEach(el => {
         el.addEventListener('click', (e) => {
