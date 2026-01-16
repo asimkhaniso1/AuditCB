@@ -67,8 +67,8 @@ window.fetchNCRs = async function () {
         updateNCRAnalytics();
 
         // Refresh view if active
-        if (document.getElementById('ncr-content')) {
-            renderNCRCAPAModule(window.state.ncrContextClientId);
+        if (document.getElementById('ncr-content') || window.contentArea.innerHTML.includes('Loading NCRs')) {
+            renderNCRCAPAModuleContent(window.state.ncrContextClientId);
         }
 
     } catch (err) {
@@ -128,7 +128,7 @@ async function persistNCR(ncr) {
 
         // Refresh local state and UI
         await window.fetchNCRs();
-        renderNCRCAPAModule(window.state.ncrContextClientId);
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
 
     } catch (error) {
         console.error('Failed to sync NCR:', error);
@@ -144,15 +144,24 @@ function renderNCRCAPAModule(clientId) {
     // Determine context
     window.state.ncrContextClientId = clientId || null;
 
-    // Auto-fetch if empty and presumed stale
+    // Auto-fetch if empty and Supabase is available
     if (window.state.ncrs.length === 0 && window.SupabaseClient) {
-        window.fetchNCRs();
-        // Render loading state initially
-        if (!document.getElementById('ncr-content')) {
-            window.contentArea.innerHTML = '<div style="text-align:center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading NCRs...</div>';
-            return; // fetchNCRs will re-render on success
-        }
+        // Show loading state
+        window.contentArea.innerHTML = '<div style="text-align:center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading NCRs...</div>';
+        // Fetch and re-render
+        window.fetchNCRs().then(() => {
+            // After fetch completes, render the module
+            renderNCRCAPAModuleContent(clientId);
+        });
+        return;
     }
+
+    // Render normally if we have data or no Supabase
+    renderNCRCAPAModuleContent(clientId);
+}
+
+function renderNCRCAPAModuleContent(clientId) {
+    window.state.ncrContextClientId = clientId || null;
 
     const html = `
         <div class="fade-in">
@@ -407,7 +416,7 @@ function getCAPATrackerHTML() {
                     CAPA Tracker
                 </h3>
                 <label style="font-size: 0.9rem; user-select: none; cursor: pointer;">
-                    <input type="checkbox" onchange="window.state.showClosedCAPAs = this.checked; renderNCRCAPAModule(window.state.ncrContextClientId);" ${showClosed ? 'checked' : ''}>
+                    <input type="checkbox" onchange="window.state.showClosedCAPAs = this.checked; renderNCRCAPAModuleContent(window.state.ncrContextClientId);" ${showClosed ? 'checked' : ''}>
                     Show Closed Items
                 </label>
             </div>
@@ -793,7 +802,7 @@ window.editNCR = function (ncrId) {
         ncr.status = document.getElementById('edit-status').value;
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModule(window.state.ncrContextClientId);
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
     };
     window.openModal();
 };
@@ -817,7 +826,7 @@ window.openAddCAPAModal = function (ncrId) {
         ncr.status = 'In Progress';
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModule(window.state.ncrContextClientId);
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
     };
     window.openModal();
 };
@@ -832,7 +841,7 @@ window.deleteNCR = async function (id) {
         }
         window.state.ncrs = window.state.ncrs.filter(n => String(n.id) !== String(id));
         window.saveData();
-        renderNCRCAPAModule(window.state.ncrContextClientId);
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
         window.showNotification('NCR deleted', 'success');
     } catch (e) {
         window.showNotification('Delete failed: ' + e.message, 'error');
@@ -922,7 +931,7 @@ window.verifyCAPA = function (ncrId) {
 
         await persistNCR(ncr);
         window.closeModal();
-        renderNCRCAPAModule(window.state.ncrContextClientId);
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
     };
     window.openModal();
 }
