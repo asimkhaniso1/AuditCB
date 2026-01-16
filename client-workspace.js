@@ -637,27 +637,46 @@ window.switchClientOverviewTab = function (element, tabId, clientId) {
     }
 };
 
-// Audit cycle timeline
+// Audit cycle timeline - UNIFIED with Settings → Scopes
 function renderAuditCycleTimeline(client) {
-    const certs = (window.state.certifications || []).filter(c => matchesClient(c, client));
-    const latestCert = certs.sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate))[0];
+    // Use client.certificates from Settings instead of separate certifications array
+    const certs = client.certificates || [];
 
-    if (!latestCert) {
+    // Find the certificate with the most recent initialDate or currentIssue
+    const latestCert = certs
+        .filter(c => c.initialDate || c.currentIssue)
+        .sort((a, b) => {
+            const dateA = new Date(a.currentIssue || a.initialDate);
+            const dateB = new Date(b.currentIssue || b.initialDate);
+            return dateB - dateA;
+        })[0];
+
+    if (!latestCert || (!latestCert.initialDate && !latestCert.currentIssue)) {
         return `
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No certification cycle started yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.renderCreateAuditPlanForm('${client.name}')">
-                    Start Stage 1 Audit
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                    Go to Settings → Certification Scopes & History to set the Initial Date.
+                </p>
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);">
+                    <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
                 </button>
             </div>
         `;
     }
 
-    const issueDate = new Date(latestCert.issueDate);
+    // Use currentIssue if available, otherwise initialDate
+    const issueDate = new Date(latestCert.currentIssue || latestCert.initialDate);
     const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
     const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
-    const expiry = new Date(issueDate); expiry.setFullYear(expiry.getFullYear() + 3);
+
+    // Use expiryDate from certificate if set, otherwise calculate as +3 years
+    const expiry = latestCert.expiryDate ? new Date(latestCert.expiryDate) : (() => {
+        const exp = new Date(issueDate);
+        exp.setFullYear(exp.getFullYear() + 3);
+        return exp;
+    })();
 
     const today = new Date();
     let currentStage = "Initial Certification";
@@ -670,6 +689,14 @@ function renderAuditCycleTimeline(client) {
 
     return `
         <div class="fade-in">
+            <!-- Quick Link to Settings -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-timeline" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Certification Cycle</h3>
+                <button class="btn btn-sm btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);" title="Edit certification dates in Settings">
+                    <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Edit Dates
+                </button>
+            </div>
+            
             <!-- Summary Cards -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
@@ -691,7 +718,14 @@ function renderAuditCycleTimeline(client) {
             </div>
 
             <div class="card">
-                <h3 style="margin: 0 0 1.5rem 0;"><i class="fa-solid fa-timeline" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Certification Cycle: ${latestCert.standard || 'ISO'}</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>${latestCert.standard || 'ISO'}</h3>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Cert #: <strong>${latestCert.certificateNo || 'Not assigned'}</strong></div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Rev: <strong>${latestCert.revision || '00'}</strong></div>
+                    </div>
+                </div>
+                
                 <div style="display: flex; justify-content: space-between; position: relative; padding: 2rem 0;">
                     <div style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 33%, #3b82f6 33%, #3b82f6 66%, #f59e0b 66%); border-radius: 2px;"></div>
                     
@@ -1147,18 +1181,25 @@ function renderClientFindings(client) {
     `;
 }
 
-// Client certificates
+// Client certificates - UNIFIED with Settings → Scopes
 function renderClientCertificates(client) {
-    const certs = (window.state.certifications || []).filter(c => matchesClient(c, client));
+    // Use client.certificates from Settings (same as Audit Cycle)
+    const certs = client.certificates || [];
 
     const totalCerts = certs.length;
-    const validCertsCount = certs.filter(c => c.status === 'Valid').length;
+    const validCertsCount = certs.filter(c => c.status === 'Active' || !c.status).length;
 
     if (certs.length === 0) {
         return `
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                <p style="color: var(--text-secondary);">No certificates issued for this client yet.</p>
+                <p style="color: var(--text-secondary);">No certificates configured for this client yet.</p>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                    Go to Settings → Certification Scopes & History to set up certifications.
+                </p>
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);">
+                    <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
+                </button>
             </div>
         `;
     }
@@ -1204,29 +1245,42 @@ function renderClientCertificates(client) {
             </div>
 
             <div class="card">
-                <h3 style="margin: 0 0 1rem 0;">Certificates</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Certificates</h3>
+                    <button class="btn btn-sm btn-primary" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 100);" title="Manage certifications in Settings">
+                        <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Manage in Settings
+                    </button>
+                </div>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
                                 <th>Certificate #</th>
                                 <th>Standard</th>
-                                <th>Issue Date</th>
+                                <th>Initial Date</th>
+                                <th>Current Issue</th>
                                 <th>Expiry Date</th>
+                                <th>Revision</th>
                                 <th>Status</th>
+                                <th style="text-align: right;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${certs.map(c => `
                                 <tr>
-                                    <td style="font-weight: 500;">${c.certificateNumber || c.id}</td>
+                                    <td style="font-weight: 500;">${c.certificateNo || 'Not assigned'}</td>
                                     <td><span class="badge" style="background: #d1fae5; color: #065f46;">${c.standard || 'ISO'}</span></td>
-                                    <td>${c.issueDate || '-'}</td>
+                                    <td>${c.initialDate || '-'}</td>
+                                    <td>${c.currentIssue || '-'}</td>
                                     <td>${c.expiryDate || '-'}</td>
-                                    <td><span class="status-badge status-${(c.status || 'valid').toLowerCase()}">${c.status || 'Valid'}</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-icon" onclick="alert('Viewing Certificate PDF (Simulated)')" title="View PDF">
-                                            <i class="fa-solid fa-file-pdf"></i>
+                                    <td><span class="badge" style="background: #e0f2fe; color: #0369a1;">${c.revision || '00'}</span></td>
+                                    <td><span class="status-badge status-${(c.status || 'active').toLowerCase()}">${c.status || 'Active'}</span></td>
+                                    <td style="text-align: right;">
+                                        <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 100);" title="Edit in Settings">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/cycle'" title="View Audit Cycle">
+                                            <i class="fa-solid fa-timeline"></i>
                                         </button>
                                     </td>
                                 </tr>

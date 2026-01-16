@@ -4031,8 +4031,11 @@ function getClientCertificatesHTML(client) {
                             </div>
                         </div>
                         <div style="text-align: right;">
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" onclick="window.viewCertRevisionHistory(${client.id}, ${index})" title="View revision history for this certification">
                                 <i class="fa-solid fa-history"></i> Revision History
+                             </button>
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope(${client.id}, ${index})" title="Remove this certification scope">
+                                <i class="fa-solid fa-trash"></i>
                              </button>
                              <div style="font-size: 0.85rem; color: var(--text-secondary);">
                                 Current Rev: <strong>${cert.revision || '00'}</strong>
@@ -4173,6 +4176,122 @@ window.saveCertificateDetails = function (clientId) {
     window.saveData();
     window.showNotification('Certificate details and scopes saved successfully', 'success');
 };
+
+window.viewCertRevisionHistory = function (clientId, certIndex) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.certificates || !client.certificates[certIndex]) return;
+
+    const cert = client.certificates[certIndex];
+    const history = cert.revisionHistory || [];
+
+    document.getElementById('modal-title').textContent = `Revision History - ${cert.standard}`;
+    document.getElementById('modal-body').innerHTML = `
+        \u003cdiv style="margin-bottom: 1rem;"\u003e
+            \u003cp\u003e\u003cstrong\u003eCertificate:\u003c/strong\u003e ${cert.certificateNo || 'Not assigned'}\u003c/p\u003e
+            \u003cp\u003e\u003cstrong\u003eCurrent Revision:\u003c/strong\u003e ${cert.revision || '00'}\u003c/p\u003e
+        \u003c/div\u003e
+        
+        ${history.length > 0 ? `
+            \u003cdiv class="table-container"\u003e
+                \u003ctable\u003e
+                    \u003cthead\u003e
+                        \u003ctr\u003e
+                            \u003cth\u003eRevision\u003c/th\u003e
+                            \u003cth\u003eDate\u003c/th\u003e
+                            \u003cth\u003eChange Description\u003c/th\u003e
+                            \u003cth\u003eChanged By\u003c/th\u003e
+                        \u003c/tr\u003e
+                    \u003c/thead\u003e
+                    \u003ctbody\u003e
+                        ${history.map(h => `
+                            \u003ctr\u003e
+                                \u003ctd\u003e\u003cstrong\u003e${h.revision}\u003c/strong\u003e\u003c/td\u003e
+                                \u003ctd\u003e${h.date}\u003c/td\u003e
+                                \u003ctd\u003e${h.description}\u003c/td\u003e
+                                \u003ctd\u003e${h.changedBy || 'N/A'}\u003c/td\u003e
+                            \u003c/tr\u003e
+                        `).join('')}
+                    \u003c/tbody\u003e
+                \u003c/table\u003e
+            \u003c/div\u003e
+        ` : `
+            \u003cdiv style="text-align: center; padding: 2rem; color: var(--text-secondary);"\u003e
+                \u003ci class="fa-solid fa-info-circle" style="font-size: 2rem; margin-bottom: 1rem; display: block;"\u003e\u003c/i\u003e
+                \u003cp\u003eNo revision history recorded yet.\u003c/p\u003e
+                \u003cp style="font-size: 0.85rem;"\u003eRevisions are automatically tracked when scope changes are saved.\u003c/p\u003e
+            \u003c/div\u003e
+        `}
+        
+        \u003cdiv style="margin-top: 1.5rem; padding: 1rem; background: #eff6ff; border-radius: 6px;"\u003e
+            \u003ch4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #1d4ed8;"\u003eAdd New Revision\u003c/h4\u003e
+            \u003cdiv class="form-group"\u003e
+                \u003clabel\u003eRevision Number\u003c/label\u003e
+                \u003cinput type="text" id="new-revision-number" class="form-control" placeholder="e.g., 01, 02" value="${String(parseInt(cert.revision || '00') + 1).padStart(2, '0')}"\u003e
+            \u003c/div\u003e
+            \u003cdiv class="form-group"\u003e
+                \u003clabel\u003eChange Description\u003c/label\u003e
+                \u003ctextarea id="new-revision-description" class="form-control" rows="2" placeholder="Describe what changed in this revision..."\u003e\u003c/textarea\u003e
+            \u003c/div\u003e
+            \u003cbutton class="btn btn-primary btn-sm" onclick="window.addCertRevision(${clientId}, ${certIndex})"\u003e
+                \u003ci class="fa-solid fa-plus" style="margin-right: 0.5rem;"\u003e\u003c/i\u003eAdd Revision
+            \u003c/button\u003e
+        \u003c/div\u003e
+    `;
+
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
+
+window.addCertRevision = function (clientId, certIndex) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.certificates || !client.certificates[certIndex]) return;
+
+    const cert = client.certificates[certIndex];
+    const revisionNumber = document.getElementById('new-revision-number').value.trim();
+    const description = document.getElementById('new-revision-description').value.trim();
+
+    if (!revisionNumber || !description) {
+        window.showNotification('Please enter revision number and description', 'error');
+        return;
+    }
+
+    if (!cert.revisionHistory) cert.revisionHistory = [];
+
+    cert.revisionHistory.push({
+        revision: revisionNumber,
+        date: new Date().toISOString().split('T')[0],
+        description: description,
+        changedBy: window.state.currentUser?.name || 'Admin'
+    });
+
+    cert.revision = revisionNumber;
+
+    window.saveData();
+    window.closeModal();
+    window.showNotification('Revision added successfully', 'success');
+    renderClientDetail(clientId);
+    setTimeout(() => {
+        document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
+    }, 100);
+};
+
+window.deleteCertificationScope = function (clientId, certIndex) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.certificates || !client.certificates[certIndex]) return;
+
+    const cert = client.certificates[certIndex];
+
+    if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history.`)) {
+        client.certificates.splice(certIndex, 1);
+        window.saveData();
+        window.showNotification('Certification scope removed', 'success');
+        renderClientDetail(clientId);
+        setTimeout(() => {
+            document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
+        }, 100);
+    }
+};
+
 
 // Sub-Tab Switching for Org Setup
 window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
