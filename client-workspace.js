@@ -137,9 +137,6 @@ function renderClientSidebarMenu(clientId) {
         <li class="active" onclick="window.location.hash = 'client/${clientId}/overview'">
             <i class="fa-solid fa-house"></i> Overview
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/cycle'">
-            <i class="fa-solid fa-timeline"></i> Audit Cycle
-        </li>
 
         <!-- Group: Audit Operations -->
         <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
@@ -1417,8 +1414,8 @@ function renderClientCertificates(client) {
                                         <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 100);" title="Edit in Settings">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/cycle'" title="View Audit Cycle">
-                                            <i class="fa-solid fa-timeline"></i>
+                                        <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/overview'" title="View in Overview">
+                                            <i class="fa-solid fa-chart-line"></i>
                                         </button>
                                     </td>
                                 </tr>
