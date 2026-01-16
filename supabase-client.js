@@ -316,9 +316,17 @@ const SupabaseClient = {
             };
 
             // 1. Load basic entities
-            try { results.clients = await this.syncClientsFromSupabase(); } catch (e) { Logger.warn('Clients sync failed:', e); }
-            try { results.auditors = await this.syncAuditorsFromSupabase(); } catch (e) { Logger.warn('Auditors sync failed:', e); }
-            try { results.users = await this.syncUsersFromSupabase(); } catch (e) { Logger.warn('Users sync failed:', e); }
+            try { results.clients = await this.syncClientsFromSupabase(); } catch (e) {
+                Logger.warn('Clients sync failed:', e);
+                window.showNotification('Failed to sync clients from cloud. Using local data.', 'warning');
+            }
+            try { results.auditors = await this.syncAuditorsFromSupabase(); } catch (e) {
+                Logger.warn('Auditors sync failed:', e);
+                window.showNotification('Failed to sync auditors from cloud. Using local data.', 'warning');
+            }
+            try { results.users = await this.syncUsersFromSupabase(); } catch (e) {
+                Logger.warn('Users sync failed:', e);
+            }
 
             // 2. Load Settings & Knowledge Base (CRITICAL for the reported issue)
             try {
@@ -330,10 +338,20 @@ const SupabaseClient = {
             try { results.documents = await this.syncDocumentsFromSupabase(); } catch (e) { Logger.warn('Documents sync failed:', e); }
 
             // 4. Load Operational data
-            try { await this.syncAuditPlansFromSupabase(); } catch (e) { Logger.warn('Audit Plans sync failed:', e); }
-            try { await this.syncAuditReportsFromSupabase(); } catch (e) { Logger.warn('Audit Reports sync failed:', e); }
-            try { await this.syncChecklistsFromSupabase(); } catch (e) { Logger.warn('Checklists sync failed:', e); }
-            try { await this.syncCertificationDecisionsFromSupabase(); } catch (e) { Logger.warn('Certification Decisions sync failed:', e); }
+            try { await this.syncAuditPlansFromSupabase(); } catch (e) {
+                Logger.warn('Audit Plans sync failed:', e);
+                window.showNotification('Failed to sync audit plans. Working offline.', 'warning');
+            }
+            try { await this.syncAuditReportsFromSupabase(); } catch (e) {
+                Logger.warn('Audit Reports sync failed:', e);
+                window.showNotification('Failed to sync audit reports. Working offline.', 'warning');
+            }
+            try { await this.syncChecklistsFromSupabase(); } catch (e) {
+                Logger.warn('Checklists sync failed:', e);
+            }
+            try { await this.syncCertificationDecisionsFromSupabase(); } catch (e) {
+                Logger.warn('Certification Decisions sync failed:', e);
+            }
 
             // CRITICAL: Save to localStorage directly (don't call saveData - it triggers upload!)
             localStorage.setItem('auditCB360State', JSON.stringify(window.state));
@@ -345,6 +363,7 @@ const SupabaseClient = {
             return results;
         } catch (error) {
             Logger.error('Failed to load user data from cloud:', error);
+            window.showNotification('Failed to connect to cloud database. Working offline.', 'error');
             throw error;
         }
     },
