@@ -359,10 +359,9 @@ function renderClientOverview(client) {
     const totalSites = (client.sites || []).length;
     const totalEmployees = client.employees || 0;
 
-    // Organization Data (Placeholder/Extraction)
-    const departments = client.departments || ['Operations', 'Quality', 'HR', 'Sales', 'IT']; // Mock if missing
+    // Organization Data (use client's actual data, no hardcoded defaults)
+    const departments = client.departments || []; // No mock data
     const designations = [...new Set((client.contacts || []).map(c => c.designation).filter(Boolean))];
-    if (designations.length === 0) designations.push('Manager', 'Director', 'Officer');
 
     return `
         <div class="fade-in">

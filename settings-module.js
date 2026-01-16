@@ -9,7 +9,7 @@ if (!window.state.cbSettings) {
         cbName: 'AuditCB360 Certification Body',
         cbAddress: '123 Quality Street, ISO City, 9001',
         cbPhone: '+1-555-AUDIT',
-        cbEmail: 'info@companycertification.com',
+        cbEmail: '', // Configure in Settings > CB Profile
         cbWebsite: 'https://audit.companycertification.com',
         cbTagline: 'Committed to Excellence in Certification',
         logoUrl: '',

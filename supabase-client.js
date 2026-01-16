@@ -69,9 +69,16 @@ const SupabaseClient = {
         let userRole = user.user_metadata?.role;
         let userPermissions = user.user_metadata?.permissions;
 
-        // Check if admin email
-        const adminEmails = ['admin@companycertification.com', 'info@companycertification.com'];
-        if (adminEmails.includes(user.email.toLowerCase())) {
+        // Check if admin email (configured in settings or user management)
+        const cbEmail = window.state?.cbSettings?.cbEmail?.toLowerCase() || '';
+        const adminUsers = (window.state?.users || [])
+            .filter(u => u.role === 'Admin')
+            .map(u => u.email?.toLowerCase());
+
+        // Include CB email as admin if configured
+        if (cbEmail) adminUsers.push(cbEmail);
+
+        if (adminUsers.includes(user.email.toLowerCase())) {
             userRole = 'Admin';
             userPermissions = ['all'];
         } else if (!userRole) {

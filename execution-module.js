@@ -1945,21 +1945,53 @@ function createNCR(reportId) {
         };
     }
 
-    // Camera Capture Logic
+    // Camera Capture Logic - triggers file input for real image upload
     const captureBtn = document.getElementById('btn-capture-img');
     if (captureBtn) {
         captureBtn.onclick = function () {
-            this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Capturing...';
-            setTimeout(() => {
-                // Mock Image URL (Random Picsum Image)
-                const mockUrl = "https://picsum.photos/600/400?random=" + Math.floor(Math.random() * 1000);
-                document.getElementById('ncr-evidence-image-url').value = mockUrl;
-                document.getElementById('image-preview').innerHTML = `<img src="${mockUrl}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
-                document.getElementById('img-status').textContent = "Image captured successfully";
-                this.innerHTML = '<i class="fa-solid fa-camera"></i> Retake';
-                this.classList.remove('btn-secondary');
-                this.classList.add('btn-success');
-            }, 1000); // 1s delay to simulate capture
+            // Create file input for image selection
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.capture = 'environment'; // Use back camera on mobile
+
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                captureBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+                try {
+                    // Upload to Supabase if available
+                    if (window.SupabaseClient?.isInitialized) {
+                        const result = await window.SupabaseClient.storage.uploadAuditImage(file, 'ncr-evidence', Date.now().toString());
+                        if (result?.url) {
+                            document.getElementById('ncr-evidence-image-url').value = result.url;
+                            document.getElementById('image-preview').innerHTML = `<img src="${result.url}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
+                            document.getElementById('img-status').textContent = "Image uploaded successfully";
+                        }
+                    } else {
+                        // Fallback: Use base64 data URL for local storage
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            document.getElementById('ncr-evidence-image-url').value = ev.target.result;
+                            document.getElementById('image-preview').innerHTML = `<img src="${ev.target.result}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
+                            document.getElementById('img-status').textContent = "Image captured (stored locally)";
+                        };
+                        reader.readAsDataURL(file);
+                    }
+
+                    captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Retake';
+                    captureBtn.classList.remove('btn-secondary');
+                    captureBtn.classList.add('btn-success');
+                } catch (error) {
+                    console.error('Image upload failed:', error);
+                    document.getElementById('img-status').textContent = "Upload failed: " + error.message;
+                    captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Retry';
+                }
+            };
+
+            fileInput.click();
         };
     }
 
