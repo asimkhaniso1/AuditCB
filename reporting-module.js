@@ -139,16 +139,23 @@ function renderReportSummaryTab(report, tabContent) {
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review findings and finalize report content.</p>
                 </div>
                 ${(function () {
-            const role = (window.state.currentUser?.role || '').toLowerCase();
-            const allowed = ['admin', 'administrator', 'certification manager', 'lead auditor'];
-            return allowed.includes(role);
+            const role = (window.state.currentUser?.role || '').toLowerCase().trim();
+            // Check against CONSTANTS first, then fallback to string matching
+            const isAdmin = role === 'admin' || role === 'administrator' ||
+                userRole === window.CONSTANTS.ROLES.ADMIN;
+            const isCertManager = role === 'certification manager' || role === 'cert manager' ||
+                userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER;
+            const isLeadAuditor = role === 'lead auditor' || role === 'lead' ||
+                userRole === window.CONSTANTS.ROLES.LEAD_AUDITOR;
+
+            return isAdmin || isCertManager || isLeadAuditor;
         })() ? `
                 <button id="btn-ai-draft-${report.id}" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onclick="window.generateAIConclusion('${report.id}')">
                     <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> Auto-Draft with AI
                 </button>
                 ` : `
                 <span style="font-size: 0.8rem; color: var(--text-secondary); padding: 0.5rem 1rem; background: #f1f5f9; border-radius: 6px;">
-                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> AI Draft (Manager/Admin Only)
+                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> AI Draft (Manager/Admin Only) - Current: ${userRole || 'Unknown'}
                 </span>
                 `}
             </div>
