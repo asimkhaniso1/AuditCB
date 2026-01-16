@@ -671,18 +671,23 @@ function renderAuditCycleTimeline(client) {
     const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
     const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
 
-    // Use expiryDate from certificate if set, otherwise calculate as +3 years
+    // Calculate expiry date (3 years from issue)
     const expiry = latestCert.expiryDate ? new Date(latestCert.expiryDate) : (() => {
         const exp = new Date(issueDate);
         exp.setFullYear(exp.getFullYear() + 3);
         return exp;
     })();
 
+    // Recertification audit should occur 60 days BEFORE expiry
+    const recertAudit = new Date(expiry);
+    recertAudit.setDate(recertAudit.getDate() - 60); // 60 days before expiry
+
     const today = new Date();
     let currentStage = "Initial Certification";
     let nextAudit = surv1;
     if (today > surv1) { currentStage = "Surveillance 1"; nextAudit = surv2; }
-    if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = expiry; }
+    if (today > surv2) { currentStage = "Surveillance 2"; nextAudit = recertAudit; }
+    if (today > recertAudit) { currentStage = "Recertification Due"; nextAudit = expiry; }
     if (today > expiry) { currentStage = "Expired"; nextAudit = null; }
 
     const daysToNext = nextAudit ? Math.ceil((nextAudit - today) / (1000 * 60 * 60 * 24)) : 0;
@@ -727,30 +732,40 @@ function renderAuditCycleTimeline(client) {
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; position: relative; padding: 2rem 0;">
-                    <div style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 33%, #3b82f6 33%, #3b82f6 66%, #f59e0b 66%); border-radius: 2px;"></div>
+                    <div style="position: absolute; top: 50%; left: 5%; right: 5%; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 25%, #3b82f6 25%, #3b82f6 50%, #3b82f6 50%, #3b82f6 75%, #f59e0b 75%, #f59e0b 90%, #dc2626 90%); border-radius: 2px;"></div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: #10b981; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-check"></i></div>
-                        <div style="font-weight: 500;">Certification</div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${issueDate.toLocaleDateString()}</div>
+                        <div style="font-weight: 500; font-size: 0.9rem;">Certification</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${issueDate.toLocaleDateString()}</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: ${new Date() > surv1 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
-                        <div style="font-weight: 500;">Surveillance 1</div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${surv1.toLocaleDateString()}</div>
+                        <div style="font-weight: 500; font-size: 0.9rem;">Surv 1</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${surv1.toLocaleDateString()}</div>
+                        <div style="font-size: 0.7rem; color: #64748b;">Year 1</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: ${new Date() > surv2 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
-                        <div style="font-weight: 500;">Surveillance 2</div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${surv2.toLocaleDateString()}</div>
+                        <div style="font-weight: 500; font-size: 0.9rem;">Surv 2</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${surv2.toLocaleDateString()}</div>
+                        <div style="font-size: 0.7rem; color: #64748b;">Year 2</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
-                        <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
-                        <div style="font-weight: 500;">Recertification</div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${expiry.toLocaleDateString()}</div>
+                        <div style="width: 40px; height: 40px; background: ${new Date() > recertAudit ? '#10b981' : '#f59e0b'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
+                        <div style="font-weight: 500; font-size: 0.9rem;">Recert Audit</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${recertAudit.toLocaleDateString()}</div>
+                        <div style="font-size: 0.7rem; color: #64748b;">60 days before</div>
+                    </div>
+                    
+                    <div style="text-align: center; z-index: 1;">
+                        <div style="width: 40px; height: 40px; background: ${new Date() > expiry ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <div style="font-weight: 500; font-size: 0.9rem;">Expiry</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${expiry.toLocaleDateString()}</div>
+                        <div style="font-size: 0.7rem; color: #64748b;">Year 3</div>
                     </div>
                 </div>
             </div>
