@@ -230,16 +230,16 @@ function renderManagementReviewModule() {
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" onclick="viewManagementReview('${review.id}')" title="View Details">
+                                            <button class="btn btn-sm btn-icon" onclick="window.viewManagementReview('${review.id}')" title="View Details">
                                                 <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" onclick="editManagementReview('${review.id}')" title="Edit Review">
+                                            <button class="btn btn-sm btn-icon" onclick="window.editManagementReview('${review.id}')" title="Edit Review">
                                                 <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" onclick="deleteManagementReview('${review.id}')" title="Delete Review">
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteManagementReview('${review.id}')" title="Delete Review">
                                                 <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" onclick="printManagementReview('${review.id}')" title="Print Minutes">
+                                            <button class="btn btn-sm btn-icon" onclick="window.printManagementReview('${review.id}')" title="Print Minutes">
                                                 <i class="fa-solid fa-print"></i>
                                             </button>
                                         </td>
