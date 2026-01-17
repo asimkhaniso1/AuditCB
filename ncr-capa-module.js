@@ -646,18 +646,12 @@ window.openNewNCRModal = function () {
     document.getElementById('modal-body').innerHTML = `
         <form id="ncr-form">
             <div class="form-group">
-                <label>Level <span style="color: var(--danger-color);">*</span></label>
-                <select class="form-control" id="ncr-level" onchange="toggleClientSelect()" required>
-                    <option value="client">Client NCR</option>
-                    <option value="cb-internal" ${contextClientId ? 'disabled' : ''}>CB Internal NCR</option>
-                </select>
-            </div>
-            <div class="form-group" id="client-select-group">
                 <label>Client <span style="color: var(--danger-color);">*</span></label>
                 <select class="form-control" id="ncr-client" required ${contextClientId ? 'disabled' : ''} onchange="window.updateNCRAuditPlanOptions()">
                     <option value="">Select Client...</option>
                     ${window.state.clients.map(c => `<option value="${c.id}" ${String(c.id) === String(contextClientId) ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
+                <small style="color: var(--text-secondary);">For CB internal NCRs, select your internal audit client</small>
             </div>
             <div class="form-group" id="audit-plan-select-group">
                 <label>Audit Plan <span style="color: var(--danger-color);">*</span></label>
@@ -733,34 +727,13 @@ window.openNewNCRModal = function () {
     window.openModal();
 };
 
-function toggleClientSelect() {
-    const level = document.getElementById('ncr-level').value;
-    const clientGroup = document.getElementById('client-select-group');
-    if (level === 'cb-internal') {
-        clientGroup.style.display = 'none';
-        document.getElementById('ncr-client').required = false;
-    } else {
-        clientGroup.style.display = 'block';
-        document.getElementById('ncr-client').required = true;
-    }
-}
-
 async function saveNewNCR() {
-    const level = document.getElementById('ncr-level').value;
-    let clientId = null;
-    let clientName = '';
-
-    if (level === 'client') {
-        clientId = document.getElementById('ncr-client').value;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
-        clientName = client ? client.name : 'Unknown';
-    } else {
-        clientId = 'INTERNAL';
-        clientName = 'Corporate (AuditCB360)';
-    }
+    const clientId = document.getElementById('ncr-client').value;
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const clientName = client ? client.name : 'Unknown';
 
     const ncrData = {
-        level: level,
+        level: 'client', // All NCRs are now client-based (including CB internal via internal client)
         clientId: clientId,
         clientName: clientName,
         auditPlanId: document.getElementById('ncr-audit-plan')?.value || null,
