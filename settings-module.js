@@ -4494,7 +4494,7 @@ function getAssignmentsHTML() {
     });
 
     return `
-            < div class="fade-in" >
+            <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
                     <h3 style="color: var(--primary-color); margin: 0;">
@@ -4591,7 +4591,7 @@ function getAssignmentsHTML() {
                     <div style="font-size: 0.85rem; color: #92400e;">Active Assignments</div>
                 </div>
             </div>
-        </div >
+        </div>
             `;
 }
 
@@ -4717,7 +4717,7 @@ function getActivityLogHTML() {
     const recentLogs = logs.slice(0, 50);
 
     return `
-            < div class="fade-in" >
+            <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-history" style="margin-right: 0.5rem;"></i>
@@ -4769,7 +4769,7 @@ function getActivityLogHTML() {
                     </div>
                 `}
             </div>
-        </div >
+        </div>
             `;
 }
 
@@ -4815,7 +4815,7 @@ function getUsageAnalyticsHTML() {
     const tracker = window.APIUsageTracker;
     if (!tracker) {
         return `
-            < div class="fade-in" >
+            <div class="fade-in">
                 <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
                     <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
                     Usage Analytics
@@ -4824,7 +4824,7 @@ function getUsageAnalyticsHTML() {
                     <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
                     API Usage Tracker module not loaded. Please refresh the page.
                 </div>
-            </div >
+            </div>
             `;
     }
 
@@ -4834,7 +4834,7 @@ function getUsageAnalyticsHTML() {
     const features = Object.entries(summary.byFeature || {});
 
     return `
-            < div class="fade-in" >
+            <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
@@ -4992,7 +4992,7 @@ function getUsageAnalyticsHTML() {
                     * Projections based on average of 3.5 AI calls per audit with ~3,000 tokens each
                 </p>
             </div>
-        </div >
+        </div>
             `;
 }
 
