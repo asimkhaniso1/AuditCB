@@ -40,6 +40,7 @@ window.fetchNCRs = async function () {
             id: row.id,
             clientId: row.client_id,
             auditId: row.audit_id,
+            auditPlanId: row.audit_plan_id,
             level: row.level,
             clientName: row.client_name,
             source: row.source,
@@ -84,6 +85,7 @@ async function persistNCR(ncr) {
     const dbPayload = {
         client_id: ncr.clientId,
         audit_id: ncr.auditId,
+        audit_plan_id: ncr.auditPlanId || null,
         level: ncr.level,
         client_name: ncr.clientName,
         source: ncr.source,
@@ -135,6 +137,40 @@ async function persistNCR(ncr) {
         window.showNotification('Failed to sync NCR changes to database: ' + error.message, 'error');
     }
 }
+
+// --------------------------------------------
+// AUDIT PLAN HELPERS FOR NCR LINKING
+// --------------------------------------------
+
+// Get audit plan options for a specific client
+window.getNCRAuditPlanOptions = function (clientId) {
+    if (!clientId) return '';
+
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const clientName = client ? client.name : '';
+
+    const plans = (window.state.auditPlans || []).filter(p =>
+        String(p.clientId) === String(clientId) || p.client === clientName
+    );
+
+    if (plans.length === 0) {
+        return '<option value="" disabled>No audit plans found for this client</option>';
+    }
+
+    return plans.map(p =>
+        `<option value="${p.id}">${window.UTILS.escapeHtml(p.auditType || p.type || 'Audit')} - ${window.UTILS.escapeHtml(p.date || 'No date')} (${window.UTILS.escapeHtml(p.status || 'Draft')})</option>`
+    ).join('');
+};
+
+// Update audit plan dropdown when client changes
+window.updateNCRAuditPlanOptions = function () {
+    const clientId = document.getElementById('ncr-client')?.value;
+    const planSelect = document.getElementById('ncr-audit-plan');
+
+    if (!planSelect) return;
+
+    planSelect.innerHTML = '<option value="">Select Audit Plan...</option>' + window.getNCRAuditPlanOptions(clientId);
+};
 
 // --------------------------------------------
 // MAIN RENDER FUNCTION
@@ -618,10 +654,18 @@ window.openNewNCRModal = function () {
             </div>
             <div class="form-group" id="client-select-group">
                 <label>Client <span style="color: var(--danger-color);">*</span></label>
-                <select class="form-control" id="ncr-client" required ${contextClientId ? 'disabled' : ''}>
+                <select class="form-control" id="ncr-client" required ${contextClientId ? 'disabled' : ''} onchange="window.updateNCRAuditPlanOptions()">
                     <option value="">Select Client...</option>
                     ${window.state.clients.map(c => `<option value="${c.id}" ${String(c.id) === String(contextClientId) ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>
+            </div>
+            <div class="form-group" id="audit-plan-select-group">
+                <label>Audit Plan <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="ncr-audit-plan" required>
+                    <option value="">Select Audit Plan...</option>
+                    ${window.getNCRAuditPlanOptions(contextClientId)}
+                </select>
+                <small style="color: var(--text-secondary);">Link this NCR to a specific audit</small>
             </div>
             <div class="form-group">
                 <label>Source <span style="color: var(--danger-color);">*</span></label>
@@ -719,6 +763,7 @@ async function saveNewNCR() {
         level: level,
         clientId: clientId,
         clientName: clientName,
+        auditPlanId: document.getElementById('ncr-audit-plan')?.value || null,
         source: document.getElementById('ncr-source').value,
         standard: document.getElementById('ncr-standard').value,
         clause: document.getElementById('ncr-clause').value,
