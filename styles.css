@@ -1499,3 +1499,275 @@ textarea:focus:invalid {
     justify-content: center;
     padding: 0;
 }
+
+/* ============================================
+   ENHANCED MOBILE RESPONSIVENESS
+   ============================================ */
+
+/* Mobile (max-width: 768px) - Complete overhaul */
+@media (max-width: 768px) {
+
+    /* Ensure sidebar starts hidden */
+    .sidebar {
+        left: -100% !important;
+        width: 260px !important;
+    }
+
+    .sidebar.mobile-open {
+        left: 0 !important;
+    }
+
+    /* Main content takes full width */
+    .main-content {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    /* Content area - proper spacing for mobile */
+    #content-area {
+        padding: 1rem;
+        padding-top: 4rem;
+        /* Space for mobile menu button */
+    }
+
+    /* Quick Action Buttons - Stack vertically */
+    .quick-actions,
+    [style*="display: flex"][style*="gap"] {
+        flex-wrap: wrap !important;
+    }
+
+    .quick-actions .btn,
+    .btn-group .btn {
+        flex: 1 1 calc(50% - 0.5rem);
+        min-width: 120px;
+    }
+
+    /* Dashboard stat cards - Stack on mobile */
+    .dashboard-grid,
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem;
+    }
+
+    /* Card improvements */
+    .card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-card .stat-value {
+        font-size: 1.5rem;
+    }
+
+    /* Form improvements - Stack columns */
+    .form-row,
+    .form-grid,
+    [style*="display: grid"][style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem;
+    }
+
+    [style*="display: flex"][style*="gap: 1rem"],
+    [style*="display: flex"][style*="gap: 1.5rem"] {
+        flex-direction: column;
+    }
+
+    /* Tab container - horizontal scroll */
+    .tab-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        padding-bottom: 0.5rem;
+        scrollbar-width: thin;
+    }
+
+    .tab-btn {
+        flex-shrink: 0;
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+    }
+
+    /* Table mobile improvements */
+    table {
+        min-width: 100% !important;
+        font-size: 0.85rem;
+    }
+
+    th,
+    td {
+        padding: 0.5rem 0.75rem;
+    }
+
+    /* Hide less important columns on mobile */
+    table th:nth-child(n+4),
+    table td:nth-child(n+4) {
+        display: none;
+    }
+
+    /* Show actions column always (usually last) */
+    table th:last-child,
+    table td:last-child {
+        display: table-cell;
+    }
+
+    /* Top bar adjustments */
+    .top-bar {
+        padding: 0 0.75rem;
+        padding-left: 3.5rem;
+        /* Space for hamburger */
+    }
+
+    .top-bar h2 {
+        font-size: 1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* User profile - hide name */
+    .user-profile span,
+    .user-profile .user-name {
+        display: none !important;
+    }
+
+    /* Modal improvements */
+    .modal-content {
+        width: 95% !important;
+        max-width: 95% !important;
+        max-height: 85vh;
+        margin: 0.5rem;
+        border-radius: 12px;
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+
+    .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+    }
+
+    /* Client sidebar - hide on mobile by default */
+    .client-sidebar {
+        display: none !important;
+    }
+
+    /* Charts - full width */
+    .chart-container,
+    canvas {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    /* Badge improvements */
+    .badge,
+    .status-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    /* Button sizing for touch */
+    .btn {
+        min-height: 44px;
+        padding: 0.625rem 1rem;
+    }
+
+    .btn-sm {
+        min-height: 36px;
+        padding: 0.5rem 0.75rem;
+    }
+
+    /* Icon buttons */
+    .btn-icon {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Extra small mobile (max-width: 480px) */
+@media (max-width: 480px) {
+    #content-area {
+        padding: 0.75rem;
+        padding-top: 4rem;
+    }
+
+    /* Stack all buttons */
+    .quick-actions .btn,
+    .btn-group .btn {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    /* Form inputs full width */
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+        /* Prevent zoom on iOS */
+    }
+
+    /* Table becomes card layout */
+    table thead {
+        display: none;
+    }
+
+    table tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+        background: var(--surface-color);
+    }
+
+    table tbody td {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    table tbody td:last-child {
+        border-bottom: none;
+        justify-content: center;
+        padding-top: 0.75rem;
+    }
+
+    table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        font-size: 0.7rem;
+    }
+
+    /* Show all columns in card layout */
+    table th:nth-child(n+4),
+    table td:nth-child(n+4) {
+        display: flex !important;
+    }
+
+    /* Mobile menu position */
+    .mobile-menu-toggle {
+        top: 0.75rem;
+        left: 0.75rem;
+    }
+
+    /* Header in mobile */
+    .top-bar h2 {
+        font-size: 0.875rem;
+        max-width: 60%;
+    }
+
+    /* Settings tabs - scrollable */
+    .settings-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+}
