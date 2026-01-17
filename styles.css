@@ -1770,4 +1770,25 @@ textarea:focus:invalid {
         flex-wrap: nowrap;
         overflow-x: auto;
     }
+
+    /* Dashboard Stats Grid - Stack on small mobile */
+    .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Quick Actions Grid - 2 columns on small mobile */
+    .quick-actions-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* Extra small screens - single column */
+@media (max-width: 375px) {
+    .dashboard-stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .quick-actions-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
 }

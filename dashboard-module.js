@@ -101,7 +101,7 @@ function renderDashboardEnhanced() {
             </div>
 
             <!-- Quick Stats Cards -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+            <div class="dashboard-stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
                 <!-- Active Clients -->
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
@@ -162,7 +162,7 @@ function renderDashboardEnhanced() {
             <!-- Quick Actions -->
             <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); border: none;">
                 <h3 style="margin: 0 0 1rem 0; color: #1e293b;"><i class="fa-solid fa-bolt" style="margin-right: 0.5rem; color: #8b5cf6;"></i>Quick Actions</h3>
-                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+                <div class="quick-actions-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
                     <!-- 1. Add Client -->
                     <button class="btn" onclick="window.renderModule('clients')" style="background: white; color: #30cfd0; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <i class="fa-solid fa-building" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
