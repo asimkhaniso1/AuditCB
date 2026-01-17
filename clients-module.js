@@ -274,9 +274,6 @@ function renderClientDetail(clientId, options = {}) {
                 <p style="color: var(--text-secondary); margin: 0.25rem 0;">${window.UTILS.escapeHtml(client.industry || 'N/A')} • ${window.UTILS.escapeHtml(client.standard || 'N/A')}</p>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.initiateAuditPlanFromClient(${client.id})">
-                    <i class="fa-solid fa-calendar-plus"></i> Create Audit Plan
-                </button>
                 ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-primary" onclick="window.renderEditClient(${client.id})">
                         <i class="fa-solid fa-pen"></i> Edit
