@@ -57,16 +57,18 @@ Example:
 
     // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt) => {
-        const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
+        const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
         let lastError;
+        let proxyFailed = false;
 
         if (!window.navigator.onLine) {
             throw new Error('You appear to be offline. Please check your internet connection.');
         }
 
+        // First, try the serverless proxy (for Vercel deployment)
         for (const model of models) {
             try {
-                console.log(`Attempting AI generation with model: ${model}`);
+                console.log(`Attempting AI generation with model: ${model} via proxy`);
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -109,15 +111,69 @@ Example:
 
                 // Check if this is a network/fetch error indicating the API isn't available
                 if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
-                    // Likely running locally without proper API setup
-                    throw new Error(
-                        'AI Service Unavailable: The Gemini API endpoint is not accessible. ' +
-                        'This feature requires deployment to Vercel or a local development server with serverless function support. ' +
-                        'Please ensure the app is deployed to Vercel with GEMINI_API_KEY configured in environment variables.'
-                    );
+                    proxyFailed = true;
+                    break; // Stop trying proxy, fall through to direct API
                 }
             }
         }
+
+        // FALLBACK: If proxy failed (likely running locally), try direct API call with client-side key
+        if (proxyFailed) {
+            console.log('Proxy unavailable. Attempting direct Gemini API call...');
+
+            // Get API key from settings
+            const apiKey = window.state?.settings?.geminiApiKey || localStorage.getItem('geminiApiKey');
+
+            if (!apiKey) {
+                throw new Error(
+                    'AI Service requires configuration. Please go to Settings > AI Configuration and enter your Gemini API Key. ' +
+                    'You can get a free API key from https://makersuite.google.com/app/apikey'
+                );
+            }
+
+            // Try direct API call
+            for (const model of models) {
+                try {
+                    console.log(`Attempting direct Gemini API with model: ${model}`);
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }]
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        console.warn(`Direct API model ${model} failed:`, data.error?.message || response.statusText);
+                        lastError = new Error(data.error?.message || `Model ${model} failed`);
+                        continue;
+                    }
+
+                    const data = await response.json();
+
+                    if (window.APIUsageTracker) {
+                        window.APIUsageTracker.logUsage({
+                            feature: 'ai-generation-direct',
+                            inputTokens: window.APIUsageTracker.estimateTokens(prompt),
+                            outputTokens: 0,
+                            success: true,
+                            model: model
+                        });
+                    }
+
+                    console.log('Direct Gemini API call successful!');
+                    return AI_SERVICE.extractTextFromResponse(data);
+
+                } catch (error) {
+                    console.error(`Direct API error with ${model}:`, error);
+                    lastError = error;
+                }
+            }
+        }
+
 
         // If all hardcoded models fail, try to dynamically fetch available models
         try {
