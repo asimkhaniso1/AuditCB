@@ -996,11 +996,68 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             break;
 
         case 'ncr':
-            const ncrs = report.ncrs || [];
+            // Combine Manual NCRs and Checklist-marked NCs for real-time display
+            const manualNCRs = report.ncrs || [];
+
+            // Get checklist-marked NCs from checklistProgress
+            const checklistNCRs = (report.checklistProgress || [])
+                .filter(item => item.status === 'nc')
+                .map((item, idx) => {
+                    // Resolve clause from checklist definition
+                    let clauseText = 'Checklist Item';
+                    let reqText = '';
+                    const { assignedChecklists = [] } = contextData;
+
+                    if (item.checklistId && assignedChecklists.length > 0) {
+                        const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
+                        if (cl) {
+                            if (cl.clauses && (String(item.itemIdx).includes('-'))) {
+                                const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
+                                const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
+                                if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
+                                    clauseText = mainObj.subClauses[subIdxVal].clause || `Clause ${mainClauseVal}`;
+                                    reqText = mainObj.subClauses[subIdxVal].requirement || '';
+                                }
+                            } else if (cl.items && cl.items[item.itemIdx]) {
+                                clauseText = cl.items[item.itemIdx].clause || 'Checklist Item';
+                                reqText = cl.items[item.itemIdx].requirement || '';
+                            }
+                        }
+                    } else if (item.isCustom) {
+                        const customItem = (report.customItems || [])[item.itemIdx];
+                        if (customItem) {
+                            clauseText = customItem.clause || 'Custom Question';
+                            reqText = customItem.requirement || '';
+                        }
+                    }
+
+                    return {
+                        type: item.ncrType || window.CONSTANTS.NCR_TYPES.OBSERVATION,
+                        clause: clauseText,
+                        description: item.ncrDescription || item.comment || reqText || 'Non-conformity identified in checklist',
+                        status: 'Open',
+                        source: 'checklist',
+                        department: item.department || '',
+                        designation: item.designation || '',
+                        evidenceImage: item.evidenceImage
+                    };
+                });
+
+            // Combine all NCRs
+            const allNCRs = [
+                ...manualNCRs.map(ncr => ({ ...ncr, source: 'manual' })),
+                ...checklistNCRs
+            ];
+
             tabContent.innerHTML = `
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <h3>Non-Conformity Reports (NCRs)</h3>
+                        <div>
+                            <h3>Non-Conformity Reports (NCRs)</h3>
+                            <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+                                Showing ${allNCRs.length} finding(s) - ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
+                            </p>
+                        </div>
                         <button class="btn btn-primary" onclick="createNCR(${report.id})">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create NCR
                         </button>
@@ -1011,6 +1068,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <thead>
                                 <tr>
                                     <th>NCR #</th>
+                                    <th>Source</th>
                                     <th>Type</th>
                                     <th>Clause</th>
                                     <th>Description</th>
@@ -1019,18 +1077,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${ncrs.length > 0 ? ncrs.map((ncr, idx) => `
+                                ${allNCRs.length > 0 ? allNCRs.map((ncr, idx) => `
                                     <tr>
                                         <td>NCR-${String(idx + 1).padStart(3, '0')}</td>
-                                        <td><span style="background: ${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'var(--danger-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'Major' : 'Minor'}</span></td>
+                                        <td><span style="background: ${ncr.source === 'manual' ? '#3b82f6' : '#8b5cf6'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${ncr.source === 'manual' ? 'Manual' : 'Checklist'}</span></td>
+                                        <td><span style="background: ${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'var(--danger-color)' : ncr.type === window.CONSTANTS.NCR_TYPES.MINOR ? 'var(--warning-color)' : '#9ca3af'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'Major' : ncr.type === window.CONSTANTS.NCR_TYPES.MINOR ? 'Minor' : 'Obs'}</span></td>
                                         <td>${window.UTILS.escapeHtml(ncr.clause || '-')}</td>
-                                        <td>${window.UTILS.escapeHtml(ncr.description || '-')}</td>
+                                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.description || '-')}">${window.UTILS.escapeHtml(ncr.description || '-')}</td>
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
                                         <td><button class="btn btn-sm" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button></td>
                                     </tr>
                                 `).join('') : `
                                     <tr>
-                                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No NCRs raised yet</td>
+                                        <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                            <i class="fa-solid fa-clipboard-check" style="font-size: 2rem; margin-bottom: 0.5rem; display: block; opacity: 0.5;"></i>
+                                            No NCRs raised yet. Mark items as NC in the Checklist tab or click "Create NCR" to add manually.
+                                        </td>
                                     </tr>
                                 `}
                             </tbody>

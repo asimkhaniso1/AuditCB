@@ -424,8 +424,8 @@ function publishReport(reportId) {
 // Note: revertToDraft is already defined above as window.revertToDraft
 
 // Save report draft
-window.saveReportDraft = function (reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
+window.saveReportDraft = function (reportId, silent = false) {
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     report.execSummary = Sanitizer.sanitizeText(document.getElementById('exec-summary')?.value || '');
@@ -451,197 +451,11 @@ window.saveReportDraft = function (reportId) {
 
     // Save to DB and Local
     window.saveData();
-    updateReportInDB(report, 'Report draft saved to database');
+    updateReportInDB(report, silent ? null : 'Report draft saved to database');
 };
 
-// AI-powered draft generation (enhanced with Gemini API)
-window.generateAIConclusion = async function (reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
-    if (!report) return;
-
-    // Show loading state on button
-    const aiBtn = document.querySelector('[onclick*="generateAIConclusion"]');
-    const originalBtnHTML = aiBtn ? aiBtn.innerHTML : '';
-    if (aiBtn) {
-        aiBtn.disabled = true;
-        aiBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating...';
-    }
-
-    window.showNotification('AI Agent analyzing audit findings...', 'info');
-
-    // 1. GATHER ALL FINDINGS (Manual NCRs + Checklist NCs)
-    const allFindings = [];
-
-    // A. Manual NCRs
-    (report.ncrs || []).forEach((n, i) => {
-        allFindings.push({
-            type: n.type || 'minor',
-            clause: n.clause || 'General',
-            description: n.description || 'No description'
-        });
-    });
-
-    // B. Checklist NCs (Review Stage Data)
-    (report.checklistProgress || []).filter(item => item.status === 'nc').forEach(item => {
-        let clause = 'Checklist Item';
-        // Resolve clause from checklist definition
-        if (item.checklistId) {
-            const cl = window.state.checklists.find(c => c.id == item.checklistId);
-            if (cl) {
-                if (cl.clauses && (String(item.itemIdx).includes('-'))) {
-                    const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
-                    const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
-                    if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
-                        clause = mainObj.subClauses[subIdxVal].clause;
-                    }
-                } else {
-                    const clItem = cl.items?.[item.itemIdx];
-                    if (clItem) clause = clItem.clause;
-                }
-            }
-        } else if (item.isCustom) {
-            const customItem = (report.customItems || [])[item.itemIdx];
-            if (customItem) clause = customItem.clause;
-        }
-
-        allFindings.push({
-            type: item.ncrType || 'minor',
-            clause: clause,
-            description: item.ncrDescription || item.comment || 'Checklist finding identified.'
-        });
-    });
-
-    const ncrCount = allFindings.length;
-    const majorCount = allFindings.filter(n => n.type === 'major').length;
-    const minorCount = allFindings.filter(n => n.type === 'minor').length;
-    const plan = state.auditPlans.find(p => p.client === report.client) || {};
-
-    // Check Knowledge Base
-    const kb = window.state.knowledgeBase || { standards: [] };
-    const hasStandards = kb.standards.length > 0;
-
-    // Build NCR descriptions for context
-    const ncrDescriptions = allFindings.map((n, i) =>
-        `Finding ${i + 1} (${n.type}): Clause ${n.clause} - ${n.description}`
-    ).join('\n');
-
-    const prompt = `You are an ISO certification auditor writing an audit report for a Certification Body.
-
-Client: ${report.client}
-Standard: ${plan.standard || 'ISO Management System'}
-Audit Date: ${report.date}
-Total Non-Conformities: ${ncrCount} (${majorCount} Major, ${minorCount} Minor)
-
-Findings Data:
-${ncrDescriptions || 'No non-conformities identified. System is fully compliant.'}
-
-Generate the following sections for the audit report:
-1. EXECUTIVE SUMMARY (2-3 paragraphs covering scope, methodology, and overall findings)
-2. KEY STRENGTHS (bullet points, 4-5 items)
-3. AREAS FOR IMPROVEMENT (bullet points, 3-4 items based on findings)
-4. CONCLUSION (1-2 paragraphs with certification recommendation)
-
-Format each section with its header on a new line. Use professional certification body language.`;
-
-    let useAI = false;
-
-    try {
-        // Use unified AI Service
-        const generatedText = await AI_SERVICE.callProxyAPI(prompt);
-
-        if (generatedText) {
-            const sections = parseAIReportSections(generatedText);
-
-            if (document.getElementById('exec-summary'))
-                document.getElementById('exec-summary').value = sections.execSummary;
-            if (document.getElementById('strengths'))
-                document.getElementById('strengths').value = sections.strengths;
-            if (document.getElementById('improvements'))
-                document.getElementById('improvements').value = sections.improvements;
-            if (document.getElementById('conclusion'))
-                document.getElementById('conclusion').value = sections.conclusion;
-
-            if (document.getElementById('recommendation')) {
-                if (majorCount > 0) document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL;
-                else document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.RECOMMEND;
-            }
-
-            useAI = true;
-            window.showNotification('AI Draft generated successfully!', 'success');
-        }
-    } catch (error) {
-        console.error('AI Generation Error:', error);
-        window.showNotification('AI service unavailable. Using template-based generation.', 'warning');
-    }
-
-    // Restore button
-    if (aiBtn) {
-        aiBtn.disabled = false;
-        aiBtn.innerHTML = originalBtnHTML;
-    }
-
-    // Fallback: Template-based generation if AI failed
-    if (!useAI) {
-        generateTemplateDraft(report, plan, ncrCount, majorCount, minorCount);
-    }
-};
-
-// Parse AI response into report sections
-function parseAIReportSections(text) {
-    const sections = {
-        execSummary: '',
-        strengths: '',
-        improvements: '',
-        conclusion: ''
-    };
-
-    // Try to split by headers
-    const execMatch = text.match(/EXECUTIVE SUMMARY[:\s]*([\s\S]*?)(?=KEY STRENGTHS|STRENGTHS|$)/i);
-    const strengthsMatch = text.match(/(?:KEY )?STRENGTHS[:\s]*([\s\S]*?)(?=AREAS FOR IMPROVEMENT|IMPROVEMENTS|$)/i);
-    const improvementsMatch = text.match(/(?:AREAS FOR )?IMPROVEMENTS?[:\s]*([\s\S]*?)(?=CONCLUSION|$)/i);
-    const conclusionMatch = text.match(/CONCLUSION[:\s]*([\s\S]*?)$/i);
-
-    sections.execSummary = execMatch ? execMatch[1].trim() : text.substring(0, 500);
-    sections.strengths = strengthsMatch ? strengthsMatch[1].trim() : '';
-    sections.improvements = improvementsMatch ? improvementsMatch[1].trim() : '';
-    sections.conclusion = conclusionMatch ? conclusionMatch[1].trim() : '';
-
-    return sections;
-}
-
-// Fallback template generation
-function generateTemplateDraft(report, plan, ncrCount, majorCount, minorCount) {
-    const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${plan.standard || 'the standard'}. The primary objective was to verify compliance and effectiveness of the management system.
-
-During the audit, a total of ${ncrCount} non-conformities were identified (${majorCount} Major, ${minorCount} Minor). The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
-
-Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance. Key processes are generally well-defined, though specific lapses were noted in operational controls as detailed in the findings.`;
-
-    const strengths = `- Strong commitment from top management towards quality objectives.
-- Documentation structure is comprehensive and easily accessible.
-- Employee awareness regarding policy and objectives is commendable.
-- Infrastructure and resources are well-maintained.`;
-
-    const improvements = `- Need to strengthen the internal audit mechanism to capture process deviations earlier.
-- Document control for external origin documents needs review.
-- Training records for temporary staff could be better organized.`;
-
-    const conclusion = ncrCount === 0
-        ? `Based on the audit results, the management system is found to be properly maintained and compliant with ${plan.standard}. No non-conformities were raised. It is recommended to continue certification.`
-        : `The management system is generally effective, with the exception of the identified non-conformities. The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days. Subject to the acceptance of the corrective actions, certification is recommended.`;
-
-    if (document.getElementById('exec-summary')) document.getElementById('exec-summary').value = execSummary;
-    if (document.getElementById('strengths')) document.getElementById('strengths').value = strengths;
-    if (document.getElementById('improvements')) document.getElementById('improvements').value = improvements;
-    if (document.getElementById('conclusion')) document.getElementById('conclusion').value = conclusion;
-
-    if (document.getElementById('recommendation')) {
-        if (majorCount > 0) document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL;
-        else document.getElementById('recommendation').value = window.CONSTANTS.RECOMMENDATIONS.RECOMMEND;
-    }
-
-    window.showNotification('AI Draft generated (using template)!', 'success');
-}
+// NOTE: AI-powered draft generation is defined at the end of this file (line ~1897)
+// to avoid duplicate function definitions. See window.generateAIConclusion below.
 
 /**
  * Generate and Download Audit Report as PDF
@@ -1912,9 +1726,9 @@ window.generateAIConclusion = async function (reportId) {
 
     // Gather Findings
     const findings = [];
-    // 1. Checklist Findings
+    // 1. Checklist Findings (status is stored as 'nc' lowercase)
     (report.checklistProgress || []).forEach(item => {
-        if (item.status === 'Non-Conformity' || item.status === 'NC') {
+        if (item.status === 'nc') {
             findings.push(`[${item.ncrType || 'Minor'}] ${item.comment || item.ncrDescription || 'Checklist Finding'}`);
         }
     });
@@ -1960,47 +1774,88 @@ window.generateAIConclusion = async function (reportId) {
 
         // Parse JSON
         let data;
+        let useTemplate = false;
         try {
             const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
             data = JSON.parse(cleanText);
         } catch (e) {
             console.error('JSON Parse Error', e);
-            // Fallback if AI returns plain text
-            window.showNotification('AI returned invalid format. Please try again.', 'error');
-            if (btn) {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
-            return;
+            console.log('[AI Draft] Falling back to template-based generation...');
+            useTemplate = true;
         }
 
-        // Populate Fields
+        // Populate Fields helper
         const setVal = (id, val) => {
             const el = document.getElementById(id);
             if (el) {
                 el.value = val;
-                // Trigger change for autosave if applicable, or manually update report object
+                // Update report object for persistence
                 report[id === 'exec-summary' ? 'execSummary' : id] = val;
             }
         };
 
-        if (data.executiveSummary) setVal('exec-summary', data.executiveSummary);
-        if (data.strengths) setVal('strengths', data.strengths);
-        if (data.improvements) setVal('improvements', data.improvements);
-        if (data.conclusion) setVal('conclusion', data.conclusion);
+        if (!useTemplate && data) {
+            // AI response parsed successfully
+            if (data.executiveSummary) setVal('exec-summary', data.executiveSummary);
+            if (data.strengths) setVal('strengths', data.strengths);
+            if (data.improvements) setVal('improvements', data.improvements);
+            if (data.conclusion) setVal('conclusion', data.conclusion);
+            window.showNotification('Audit Report drafted successfully!', 'success');
+        } else {
+            // Fallback: Template-based generation
+            const plan = window.state.auditPlans.find(p => p.client === report.client) || {};
+            const ncrCount = findings.length;
+            const majorCount = findings.filter(f => f.toLowerCase().includes('[major]')).length;
+            const minorCount = ncrCount - majorCount;
 
-        window.showNotification('Audit Report drafted successfully!', 'success');
+            const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${report.standard || plan.standard || 'the applicable standard'}. The primary objective was to verify compliance and effectiveness of the management system.
 
-        // Verify we update the DB with these new drafts
-        // We can trigger a save if we have a save function exposed, or just rely on the user clicking "Save Draft"
-        // Ideally, we run saveReportDraft logic.
+During the audit, a total of ${ncrCount} non-conformities were identified (${majorCount} Major, ${minorCount} Minor). The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
+
+Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance.`;
+
+            const strengths = `• Strong commitment from top management towards quality objectives.
+• Documentation structure is comprehensive and easily accessible.
+• Employee awareness regarding policy and objectives is commendable.
+• Infrastructure and resources are well-maintained.`;
+
+            const improvements = `• Need to strengthen the internal audit mechanism to capture process deviations earlier.
+• Document control for external origin documents needs review.
+• Training records for temporary staff could be better organized.`;
+
+            const conclusion = ncrCount === 0
+                ? `Based on the audit results, the management system is found to be properly maintained and compliant. No non-conformities were raised. It is recommended to continue certification.`
+                : `The management system is generally effective, with the exception of the identified non-conformities. The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days. Subject to the acceptance of the corrective actions, certification is recommended.`;
+
+            setVal('exec-summary', execSummary);
+            setVal('strengths', strengths);
+            setVal('improvements', improvements);
+            setVal('conclusion', conclusion);
+
+            window.showNotification('Audit Report drafted (using template fallback)!', 'success');
+        }
+
+        // Auto-save the draft
         if (window.saveReportDraft) {
             window.saveReportDraft(reportId, true); // true = silent save
         }
 
     } catch (err) {
         console.error('AI Draft Error:', err);
-        window.showNotification('Failed to generate draft: ' + err.message, 'error');
+        window.showNotification('AI service error. Using template...', 'warning');
+
+        // Ultimate fallback - generate basic template even if AI call fails completely
+        const plan = window.state.auditPlans.find(p => p.client === report.client) || {};
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        };
+
+        setVal('exec-summary', `The audit of ${report.client} was conducted to assess compliance with ${report.standard || 'the applicable management system standard'}.`);
+        setVal('strengths', '• Management commitment evident\n• Documented procedures in place');
+        setVal('improvements', '• Continuous improvement opportunities identified');
+        setVal('conclusion', 'Further review of findings is recommended before certification decision.');
+
     } finally {
         if (btn) {
             btn.innerHTML = originalText;
