@@ -319,7 +319,8 @@ const SupabaseClient = {
                 auditors: { added: 0, updated: 0 },
                 users: { added: 0, updated: 0 },
                 settings: false,
-                documents: { added: 0, updated: 0 }
+                documents: { added: 0, updated: 0 },
+                auditorAssignments: { added: 0, updated: 0 }
             };
 
             // 1. Load basic entities
@@ -344,7 +345,15 @@ const SupabaseClient = {
             // 3. Load Documents (Includes Knowledge Base files)
             try { results.documents = await this.syncDocumentsFromSupabase(); } catch (e) { Logger.warn('Documents sync failed:', e); }
 
-            // 4. Load Operational data
+            // 4. Load Auditor Assignments
+            try {
+                results.auditorAssignments = await this.syncAuditorAssignmentsFromSupabase();
+                Logger.info('Auditor assignments synced:', results.auditorAssignments);
+            } catch (e) {
+                Logger.warn('Auditor assignments sync failed:', e);
+            }
+
+            // 5. Load Operational data
             try { await this.syncAuditPlansFromSupabase(); } catch (e) {
                 Logger.warn('Audit Plans sync failed:', e);
                 window.showNotification('Failed to sync audit plans. Working offline.', 'warning');
@@ -1292,12 +1301,13 @@ const SupabaseClient = {
 
             data.forEach(remote => {
                 const existing = localAssignments.find(l =>
-                    l.auditorId === remote.auditor_id && l.clientId === remote.client_id
+                    String(l.auditorId) === String(remote.auditor_id) && String(l.clientId) === String(remote.client_id)
                 );
 
                 const mapped = {
-                    auditorId: remote.auditor_id,
-                    clientId: remote.client_id,
+                    id: remote.id, // Include the ID field
+                    auditorId: String(remote.auditor_id),
+                    clientId: String(remote.client_id),
                     role: remote.role || 'Auditor',
                     assignedBy: remote.assigned_by,
                     assignedAt: remote.assigned_at
