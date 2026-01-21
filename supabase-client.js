@@ -1227,26 +1227,42 @@ const SupabaseClient = {
      * Sync auditor assignments to Supabase
      */
     async syncAuditorAssignmentsToSupabase(assignments) {
-        if (!this.isInitialized || !assignments?.length) return;
+        if (!this.isInitialized || !assignments?.length) {
+            Logger.warn('Supabase not initialized or no assignments to sync');
+            return;
+        }
 
         try {
+            Logger.info(`[syncAuditorAssignmentsToSupabase] Syncing ${assignments.length} assignments...`);
+
             for (const assignment of assignments) {
                 const data = {
-                    auditor_id: assignment.auditorId,
-                    client_id: assignment.clientId,
+                    id: assignment.id || Date.now(), // Include the ID field
+                    auditor_id: String(assignment.auditorId),
+                    client_id: String(assignment.clientId),
                     role: assignment.role || 'Auditor',
-                    assigned_by: assignment.assignedBy,
+                    assigned_by: assignment.assignedBy || 'System',
                     assigned_at: assignment.assignedAt || new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
 
-                await this.client
+                Logger.info('[syncAuditorAssignmentsToSupabase] Upserting assignment:', data);
+
+                const { data: result, error } = await this.client
                     .from('auditor_assignments')
-                    .upsert(data, { onConflict: 'auditor_id,client_id' });
+                    .upsert(data, { onConflict: 'id' }); // Use id as conflict resolution
+
+                if (error) {
+                    Logger.error('[syncAuditorAssignmentsToSupabase] Upsert failed:', error);
+                    throw error;
+                }
+
+                Logger.info('[syncAuditorAssignmentsToSupabase] Assignment synced successfully:', result);
             }
-            Logger.info(`Synced ${assignments.length} assignments to Supabase`);
+            Logger.info(`✓ Synced ${assignments.length} assignments to Supabase`);
         } catch (error) {
-            Logger.error('Failed to sync assignments:', error);
+            Logger.error('[syncAuditorAssignmentsToSupabase] Failed to sync assignments:', error);
+            console.error('Full error details:', error);
             throw error;
         }
     },

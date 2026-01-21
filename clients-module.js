@@ -5005,11 +5005,30 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
     const auditors = window.state.auditors || [];
     const assignments = window.state.auditorAssignments || [];
 
+    console.log('[openClientAuditorAssignmentModal] Debug Info:', {
+        clientId,
+        clientName,
+        totalAuditors: auditors.length,
+        totalAssignments: assignments.length,
+        auditorsList: auditors.map(a => ({ id: a.id, name: a.name }))
+    });
+
+    // Check if there are any auditors in the system
+    if (auditors.length === 0) {
+        window.showNotification('No auditors found in the system. Please add auditors first from the Auditors module.', 'warning');
+        return;
+    }
+
     // Get auditors not yet assigned to this client
     const assignedAuditorIds = assignments
         .filter(a => String(a.clientId) === String(clientId))
         .map(a => String(a.auditorId));
     const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(String(a.id)));
+
+    console.log('[openClientAuditorAssignmentModal] Assignment Info:', {
+        assignedAuditorIds,
+        availableAuditors: availableAuditors.length
+    });
 
     if (availableAuditors.length === 0) {
         window.showNotification('All auditors are already assigned to this client.', 'info');

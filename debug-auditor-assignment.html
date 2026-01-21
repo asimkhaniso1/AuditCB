@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Auditor Assignment Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border-color: #bee5eb;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Auditor Assignment Debug Tool</h1>
+
+    <div class="section">
+        <h2>Step 1: Check Current State</h2>
+        <button onclick="checkState()">Check State</button>
+        <div id="state-output"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 2: Add Test Auditor (if needed)</h2>
+        <button onclick="addTestAuditor()">Add Test Auditor</button>
+        <div id="auditor-output"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Test Assignment</h2>
+        <p>Client ID: <input type="text" id="clientId" placeholder="Enter client ID" /></p>
+        <button onclick="testAssignment()">Test Assignment Function</button>
+        <div id="test-output"></div>
+    </div>
+
+    <script>
+        function checkState() {
+            const output = document.getElementById('state-output');
+            if (!window.opener || !window.opener.state) {
+                output.innerHTML = '<div class="error">Error: Cannot access parent window state. Please open this from the main application.</div>';
+                return;
+            }
+
+            const state = window.opener.state;
+            const html = `
+                <div class="info">
+                    <h3>Current State:</h3>
+                    <pre>${JSON.stringify({
+                auditors: state.auditors?.length || 0,
+                clients: state.clients?.length || 0,
+                assignments: state.auditorAssignments?.length || 0,
+                auditorsList: (state.auditors || []).map(a => ({ id: a.id, name: a.name, role: a.role }))
+            }, null, 2)}</pre>
+                </div>
+            `;
+            output.innerHTML = html;
+        }
+
+        function addTestAuditor() {
+            const output = document.getElementById('auditor-output');
+            if (!window.opener || !window.opener.state) {
+                output.innerHTML = '<div class="error">Error: Cannot access parent window state.</div>';
+                return;
+            }
+
+            const state = window.opener.state;
+            if (!state.auditors) state.auditors = [];
+
+            const testAuditor = {
+                id: Date.now(),
+                name: 'Test Auditor',
+                email: 'test.auditor@example.com',
+                role: 'Lead Auditor',
+                phone: '555-0100',
+                qualifications: ['ISO 9001', 'ISO 14001'],
+                status: 'Active'
+            };
+
+            state.auditors.push(testAuditor);
+            window.opener.saveData();
+
+            output.innerHTML = `<div class="success">Test auditor added successfully! ID: ${testAuditor.id}</div>`;
+        }
+
+        function testAssignment() {
+            const output = document.getElementById('test-output');
+            const clientId = document.getElementById('clientId').value;
+
+            if (!clientId) {
+                output.innerHTML = '<div class="error">Please enter a client ID</div>';
+                return;
+            }
+
+            if (!window.opener || !window.opener.openClientAuditorAssignmentModal) {
+                output.innerHTML = '<div class="error">Error: Cannot access assignment function.</div>';
+                return;
+            }
+
+            try {
+                window.opener.openClientAuditorAssignmentModal(clientId, 'Test Client');
+                output.innerHTML = '<div class="success">Assignment function called. Check the main window for the modal.</div>';
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+
+</html>
