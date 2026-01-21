@@ -953,7 +953,7 @@ function getClientAuditTeamHTML(client) {
     const assignedAuditors = auditors.filter(a => assignedAuditorIds.includes(String(a.id)));
 
     return `
-    <div class="card">
+    <div class="card" id="client-audit-team-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
             <div>
                 <h3 style="margin: 0;"><i class="fa-solid fa-user-shield" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Audit Team</h3>
@@ -1974,7 +1974,7 @@ window.renderEditClient = function (clientId) {
 };
 
 window.saveAuditClient = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => c.id == clientId);
     if (!client) return;
 
     // 1. Define Fields
@@ -2165,7 +2165,24 @@ function addContactPerson(clientId) {
             }
             window.closeModal();
             // renderClientDetail(clientId); // Don't reset view
-            renderClientTab(client, 'client_org'); // Refresh setup tab
+            if (document.getElementById('tab-contacts')) {
+                // Workspace mode: update table directly
+                const tableBody = document.querySelector('#tab-contacts tbody');
+                if (tableBody) {
+                    const html = (client.contacts || []).map(contact => `
+                        <tr>
+                            <td style="font-weight: 500;">${contact.name}</td>
+                            <td>${contact.designation || '-'}</td>
+                            <td><a href="mailto:${contact.email}" style="color: var(--primary-color);">${contact.email}</a></td>
+                            <td>${contact.phone || '-'}</td>
+                            <td>${contact.department || '-'}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="5" style="text-align: center;">No contacts found.</td></tr>';
+                    tableBody.innerHTML = html;
+                }
+            } else {
+                renderClientTab(client, 'client_org');
+            }
             window.showNotification('Contact added successfully');
         } else {
             window.showNotification('Name is required', 'error');
@@ -2823,7 +2840,19 @@ function addDepartment(clientId) {
                 window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
             }
             window.closeModal();
-            renderClientTab(client, 'client_org'); // Refresh the specific tab
+            if (document.getElementById('tab-organization')) {
+                const ul = document.querySelector('#tab-organization .card:first-child ul') || document.querySelector('#tab-organization ul');
+                if (ul) {
+                    ul.innerHTML = (client.departments || []).map(dept => `
+                        <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                            <span>${typeof dept === 'object' ? (dept.name || 'Unnamed') : dept}</span>
+                            <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
+                        </li>
+                     `).join('');
+                }
+            } else {
+                renderClientTab(client, 'client_org');
+            }
             window.showNotification('Department added successfully');
         }
     );
@@ -3276,7 +3305,23 @@ window.addClientDesignation = function (clientId) {
         window.saveData();
         window.closeModal();
         window.setSetupWizardStep(clientId, 4);
-        renderClientTab(client, 'client_org');
+        if (document.getElementById('tab-organization')) {
+            const ul = document.querySelector('#tab-organization .card:nth-child(2) ul');
+            if (ul) {
+                const designations = Array.from(new Set([
+                    ...(client.designations || []).map(d => d.title || d),
+                    ...(client.contacts || []).map(c => c.designation)
+                ].filter(Boolean)));
+                ul.innerHTML = designations.map(desig => `
+                    <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                        <span>${desig}</span>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
+                    </li>
+                 `).join('');
+            }
+        } else {
+            renderClientTab(client, 'client_org');
+        }
         window.showNotification('Designation added');
     });
 };
@@ -5023,11 +5068,20 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
 
         window.closeModal();
 
-        // Refresh the wizard step to show updated team
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
-        }, 100);
+        // Direct UI Refresh
+        const container = document.getElementById('client-audit-team-container');
+        if (container) {
+            const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
+            // parse the string returned by getClientAuditTeamHTML or just replace outerHTML
+            // getClientAuditTeamHTML returns a template string starting with <div class="card" id="...">
+            container.outerHTML = getClientAuditTeamHTML(updatedClient);
+        } else {
+            // Fallback if not currently on the tab
+            renderClientDetail(clientId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
+            }, 100);
+        }
 
         const auditor = auditors.find(a => String(a.id) === String(auditorId));
         window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
@@ -5085,11 +5139,18 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
                 .catch(e => console.error('Auditor assignment removal failed:', e));
         }
 
-        // Refresh the view and switch to Audit Team tab
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
-        }, 100);
+        // Direct UI Refresh
+        const container = document.getElementById('client-audit-team-container');
+        if (container) {
+            const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
+            container.outerHTML = getClientAuditTeamHTML(updatedClient);
+        } else {
+            // Fallback
+            renderClientDetail(clientId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
+            }, 100);
+        }
 
         window.showNotification(`${auditor.name} removed from ${client.name}. Historical records retained.`, 'success');
     }

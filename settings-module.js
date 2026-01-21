@@ -186,8 +186,7 @@ function getSettingsSubTabs(mainTab) {
         ],
         'organization': [
             { id: 'structure', label: 'Structure', icon: 'fa-sitemap' },
-            { id: 'permissions', label: 'Permissions', icon: 'fa-user-shield' },
-            { id: 'auditor-access', label: 'Auditor Access', icon: 'fa-id-card' }
+            { id: 'permissions', label: 'Permissions', icon: 'fa-user-shield' }
         ],
         'policies': [
             { id: 'quality', label: 'Quality Policy', icon: 'fa-star' },
@@ -230,8 +229,7 @@ function getSettingsContent(mainTab, subTab) {
         },
         'organization': {
             'structure': () => getOrganizationHTML(),
-            'permissions': () => getPermissionsHTML(),
-            'auditor-access': () => getAuditorAccessHTML()
+            'permissions': () => getPermissionsHTML()
         },
         'policies': {
             'quality': () => getQualityPolicyHTML(),
@@ -1757,231 +1755,9 @@ window.resetPermissions = function () {
     window.showNotification('Role permissions reset to defaults', 'success');
 };
 
-// ============================================
-// TAB 3c: AUDITOR ACCESS (ASSIGNMENTS)
-// ============================================
 
-function getAuditorAccessHTML() {
-    // Only Admin and Cert Manager can access
-    const userRole = window.state.currentUser?.role;
-    if (userRole !== 'Admin' && userRole !== 'Certification Manager') {
-        return `
-        <div class="fade-in">
-            <div style="text-align: center; padding: 4rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
-                <i class="fa-solid fa-lock" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1.5rem;"></i>
-                <h3 style="color: #64748b; margin-bottom: 0.5rem;">Access Restricted</h3>
-                <p style="color: #94a3b8;">You do not have permission to view this section.</p>
-            </div>
-        </div>
-        `;
-    }
 
-    const assignments = window.state.auditorAssignments || [];
-    const auditors = window.state.auditors || [];
-    const clients = window.state.clients || [];
 
-    return `
-        <div class="fade-in">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <div>
-                    <h3 style="color: var(--primary-color); margin: 0; display: flex; align-items: center; gap: 8px;">
-                        <i class="fa-solid fa-id-card"></i> Auditor Access Control
-                    </h3>
-                    <p style="color: var(--text-secondary); margin: 4px 0 0 0; font-size: 0.9rem;">
-                        Assign auditors to specific clients to grant them access to client data.
-                    </p>
-                </div>
-                <button class="btn btn-primary" onclick="openAuditorAssignmentModal()">
-                    <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Assign Access
-                </button>
-            </div>
-
-            <div class="card">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Auditor</th>
-                                <th>Assigned Client</th>
-                                <th>Role Scope</th>
-                                <th>Assigned Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${assignments.length > 0 ? assignments.map((assignment, index) => {
-        const auditor = auditors.find(a => a.id == assignment.auditorId) || { name: 'Unknown Auditor', role: 'N/A' };
-        const client = clients.find(c => c.id == assignment.clientId) || { name: 'Unknown Client' };
-        return `
-                                <tr>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                            <div style="width: 32px; height: 32px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.8rem;">
-                                                ${auditor.name.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div style="font-weight: 500;">${window.UTILS.escapeHtml(auditor.name)}</div>
-                                                <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(auditor.role)}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span style="font-weight: 500; color: #1e293b;">${window.UTILS.escapeHtml(client.name)}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge" style="background: #f0fdf4; color: #166534;">${window.UTILS.escapeHtml(assignment.role || 'Auditor')}</span>
-                                    </td>
-                                    <td style="color: var(--text-secondary); font-size: 0.85rem;">
-                                        ${new Date(assignment.assignedAt || Date.now()).toLocaleDateString()}
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-icon" onclick="removeAuditorClientAssignment(${index})" title="Revoke Access" style="color: var(--danger-color);">
-                                            <i class="fa-solid fa-trash-can"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                `;
-    }).join('') : `
-                                <tr>
-                                    <td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                                        <i class="fa-solid fa-users-slash" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                                        <p>No active auditor assignments found.</p>
-                                    </td>
-                                </tr>
-                            `}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-window.openAuditorAssignmentModal = function () {
-    const auditors = window.state.auditors || [];
-    const clients = window.state.clients || [];
-    const assignments = window.state.auditorAssignments || [];
-
-    // Filter out auditors who are not active? For now show all.
-    const auditorOptions = auditors.map(a => `<option value="${a.id}">${window.UTILS.escapeHtml(a.name)} (${a.role})</option>`).join('');
-    const clientOptions = clients.filter(c => c.status === 'Active').map(c => `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}</option>`).join('');
-
-    document.getElementById('modal-title').textContent = 'Assign Auditor Access';
-    document.getElementById('modal-body').innerHTML = `
-        <form id="assignment-form">
-            <div class="form-group">
-                <label>Select Auditor <span style="color: var(--danger-color);">*</span></label>
-                <select id="assign-auditor" class="form-control" required>
-                    <option value="">-- Choose Auditor --</option>
-                    ${auditorOptions}
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Select Client <span style="color: var(--danger-color);">*</span></label>
-                <select id="assign-client" class="form-control" required>
-                    <option value="">-- Choose Client --</option>
-                    ${clientOptions}
-                </select>
-                <small style="color: var(--text-secondary); display: block; margin-top: 4px;">Only active clients are listed.</small>
-            </div>
-            <div class="form-group">
-                <label>Access Role</label>
-                <select id="assign-role" class="form-control">
-                    <option value="Auditor">Auditor (Standard Access)</option>
-                    <option value="Lead Auditor">Lead Auditor (Full Audit Control)</option>
-                    <option value="Technical Expert">Technical Expert (Read Only)</option>
-                </select>
-            </div>
-        </form>
-    `;
-
-    document.getElementById('modal-save').style.display = '';
-    document.getElementById('modal-save').onclick = () => {
-        const auditorId = document.getElementById('assign-auditor').value;
-        const clientId = document.getElementById('assign-client').value;
-        const role = document.getElementById('assign-role').value;
-
-        if (!auditorId || !clientId) {
-            window.showNotification('Please select both auditor and client', 'error');
-            return;
-        }
-
-        // Check for duplicate
-        const exists = assignments.some(a => a.auditorId == auditorId && a.clientId == clientId);
-        if (exists) {
-            window.showNotification('This auditor is already assigned to this client', 'warning');
-            return;
-        }
-
-        window.assignAuditorToClient(auditorId, clientId, role);
-        window.closeModal();
-    };
-
-    window.openModal();
-};
-
-window.assignAuditorToClient = function (auditorId, clientId, role) {
-    if (!window.state.auditorAssignments) window.state.auditorAssignments = [];
-
-    const assignment = {
-        id: Date.now(),
-        auditorId: String(auditorId),
-        clientId: String(clientId),
-        role: role,
-        assignedAt: new Date().toISOString(),
-        assignedBy: window.state.currentUser?.name || 'Admin'
-    };
-
-    window.state.auditorAssignments.push(assignment);
-
-    window.saveData();
-
-    // Sync to Supabase
-    if (window.SupabaseClient?.isInitialized) {
-        window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
-            .then(() => console.log('Auditor assignment synced to Supabase'))
-            .catch(e => console.error('Auditor assignment sync failed:', e));
-    }
-    window.showNotification('Access assigned successfully', 'success');
-
-    // Refresh view if on the tab
-    if (window.state.settingsSubTab === 'auditor-access') {
-        // Find specific container if possible, otherwise rely on manual refresh (or modal close handling)
-        // Since modal handling already closes modal, we just need to re-render.
-        // The implementation in openAuditorAssignmentModal calls saveData() then closeModal().
-        // We'll trust that navigating back to the tab works or add the render call there.
-        const content = getAuditorAccessHTML();
-        const container = document.querySelector('.card .fade-in');
-        if (container && container.innerHTML.includes('Auditor Access Control')) {
-            container.outerHTML = content;
-        } else {
-            // Fallback: reload the subtab
-            switchSettingsSubTab('organization', 'auditor-access');
-        }
-    }
-};
-
-window.removeAuditorClientAssignment = function (index) {
-    const assignment = window.state.auditorAssignments[index];
-    if (!assignment) return;
-
-    if (confirm(`Are you sure you want to revoke access?`)) {
-        const { auditorId, clientId } = assignment;
-
-        window.state.auditorAssignments.splice(index, 1);
-        window.saveData();
-
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId)
-                .then(() => console.log('Auditor assignment removed from Supabase'))
-                .catch(e => console.error('Auditor assignment removal failed:', e));
-        }
-
-        window.showNotification('Access revoked', 'success');
-        switchSettingsSubTab('organization', 'auditor-access');
-    }
-};
 
 // ============================================
 // TAB 5: RECORD RETENTION (Moved from separate module)

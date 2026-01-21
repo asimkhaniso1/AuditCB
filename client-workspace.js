@@ -360,8 +360,12 @@ function renderClientOverview(client) {
     const totalEmployees = (client.sites || []).reduce((acc, site) => acc + (parseInt(site.employees) || 0), 0) || client.employees || 0;
 
     // Organization Data (use client's actual data, no hardcoded defaults)
-    const departments = client.departments || []; // No mock data
-    const designations = [...new Set((client.contacts || []).map(c => c.designation).filter(Boolean))];
+    const departments = client.departments || [];
+    const designations = Array.from(new Set([
+        ...(client.designations || []),
+        ...(client.contacts || []).map(c => c.designation)
+    ].filter(Boolean)));
+
 
     return `
         <div class="fade-in">
@@ -584,7 +588,7 @@ function renderClientOverview(client) {
                         <ul style="list-style: none; padding: 0;">
                             ${departments.map(dept => `
                             <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
-                                <span>${dept}</span>
+                                <span>${typeof dept === 'object' ? (dept.name || 'Unnamed') : dept}</span>
                                 <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
                             </li>
                             `).join('')}
