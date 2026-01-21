@@ -2055,13 +2055,15 @@ window.saveAuditClient = function (clientId) {
         document.getElementById('client-industry-custom').value :
         document.getElementById('client-industry').value;
     client.status = document.getElementById('client-status').value;
-    client.website = Sanitizer.sanitizeURL(cleanData.website);
+    // Direct read to avoid sanitizer issues for now
+    client.website = document.getElementById('client-website').value.trim();
     client.employees = parseInt(cleanData.employees) || 0;
     client.shifts = document.getElementById('client-shifts').value;
     client.nextAudit = cleanData.nextAudit;
 
     // Update Logo if changed
     if (window._tempClientLogo) {
+        console.log('Saving new logo...');
         client.logoUrl = window._tempClientLogo;
     }
     // If user cleared it or didn't change it, we keep current (or can implement clear logic if needed)
@@ -2158,12 +2160,12 @@ function addContactPerson(clientId) {
             client.contacts.push({ name, designation, phone, email });
             window.saveData();
 
-            // Sync to Supabase
             if (window.SupabaseClient?.isInitialized) {
                 window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
             }
             window.closeModal();
-            renderClientDetail(clientId);
+            // renderClientDetail(clientId); // Don't reset view
+            renderClientTab(client, 'client_org'); // Refresh setup tab
             window.showNotification('Contact added successfully');
         } else {
             window.showNotification('Name is required', 'error');
