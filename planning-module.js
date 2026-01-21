@@ -194,13 +194,27 @@ function renderAuditPlanningEnhanced() {
 }
 
 // Delete Plan Function
+// Delete Plan Function
 function deletePlan(planId) {
     const index = window.state.auditPlans.findIndex(p => String(p.id) === String(planId));
     if (index !== -1) {
+        // 1. Local Delete (Optimistic)
         window.state.auditPlans.splice(index, 1);
         window.saveData();
-        window.showNotification('Audit plan deleted successfully', 'success');
+        window.showNotification('Audit plan deleted locally', 'success');
         renderAuditPlanningEnhanced();
+
+        // 2. Cloud Delete
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            window.SupabaseClient.db.delete('audit_plans', String(planId))
+                .then(() => {
+                    console.log(`Plan ${planId} deleted from cloud.`);
+                })
+                .catch(err => {
+                    console.error('Cloud deletion failed:', err);
+                    window.showNotification('Failed to delete from server. It may reappear on sync.', 'warning');
+                });
+        }
     }
 }
 

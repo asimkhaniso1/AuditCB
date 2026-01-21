@@ -544,7 +544,7 @@ function renderClientOverview(client) {
                 <div class="card">
                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Client Contacts</h3>
-                        <button class="btn btn-sm btn-primary"><i class="fa-solid fa-plus"></i> Add Contact</button>
+                        <button class="btn btn-sm btn-primary" onclick="window.addContactPerson(${client.id})"><i class="fa-solid fa-plus"></i> Add Contact</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -579,7 +579,7 @@ function renderClientOverview(client) {
                     <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Departments</h3>
-                            <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.addDepartment(${client.id})"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${departments.map(dept => `
@@ -593,7 +593,7 @@ function renderClientOverview(client) {
                      <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Designations</h3>
-                            <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.addClientDesignation(${client.id})"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${designations.map(desig => `
