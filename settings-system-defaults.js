@@ -23,11 +23,26 @@ function getDefaultsHTML() {
                     <div class="form-group">
                         <label>Currency</label>
                         <select id="cb-currency" class="form-control">
-                            <option value="USD" ${s.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
-                            <option value="EUR" ${s.currency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
-                            <option value="GBP" ${s.currency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
-                            <option value="INR" ${s.currency === 'INR' ? 'selected' : ''}>INR (₹)</option>
-                            <option value="AUD" ${s.currency === 'AUD' ? 'selected' : ''}>AUD (A$)</option>
+                            <option value="USD" ${s.currency === 'USD' ? 'selected' : ''}>USD - US Dollar ($)</option>
+                            <option value="EUR" ${s.currency === 'EUR' ? 'selected' : ''}>EUR - Euro (€)</option>
+                            <option value="GBP" ${s.currency === 'GBP' ? 'selected' : ''}>GBP - British Pound (£)</option>
+                            <option value="INR" ${s.currency === 'INR' ? 'selected' : ''}>INR - Indian Rupee (₹)</option>
+                            <option value="AUD" ${s.currency === 'AUD' ? 'selected' : ''}>AUD - Australian Dollar (A$)</option>
+                            <option value="CAD" ${s.currency === 'CAD' ? 'selected' : ''}>CAD - Canadian Dollar (C$)</option>
+                            <option value="CNY" ${s.currency === 'CNY' ? 'selected' : ''}>CNY - Chinese Yuan (¥)</option>
+                            <option value="JPY" ${s.currency === 'JPY' ? 'selected' : ''}>JPY - Japanese Yen (¥)</option>
+                            <option value="CHF" ${s.currency === 'CHF' ? 'selected' : ''}>CHF - Swiss Franc (Fr)</option>
+                            <option value="SGD" ${s.currency === 'SGD' ? 'selected' : ''}>SGD - Singapore Dollar (S$)</option>
+                            <option value="AED" ${s.currency === 'AED' ? 'selected' : ''}>AED - UAE Dirham (د.إ)</option>
+                            <option value="SAR" ${s.currency === 'SAR' ? 'selected' : ''}>SAR - Saudi Riyal (﷼)</option>
+                            <option value="ZAR" ${s.currency === 'ZAR' ? 'selected' : ''}>ZAR - South African Rand (R)</option>
+                            <option value="BRL" ${s.currency === 'BRL' ? 'selected' : ''}>BRL - Brazilian Real (R$)</option>
+                            <option value="MXN" ${s.currency === 'MXN' ? 'selected' : ''}>MXN - Mexican Peso ($)</option>
+                            <option value="NZD" ${s.currency === 'NZD' ? 'selected' : ''}>NZD - New Zealand Dollar (NZ$)</option>
+                            <option value="KRW" ${s.currency === 'KRW' ? 'selected' : ''}>KRW - South Korean Won (₩)</option>
+                            <option value="SEK" ${s.currency === 'SEK' ? 'selected' : ''}>SEK - Swedish Krona (kr)</option>
+                            <option value="NOK" ${s.currency === 'NOK' ? 'selected' : ''}>NOK - Norwegian Krone (kr)</option>
+                            <option value="DKK" ${s.currency === 'DKK' ? 'selected' : ''}>DKK - Danish Krone (kr)</option>
                         </select>
                     </div>
 
