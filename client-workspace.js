@@ -357,7 +357,7 @@ function renderClientOverview(client) {
     const upcomingAudits = clientPlans.filter(p => p.status === 'Planned' || p.status === 'Approved').length;
     const validCerts = clientCerts.filter(c => c.status === 'Valid').length;
     const totalSites = (client.sites || []).length;
-    const totalEmployees = client.employees || 0;
+    const totalEmployees = (client.sites || []).reduce((acc, site) => acc + (parseInt(site.employees) || 0), 0) || client.employees || 0;
 
     // Organization Data (use client's actual data, no hardcoded defaults)
     const departments = client.departments || []; // No mock data
