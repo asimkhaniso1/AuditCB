@@ -767,6 +767,7 @@ function getClientOrgSetupHTML(client) {
             </div>
             ${getClientDepartmentsHTML(client)}
             ${getClientDesignationsHTML(client)}
+            ${getClientContactsHTML(client)}
             ${getClientKeyProcessesHTML(client)}
             ${getClientGoodsServicesHTML(client)}
         </div>
@@ -2043,7 +2044,7 @@ window.saveAuditClient = function (clientId) {
     // 4. Sanitize
     const cleanData = Sanitizer.sanitizeFormData(result.formData,
         ['name', 'contactName', 'contactDesignation', 'contactPhone',
-            'address', 'city', 'country', 'geotag']
+            'address', 'city', 'country', 'geotag', 'website']
     );
 
     // 5. Update Record
@@ -2820,8 +2821,7 @@ function addDepartment(clientId) {
                 window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
             }
             window.closeModal();
-            renderClientDetail(clientId);
-            renderClientTab(client, 'departments');
+            renderClientTab(client, 'client_org'); // Refresh the specific tab
             window.showNotification('Department added successfully');
         }
     );
@@ -3271,7 +3271,10 @@ window.addClientDesignation = function (clientId) {
         if (!title) { window.showNotification('Job title is required', 'error'); return; }
         if (!client.designations) client.designations = [];
         client.designations.push({ title, department: document.getElementById('des-dept').value });
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 4);
+        window.saveData();
+        window.closeModal();
+        window.setSetupWizardStep(clientId, 4);
+        renderClientTab(client, 'client_org');
         window.showNotification('Designation added');
     });
 };
