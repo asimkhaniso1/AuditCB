@@ -27,6 +27,7 @@ function getDefaultsHTML() {
                             <option value="EUR" ${s.currency === 'EUR' ? 'selected' : ''}>EUR - Euro (€)</option>
                             <option value="GBP" ${s.currency === 'GBP' ? 'selected' : ''}>GBP - British Pound (£)</option>
                             <option value="INR" ${s.currency === 'INR' ? 'selected' : ''}>INR - Indian Rupee (₹)</option>
+                            <option value="PKR" ${s.currency === 'PKR' ? 'selected' : ''}>PKR - Pakistani Rupee (₨)</option>
                             <option value="AUD" ${s.currency === 'AUD' ? 'selected' : ''}>AUD - Australian Dollar (A$)</option>
                             <option value="CAD" ${s.currency === 'CAD' ? 'selected' : ''}>CAD - Canadian Dollar (C$)</option>
                             <option value="CNY" ${s.currency === 'CNY' ? 'selected' : ''}>CNY - Chinese Yuan (¥)</option>
