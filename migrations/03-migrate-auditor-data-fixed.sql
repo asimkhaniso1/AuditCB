@@ -59,7 +59,7 @@ BEGIN
         SELECT 
             a.email,
             a.name,
-            COALESCE(a.role, 'Auditor'),
+            COALESCE(a.role, 'Auditor')::app_role,
             CONCAT('https://ui-avatars.com/api/?name=', 
                    REPLACE(a.name, ' ', '+'), 
                    '&background=random'),
