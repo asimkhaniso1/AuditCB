@@ -60,8 +60,15 @@ function populateClientSidebar() {
                     <div class="client-status">${status}</div>
                 </div>
             </div>
-        `;
-    }).join('');
+        `);
+}).join('');
+
+// Hide "Add Client" button for Auditors and Lead Auditors
+const addClientBtn = document.querySelector('.client-sidebar-footer button');
+if (addClientBtn && currentUser) {
+    const canAddClients = currentUser.role === 'Admin' || currentUser.role === 'Certification Manager';
+    addClientBtn.style.display = canAddClients ? '' : 'none';
+}
 }
 
 // Setup client search functionality
