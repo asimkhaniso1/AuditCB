@@ -255,10 +255,10 @@ SELECT
     aa.user_id,
     p.full_name as auditor_name,
     p.role,
-    aa.assigned_date
+    aa.assigned_at
 FROM public.auditor_assignments aa
 JOIN public.profiles p ON p.id = aa.user_id::uuid
-ORDER BY aa.assigned_date DESC
+ORDER BY aa.assigned_at DESC
 LIMIT 5;
 
 -- Should show assignments with auditor names

@@ -103,7 +103,7 @@ SELECT
     auditor_id AS old_auditor_id,
     user_id AS new_user_id,
     role,
-    assigned_date,
+    assigned_at,
     CASE 
         WHEN user_id = auditor_id THEN '✅ Match'
         ELSE '⚠️  Mismatch'

@@ -266,7 +266,7 @@ SELECT
     client_id,
     auditor_id,
     role,
-    assigned_date
+    assigned_at
 FROM public.auditor_assignments
 LIMIT 5;
 
