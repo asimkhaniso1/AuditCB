@@ -306,6 +306,9 @@ function renderImpartialityModule() {
                                             <button class="btn btn-sm btn-icon" onclick="window.editCommitteeMember('${m.id}')" title="Edit">
                                                 <i class="fa-solid fa-edit"></i>
                                             </button>
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteCommitteeMember('${m.id}')" title="Delete">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -348,6 +351,12 @@ function renderImpartialityModule() {
                                             <button class="btn btn-sm btn-icon" onclick="window.viewMeeting('${mtg.id}')" title="View Details">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
+                                            <button class="btn btn-sm btn-icon" onclick="window.editMeeting('${mtg.id}')" title="Edit">
+                                                <i class="fa-solid fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteMeeting('${mtg.id}')" title="Delete">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -377,6 +386,7 @@ function renderImpartialityModule() {
                                     <th>Safeguard</th>
                                     <th>Status</th>
                                     <th>Committee Review</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -389,6 +399,14 @@ function renderImpartialityModule() {
                                         <td>${window.UTILS.escapeHtml(t.safeguard)}</td>
                                         <td><span class="badge ${t.status === 'Resolved' ? 'bg-green' : 'bg-red'}">${window.UTILS.escapeHtml(t.status)}</span></td>
                                         <td>${t.reviewedByCommittee ? '<i class="fa-solid fa-check" style="color: green;"></i> Yes' : '<i class="fa-solid fa-times" style="color: red;"></i> No'}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-icon" onclick="window.editThreat('${t.id}')" title="Edit">
+                                                <i class="fa-solid fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-icon" onclick="window.deleteThreat('${t.id}')" title="Delete">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -784,3 +802,286 @@ window.viewThreat = function (id) {
     // Simple alert for now, can expand to modal if needed
     alert(`Threat: ${threat.type}\nStatus: ${threat.status}\nDecision: ${threat.committeeDecision || 'Pending'}`);
 };
+
+// ============================================
+// EDIT FUNCTIONS
+// ============================================
+
+window.editThreat = function (id) {
+    const threat = window.state.impartialityCommittee.threats.find(t => String(t.id) === String(id));
+    if (!threat) return;
+
+    const clients = window.state.clients || [];
+
+    document.getElementById('modal-title').textContent = 'Edit Impartiality Threat';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="threat-form">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" class="form-control" id="threat-date" value="${threat.date || ''}">
+            </div>
+            <div class="form-group">
+                <label>Threat Type <span style="color: var(--danger-color);">*</span></label>
+                <select class="form-control" id="threat-type" required>
+                    <option value="">-- Select --</option>
+                    <option value="Self-Interest" ${threat.type === 'Self-Interest' ? 'selected' : ''}>Self-Interest</option>
+                    <option value="Self-Review" ${threat.type === 'Self-Review' ? 'selected' : ''}>Self-Review</option>
+                    <option value="Familiarity" ${threat.type === 'Familiarity' ? 'selected' : ''}>Familiarity</option>
+                    <option value="Intimidation" ${threat.type === 'Intimidation' ? 'selected' : ''}>Intimidation</option>
+                    <option value="Advocacy" ${threat.type === 'Advocacy' ? 'selected' : ''}>Advocacy</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="threat-description" rows="3" required>${window.UTILS.escapeHtml(threat.description)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Related Client</label>
+                <select class="form-control" id="threat-client">
+                    <option value="">-- Select --</option>
+                    ${clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${threat.client === c.name ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Safeguard Implemented <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="threat-safeguard" rows="2" required>${window.UTILS.escapeHtml(threat.safeguard)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Identified By</label>
+                <input type="text" class="form-control" id="threat-identified-by" value="${window.UTILS.escapeHtml(threat.identifiedBy || '')}">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select class="form-control" id="threat-status">
+                    <option value="Open" ${threat.status === 'Open' ? 'selected' : ''}>Open</option>
+                    <option value="Resolved" ${threat.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Committee Decision</label>
+                <textarea class="form-control" id="threat-committee-decision" rows="2">${window.UTILS.escapeHtml(threat.committeeDecision || '')}</textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = async () => {
+        const type = document.getElementById('threat-type').value;
+        const description = document.getElementById('threat-description').value.trim();
+        const safeguard = document.getElementById('threat-safeguard').value.trim();
+
+        if (!type || !description || !safeguard) {
+            window.showNotification('Please fill in required fields', 'error');
+            return;
+        }
+
+        threat.date = document.getElementById('threat-date').value;
+        threat.type = type;
+        threat.description = description;
+        threat.client = document.getElementById('threat-client').value;
+        threat.safeguard = safeguard;
+        threat.identifiedBy = document.getElementById('threat-identified-by').value;
+        threat.status = document.getElementById('threat-status').value;
+        threat.committeeDecision = document.getElementById('threat-committee-decision').value;
+
+        window.saveData();
+        await persistImpartialityThreat(threat);
+        window.closeModal();
+        renderImpartialityModule();
+    };
+
+    window.openModal();
+};
+
+window.editMeeting = function (id) {
+    const meeting = window.state.impartialityCommittee.meetings.find(m => String(m.id) === String(id));
+    if (!meeting) return;
+
+    const activeMembers = window.state.impartialityCommittee.members.filter(m => m.status === 'Active');
+    const allThreats = window.state.impartialityCommittee.threats;
+
+    document.getElementById('modal-title').textContent = 'Edit Committee Meeting';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="meeting-form">
+            <div class="form-group">
+                <label>Meeting Date <span style="color: var(--danger-color);">*</span></label>
+                <input type="date" class="form-control" id="meeting-date" value="${meeting.date || ''}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Attendees</label>
+                <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px;">
+                    ${activeMembers.map(m => `
+                        <div style="margin-bottom: 0.25rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" class="meeting-attendee" value="${m.id}" ${meeting.attendees.includes(String(m.id)) ? 'checked' : ''}>
+                                <span>${window.UTILS.escapeHtml(m.name)} <small style="color: grey;">(${m.role})</small></span>
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Threats Reviewed</label>
+                <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px;">
+                    ${allThreats.length > 0 ? allThreats.map(t => {
+        const isReviewed = meeting.threatsReviewed.some(tr => tr.threat && tr.threat.includes(t.description.substring(0, 20)));
+        return `
+                        <div style="margin-bottom: 0.25rem;">
+                            <label style="display: flex; align-items: start; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" class="meeting-threat" value="${t.id}" ${isReviewed ? 'checked' : ''}>
+                                <span style="font-size: 0.9rem;">
+                                    <strong>${window.UTILS.escapeHtml(t.type)}</strong>: ${window.UTILS.escapeHtml(t.description.substring(0, 50))}...
+                                    <br><small style="color: grey;">Status: ${t.status}</small>
+                                </span>
+                            </label>
+                        </div>
+                    `}).join('') : '<span style="color: var(--text-secondary);">No threats logged.</span>'}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Decisions & Outcomes <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="meeting-decisions" rows="3" placeholder="Enter key decisions made..." required>${meeting.decisions.join('\n')}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Next Meeting Date</label>
+                <input type="date" class="form-control" id="meeting-next" value="${meeting.nextMeetingDate || ''}">
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').onclick = async () => {
+        const date = document.getElementById('meeting-date').value;
+        const decisionsRaw = document.getElementById('meeting-decisions').value.trim();
+
+        if (!date || !decisionsRaw) {
+            window.showNotification('Please fill in required fields', 'error');
+            return;
+        }
+
+        const attendees = Array.from(document.querySelectorAll('.meeting-attendee:checked')).map(cb => cb.value);
+        const threatsReviewedIds = Array.from(document.querySelectorAll('.meeting-threat:checked')).map(cb => cb.value);
+
+        const threatsReviewed = window.state.impartialityCommittee.threats
+            .filter(t => threatsReviewedIds.includes(String(t.id)))
+            .map(t => ({
+                threat: t.type + ' - ' + t.description,
+                client: t.client,
+                safeguard: t.safeguard,
+                decision: 'Reviewed'
+            }));
+
+        meeting.date = date;
+        meeting.attendees = attendees;
+        meeting.threatsReviewed = threatsReviewed;
+        meeting.decisions = decisionsRaw.split('\n').filter(d => d.trim() !== '');
+        meeting.nextMeetingDate = document.getElementById('meeting-next').value;
+
+        window.saveData();
+        await persistImpartialityMeeting(meeting);
+        window.closeModal();
+        renderImpartialityModule();
+    };
+
+    window.openModal();
+};
+
+// ============================================
+// DELETE FUNCTIONS
+// ============================================
+
+window.deleteThreat = async function (id) {
+    const threat = window.state.impartialityCommittee.threats.find(t => String(t.id) === String(id));
+    if (!threat) return;
+
+    if (!confirm(`Are you sure you want to delete this threat?\n\nType: ${threat.type}\nDescription: ${threat.description}`)) {
+        return;
+    }
+
+    try {
+        // Remove from state
+        const index = window.state.impartialityCommittee.threats.findIndex(t => String(t.id) === String(id));
+        if (index > -1) {
+            window.state.impartialityCommittee.threats.splice(index, 1);
+        }
+
+        window.saveData();
+
+        // Delete from Supabase
+        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient.from('audit_impartiality_threats').delete().eq('id', id);
+            if (error) throw error;
+        }
+
+        window.showNotification('Threat deleted successfully', 'success');
+        renderImpartialityModule();
+    } catch (e) {
+        console.error('Failed to delete threat:', e);
+        window.showNotification('Failed to delete threat: ' + e.message, 'error');
+    }
+};
+
+window.deleteMeeting = async function (id) {
+    const meeting = window.state.impartialityCommittee.meetings.find(m => String(m.id) === String(id));
+    if (!meeting) return;
+
+    if (!confirm(`Are you sure you want to delete this meeting record?\n\nDate: ${meeting.date}\nAttendees: ${meeting.attendees.length} members`)) {
+        return;
+    }
+
+    try {
+        // Remove from state
+        const index = window.state.impartialityCommittee.meetings.findIndex(m => String(m.id) === String(id));
+        if (index > -1) {
+            window.state.impartialityCommittee.meetings.splice(index, 1);
+        }
+
+        window.saveData();
+
+        // Delete from Supabase
+        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient.from('audit_impartiality_meetings').delete().eq('id', id);
+            if (error) throw error;
+        }
+
+        window.showNotification('Meeting deleted successfully', 'success');
+        renderImpartialityModule();
+    } catch (e) {
+        console.error('Failed to delete meeting:', e);
+        window.showNotification('Failed to delete meeting: ' + e.message, 'error');
+    }
+};
+
+window.deleteCommitteeMember = async function (id) {
+    const member = window.state.impartialityCommittee.members.find(m => String(m.id) === String(id));
+    if (!member) return;
+
+    if (!confirm(`Are you sure you want to delete this committee member?\n\nName: ${member.name}\nOrganization: ${member.organization}`)) {
+        return;
+    }
+
+    try {
+        // Remove from state
+        const index = window.state.impartialityCommittee.members.findIndex(m => String(m.id) === String(id));
+        if (index > -1) {
+            window.state.impartialityCommittee.members.splice(index, 1);
+        }
+
+        window.saveData();
+
+        // Delete from Supabase
+        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+            const { error } = await window.SupabaseClient.from('audit_impartiality_members').delete().eq('id', id);
+            if (error) throw error;
+        }
+
+        window.showNotification('Committee member deleted successfully', 'success');
+        renderImpartialityModule();
+    } catch (e) {
+        console.error('Failed to delete member:', e);
+        window.showNotification('Failed to delete member: ' + e.message, 'error');
+    }
+};
+
