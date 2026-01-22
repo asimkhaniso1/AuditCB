@@ -181,8 +181,12 @@ const SupabaseClient = {
 
     /**
      * Sign up new user
+     * @param {string} email - User email
+     * @param {string} password - User password
+     * @param {object} metadata - User metadata (full_name, role, etc.)
+     * @param {object} options - Additional signup options (emailRedirectTo, etc.)
      */
-    async signUp(email, password, metadata = {}) {
+    async signUp(email, password, metadata = {}, options = {}) {
         if (!this.isInitialized) {
             Logger.warn('Supabase not initialized');
             return null;
@@ -193,7 +197,8 @@ const SupabaseClient = {
                 email,
                 password,
                 options: {
-                    data: metadata // user_metadata
+                    data: metadata, // user_metadata
+                    ...options // Spread additional options (emailRedirectTo, etc.)
                 }
             });
 
