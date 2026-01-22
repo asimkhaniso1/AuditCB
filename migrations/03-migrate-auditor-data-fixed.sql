@@ -55,8 +55,13 @@ BEGIN
     ) INTO auditors_table_exists;
     
     IF auditors_table_exists THEN
-        INSERT INTO public.profiles (email, full_name, role, avatar_url, created_at)
+        -- Note: We can only create profiles for auditors who already have auth users
+        -- because profiles.id must match auth.users.id
+        -- Auditors without auth users will be listed in STEP 4
+        
+        INSERT INTO public.profiles (id, email, full_name, role, avatar_url, created_at)
         SELECT 
+            u.id,
             a.email,
             a.name,
             COALESCE(a.role, 'Auditor')::app_role,
@@ -65,16 +70,17 @@ BEGIN
                    '&background=random'),
             NOW()
         FROM public.auditors a
+        JOIN auth.users u ON LOWER(u.email) = LOWER(a.email)
         WHERE a.email IS NOT NULL
           AND a.email != ''
           AND NOT EXISTS (
               SELECT 1 FROM public.profiles p 
-              WHERE LOWER(p.email) = LOWER(a.email)
+              WHERE p.id = u.id
           )
-        ON CONFLICT (email) DO NOTHING;
+        ON CONFLICT (id) DO NOTHING;
         
         GET DIAGNOSTICS created_count = ROW_COUNT;
-        RAISE NOTICE '✅ Created % user profiles for auditors', created_count;
+        RAISE NOTICE '✅ Created % user profiles for auditors with auth users', created_count;
     ELSE
         RAISE NOTICE 'ℹ️  No auditors table found - skipping profile creation from auditors';
     END IF;
