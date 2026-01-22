@@ -1285,6 +1285,8 @@ window.saveUser = async function (userId) {
         }
     } else {
         // Create new user
+        const defaultPassword = document.getElementById('user-password')?.value || 'Welcome123!';
+
         const newUser = {
             id: `usr_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             name: name,
@@ -1298,21 +1300,39 @@ window.saveUser = async function (userId) {
         // Add to Supabase if available
         if (window.SupabaseClient?.isInitialized) {
             try {
-                // Create in profiles table
+                // Create Supabase Auth user first
+                const signUpResult = await window.SupabaseClient.signUp(email, defaultPassword, {
+                    full_name: name,
+                    role: role
+                });
+
+                if (signUpResult?.user) {
+                    // Update user ID to match Supabase Auth ID
+                    newUser.id = signUpResult.user.id;
+                    newUser.supabaseId = signUpResult.user.id;
+                    newUser.isLocal = false;
+
+                    Logger.info('Supabase Auth user created:', signUpResult.user.id);
+                }
+
+                // Create/Update in profiles table
                 const { error: profileError } = await window.SupabaseClient.client
                     .from('profiles')
-                    .insert([{
+                    .upsert([{
+                        id: newUser.supabaseId || newUser.id,
                         email: email,
                         full_name: name,
                         role: role,
                         avatar_url: newUser.avatar
-                    }]);
+                    }], {
+                        onConflict: 'id'
+                    });
 
                 if (profileError) {
                     console.warn('Profile creation warning:', profileError);
                 }
 
-                window.showNotification('User created successfully', 'success');
+                window.showNotification(`User created successfully! Login: ${email} / Password: ${defaultPassword}`, 'success');
             } catch (error) {
                 Logger.error('Supabase user creation failed:', error);
                 window.showNotification('User created locally (cloud sync pending)', 'warning');
