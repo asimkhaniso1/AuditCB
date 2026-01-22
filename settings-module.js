@@ -1124,6 +1124,11 @@ function renderUsersList(users) {
                                 <i class="fa-solid fa-key" style="color: #f59e0b;"></i>
                             </button>
                             ` : ''}
+                            ${window.state.currentUser?.role === 'Admin' ? `
+                            <button class="btn btn-sm btn-icon" onclick="deleteUser('${user.id}')" title="Delete User">
+                                <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                            </button>
+                            ` : ''}
                         </td>
                     </tr>
                 `).join('')}
@@ -1371,6 +1376,78 @@ window.toggleUserStatus = function (userId) {
     document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
     window.showNotification(`User ${user.status === 'Active' ? 'activated' : 'deactivated'}`, 'info');
 };
+
+// Delete user permanently (Admin only)
+window.deleteUser = async function (userId) {
+    if (window.state.currentUser?.role !== 'Admin') {
+        window.showNotification('Only administrators can delete users', 'warning');
+        return;
+    }
+
+    const user = window.state.users.find(u => String(u.id) === String(userId));
+    if (!user) return;
+
+    // Prevent deleting the current user
+    if (String(user.id) === String(window.state.currentUser?.id)) {
+        window.showNotification('You cannot delete your own account', 'warning');
+        return;
+    }
+
+    // Prevent deleting the main admin
+    if (user.email === 'admin@companycertification.com' || user.email === 'info@companycertification.com') {
+        window.showNotification('Cannot delete the main Administrator account', 'warning');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to permanently delete user "${user.name}" (${user.email})?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        // Delete from Supabase if available
+        if (window.SupabaseClient?.isInitialized) {
+            // Delete from profiles table
+            const { error: profileError } = await window.SupabaseClient.client
+                .from('profiles')
+                .delete()
+                .eq('email', user.email);
+
+            if (profileError) {
+                console.warn('Profile deletion warning:', profileError);
+            }
+
+            // Note: Deleting from auth.users requires admin API
+            // For now, we'll just delete from profiles and local state
+            // The auth user can be deleted manually from Supabase Dashboard → Authentication → Users
+
+            Logger.info('User deleted from profiles table:', user.email);
+        }
+
+        // Remove from local state
+        window.state.users = window.state.users.filter(u => String(u.id) !== String(userId));
+        window.saveData();
+
+        // Refresh UI
+        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+
+        window.showNotification(`User "${user.name}" deleted successfully`, 'success');
+
+        // Show additional info if Supabase auth user still exists
+        if (window.SupabaseClient?.isInitialized) {
+            setTimeout(() => {
+                window.showNotification(
+                    'Note: To fully remove the user, also delete from Supabase Dashboard → Authentication → Users',
+                    'info'
+                );
+            }, 2000);
+        }
+    } catch (error) {
+        Logger.error('User deletion failed:', error);
+        window.showNotification('Failed to delete user: ' + error.message, 'error');
+    }
+};
+
+
 
 // Approve pending user account (Admin only)
 window.approveUser = function (userId) {
