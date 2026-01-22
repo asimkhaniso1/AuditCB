@@ -979,20 +979,8 @@ function getUsersHTML() {
                 </h3>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                    <button class="btn btn-outline-secondary btn-sm" onclick="syncUsersFromCloud()" title="Pull users from Supabase">
-                        <i class="fa-solid fa-cloud-arrow-down" style="margin-right: 0.25rem;"></i>Sync from Cloud
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="syncUsersToCloud()" title="Push users to Supabase">
-                        <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.25rem;"></i>Sync to Cloud
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="openInviteUserModal()">
-                        <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i>Invite User
-                    </button>
                     <button class="btn btn-primary" onclick="openAddUserModal()">
                         <i class="fa-solid fa-user-plus"></i> Add User
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.cleanupDemoUsers()" title="Remove local-only demo users">
-                        <i class="fa-solid fa-broom"></i> Clean Demo Users
                     </button>
                     ` : ''}
                 </div>
