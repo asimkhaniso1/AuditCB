@@ -1685,13 +1685,11 @@ function renderRoleSwitcher() {
     const existing = document.getElementById('role-switcher-container');
     if (existing) existing.remove();
 
-    // Initialize currentUser if it doesn't exist
+    // Require proper authentication - no demo user fallback
     if (!state.currentUser) {
-        state.currentUser = {
-            name: 'Demo User',
-            role: 'Admin',
-            isDemo: true
-        };
+        console.warn('No authenticated user - redirecting to login');
+        window.location.hash = 'login';
+        return;
     }
 
     const switcher = document.createElement('div');
@@ -1811,16 +1809,18 @@ window.exitDemoMode = function () {
 // Logout user
 window.logoutUser = function () {
     if (confirm('Are you sure you want to logout?')) {
-        state.currentUser = {
-            name: 'Demo User',
-            role: 'Admin',
-            isDemo: true
-        };
+        // Clear current user and redirect to login
+        state.currentUser = null;
         saveState();
-        renderRoleSwitcher();
-        updateNavigationForRole('Admin');
+
+        // Sign out from Supabase if available
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.signOut();
+        }
+
         window.showNotification('Logged out successfully', 'success');
-        window.location.hash = 'dashboard';
+        window.location.hash = 'login';
+        window.renderModule('login');
     }
 };
 
