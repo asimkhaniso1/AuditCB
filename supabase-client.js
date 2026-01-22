@@ -1219,7 +1219,7 @@ const SupabaseClient = {
                     updated++;
                 } else {
                     // Add new
-                    localAuditors.push({
+                    const newAuditor = {
                         id: auditor.id,
                         name: auditor.name,
                         role: auditor.role,
@@ -1234,8 +1234,21 @@ const SupabaseClient = {
                         education: auditor.education,
                         customerRating: auditor.rating,
                         status: auditor.status
-                    });
+                    };
+                    localAuditors.push(newAuditor);
                     added++;
+                }
+            });
+
+            // Link auditors to users (to get UUID)
+            const users = window.state.users || [];
+            localAuditors.forEach(auditor => {
+                if (auditor.email) {
+                    const user = users.find(u => u.email?.toLowerCase() === auditor.email.toLowerCase());
+                    if (user) {
+                        auditor.userId = user.id || user.supabaseId;
+                        // console.log(`Linked auditor ${auditor.name} to user ${auditor.userId}`);
+                    }
                 }
             });
 
@@ -1265,6 +1278,7 @@ const SupabaseClient = {
                 const data = {
                     id: assignment.id || Date.now(), // Include the ID field
                     auditor_id: String(assignment.auditorId),
+                    user_id: assignment.userId || null, // Sync user_id (UUID)
                     client_id: String(assignment.clientId),
                     role: assignment.role || 'Auditor',
                     assigned_by: assignment.assignedBy || 'System',
@@ -1324,6 +1338,7 @@ const SupabaseClient = {
                 const mapped = {
                     id: remote.id, // Include the ID field
                     auditorId: String(remote.auditor_id),
+                    userId: remote.user_id, // Read user_id (UUID)
                     clientId: String(remote.client_id),
                     role: remote.role || 'Auditor',
                     assignedBy: remote.assigned_by,

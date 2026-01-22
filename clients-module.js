@@ -5138,11 +5138,14 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
             window.state.auditorAssignments = [];
         }
 
+        const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
+
         const assignment = {
             id: Date.now(),
             auditorId: String(auditorId),
+            userId: auditor?.userId || auditor?.user_id || null, // Include UUID if available
             clientId: String(clientId),
-            role: 'Auditor', // Default role
+            role: auditor?.role || 'Auditor',
             assignedBy: window.state.currentUser?.name || 'System',
             assignedAt: new Date().toISOString()
         };

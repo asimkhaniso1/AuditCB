@@ -1188,6 +1188,40 @@ window.openAddUserModal = function (userId = null) {
     window.openModal();
 };
 
+// Helper to ensure auditor profile exists for Auditor/Lead Auditor roles
+async function ensureAuditorProfile(userId, userName) {
+    if (!userId || !window.SupabaseClient?.isInitialized) return;
+
+    try {
+        // Create default auditor profile if it doesn't exist
+        const { error } = await window.SupabaseClient.client
+            .from('auditor_profiles')
+            .upsert([{
+                user_id: userId,
+                // Generate default auditor number: AUD-YYYY-XXXX (random fallback)
+                auditor_number: `AUD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+                experience: 0,
+                availability_status: 'Available',
+                max_audits_per_month: 10,
+                audits_completed: 0,
+                certifications: [],
+                industries: [],
+                standards: []
+            }], {
+                onConflict: 'user_id',
+                ignoreDuplicates: true // Only create if missing
+            });
+
+        if (error) {
+            console.warn('Auto-creating auditor profile failed (might already exist):', error.message);
+        } else {
+            console.log('Ensured auditor profile for user:', userId);
+        }
+    } catch (e) {
+        console.warn('Error in ensureAuditorProfile:', e);
+    }
+}
+
 window.saveUser = async function (userId) {
     const name = document.getElementById('user-name').value.trim();
     const email = document.getElementById('user-email').value.trim().toLowerCase();
@@ -1263,6 +1297,11 @@ window.saveUser = async function (userId) {
                     } else {
                         window.showNotification('User updated successfully', 'success');
                     }
+
+                    // If role is Auditor or Lead Auditor, ensure profile exists
+                    if (role === 'Auditor' || role === 'Lead Auditor') {
+                        await ensureAuditorProfile(userId, name);
+                    }
                 } catch (error) {
                     Logger.error('Supabase update failed:', error);
                     window.showNotification('User updated locally (cloud sync failed)', 'warning');
@@ -1323,6 +1362,11 @@ window.saveUser = async function (userId) {
 
                 if (profileError) {
                     console.warn('Profile creation warning:', profileError);
+                }
+
+                // If role is Auditor or Lead Auditor, auto-create auditor profile
+                if (role === 'Auditor' || role === 'Lead Auditor') {
+                    await ensureAuditorProfile(newUser.supabaseId || newUser.id, name);
                 }
 
                 window.showNotification(`User created successfully! Login: ${email} / Password: ${defaultPassword}`, 'success');
