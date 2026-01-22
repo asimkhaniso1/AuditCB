@@ -16,8 +16,8 @@ function renderClientsEnhanced() {
     }
 
     let filteredClients = window.getVisibleClients().filter(client => {
-        const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
+        const matchesSearch = (client.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = filterStatus === 'All' || (client.status || '').toLowerCase() === filterStatus.toLowerCase();
         return matchesSearch && matchesStatus;
     });
 
@@ -34,7 +34,7 @@ function renderClientsEnhanced() {
     const paginatedClients = filteredClients.slice(startIndex, startIndex + window.state.clientPagination.itemsPerPage);
 
     const rows = paginatedClients.map(client => `
-    <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;" onclick="renderClientDetail(${client.id})">
+    <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;" onclick="renderClientDetail('${client.id}')">
             <td>${window.UTILS.escapeHtml(client.name)}</td>
             <td>
                 ${(client.standard || '').split(',').map(s =>
