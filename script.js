@@ -474,22 +474,17 @@ function getVisibleClients() {
 
     // Auditors (Lead Auditor, Auditor, Technical Expert) see only assigned clients
     if (filteredRoles.includes(user.role)) {
-        // Find matching auditor profile
-        const auditor = window.state.auditors.find(a =>
-            String(a.email || '').toLowerCase() === String(user.email || '').toLowerCase() ||
-            String(a.name || '').toLowerCase() === String(user.name || '').toLowerCase()
-        );
-
-        if (!auditor) {
-            console.warn('Current user has auditor role but no matching auditor profile found:', user.email);
-            return [];
-        }
-
-        // Get assignments for this auditor
+        // Get assignments for this user (using user ID directly)
         const assignments = window.state.auditorAssignments || [];
         const assignedClientIds = assignments
-            .filter(a => String(a.auditorId) === String(auditor.id))
+            .filter(a => String(a.auditorId) === String(user.id))
             .map(a => String(a.clientId));
+
+        // If no assignments, return empty array (no clients visible)
+        if (assignedClientIds.length === 0) {
+            console.info(`User ${user.name} (${user.role}) has no client assignments`);
+            return [];
+        }
 
         // Filter clients based on assignments
         return allClients.filter(client => assignedClientIds.includes(String(client.id)));
