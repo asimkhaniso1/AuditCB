@@ -50,12 +50,13 @@ function populateClientSidebar() {
         const initials = client.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
         const isActive = client.id === activeClientId;
         const status = client.status || 'Active';
+        const escapedName = window.UTILS?.escapeHtml ? window.UTILS.escapeHtml(client.name) : client.name;
 
         return `
             <div class="client-list-item ${isActive ? 'active' : ''}" data-client-id="${client.id}" onclick="window.location.hash = 'client/${client.id}/overview'">
                 <div class="client-avatar">${initials}</div>
                 <div class="client-info">
-                    <div class="client-name">${client.name}</div>
+                    <div class="client-name">${escapedName}</div>
                     <div class="client-status">${status}</div>
                 </div>
             </div>
