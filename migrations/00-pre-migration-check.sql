@@ -122,6 +122,7 @@ DECLARE
     auditors_without_users INTEGER;
     users_with_auditor_role INTEGER;
     users_without_auditor_profile INTEGER;
+    rec RECORD;  -- Add this declaration
 BEGIN
     SELECT EXISTS (
         SELECT FROM information_schema.tables 
