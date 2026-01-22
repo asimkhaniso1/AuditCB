@@ -345,8 +345,8 @@ window.openIssueCertificateModal = function (reportId) {
                     <input type="date" class="form-control" id="cert-issue-date" value="${new Date().toISOString().split('T')[0]}" required>
                 </div>
                 <div class="form-group">
-                    <label>Expiry Date (3 Years)</label>
-                    <input type="date" class="form-control" id="cert-expiry-date" value="${new Date(new Date().setFullYear(new Date().getFullYear() + 3)).toISOString().split('T')[0]}" required>
+                    <label>Expiry Date</label>
+                    <input type="date" class="form-control" id="cert-expiry-date" value="${new Date(new Date().setDate(new Date().getDate() + 364)).toISOString().split('T')[0]}" required>
                 </div>
             </div>
             <div class="form-group">
@@ -391,6 +391,12 @@ window.openIssueCertificateModal = function (reportId) {
     `;
 
     window.openModal();
+
+    // Auto-update expiry date when issue date changes
+    const issueDateInput = document.getElementById('cert-issue-date');
+    if (issueDateInput) {
+        issueDateInput.addEventListener('change', window.updateCertExpiryDate);
+    }
 
     modalSave.onclick = () => {
         // 1. Define Fields
@@ -982,4 +988,24 @@ window.generateEmbedCode = function () {
     `;
     document.getElementById('modal-save').style.display = 'none';
     window.openModal();
+};
+
+window.updateCertExpiryDate = function () {
+    const issueDateInput = document.getElementById('cert-issue-date');
+    const expiryDateInput = document.getElementById('cert-expiry-date');
+
+    if (!issueDateInput || !expiryDateInput) return;
+
+    const issueDate = new Date(issueDateInput.value);
+    if (isNaN(issueDate.getTime())) {
+        expiryDateInput.value = '';
+        return;
+    }
+
+    // Calculate expiry date: Issue Date + 364 days
+    const expiryDate = new Date(issueDate);
+    expiryDate.setDate(issueDate.getDate() + 364);
+
+    // Format to YYYY-MM-DD
+    expiryDateInput.value = expiryDate.toISOString().split('T')[0];
 };

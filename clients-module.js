@@ -70,7 +70,7 @@ function renderClientsEnhanced() {
                     <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                 </button>
                 ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
-                    <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;">
+                    <button id="btn-new-client" class="btn btn-primary" onclick="window.renderAddClient()" style="white-space: nowrap;">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                     ` : ''}
@@ -182,8 +182,7 @@ function renderClientsEnhanced() {
 
     window.contentArea.innerHTML = html;
 
-    // Event listeners
-    document.getElementById('btn-new-client')?.addEventListener('click', window.renderAddClient);
+    // Event listeners removed - using inline onclick for reliability
 
     document.getElementById('client-import-file')?.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
@@ -3047,7 +3046,13 @@ window.addGoodsService = function (clientId) {
         if (!name) { window.showNotification('Name is required', 'error'); return; }
         if (!client.goodsServices) client.goodsServices = [];
         client.goodsServices.push({ name, category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() });
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 6);
+        window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
+        window.closeModal();
+        window.setSetupWizardStep(clientId, 6);
         window.showNotification('Goods/Service added');
     });
 };
@@ -3072,7 +3077,16 @@ window.editGoodsService = function (clientId, index) {
 window.deleteGoodsService = function (clientId, index) {
     if (!confirm('Delete this item?')) return;
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.goodsServices) { client.goodsServices.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 6); window.showNotification('Goods/Service deleted'); }
+    if (client && client.goodsServices) {
+        client.goodsServices.splice(index, 1);
+        window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
+        window.setSetupWizardStep(clientId, 6);
+        window.showNotification('Goods/Service deleted');
+    }
 };
 
 // Bulk Upload Goods/Services
@@ -3148,6 +3162,10 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
             }
 
             window.saveData();
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             window.setSetupWizardStep(clientId, 6);
 
@@ -3174,7 +3192,13 @@ window.addKeyProcess = function (clientId) {
         if (!name) { window.showNotification('Process name is required', 'error'); return; }
         if (!client.keyProcesses) client.keyProcesses = [];
         client.keyProcesses.push({ name, category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() });
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 7);
+        window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
+        window.closeModal();
+        window.setSetupWizardStep(clientId, 7);
         window.showNotification('Process added');
     });
 };
@@ -3191,7 +3215,13 @@ window.editKeyProcess = function (clientId, index) {
         </form>
     `, () => {
         client.keyProcesses[index] = { name: document.getElementById('process-name').value.trim(), category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() };
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 7);
+        window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
+        window.closeModal();
+        window.setSetupWizardStep(clientId, 7);
         window.showNotification('Process updated');
     });
 };
@@ -3199,7 +3229,16 @@ window.editKeyProcess = function (clientId, index) {
 window.deleteKeyProcess = function (clientId, index) {
     if (!confirm('Delete this process?')) return;
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.keyProcesses) { client.keyProcesses.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 7); window.showNotification('Process deleted'); }
+    if (client && client.keyProcesses) {
+        client.keyProcesses.splice(index, 1);
+        window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
+        window.setSetupWizardStep(clientId, 7);
+        window.showNotification('Process deleted');
+    }
 };
 
 // Bulk Upload Key Processes
@@ -3276,6 +3315,10 @@ HR Management, Support," style="font-family: monospace;"></textarea>
             }
 
             window.saveData();
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             window.setSetupWizardStep(clientId, 7);
 
@@ -3303,6 +3346,10 @@ window.addClientDesignation = function (clientId) {
         if (!client.designations) client.designations = [];
         client.designations.push({ title, department: document.getElementById('des-dept').value });
         window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
         window.closeModal();
         window.setSetupWizardStep(clientId, 4);
         if (document.getElementById('tab-organization')) {
@@ -3329,7 +3376,16 @@ window.addClientDesignation = function (clientId) {
 window.deleteClientDesignation = function (clientId, index) {
     if (!confirm('Delete this designation?')) return;
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.designations) { client.designations.splice(index, 1); window.saveData(); window.setSetupWizardStep(clientId, 4); window.showNotification('Designation deleted'); }
+    if (client && client.designations) {
+        client.designations.splice(index, 1);
+        window.saveData();
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        }
+        window.setSetupWizardStep(clientId, 4);
+        window.showNotification('Designation deleted');
+    }
 };
 
 // Bulk Upload Designations
@@ -3406,6 +3462,10 @@ CFO," style="font-family: monospace;"></textarea>
             }
 
             window.saveData();
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             window.closeModal();
             window.setSetupWizardStep(clientId, 4);
 
@@ -4212,6 +4272,10 @@ window.generateCertificatesFromStandards = function (clientId) {
     });
 
     window.saveData();
+    // Sync to Supabase
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+    }
     renderClientDetail(clientId);
     // Switch to scopes tab
     setTimeout(() => {
@@ -4240,7 +4304,13 @@ window.updateSiteScope = function (clientId, certIndex, siteName, value) {
 };
 
 window.saveCertificateDetails = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
     window.saveData();
+    // Sync to Supabase
+    if (window.SupabaseClient?.isInitialized) {
+        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+    }
     window.showNotification('Certificate details and scopes saved successfully', 'success');
 };
 
@@ -4968,6 +5038,10 @@ window.handleClientLogoUpload = function (input, clientId) {
         if (client) {
             client.logoUrl = e.target.result;
             window.saveData();
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+            }
             const preview = document.getElementById('edit-client-logo-preview');
             if (preview) {
                 preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
