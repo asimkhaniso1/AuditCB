@@ -22,11 +22,20 @@ function populateClientSidebar() {
     const allClients = window.state?.clients || [];
     const currentUser = window.state?.currentUser;
 
+    // DEBUG: Log current state
+    console.log('[CLIENT SIDEBAR DEBUG]', {
+        allClientsCount: allClients.length,
+        currentUser: currentUser,
+        hasGetVisibleClients: typeof window.getVisibleClients === 'function'
+    });
+
     // Use RLS-aware client filtering (respects database permissions)
     // This ensures Admins see all clients and Auditors see only assigned ones
     // Fallback to allClients if getVisibleClients is not yet loaded
     let clients = (typeof window.getVisibleClients === 'function') ? window.getVisibleClients() : allClients;
 
+    // DEBUG: Log filtered results
+    console.log('[CLIENT SIDEBAR DEBUG] Filtered clients:', clients.length);
 
 
     if (clients.length === 0) {
