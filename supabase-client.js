@@ -1720,6 +1720,9 @@ const SupabaseClient = {
     /**
      * Sync settings to Supabase
      */
+    /**
+     * Sync settings to Supabase
+     */
     async syncSettingsToSupabase(settings) {
         if (!this.isInitialized) return;
 
@@ -1729,8 +1732,27 @@ const SupabaseClient = {
             const roles = settings?.roles || window.state.settings?.roles || [];
             const isAdmin = settings?.isAdmin || window.state.settings?.isAdmin || false;
 
+            // PREPARATION: Dynamically find the ID
+            // We cannot hardcode '1' because the DB uses UUIDs.
+            let settingsId = window.state.settingsId; // Cache ID locally
+
+            if (!settingsId) {
+                // Try to find ANY existing row
+                const { data: existing } = await this.client
+                    .from('settings')
+                    .select('id')
+                    .limit(1)
+                    .maybeSingle();
+
+                if (existing) {
+                    settingsId = existing.id;
+                }
+                // If not found, we let the DB generate one on insert
+            }
+
             const settingsData = {
-                id: '1', // Single settings record - must be TEXT to match DB column
+                // If we have an ID, update it. If not, don't send ID so DB generates UUID.
+                ...(settingsId ? { id: settingsId } : {}),
                 standards: standards,
                 roles: roles,
                 is_admin: isAdmin,
@@ -1741,15 +1763,23 @@ const SupabaseClient = {
                 updated_at: new Date().toISOString()
             };
 
-            console.log('[DEBUG] Syncing Settings to Supabase:', settingsData); // DEBUG
+            console.log('[DEBUG] Syncing Settings to Supabase:', settingsData);
 
-            const { error } = await this.client
+            // Use UPSERT with ID if available, otherwise INSERT
+            const { data, error } = await this.client
                 .from('settings')
-                .upsert(settingsData, { onConflict: 'id' });
+                .upsert(settingsData)
+                .select()
+                .single();
 
             if (error) {
-                console.error('[DEBUG] Supabase Settings Sync Error:', error.message, error.details, error.hint);
+                console.error('[DEBUG] Supabase Settings Sync Error:', error.message);
                 throw error;
+            }
+
+            // Cache the ID for next time
+            if (data && data.id) {
+                window.state.settingsId = data.id;
             }
 
             Logger.info('Synced settings to Supabase');
@@ -1769,15 +1799,19 @@ const SupabaseClient = {
         }
 
         try {
+            // GET SINGLETON ROW (Limit 1) regardless of ID
             const { data, error } = await this.client
                 .from('settings')
                 .select('*')
-                .eq('id', '1')
-                .single();
+                .limit(1)
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
+            if (error) throw error;
 
             if (data) {
+                // Store the real ID for updates
+                window.state.settingsId = data.id;
+
                 // Update basic settings
                 window.state.settings = {
                     standards: data.standards || [],
@@ -1792,7 +1826,7 @@ const SupabaseClient = {
                 if (data.knowledge_base) window.state.knowledgeBase = data.knowledge_base;
 
                 window.saveState();
-                Logger.info('Synced settings from Supabase');
+                Logger.info('Synced settings from Supabase (Singleton)');
                 return { updated: true };
             }
 
