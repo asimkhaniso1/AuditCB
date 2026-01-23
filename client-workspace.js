@@ -89,6 +89,9 @@ if (addClientBtn && currentUser) {
 }
 }
 
+// Export for use in other modules
+window.populateClientSidebar = populateClientSidebar;
+
 // Setup client search functionality
 function setupClientSearch() {
     const searchInput = document.getElementById('client-search-input');

@@ -1180,6 +1180,13 @@ const SupabaseClient = {
             window.state.clients = localClients;
             window.saveState();
             Logger.info(`Synced clients from Supabase: ${added} added, ${updated} updated`);
+
+            // CRITICAL: Refresh the client sidebar after syncing
+            if (typeof window.populateClientSidebar === 'function') {
+                window.populateClientSidebar();
+                Logger.info('Client sidebar refreshed after sync');
+            }
+
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch clients from Supabase:', error);
