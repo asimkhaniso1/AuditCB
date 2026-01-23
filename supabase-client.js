@@ -991,7 +991,7 @@ const SupabaseClient = {
 
         try {
             const clientData = {
-                id: client.id,
+                id: String(client.id), // Ensure id is a string for TEXT column
                 name: client.name,
                 standard: client.standard,
                 status: client.status,
