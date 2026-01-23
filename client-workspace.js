@@ -39,12 +39,26 @@ function populateClientSidebar() {
 
 
     if (clients.length === 0) {
+        // DEBUG: Show visible error in sidebar
+        const debugInfo = `
+            User: ${currentUser?.name}
+            Role: ${currentUser?.role}
+            Total Clients: ${allClients.length}
+            Visible: ${clients.length}
+            Fn Loaded: ${typeof window.getVisibleClients === 'function'}
+        `;
+
         clientList.innerHTML = `
             <div style="padding: 2rem 1rem; text-align: center; color: var(--text-secondary);">
                 <i class="fa-solid fa-building" style="font-size: 2rem; opacity: 0.5; margin-bottom: 0.5rem;"></i>
-                <p style="font-size: 0.85rem;">No clients yet</p>
+                <p style="font-size: 0.85rem;">No clients found</p>
+                <div style="margin-top: 1rem; padding: 0.5rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 4px; font-size: 0.7rem; text-align: left; font-family: monospace;">
+                    <strong>DEBUG INFO:</strong><br>
+                    <pre style="white-space: pre-wrap; margin: 0;">${debugInfo}</pre>
+                </div>
             </div>
         `;
+        console.warn('[CLIENT SIDEBAR] No clients to display', { debugInfo });
         return;
     }
 

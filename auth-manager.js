@@ -110,7 +110,8 @@ const AuthManager = {
         }
 
         // Admin has all permissions
-        if (user.role === 'Admin' || user.permissions?.includes('all')) {
+        const userRole = (user.role || '').toLowerCase();
+        if (userRole === 'admin' || user.permissions?.includes('all')) {
             return true;
         }
 
@@ -133,32 +134,33 @@ const AuthManager = {
         if (!user) return false;
 
         // Admin bypass
-        if (user.role === 'Admin') return true;
+        const userRole = (user.role || '').toLowerCase();
+        if (userRole === 'admin') return true;
 
-        // Role-based permission matrix
+        // Role-based permission matrix (keys normalized to lowercase)
         const matrix = {
-            'Certification Manager': {
+            'certification manager': {
                 client: ['view', 'create', 'edit', 'delete'],
                 audit: ['view', 'create', 'edit', 'finalize'],
                 report: ['view', 'create', 'edit', 'finalize', 'download'],
                 user: ['view'],
                 auditor: ['view', 'assign']
             },
-            'Lead Auditor': {
+            'lead auditor': {
                 client: ['view'],
                 audit: ['view', 'edit'],
                 report: ['view', 'create', 'edit'],
                 user: [],
                 auditor: ['view']
             },
-            'Auditor': {
+            'auditor': {
                 client: ['view'],
                 audit: ['view'],
                 report: ['view'],
                 user: [],
                 auditor: []
             },
-            'Technical Expert': {
+            'technical expert': {
                 client: ['view'],
                 audit: ['view'],
                 report: ['view'],
@@ -167,7 +169,7 @@ const AuthManager = {
             }
         };
 
-        const rolePerms = matrix[user.role];
+        const rolePerms = matrix[userRole];
         if (!rolePerms) return false;
 
         const resourcePerms = rolePerms[resource];
@@ -190,8 +192,11 @@ const AuthManager = {
             return false;
         }
 
-        const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-        return roles.includes(user.role);
+        const userRole = (user.role || '').toLowerCase();
+        const roles = Array.isArray(requiredRole)
+            ? requiredRole.map(r => r.toLowerCase())
+            : [requiredRole.toLowerCase()];
+        return roles.includes(userRole);
     },
 
     /**
