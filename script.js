@@ -462,13 +462,16 @@ function getVisibleClients() {
     if (!user) return allClients; // No user = show all (demo mode)
 
     // Roles that see ALL clients (management roles)
-    const fullAccessRoles = ['Admin', 'Certification Manager'];
+    // defined in lowercase for case-insensitive comparison
+    const fullAccessRoles = ['admin', 'certification manager', 'super admin'];
 
     // Roles that only see ASSIGNED clients (auditor roles)
-    const filteredRoles = ['Lead Auditor', 'Auditor', 'Technical Expert'];
+    const filteredRoles = ['lead auditor', 'auditor', 'technical expert'];
+
+    const userRole = (user.role || '').toLowerCase();
 
     // Admin and Cert Manager see all clients
-    if (fullAccessRoles.includes(user.role)) {
+    if (fullAccessRoles.includes(userRole)) {
         return allClients;
     }
 
@@ -2217,15 +2220,20 @@ function updateCBLogoDisplay() {
     const logoContainer = document.getElementById('cb-logo-display');
     if (!logoContainer) return;
 
-    const logoUrl = state.cbSettings?.logoUrl;
-    const cbName = state.cbSettings?.cbName || 'AuditCB360';
+    // Defensive check: Ensure state exists
+    const settings = window.state?.cbSettings;
+    const logoUrl = settings?.logoUrl;
+    const cbName = settings?.cbName || 'AuditCB360';
 
     if (logoUrl && logoUrl.startsWith('data:')) {
         // Replace entire header with just the logo
-        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${cbName}">`;
+        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'CB Logo'}">`;
+    } else if (logoUrl && logoUrl.startsWith('http')) {
+        // Handle URL based logos too (e.g. from Supabase Storage)
+        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'CB Logo'}">`;
     } else {
         // Default: icon + text
-        logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${cbName}</h1>`;
+        logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${window.UTILS?.escapeHtml(cbName) || 'AuditCB360'}</h1>`;
     }
 }
 window.updateCBLogoDisplay = updateCBLogoDisplay;
