@@ -2217,23 +2217,24 @@ window.showForgotPassword = function () {
 
 // Update CB Logo in Sidebar Header
 function updateCBLogoDisplay() {
-    const logoContainer = document.getElementById('cb-logo-display');
-    if (!logoContainer) return;
+    try {
+        const logoContainer = document.getElementById('cb-logo-display');
+        if (!logoContainer) return;
 
-    // Defensive check: Ensure state exists
-    const settings = window.state?.cbSettings;
-    const logoUrl = settings?.logoUrl;
-    const cbName = settings?.cbName || 'AuditCB360';
+        // Use maximum defensiveness
+        const settings = (window.state && window.state.cbSettings) ? window.state.cbSettings : {};
+        const logoUrl = settings.logoUrl || '';
+        const cbName = settings.cbName || 'AuditCB360';
 
-    if (logoUrl && logoUrl.startsWith('data:')) {
-        // Replace entire header with just the logo
-        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'CB Logo'}">`;
-    } else if (logoUrl && logoUrl.startsWith('http')) {
-        // Handle URL based logos too (e.g. from Supabase Storage)
-        logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'CB Logo'}">`;
-    } else {
-        // Default: icon + text
-        logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${window.UTILS?.escapeHtml(cbName) || 'AuditCB360'}</h1>`;
+        if (logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'))) {
+            // Replace entire header with just the logo
+            logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'Logo'}">`;
+        } else {
+            // Default: icon + text
+            logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${window.UTILS?.escapeHtml(cbName) || 'AuditCB360'}</h1>`;
+        }
+    } catch (e) {
+        console.warn('[SILENT ERROR] updateCBLogoDisplay failed:', e.message);
     }
 }
 window.updateCBLogoDisplay = updateCBLogoDisplay;
