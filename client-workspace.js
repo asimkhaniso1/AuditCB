@@ -21,18 +21,11 @@ function populateClientSidebar() {
 
     const allClients = window.state?.clients || [];
     const currentUser = window.state?.currentUser;
-    const assignments = window.state?.auditorAssignments || [];
 
-    // Filter clients based on user role
-    let clients = allClients;
+    // Use RLS-aware client filtering (respects database permissions)
+    // This ensures Admins see all clients and Auditors see only assigned ones
+    let clients = window.getVisibleClients ? window.getVisibleClients() : allClients;
 
-    // If user is an Auditor or Lead Auditor, show only assigned clients
-    if (currentUser && (currentUser.role === 'Auditor' || currentUser.role === 'Lead Auditor')) {
-        const userAssignments = assignments.filter(a => String(a.auditorId) === String(currentUser.id));
-        const assignedClientIds = userAssignments.map(a => String(a.clientId));
-        clients = allClients.filter(c => assignedClientIds.includes(String(c.id)));
-    }
-    // Admin and other roles see all clients
 
     if (clients.length === 0) {
         clientList.innerHTML = `
