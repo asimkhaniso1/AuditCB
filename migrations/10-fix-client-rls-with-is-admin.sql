@@ -21,7 +21,7 @@ FOR SELECT
 USING (
   EXISTS (
     SELECT 1 FROM public.auditor_assignments
-    WHERE client_id = clients.id
+    WHERE client_id::uuid = clients.id  -- Cast text to uuid
       AND user_id = auth.uid()
   )
 );
