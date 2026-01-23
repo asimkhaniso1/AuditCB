@@ -3,8 +3,7 @@
 -- The role column is an ENUM type and doesn't accept lowercase variants
 -- ============================================
 
--- Drop and recreate the is_admin() function with correct enum values
-DROP FUNCTION IF EXISTS public.is_admin();
+-- Update the is_admin() function (using CREATE OR REPLACE to avoid breaking dependencies)
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN 
