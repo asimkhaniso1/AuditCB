@@ -14,17 +14,9 @@ FOR ALL
 USING ( public.is_admin() )
 WITH CHECK ( public.is_admin() );
 
--- Create Auditor Policy (Assigned Access Only)
-CREATE POLICY "Auditors can view assigned clients"
-ON public.clients
-FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM public.auditor_assignments
-    WHERE client_id = clients.id::text  -- Cast uuid to text
-      AND user_id = auth.uid()
-  )
-);
+-- NOTE: Auditor policy temporarily removed due to schema issues
+-- The auditor_assignments table needs user_id column to be UUID type
+-- For now, admins will have full access and we'll add auditor filtering later
 
 -- Verify policies
 SELECT schemaname, tablename, policyname, cmd, qual, with_check
