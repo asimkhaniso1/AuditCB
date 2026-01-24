@@ -176,65 +176,83 @@ function renderClientsEnhanced() {
 
     window.contentArea.innerHTML = html;
 
-    // Event listeners with EventManager (prevents memory leaks)
-    const newClientBtn = document.getElementById('btn-new-client');
-    if (newClientBtn) {
-        EventManager.add(newClientBtn, 'click', window.renderAddClient, 'btn-new-client');
-    }
+    // ATTACH LISTENERS AFTER RENDER
+    setTimeout(() => {
+        // 1. New Client Button
+        const newClientBtn = document.getElementById('btn-new-client');
+        if (newClientBtn) {
+            newClientBtn.onclick = function (e) { e.preventDefault(); window.renderAddClient(); };
+        }
 
-    const importFile = document.getElementById('client-import-file');
-    if (importFile) {
-        EventManager.add(importFile, 'change', (e) => {
-            if (e.target.files.length > 0) {
-                importClientsFromExcel(e.target.files[0]);
-                e.target.value = '';
-            }
-        }, 'client-import-file');
-    }
+        // 2. Import/Export
+        const importFile = document.getElementById('client-import-file');
+        if (importFile) {
+            importFile.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    importClientsFromExcel(e.target.files[0]);
+                    e.target.value = '';
+                }
+            };
+        }
 
-    const searchInput = document.getElementById('client-search');
-    if (searchInput) {
-        // Debounced search handler (300ms delay)  
-        const debouncedSearch = debounce((value) => {
-            window.state.clientSearchTerm = value;
-            renderClientsEnhanced();
-        }, 300);
+        // 3. Search (Debounced)
+        const searchInput = document.getElementById('client-search');
+        if (searchInput) {
+            searchInput.focus();
+            // Move cursor to end
+            const val = searchInput.value;
+            searchInput.value = '';
+            searchInput.value = val;
 
-        EventManager.add(searchInput, 'input', (e) => {
-            debouncedSearch(e.target.value);
-        }, 'client-search-input');
-    }
+            searchInput.oninput = (e) => {
+                clearTimeout(window._clientSearchTimer);
+                window._clientSearchTimer = setTimeout(() => {
+                    window.state.clientSearchTerm = e.target.value;
+                    renderClientsEnhanced();
+                }, 300);
+            };
+        }
 
-    const filterSelect = document.getElementById('client-filter');
-    if (filterSelect) {
-        EventManager.add(filterSelect, 'change', (e) => {
-            window.state.clientFilterStatus = e.target.value;
-            renderClientsEnhanced();
-        }, 'client-filter-select');
-    }
+        // 4. Filter
+        const filterSelect = document.getElementById('client-filter');
+        if (filterSelect) {
+            filterSelect.onchange = (e) => {
+                window.state.clientFilterStatus = e.target.value;
+                renderClientsEnhanced();
+            };
+        }
 
-    document.querySelectorAll('.view-client, .client-row').forEach(el => {
-        el.addEventListener('click', (e) => {
-            if (!e.target.closest('.edit-client')) {
-                const clientId = el.getAttribute('data-client-id');
-                window.location.hash = `client/${clientId}`;
-            }
+        // 5. Edit Button (Delegation is better, but direct attach for now)
+        document.querySelectorAll('.edit-client').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const clientId = btn.getAttribute('data-client-id');
+                if (typeof window.renderEditClient === 'function') {
+                    window.renderEditClient(clientId);
+                } else {
+                    console.error('renderEditClient function missing');
+                }
+            };
         });
-    });
 
-    document.querySelectorAll('.edit-client').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const clientId = btn.getAttribute('data-client-id');
-            window.renderEditClient(clientId);
+        // 6. View Button
+        document.querySelectorAll('.view-client').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const clientId = btn.getAttribute('data-client-id');
+                window.location.hash = `client/${String(clientId)}`;
+            };
         });
-    });
 
-    window.toggleClientAnalytics = function () {
-        if (window.state.showClientAnalytics === undefined) window.state.showClientAnalytics = true;
-        window.state.showClientAnalytics = !window.state.showClientAnalytics;
-        renderClientsEnhanced();
-    };
+        // 7. Row Click
+        document.querySelectorAll('.client-row').forEach(row => {
+            row.onclick = (e) => {
+                if (e.target.closest('button')) return;
+                const clientId = row.getAttribute('data-client-id');
+                window.location.hash = `client/${String(clientId)}`;
+            };
+        });
+    }, 0);
 }
 
 // Pagination helpers (fixed window.window.state bug)
@@ -256,7 +274,7 @@ window.changeClientItemsPerPage = function (val) {
 // Export to window (overrides clients-module.js version)
 window.renderClientsEnhanced = renderClientsEnhanced;
 
-Logger.info('Clients List module loaded (split version with bug fixes)');
+Logger.info('Clients List module loaded (Dynamic Event Binding Fix - v3.1)');
 
 // ============================================
 // CLIENT ACTIONS (Moved from clients-module.js for reliability)
