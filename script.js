@@ -476,7 +476,7 @@ function getVisibleClients() {
     }
 
     // Auditors (Lead Auditor, Auditor, Technical Expert) see only assigned clients
-    if (filteredRoles.includes(user.role)) {
+    if (filteredRoles.includes(userRole)) {
         // Get assignments for this user (using user ID directly)
         const assignments = window.state.auditorAssignments || [];
         const assignedClientIds = assignments

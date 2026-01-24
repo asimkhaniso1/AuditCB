@@ -14,7 +14,8 @@ function renderClientsEnhanced() {
     }
 
     let filteredClients = window.state.clients.filter(client => {
-        const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const name = client.name || 'Unnamed Client';
+        const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'All' || client.status === filterStatus;
         return matchesSearch && matchesStatus;
     });

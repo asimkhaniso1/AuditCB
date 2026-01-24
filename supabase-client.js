@@ -1046,7 +1046,7 @@ const SupabaseClient = {
             // Insert current clients if any
             if (clients?.length > 0) {
                 const clientsData = clients.map(client => ({
-                    id: client.id,
+                    id: String(client.id),
                     name: client.name,
                     standard: client.standard,
                     status: client.status,

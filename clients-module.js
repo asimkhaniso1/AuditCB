@@ -1391,6 +1391,8 @@ function renderClientTab(client, tabName) {
         tabContent.innerHTML = getClientDocumentsHTML(client);
     } else if (tabName === 'compliance') {
         tabContent.innerHTML = getClientComplianceHTML(client);
+    } else if (tabName === 'settings') {
+        tabContent.innerHTML = getClientSettingsHTML(client);
     }
 }
 
@@ -5258,3 +5260,52 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
 // Note: deleteClient and archiveClient functions are defined in clients-list.js
 // which provides the enhanced implementation including Supabase cloud sync.
 
+// ============================================
+// CLIENT SETTINGS TAB HTML
+// ============================================
+
+function getClientSettingsHTML(client) {
+    return `
+        <div class="fade-in">
+             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+                <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i> Client Settings
+            </h3>
+            
+            <div class="card" style="border-left: 4px solid var(--danger-color);">
+                <h4 class="text-danger" style="margin-top: 0;">Danger Zone</h4>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #fff1f2; border-radius: 8px;">
+                        <div>
+                            <strong style="color: #991b1b;">Archive Client</strong>
+                            <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Move this client to archives. Data is preserved but hidden from active lists.</p>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.archiveClient('${client.id}')">
+                            <i class="fa-solid fa-box-archive"></i> Archive
+                        </button>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #fee2e2; border-radius: 8px;">
+                        <div>
+                            <strong style="color: #dc2626;">Delete Client</strong>
+                            <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Permanently remove this client and ALL associated data. This cannot be undone.</p>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="window.deleteClient('${client.id}')">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h4>Information</h4>
+                 <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
+                    <p style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong>Unique Client ID:</strong> <code>${client.id}</code></p>
+                    <p style="margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);">This ID is used for linking data in the database.</p>
+                    <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${client.id}').then(() => window.showNotification('ID Copied', 'success'))">
+                        <i class="fa-solid fa-copy"></i> Copy ID
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
