@@ -255,20 +255,21 @@
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <!-- New Security & Utility Modules (Load BEFORE core script) -->
+    <!-- Core Utilities (Load BEFORE everything else) -->
     <script src="logger.js?v=2.0"></script>
     <script src="error-handler.js"></script>
     <script src="safe-dom.js"></script>
+    <script src="utils.js"></script>
+    <script src="sanitization.js"></script>
+    <script src="constants.js"></script>
+    <script src="debounce.js"></script>
 
     <!-- Load core script to initialize window.state -->
-    <script src="script.js?v=9.3_FORCE_REFRESH_V2"></script>
+    <script src="script.js?v=9.4_FINAL_STABLE"></script>
 
     <!-- Core Modules load after state is initialized -->
-    <script src="constants.js"></script>
-    <script src="utils.js"></script>
     <script src="event-manager.js"></script>
-    <script src="debounce.js"></script>
     <script src="validation.js"></script>
-    <script src="sanitization.js"></script>
     <script src="auth-manager.js"></script>
     <script src="email-service.js"></script>
     <script src="supabase-config.js"></script>
