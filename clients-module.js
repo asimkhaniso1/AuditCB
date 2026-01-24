@@ -1719,7 +1719,7 @@ window.saveNewClient = function () {
         contacts: contacts,
         sites: sites,
         employees: parseInt(cleanData.employees) || 0,
-        shifts: document.getElementById('client-shifts').value,
+        shifts: document.getElementById('client-shifts') ? document.getElementById('client-shifts').value : 'No',
         logoUrl: window._tempClientLogo || ''
     };
 
