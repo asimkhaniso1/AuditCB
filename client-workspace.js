@@ -65,7 +65,8 @@ function populateClientSidebar() {
     const activeClientId = window.state.activeClientId;
 
     clientList.innerHTML = clients.map(client => {
-        const initials = client.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        const safeName = client.name || 'Unknown Client';
+        const initials = safeName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
         const isActive = client.id === activeClientId;
         const status = client.status || 'Active';
         const escapedName = window.UTILS?.escapeHtml ? window.UTILS.escapeHtml(client.name) : client.name;
@@ -78,15 +79,15 @@ function populateClientSidebar() {
                     <div class="client-status">${status}</div>
                 </div>
             </div>
-        `);
-}).join('');
+        `;
+    }).join('');
 
-// Hide "Add Client" button for Auditors and Lead Auditors
-const addClientBtn = document.querySelector('.client-sidebar-footer button');
-if (addClientBtn && currentUser) {
-    const canAddClients = currentUser.role === 'Admin' || currentUser.role === 'Certification Manager';
-    addClientBtn.style.display = canAddClients ? '' : 'none';
-}
+    // Hide "Add Client" button for Auditors and Lead Auditors
+    const addClientBtn = document.querySelector('.client-sidebar-footer button');
+    if (addClientBtn && currentUser) {
+        const canAddClients = currentUser.role === 'Admin' || currentUser.role === 'Certification Manager';
+        addClientBtn.style.display = canAddClients ? '' : 'none';
+    }
 }
 
 // Export for use in other modules
