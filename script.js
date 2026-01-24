@@ -1367,7 +1367,22 @@ async function renderModule(moduleName, syncHash = true) {
                 }
                 break;
             default:
-                renderPlaceholder(moduleName);
+                // Handle dynamic routes like client/123
+                if (moduleName.startsWith('client/')) {
+                    const parts = moduleName.split('/');
+                    const clientId = parts[1];
+                    const subView = parts[2] || 'overview';
+
+                    if (typeof window.loadClientDetails === 'function') {
+                        // Ensure we pass string ID (as per UUID/Text ID fix)
+                        window.loadClientDetails(String(clientId), subView);
+                    } else {
+                        console.error('loadClientDetails function is missing');
+                        contentArea.innerHTML = '<div class="alert alert-danger">Client Details module not loaded. <br>Please refresh the page.</div>';
+                    }
+                } else {
+                    renderPlaceholder(moduleName);
+                }
         }
     } catch (error) {
         console.error('Error loading module:', error);
