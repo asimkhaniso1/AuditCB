@@ -29,7 +29,7 @@ const Sanitizer = {
             ...config
         };
 
-        return DOMPurify.sanitize(dirty, defaultConfig);
+        return (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(dirty, defaultConfig) : dirty;
     },
 
     /**
@@ -46,10 +46,9 @@ const Sanitizer = {
         }
 
         // Strip all HTML tags
-        const clean = DOMPurify.sanitize(dirty, {
-            ALLOWED_TAGS: [],
-            ALLOWED_ATTR: []
-        });
+        const clean = (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize)
+            ? DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+            : dirty;
 
         // Additional escaping for safety
         return Sanitizer.escapeHTML(clean);
@@ -100,7 +99,9 @@ const Sanitizer = {
         }
 
         if (typeof DOMPurify === 'undefined') return url;
-        return DOMPurify.sanitize(url, { ALLOWED_TAGS: [] });
+        return (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize)
+            ? DOMPurify.sanitize(url, { ALLOWED_TAGS: [] })
+            : url;
     },
 
     // Alias for lowercase 'url' (compatibility)
@@ -116,8 +117,14 @@ const Sanitizer = {
     sanitizeEmail: (email) => {
         if (!email) return '';
 
+        if (typeof DOMPurify === 'undefined') {
+            return Sanitizer.escapeHTML(email.trim());
+        }
+
         // Basic email sanitization - strip HTML and validate format loosely
-        const clean = DOMPurify.sanitize(email, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim();
+        const clean = (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize)
+            ? DOMPurify.sanitize(email, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim()
+            : email.trim();
 
         // Accept anything that looks vaguely like an email
         // Real validation should happen server-side

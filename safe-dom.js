@@ -25,9 +25,9 @@ const SafeDOM = {
         // Use Sanitizer if available
         if (window.Sanitizer && typeof window.Sanitizer.sanitizeHTML === 'function') {
             element.innerHTML = window.Sanitizer.sanitizeHTML(html, config);
-        } else if (window.DOMPurify) {
+        } else if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
             // Fallback to DOMPurify directly
-            element.innerHTML = DOMPurify.sanitize(html, config);
+            element.innerHTML = window.DOMPurify.sanitize(html, config);
         } else {
             // Last resort - log warning and use textContent
             Logger.error('SafeDOM: No sanitizer available! Using textContent instead.');
