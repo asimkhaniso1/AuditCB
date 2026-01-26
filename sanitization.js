@@ -15,12 +15,6 @@ const Sanitizer = {
     sanitizeHTML: (dirty, config = {}) => {
         if (!dirty) return '';
 
-        // Safely check for DOMPurify
-        if (typeof DOMPurify === 'undefined') {
-            console.warn('DOMPurify not found. Using UTILS.escapeHtml fallback.');
-            return window.UTILS ? window.UTILS.escapeHtml(dirty) : String(dirty).replace(/[&<>"']/g, "");
-        }
-
         // Default config: Allow common formatting but block scripts
         const defaultConfig = {
             ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'span', 'div'],
@@ -29,7 +23,13 @@ const Sanitizer = {
             ...config
         };
 
-        return (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(dirty, defaultConfig) : dirty;
+        // Safely check for window.DOMPurify
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            return window.DOMPurify.sanitize(dirty, defaultConfig);
+        }
+
+        console.warn('DOMPurify not found. Using UTILS.escapeHtml fallback.');
+        return window.UTILS ? window.UTILS.escapeHtml(dirty) : Sanitizer.escapeHTML(dirty);
     },
 
     /**
@@ -41,14 +41,10 @@ const Sanitizer = {
     sanitizeText: (dirty) => {
         if (!dirty) return '';
 
-        if (typeof DOMPurify === 'undefined') {
-            return Sanitizer.escapeHTML(dirty);
+        let clean = dirty;
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            clean = window.DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
         }
-
-        // Strip all HTML tags
-        const clean = (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize)
-            ? DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
-            : dirty;
 
         // Additional escaping for safety
         return Sanitizer.escapeHTML(clean);
@@ -76,7 +72,7 @@ const Sanitizer = {
     sanitizeAttribute: (value) => {
         if (!value) return '';
 
-        return value
+        return String(value)
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#x27;')
             .replace(/</g, '&lt;')
@@ -93,15 +89,16 @@ const Sanitizer = {
 
         // Block dangerous protocols
         const dangerous = /^(javascript|data|vbscript):/i;
-        if (dangerous.test(url.trim())) {
+        if (dangerous.test(String(url).trim())) {
             console.warn('Blocked dangerous URL:', url);
             return '';
         }
 
-        if (typeof DOMPurify === 'undefined') return url;
-        return (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize)
-            ? DOMPurify.sanitize(url, { ALLOWED_TAGS: [] })
-            : url;
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            return window.DOMPurify.sanitize(url, { ALLOWED_TAGS: [] });
+        }
+
+        return url;
     },
 
     // Alias for lowercase 'url' (compatibility)
@@ -117,17 +114,11 @@ const Sanitizer = {
     sanitizeEmail: (email) => {
         if (!email) return '';
 
-        if (typeof DOMPurify === 'undefined') {
-            return Sanitizer.escapeHTML(email.trim());
+        let clean = String(email).trim();
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            clean = window.DOMPurify.sanitize(clean, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim();
         }
 
-        // Basic email sanitization - strip HTML and validate format loosely
-        const clean = (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize)
-            ? DOMPurify.sanitize(email, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim()
-            : email.trim();
-
-        // Accept anything that looks vaguely like an email
-        // Real validation should happen server-side
         return clean;
     },
 
