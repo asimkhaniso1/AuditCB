@@ -34,9 +34,40 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"
         media="all" onerror="this.media='none'">
-    <!-- Favicon -->
-    <link rel="icon" <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"
+        integrity="sha512-H97/Yrj9AbD9p/78S8mH2fV3v5L3sC1nE2X6p+5OqL7E3f0J6J+7S8mH2fV3v5L3sC1nE2X6p+5"
+        crossorigin="anonymous"
+        onerror="this.onerror=null;this.src='https://unpkg.com/dompurify@3.0.6/dist/purify.min.js';"></script>
+
+    <script>
+        // 🛡️ EMERGENCY RECOVERY: Ensure critical security objects exist even if CDNs fail
+        (function () {
+            if (typeof window.DOMPurify === 'undefined') {
+                console.warn('⚠️ DOMPurify missing - Initializing EMERGENCY fallbacks');
+                window.DOMPurify = {
+                    sanitize: function (dirty) { return dirty; },
+                    isEmergency: true
+                };
+            }
+
+            // 🧪 Initialize Sanitizer shell immediately to prevent ReferenceErrors during early boot
+            window.Sanitizer = window.Sanitizer || {
+                sanitizeHTML: function (d) { return window.DOMPurify ? window.DOMPurify.sanitize(d) : d; },
+                sanitizeText: function (d) { return d; },
+                sanitizeURL: function (d) { return d; },
+                escapeHTML: function (d) { return d; },
+                _placeholder: true
+            };
+        })();
+    </script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Modal Z-Index Fix to prevent sidebar overlap -->
     <style>
         .modal-overlay {
@@ -269,10 +300,30 @@
     <script src="/notifications-module.js?v=9.14" defer></script>
     <script src="/advanced-modules.js?v=9.14" defer></script>
     <script src="/planning-module.js?v=9.14" defer></script>
-    <script src="/settings-module.js?v=9.13"></script>
-    <script src="/settings-system-defaults.js?v=9.13"></script>
-    <script src="/audit-trail-module.js?v=9.13"></script>
-    <script src="/auditor-form-module.js?v=9.13"></script>
+    <script src="/api-usage-tracker.js?v=9.14"></script>
+    <script src="/ai-service.js?v=9.14"></script>
+    <script src="/execution-tab-helpers.js?v=9.14"></script>
+    <script src="/execution-module.js?v=9.14" defer></script>
+    <script src="/reporting-module.js?v=9.14" defer></script>
+    <script src="/dashboard-module.js?v=9.14"></script>
+    <script src="/clients-module.js?v=9.14_ULTRA_FORCE"></script>
+    <script src="/clients-list.js?v=9.14_ULTRA_FORCE"></script>
+    <script src="/clients-detail.js?v=9.14_ULTRA_FORCE"></script>
+    <script src="/clients-modals.js?v=9.14_ULTRA_FORCE"></script>
+    <script src="/client-workspace.js?v=9.14_ULTRA_FORCE"></script>
+    <script src="/checklist-module.js?v=9.14" defer></script>
+    <script src="/export-module.js?v=9.14" defer></script>
+    <script src="/documents-module.js?v=9.14" defer></script>
+    <script src="/certifications-module.js?v=9.14" defer></script>
+    <script src="/appeals-complaints-module.js?v=9.14" defer></script>
+    <script src="/impartiality-module.js?v=9.14" defer></script>
+    <script src="/management-review-module.js?v=9.14" defer></script>
+    <script src="/record-retention-module.js?v=9.14" defer></script>
+    <script src="/ncr-capa-module.js?v=9.14"></script>
+    <script src="/settings-module.js?v=9.14"></script>
+    <script src="/settings-system-defaults.js?v=9.14"></script>
+    <script src="/audit-trail-module.js?v=9.14"></script>
+    <script src="/auditor-form-module.js?v=9.14"></script>
     <!-- REMOVED: offline-manager.js - sync/offline functionality disabled -->
     <!-- <script src="offline-manager.js?v=20260108220000"></script> -->
 
