@@ -5260,7 +5260,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
 // ============================================
 // CLIENT DELETION & ARCHIVING
 // ============================================
-// Note: deleteClient and archiveClient functions are defined in clients-list.js
+// Note: deleteClient and archiveClient functions are defined in clients-list-v16.js
 // which provides the enhanced implementation including Supabase cloud sync.
 
 // ============================================

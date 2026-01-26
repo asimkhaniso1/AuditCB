@@ -72,10 +72,20 @@
                 }
             };
 
-            // ☢️ CACHE NUCLEAR DETONATION (v15.0)
-            const APP_VERSION = '15.0';
+            // ☢️ v16.0 ULTRA PURGE - Breaking Persistent Cache
+            const APP_VERSION = '16.0';
 
-            // 1. Unregister all Service Workers immediately
+            // 1. Purge Cache API (Breaking the most stubborn level of caching)
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    for (let name of names) {
+                        caches.delete(name);
+                        console.log('☢️ CACHE PURGED:', name);
+                    }
+                });
+            }
+
+            // 2. Unregister all Service Workers
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(registrations => {
                     for (let registration of registrations) {
@@ -85,12 +95,12 @@
                 });
             }
 
-            // 2. Force Reload logic
+            // 3. Force Reload logic
             if (window.location.search.indexOf('v=' + APP_VERSION) === -1 && !localStorage.getItem('v' + APP_VERSION + '_reloaded')) {
-                console.log('🔄 First visit to v' + APP_VERSION + ' - Forcing one-time full reload');
+                console.log('🔄 First visit to v' + APP_VERSION + ' - Forcing full purge reload');
                 localStorage.setItem('v' + APP_VERSION + '_reloaded', 'true');
                 // Clear state to force fresh fetch
-                window.location.href = window.location.pathname + '?v=' + APP_VERSION + '&cache_bust=' + Date.now() + window.location.hash;
+                window.location.href = window.location.pathname + '?v=' + APP_VERSION + '&purge=' + Date.now() + window.location.hash;
             }
         })();
     </script>
@@ -137,48 +147,33 @@
     <div class="mobile-overlay" id="mobile-overlay"></div>
 
     <div class="app-container auth-pending" id="app-container">
-        <!-- LEFT SIDEBAR: CB-Level Functions -->
-        <aside class="sidebar" id="sidebar">
-            <div class="logo-container" id="cb-logo-display" onclick="window.location.hash = 'dashboard'"
-                style="cursor: pointer;">
-                <i class="fa-solid fa-certificate"></i>
-                <h1>AuditCB360</h1>
-                <div
-                    style="font-size: 0.75rem; background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 10px; font-weight: bold; box-shadow: 0 0 10px rgba(239,68,68,0.5); display: inline-block; vertical-align: middle;">
-                    v15.0_CRITICAL</div>
-            </div>
-            <nav class="main-nav" role="navigation" aria-label="Main navigation">
-                <ul>
-                    <li class="active" data-module="dashboard" role="button" tabindex="0" aria-label="Dashboard"><i
-                            class="fa-solid fa-chart-line"></i> Dashboard</li>
-                    <li data-module="clients" role="button" tabindex="0" aria-label="Clients"><i
-                            class="fa-solid fa-building"></i> Clients</li>
-                    <li data-module="auditors" role="button" tabindex="0" aria-label="Auditors"><i
-                            class="fa-solid fa-user-tie"></i> Auditors</li>
-                    <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
-                            class="fa-solid fa-list-check"></i> Checklists</li>
+        <li data-module="clients" role="button" tabindex="0" aria-label="Clients"><i class="fa-solid fa-building"></i>
+            Clients</li>
+        <li data-module="auditors" role="button" tabindex="0" aria-label="Auditors"><i class="fa-solid fa-user-tie"></i>
+            Auditors</li>
+        <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
+                class="fa-solid fa-list-check"></i> Checklists</li>
 
-                    <!-- Governance Group -->
-                    <li class="nav-group-header" onclick="toggleNavGroup(this)" role="button" tabindex="0"
-                        aria-label="Toggle Governance Menu" style="justify-content: space-between;">
-                        <span><i class="fa-solid fa-scale-balanced"></i> Governance</span>
-                        <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
-                    </li>
-                    <div class="nav-group-content collapsed"
-                        style="overflow: hidden; padding-left: 0.5rem; display: none;">
-                        <li data-module="appeals-complaints" role="button" tabindex="0"
-                            aria-label="Appeals & Complaints"><i class="fa-solid fa-gavel"></i> Appeals</li>
-                        <li data-module="impartiality" role="button" tabindex="0" aria-label="Impartiality Committee"><i
-                                class="fa-solid fa-shield-halved"></i> Impartiality</li>
-                        <li data-module="management-review" role="button" tabindex="0" aria-label="Management Review"><i
-                                class="fa-solid fa-clipboard-check"></i> Mgmt Review</li>
-                    </div>
+        <!-- Governance Group -->
+        <li class="nav-group-header" onclick="toggleNavGroup(this)" role="button" tabindex="0"
+            aria-label="Toggle Governance Menu" style="justify-content: space-between;">
+            <span><i class="fa-solid fa-scale-balanced"></i> Governance</span>
+            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
+        </li>
+        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
+            <li data-module="appeals-complaints" role="button" tabindex="0" aria-label="Appeals & Complaints"><i
+                    class="fa-solid fa-gavel"></i> Appeals</li>
+            <li data-module="impartiality" role="button" tabindex="0" aria-label="Impartiality Committee"><i
+                    class="fa-solid fa-shield-halved"></i> Impartiality</li>
+            <li data-module="management-review" role="button" tabindex="0" aria-label="Management Review"><i
+                    class="fa-solid fa-clipboard-check"></i> Mgmt Review</li>
+        </div>
 
-                    <li data-module="settings" role="button" tabindex="0" aria-label="Settings"
-                        style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"><i
-                            class="fa-solid fa-cog"></i> Settings</li>
-                </ul>
-            </nav>
+        <li data-module="settings" role="button" tabindex="0" aria-label="Settings"
+            style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"><i
+                class="fa-solid fa-cog"></i> Settings</li>
+        </ul>
+        </nav>
         </aside>
 
         <!-- MAIN CONTENT AREA -->
@@ -308,44 +303,44 @@
 
     <!-- New Security & Utility Modules (Load BEFORE core script) -->
     <!-- Core Utilities (Load BEFORE everything else) -->
-    <script src="/logger.js?v=15.0_FINAL_FIX"></script>
-    <script src="/error-handler.js?v=15.0_FINAL_FIX"></script>
-    <script src="/safe-dom.js?v=15.0_FINAL_FIX"></script>
-    <script src="/utils.js?v=15.0_FINAL_FIX"></script>
-    <script src="/sanitization.js?v=15.0_FINAL_FIX"></script>
-    <script src="/constants.js?v=15.0_FINAL_FIX"></script>
-    <script src="/debounce.js?v=15.0_FINAL_FIX"></script>
+    <script src="/logger.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/error-handler.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/safe-dom.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/utils.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/sanitization.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/constants.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/debounce.js?v=16.0_ULTRA_PURGE"></script>
 
     <!-- Load core script to initialize window.state -->
-    <script src="/script.js?v=15.0_FINAL_FIX"></script>
+    <script src="/script.js?v=16.0_ULTRA_PURGE"></script>
 
     <!-- Core Modules load after state is initialized -->
-    <script src="/event-manager.js?v=15.0_FINAL_FIX"></script>
-    <script src="/validation.js?v=15.0_FINAL_FIX"></script>
-    <script src="/auth-manager.js?v=15.0_FINAL_FIX"></script>
-    <script src="/email-service.js?v=15.0_FINAL_FIX"></script>
-    <script src="/supabase-config.js?v=15.0_FINAL_FIX"></script>
-    <script src="/supabase-client.js?v=15.0_FINAL_FIX"></script>
-    <script src="/api-cache.js?v=15.0_FINAL_FIX"></script>
-    <script src="/data-migration.js?v=15.0_FINAL_FIX"></script>
-    <script src="/password-utils.js?v=15.0_FINAL_FIX"></script>
-    <script src="/form-validator.js?v=15.0_FINAL_FIX"></script>
-    <script src="/audit-logger.js?v=15.0_FINAL_FIX"></script>
-    <script src="/notifications-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/advanced-modules.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/planning-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/api-usage-tracker.js?v=15.0_FINAL_FIX"></script>
-    <script src="/ai-service.js?v=15.0_FINAL_FIX"></script>
-    <script src="/execution-tab-helpers.js?v=15.0_FINAL_FIX"></script>
-    <script src="/execution-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/reporting-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/dashboard-module.js?v=15.0_FINAL_FIX"></script>
-    <script src="/clients-module.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
-    <script src="/clients-list.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
-    <script src="/clients-detail.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
-    <script src="/clients-modals.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
-    <script src="/client-workspace.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
-    <script src="/checklist-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/event-manager.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/validation.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/auth-manager.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/email-service.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/supabase-config.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/supabase-client.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/api-cache.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/data-migration.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/password-utils.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/form-validator.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/audit-logger.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/notifications-module.js?v=16.0_ULTRA_PURGE" defer></script>
+    <script src="/advanced-modules.js?v=16.0_ULTRA_PURGE" defer></script>
+    <script src="/planning-module.js?v=16.0_ULTRA_PURGE" defer></script>
+    <script src="/api-usage-tracker.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/ai-service.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/execution-tab-helpers.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/execution-module.js?v=16.0_ULTRA_PURGE" defer></script>
+    <script src="/reporting-module.js?v=16.0_ULTRA_PURGE" defer></script>
+    <script src="/dashboard-module.js?v=16.0_ULTRA_PURGE"></script>
+    <script src="/clients-module.js?v=16.0_ULTRA_PURGE_FORCE"></script>
+    <script src="/clients-list-v16.js?v=16.0_ULTRA_PURGE_FORCE"></script>
+    <script src="/clients-detail.js?v=16.0_ULTRA_PURGE_FORCE"></script>
+    <script src="/clients-modals.js?v=16.0_ULTRA_PURGE_FORCE"></script>
+    <script src="/client-workspace.js?v=16.0_ULTRA_PURGE_FORCE"></script>
+    <script src="/checklist-module.js?v=16.0_ULTRA_PURGE" defer></script>
     <script src="/export-module.js?v=15.0_FINAL_FIX" defer></script>
     <script src="/documents-module.js?v=15.0_FINAL_FIX" defer></script>
     <script src="/certifications-module.js?v=15.0_FINAL_FIX" defer></script>
