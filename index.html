@@ -26,8 +26,8 @@
     <title>AuditCB360 – ISO CB Auditor & Audit Management</title>
     <meta name="description"
         content="Manage ISO Certification Body operations including clients, auditors, audits, and certification decisions.">
-    <link rel="stylesheet" href="/styles.css?v=5">
-    <link rel="preload" href="/styles.css?v=5" as="style">
+    <link rel="stylesheet" href="/styles.css?v=16.1">
+    <link rel="preload" href="/styles.css?v=16.1" as="style">
     <link rel="stylesheet" href="/required-fields.css">
     <link rel="stylesheet" href="/font-fallback.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -72,8 +72,8 @@
                 }
             };
 
-            // ☢️ v16.0 ULTRA PURGE - Breaking Persistent Cache
-            const APP_VERSION = '16.0';
+            // ☢️ v16.1 ULTRA PURGE - Breaking Persistent Cache
+            const APP_VERSION = '16.1';
 
             // 1. Purge Cache API (Breaking the most stubborn level of caching)
             if ('caches' in window) {
@@ -147,33 +147,50 @@
     <div class="mobile-overlay" id="mobile-overlay"></div>
 
     <div class="app-container auth-pending" id="app-container">
-        <li data-module="clients" role="button" tabindex="0" aria-label="Clients"><i class="fa-solid fa-building"></i>
-            Clients</li>
-        <li data-module="auditors" role="button" tabindex="0" aria-label="Auditors"><i class="fa-solid fa-user-tie"></i>
-            Auditors</li>
-        <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
-                class="fa-solid fa-list-check"></i> Checklists</li>
+        <!-- LEFT SIDEBAR: CB-Level Functions -->
+        <aside class="sidebar" id="sidebar">
+            <div class="logo-container" id="cb-logo-display" onclick="window.location.hash = 'dashboard'"
+                style="cursor: pointer;">
+                <i class="fa-solid fa-certificate"></i>
+                <h1>AuditCB360</h1>
+                <div
+                    style="font-size: 0.75rem; background: #9333ea; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 10px; font-weight: bold; box-shadow: 0 0 10px rgba(147,51,234,0.5); display: inline-block; vertical-align: middle;">
+                    v16.1_ULTRA_PURGE</div>
+            </div>
+            <nav class="main-nav" role="navigation" aria-label="Main navigation">
+                <ul>
+                    <li class="active" data-module="dashboard" role="button" tabindex="0" aria-label="Dashboard"><i
+                            class="fa-solid fa-chart-line"></i> Dashboard</li>
+                    <li data-module="clients" role="button" tabindex="0" aria-label="Clients"><i
+                            class="fa-solid fa-building"></i>
+                        Clients</li>
+                    <li data-module="auditors" role="button" tabindex="0" aria-label="Auditors"><i
+                            class="fa-solid fa-user-tie"></i>
+                        Auditors</li>
+                    <li data-module="checklists" role="button" tabindex="0" aria-label="Checklist Library"><i
+                            class="fa-solid fa-list-check"></i> Checklists</li>
 
-        <!-- Governance Group -->
-        <li class="nav-group-header" onclick="toggleNavGroup(this)" role="button" tabindex="0"
-            aria-label="Toggle Governance Menu" style="justify-content: space-between;">
-            <span><i class="fa-solid fa-scale-balanced"></i> Governance</span>
-            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
-        </li>
-        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
-            <li data-module="appeals-complaints" role="button" tabindex="0" aria-label="Appeals & Complaints"><i
-                    class="fa-solid fa-gavel"></i> Appeals</li>
-            <li data-module="impartiality" role="button" tabindex="0" aria-label="Impartiality Committee"><i
-                    class="fa-solid fa-shield-halved"></i> Impartiality</li>
-            <li data-module="management-review" role="button" tabindex="0" aria-label="Management Review"><i
-                    class="fa-solid fa-clipboard-check"></i> Mgmt Review</li>
-        </div>
+                    <!-- Governance Group -->
+                    <li class="nav-group-header" onclick="toggleNavGroup(this)" role="button" tabindex="0"
+                        aria-label="Toggle Governance Menu" style="justify-content: space-between;">
+                        <span><i class="fa-solid fa-scale-balanced"></i> Governance</span>
+                        <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
+                    </li>
+                    <div class="nav-group-content collapsed"
+                        style="overflow: hidden; padding-left: 0.5rem; display: none;">
+                        <li data-module="appeals-complaints" role="button" tabindex="0"
+                            aria-label="Appeals & Complaints"><i class="fa-solid fa-gavel"></i> Appeals</li>
+                        <li data-module="impartiality" role="button" tabindex="0" aria-label="Impartiality Committee"><i
+                                class="fa-solid fa-shield-halved"></i> Impartiality</li>
+                        <li data-module="management-review" role="button" tabindex="0" aria-label="Management Review"><i
+                                class="fa-solid fa-clipboard-check"></i> Mgmt Review</li>
+                    </div>
 
-        <li data-module="settings" role="button" tabindex="0" aria-label="Settings"
-            style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"><i
-                class="fa-solid fa-cog"></i> Settings</li>
-        </ul>
-        </nav>
+                    <li data-module="settings" role="button" tabindex="0" aria-label="Settings"
+                        style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;"><i
+                            class="fa-solid fa-cog"></i> Settings</li>
+                </ul>
+            </nav>
         </aside>
 
         <!-- MAIN CONTENT AREA -->
@@ -334,25 +351,25 @@
     <script src="/execution-tab-helpers.js?v=16.0_ULTRA_PURGE"></script>
     <script src="/execution-module.js?v=16.0_ULTRA_PURGE" defer></script>
     <script src="/reporting-module.js?v=16.0_ULTRA_PURGE" defer></script>
-    <script src="/dashboard-module.js?v=16.0_ULTRA_PURGE"></script>
-    <script src="/clients-module.js?v=16.0_ULTRA_PURGE_FORCE"></script>
-    <script src="/clients-list-v16.js?v=16.0_ULTRA_PURGE_FORCE"></script>
-    <script src="/clients-detail.js?v=16.0_ULTRA_PURGE_FORCE"></script>
-    <script src="/clients-modals.js?v=16.0_ULTRA_PURGE_FORCE"></script>
-    <script src="/client-workspace.js?v=16.0_ULTRA_PURGE_FORCE"></script>
-    <script src="/checklist-module.js?v=16.0_ULTRA_PURGE" defer></script>
-    <script src="/export-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/documents-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/certifications-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/appeals-complaints-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/impartiality-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/management-review-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/record-retention-module.js?v=15.0_FINAL_FIX" defer></script>
-    <script src="/ncr-capa-module.js?v=15.0_FINAL_FIX"></script>
-    <script src="/settings-module.js?v=15.0_FINAL_FIX"></script>
-    <script src="/settings-system-defaults.js?v=15.0_FINAL_FIX"></script>
-    <script src="/audit-trail-module.js?v=15.0_FINAL_FIX"></script>
-    <script src="/auditor-form-module.js?v=15.0_FINAL_FIX"></script>
+    <script src="/dashboard-module.js?v=16.1_ULTRA_PURGE"></script>
+    <script src="/clients-module.js?v=16.1_ULTRA_PURGE_FORCE"></script>
+    <script src="/clients-list-v16.js?v=16.1_ULTRA_PURGE_FORCE"></script>
+    <script src="/clients-detail.js?v=16.1_ULTRA_PURGE_FORCE"></script>
+    <script src="/clients-modals.js?v=16.1_ULTRA_PURGE_FORCE"></script>
+    <script src="/client-workspace.js?v=16.1_ULTRA_PURGE_FORCE"></script>
+    <script src="/checklist-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/export-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/documents-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/certifications-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/appeals-complaints-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/impartiality-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/management-review-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/record-retention-module.js?v=16.1_ULTRA_PURGE" defer></script>
+    <script src="/ncr-capa-module.js?v=16.1_ULTRA_PURGE"></script>
+    <script src="/settings-module.js?v=16.1_ULTRA_PURGE"></script>
+    <script src="/settings-system-defaults.js?v=16.1_ULTRA_PURGE"></script>
+    <script src="/audit-trail-module.js?v=16.1_ULTRA_PURGE"></script>
+    <script src="/auditor-form-module.js?v=16.1_ULTRA_PURGE"></script>
     <!-- REMOVED: offline-manager.js - sync/offline functionality disabled -->
     <!-- <script src="offline-manager.js?v=20260108220000"></script> -->
 
