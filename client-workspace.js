@@ -352,18 +352,14 @@ window.renderClientModule = function (clientId, moduleName) {
             }
             break;
         case 'settings':
-            // Settings shows Account Setup wizard
             if (typeof renderClientDetail === 'function') {
                 renderClientDetail(client.id, { showAccountSetup: true, showAnalytics: false });
-                // Try to switch to 'client_org' tab if it exists (for managers), otherwise stay on defaults
                 setTimeout(() => {
-                    const orgTab = document.querySelector('.tab-btn[data-tab="client_org"]');
-                    if (orgTab) {
-                        orgTab.click();
-                    } else {
-                        // If no org tab (e.g. auditor), maybe just show info
-                        const infoTab = document.querySelector('.tab-btn[data-tab="info"]');
-                        if (infoTab) infoTab.click();
+                    const settingsTab = document.querySelector('.tab-btn[data-tab="settings"]');
+                    if (settingsTab) {
+                        settingsTab.click();
+                    } else if (typeof renderClientTab === 'function') {
+                        renderClientTab(client, 'settings');
                     }
                 }, 100);
             } else {

@@ -180,7 +180,10 @@ function renderClientsEnhanced() {
         </div >
     `;
 
-    window.contentArea.innerHTML = html;
+    const contentArea = document.getElementById('content-area');
+    if (contentArea) {
+        contentArea.innerHTML = html;
+    }
 
     // Event listeners removed - using inline onclick for reliability
 
@@ -320,13 +323,19 @@ function renderClientDetail(clientId, options = {}) {
                 <button class="tab-btn" data-tab="scopes">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>Scopes & Certs
                 </button>
+                <button class="tab-btn" data-tab="settings">
+                    <i class="fa-solid fa-cog" style="margin-right: 0.25rem;"></i>Settings
+                </button>
             </div>
 
             <div id="tab-content"></div>
         </div >
     `;
 
-    window.contentArea.innerHTML = html;
+    const contentArea = document.getElementById('content-area');
+    if (contentArea) {
+        contentArea.innerHTML = html;
+    }
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -1373,6 +1382,12 @@ function renderClientTab(client, tabName) {
 
     // Safety check - if tab-content doesn't exist, the client workspace hasn't been rendered yet
     if (!tabContent) {
+        // Fallback for direct settings render from workspace
+        const contentArea = document.getElementById('content-area');
+        if (tabName === 'settings' && contentArea) {
+            contentArea.innerHTML = getClientSettingsHTML(client);
+            return;
+        }
         console.warn('tab-content element not found. Client workspace may not be rendered.');
         return;
     }
@@ -1609,7 +1624,10 @@ window.renderAddClient = function () {
     </div>
     `;
 
-    window.contentArea.innerHTML = html;
+    const contentArea = document.getElementById('content-area');
+    if (contentArea) {
+        contentArea.innerHTML = html;
+    }
 };
 
 window.saveNewClient = function () {
@@ -1971,7 +1989,10 @@ window.renderEditClient = function (clientId) {
     </div>
     `;
 
-    window.contentArea.innerHTML = html;
+    const contentArea = document.getElementById('content-area');
+    if (contentArea) {
+        contentArea.innerHTML = html;
+    }
 };
 
 window.saveAuditClient = function (clientId) {
