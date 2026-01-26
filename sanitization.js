@@ -15,6 +15,12 @@ const Sanitizer = {
     sanitizeHTML: (dirty, config = {}) => {
         if (!dirty) return '';
 
+        // Safely check for DOMPurify
+        if (typeof DOMPurify === 'undefined') {
+            console.warn('DOMPurify not found. Using UTILS.escapeHtml fallback.');
+            return window.UTILS ? window.UTILS.escapeHtml(dirty) : String(dirty).replace(/[&<>"']/g, "");
+        }
+
         // Default config: Allow common formatting but block scripts
         const defaultConfig = {
             ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'span', 'div'],
@@ -34,6 +40,10 @@ const Sanitizer = {
      */
     sanitizeText: (dirty) => {
         if (!dirty) return '';
+
+        if (typeof DOMPurify === 'undefined') {
+            return Sanitizer.escapeHTML(dirty);
+        }
 
         // Strip all HTML tags
         const clean = DOMPurify.sanitize(dirty, {
@@ -89,6 +99,7 @@ const Sanitizer = {
             return '';
         }
 
+        if (typeof DOMPurify === 'undefined') return url;
         return DOMPurify.sanitize(url, { ALLOWED_TAGS: [] });
     },
 
