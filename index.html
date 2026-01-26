@@ -72,12 +72,25 @@
                 }
             };
 
-            // ⚡ FORCE RELOAD if we are in a corrupted state (Vercel Cache-Bust)
-            const APP_VERSION = '12.0';
+            // ☢️ CACHE NUCLEAR DETONATION (v15.0)
+            const APP_VERSION = '15.0';
+
+            // 1. Unregister all Service Workers immediately
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    for (let registration of registrations) {
+                        registration.unregister();
+                        console.log('☢️ Service Worker Unregistered');
+                    }
+                });
+            }
+
+            // 2. Force Reload logic
             if (window.location.search.indexOf('v=' + APP_VERSION) === -1 && !localStorage.getItem('v' + APP_VERSION + '_reloaded')) {
                 console.log('🔄 First visit to v' + APP_VERSION + ' - Forcing one-time full reload');
                 localStorage.setItem('v' + APP_VERSION + '_reloaded', 'true');
-                window.location.href = window.location.pathname + '?v=' + APP_VERSION + window.location.hash;
+                // Clear state to force fresh fetch
+                window.location.href = window.location.pathname + '?v=' + APP_VERSION + '&cache_bust=' + Date.now() + window.location.hash;
             }
         })();
     </script>
@@ -131,8 +144,8 @@
                 <i class="fa-solid fa-certificate"></i>
                 <h1>AuditCB360</h1>
                 <div
-                    style="font-size: 0.65rem; background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: normal; vertical-align: middle; display: inline-block;">
-                    v12.0</div>
+                    style="font-size: 0.75rem; background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 10px; font-weight: bold; box-shadow: 0 0 10px rgba(239,68,68,0.5); display: inline-block; vertical-align: middle;">
+                    v15.0_CRITICAL</div>
             </div>
             <nav class="main-nav" role="navigation" aria-label="Main navigation">
                 <ul>
@@ -295,56 +308,56 @@
 
     <!-- New Security & Utility Modules (Load BEFORE core script) -->
     <!-- Core Utilities (Load BEFORE everything else) -->
-    <script src="/logger.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/error-handler.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/safe-dom.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/utils.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/sanitization.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/constants.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/debounce.js?v=12.0_ULTRA_FORCE"></script>
+    <script src="/logger.js?v=15.0_FINAL_FIX"></script>
+    <script src="/error-handler.js?v=15.0_FINAL_FIX"></script>
+    <script src="/safe-dom.js?v=15.0_FINAL_FIX"></script>
+    <script src="/utils.js?v=15.0_FINAL_FIX"></script>
+    <script src="/sanitization.js?v=15.0_FINAL_FIX"></script>
+    <script src="/constants.js?v=15.0_FINAL_FIX"></script>
+    <script src="/debounce.js?v=15.0_FINAL_FIX"></script>
 
     <!-- Load core script to initialize window.state -->
-    <script src="/script.js?v=12.0_ULTRA_FORCE"></script>
+    <script src="/script.js?v=15.0_FINAL_FIX"></script>
 
     <!-- Core Modules load after state is initialized -->
-    <script src="/event-manager.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/validation.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/auth-manager.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/email-service.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/supabase-config.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/supabase-client.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/api-cache.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/data-migration.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/password-utils.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/form-validator.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/audit-logger.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/notifications-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/advanced-modules.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/planning-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/api-usage-tracker.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/ai-service.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/execution-tab-helpers.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/execution-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/reporting-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/dashboard-module.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/clients-module.js?v=12.0_ULTRA_FORCE_ULTRA_FORCE"></script>
-    <script src="/clients-list.js?v=12.0_ULTRA_FORCE_ULTRA_FORCE"></script>
-    <script src="/clients-detail.js?v=12.0_ULTRA_FORCE_ULTRA_FORCE"></script>
-    <script src="/clients-modals.js?v=12.0_ULTRA_FORCE_ULTRA_FORCE"></script>
-    <script src="/client-workspace.js?v=12.0_ULTRA_FORCE_ULTRA_FORCE"></script>
-    <script src="/checklist-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/export-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/documents-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/certifications-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/appeals-complaints-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/impartiality-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/management-review-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/record-retention-module.js?v=12.0_ULTRA_FORCE" defer></script>
-    <script src="/ncr-capa-module.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/settings-module.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/settings-system-defaults.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/audit-trail-module.js?v=12.0_ULTRA_FORCE"></script>
-    <script src="/auditor-form-module.js?v=12.0_ULTRA_FORCE"></script>
+    <script src="/event-manager.js?v=15.0_FINAL_FIX"></script>
+    <script src="/validation.js?v=15.0_FINAL_FIX"></script>
+    <script src="/auth-manager.js?v=15.0_FINAL_FIX"></script>
+    <script src="/email-service.js?v=15.0_FINAL_FIX"></script>
+    <script src="/supabase-config.js?v=15.0_FINAL_FIX"></script>
+    <script src="/supabase-client.js?v=15.0_FINAL_FIX"></script>
+    <script src="/api-cache.js?v=15.0_FINAL_FIX"></script>
+    <script src="/data-migration.js?v=15.0_FINAL_FIX"></script>
+    <script src="/password-utils.js?v=15.0_FINAL_FIX"></script>
+    <script src="/form-validator.js?v=15.0_FINAL_FIX"></script>
+    <script src="/audit-logger.js?v=15.0_FINAL_FIX"></script>
+    <script src="/notifications-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/advanced-modules.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/planning-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/api-usage-tracker.js?v=15.0_FINAL_FIX"></script>
+    <script src="/ai-service.js?v=15.0_FINAL_FIX"></script>
+    <script src="/execution-tab-helpers.js?v=15.0_FINAL_FIX"></script>
+    <script src="/execution-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/reporting-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/dashboard-module.js?v=15.0_FINAL_FIX"></script>
+    <script src="/clients-module.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
+    <script src="/clients-list.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
+    <script src="/clients-detail.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
+    <script src="/clients-modals.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
+    <script src="/client-workspace.js?v=15.0_FINAL_FIX_ULTRA_FORCE"></script>
+    <script src="/checklist-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/export-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/documents-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/certifications-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/appeals-complaints-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/impartiality-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/management-review-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/record-retention-module.js?v=15.0_FINAL_FIX" defer></script>
+    <script src="/ncr-capa-module.js?v=15.0_FINAL_FIX"></script>
+    <script src="/settings-module.js?v=15.0_FINAL_FIX"></script>
+    <script src="/settings-system-defaults.js?v=15.0_FINAL_FIX"></script>
+    <script src="/audit-trail-module.js?v=15.0_FINAL_FIX"></script>
+    <script src="/auditor-form-module.js?v=15.0_FINAL_FIX"></script>
     <!-- REMOVED: offline-manager.js - sync/offline functionality disabled -->
     <!-- <script src="offline-manager.js?v=20260108220000"></script> -->
 
