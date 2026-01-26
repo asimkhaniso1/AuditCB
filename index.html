@@ -69,12 +69,14 @@
                     return String(s).replace(/[&<>"']/g, function (m) {
                         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
                     });
-                },
-                // ⚡ FORCE RELOAD if we are in a corrupted state (Vercel Cache-Bust)
-                if(window.location.search.indexOf('v=10') === -1 && !localStorage.getItem('v10_reloaded')) {
-                console.log('🔄 First visit to v10 - Forcing one-time full reload');
-                localStorage.setItem('v10_reloaded', 'true');
-                window.location.href = window.location.pathname + '?v=10' + window.location.hash;
+                }
+            };
+
+            // ⚡ FORCE RELOAD if we are in a corrupted state (Vercel Cache-Bust)
+            if (window.location.search.indexOf('v=10.1') === -1 && !localStorage.getItem('v10.1_reloaded')) {
+                console.log('🔄 First visit to v10.1 - Forcing one-time full reload');
+                localStorage.setItem('v10.1_reloaded', 'true');
+                window.location.href = window.location.pathname + '?v=10.1' + window.location.hash;
             }
         })();
     </script>
@@ -289,56 +291,56 @@
 
     <!-- New Security & Utility Modules (Load BEFORE core script) -->
     <!-- Core Utilities (Load BEFORE everything else) -->
-    <script src="/logger.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/error-handler.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/safe-dom.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/utils.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/sanitization.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/constants.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/debounce.js?v=10.0_ULTRA_HOTFIX"></script>
+    <script src="/logger.js?v=10.1_FIXED"></script>
+    <script src="/error-handler.js?v=10.1_FIXED"></script>
+    <script src="/safe-dom.js?v=10.1_FIXED"></script>
+    <script src="/utils.js?v=10.1_FIXED"></script>
+    <script src="/sanitization.js?v=10.1_FIXED"></script>
+    <script src="/constants.js?v=10.1_FIXED"></script>
+    <script src="/debounce.js?v=10.1_FIXED"></script>
 
     <!-- Load core script to initialize window.state -->
-    <script src="/script.js?v=10.0_ULTRA_HOTFIX"></script>
+    <script src="/script.js?v=10.1_FIXED"></script>
 
     <!-- Core Modules load after state is initialized -->
-    <script src="/event-manager.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/validation.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/auth-manager.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/email-service.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/supabase-config.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/supabase-client.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/api-cache.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/data-migration.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/password-utils.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/form-validator.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/audit-logger.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/notifications-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/advanced-modules.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/planning-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/api-usage-tracker.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/ai-service.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/execution-tab-helpers.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/execution-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/reporting-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/dashboard-module.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/clients-module.js?v=10.0_ULTRA_HOTFIX_ULTRA_FORCE"></script>
-    <script src="/clients-list.js?v=10.0_ULTRA_HOTFIX_ULTRA_FORCE"></script>
-    <script src="/clients-detail.js?v=10.0_ULTRA_HOTFIX_ULTRA_FORCE"></script>
-    <script src="/clients-modals.js?v=10.0_ULTRA_HOTFIX_ULTRA_FORCE"></script>
-    <script src="/client-workspace.js?v=10.0_ULTRA_HOTFIX_ULTRA_FORCE"></script>
-    <script src="/checklist-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/export-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/documents-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/certifications-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/appeals-complaints-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/impartiality-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/management-review-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/record-retention-module.js?v=10.0_ULTRA_HOTFIX" defer></script>
-    <script src="/ncr-capa-module.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/settings-module.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/settings-system-defaults.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/audit-trail-module.js?v=10.0_ULTRA_HOTFIX"></script>
-    <script src="/auditor-form-module.js?v=10.0_ULTRA_HOTFIX"></script>
+    <script src="/event-manager.js?v=10.1_FIXED"></script>
+    <script src="/validation.js?v=10.1_FIXED"></script>
+    <script src="/auth-manager.js?v=10.1_FIXED"></script>
+    <script src="/email-service.js?v=10.1_FIXED"></script>
+    <script src="/supabase-config.js?v=10.1_FIXED"></script>
+    <script src="/supabase-client.js?v=10.1_FIXED"></script>
+    <script src="/api-cache.js?v=10.1_FIXED"></script>
+    <script src="/data-migration.js?v=10.1_FIXED"></script>
+    <script src="/password-utils.js?v=10.1_FIXED"></script>
+    <script src="/form-validator.js?v=10.1_FIXED"></script>
+    <script src="/audit-logger.js?v=10.1_FIXED"></script>
+    <script src="/notifications-module.js?v=10.1_FIXED" defer></script>
+    <script src="/advanced-modules.js?v=10.1_FIXED" defer></script>
+    <script src="/planning-module.js?v=10.1_FIXED" defer></script>
+    <script src="/api-usage-tracker.js?v=10.1_FIXED"></script>
+    <script src="/ai-service.js?v=10.1_FIXED"></script>
+    <script src="/execution-tab-helpers.js?v=10.1_FIXED"></script>
+    <script src="/execution-module.js?v=10.1_FIXED" defer></script>
+    <script src="/reporting-module.js?v=10.1_FIXED" defer></script>
+    <script src="/dashboard-module.js?v=10.1_FIXED"></script>
+    <script src="/clients-module.js?v=10.1_FIXED_ULTRA_FORCE"></script>
+    <script src="/clients-list.js?v=10.1_FIXED_ULTRA_FORCE"></script>
+    <script src="/clients-detail.js?v=10.1_FIXED_ULTRA_FORCE"></script>
+    <script src="/clients-modals.js?v=10.1_FIXED_ULTRA_FORCE"></script>
+    <script src="/client-workspace.js?v=10.1_FIXED_ULTRA_FORCE"></script>
+    <script src="/checklist-module.js?v=10.1_FIXED" defer></script>
+    <script src="/export-module.js?v=10.1_FIXED" defer></script>
+    <script src="/documents-module.js?v=10.1_FIXED" defer></script>
+    <script src="/certifications-module.js?v=10.1_FIXED" defer></script>
+    <script src="/appeals-complaints-module.js?v=10.1_FIXED" defer></script>
+    <script src="/impartiality-module.js?v=10.1_FIXED" defer></script>
+    <script src="/management-review-module.js?v=10.1_FIXED" defer></script>
+    <script src="/record-retention-module.js?v=10.1_FIXED" defer></script>
+    <script src="/ncr-capa-module.js?v=10.1_FIXED"></script>
+    <script src="/settings-module.js?v=10.1_FIXED"></script>
+    <script src="/settings-system-defaults.js?v=10.1_FIXED"></script>
+    <script src="/audit-trail-module.js?v=10.1_FIXED"></script>
+    <script src="/auditor-form-module.js?v=10.1_FIXED"></script>
     <!-- REMOVED: offline-manager.js - sync/offline functionality disabled -->
     <!-- <script src="offline-manager.js?v=20260108220000"></script> -->
 
