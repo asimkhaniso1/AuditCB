@@ -276,7 +276,7 @@ function renderClientDetail(clientId, options = {}) {
                 <p style="color: var(--text-secondary); margin: 0.25rem 0;">${window.UTILS.escapeHtml(client.industry || 'N/A')} • ${window.UTILS.escapeHtml(client.standard || 'N/A')}</p>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                     <button class="btn btn-primary" onclick="window.renderEditClient(${client.id})">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
@@ -761,26 +761,7 @@ function getClientDepartmentsHTML(client) {
     `;
 }
 
-function getClientOrgSetupHTML(client) {
-    return `
-        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-            <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; border: 1px solid #bae6fd; display: flex; align-items: start; gap: 0.75rem;">
-                <i class="fa-solid fa-circle-info" style="color: #0284c7; margin-top: 3px;"></i>
-                <div>
-                    <h4 style="margin: 0 0 0.25rem 0; color: #0c4a6e; font-size: 0.95rem;">Organization Context Setup</h4>
-                    <p style="margin: 0; font-size: 0.85rem; color: #075985;">
-                        Define the organizational structure, key processes, and products/services. This information is critical for audit scoping and planning (ISO 17021-1).
-                    </p>
-                </div>
-            </div>
-            ${getClientDepartmentsHTML(client)}
-            ${getClientDesignationsHTML(client)}
-            ${getClientContactsHTML(client)}
-            ${getClientKeyProcessesHTML(client)}
-            ${getClientGoodsServicesHTML(client)}
-        </div>
-    `;
-}
+// getClientOrgSetupHTML (Wizard Version) moved to end of file to avoid duplication conflicts
 
 // Goods/Services Step (AI-Populated)
 function getClientGoodsServicesHTML(client) {
@@ -1429,6 +1410,7 @@ window.handleLogoUpload = function (input) {
 };
 
 window.renderAddClient = function () {
+    console.log('[DEBUG] renderAddClient called');
     const html = `
     <div class="fade-in" style="max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;">
         <!-- Header -->

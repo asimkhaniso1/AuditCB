@@ -352,18 +352,22 @@ window.renderClientModule = function (clientId, moduleName) {
             }
             break;
         case 'settings':
+            console.log('[DEBUG-WORKSPACE] Settings case triggered for client:', client.id);
             if (typeof renderClientDetail === 'function') {
                 renderClientDetail(client.id, { showAccountSetup: true, showAnalytics: false });
                 setTimeout(() => {
                     const settingsTab = document.querySelector('.tab-btn[data-tab="settings"]');
+                    console.log('[DEBUG-WORKSPACE] Settings tab found:', !!settingsTab);
                     if (settingsTab) {
                         settingsTab.click();
                     } else if (typeof renderClientTab === 'function') {
+                        console.log('[DEBUG-WORKSPACE] Using renderClientTab fallback for settings');
                         renderClientTab(client, 'settings');
                     }
-                }, 100);
+                }, 200);
             } else {
-                contentArea.innerHTML = 'Settings not available';
+                console.error('[DEBUG-WORKSPACE] renderClientDetail is not defined');
+                contentArea.innerHTML = 'Settings not available (Module error)';
             }
             break;
     }
