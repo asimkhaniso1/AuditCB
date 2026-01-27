@@ -1,10 +1,10 @@
 /**
- * EMERGENCY DATA RESTORATION SCRIPT (v1.0)
- * This script restores data from the Jan 22nd Manual Backup.
+ * EMERGENCY DATA RESTORATION SCRIPT (v1.1)
+ * FIXED: UUID type mismatch and Settings conflict target.
  */
 
 (async function restoreData() {
-    console.log('%c🚀 STARTING DATA RESTORATION...', 'color: blue; font-weight: bold; font-size: 16px;');
+    console.log('%c🚀 STARTING CORRECTED DATA RESTORATION...', 'color: blue; font-weight: bold; font-size: 16px;');
 
     if (!window.SupabaseClient) {
         console.error('❌ SupabaseClient not found. Please make sure the app is loaded.');
@@ -166,7 +166,7 @@
     }
   ],
   "settings": {
-    "id": 1,
+    "id": "00000000-0000-0000-0000-000000000001",
     "standards": [
       "ISO 9001:2015",
       "ISO 14001:2015",
@@ -822,8 +822,9 @@
         // 1. Restore Profiles
         console.log('Restoring Profiles...');
         for (const profile of backup.profiles) {
-            const { avatar, ...cleanProfile } = profile; // Remove  keys if any
-            await window.SupabaseClient.upsert('profiles', cleanProfile);
+            const { avatar, ...cleanProfile } = profile;
+            // Ensure ID is a valid UUID (stored as string in JSON)
+            await window.SupabaseClient.upsert('profiles', cleanProfile, { onConflict: 'id' });
         }
         console.log('✅ Profiles restored.');
 
@@ -832,13 +833,15 @@
         for (const client of backup.clients) {
             const { "key_processes\r": kp, ...cleanClient } = client;
             if (kp) cleanClient.key_processes = kp;
-            await window.SupabaseClient.upsert('clients', cleanClient);
+            // Client IDs are strings in the JSON, should work with upsert
+            await window.SupabaseClient.upsert('clients', cleanClient, { onConflict: 'id' });
         }
         console.log('✅ Clients restored.');
 
         // 3. Restore Settings
-        console.log('Restoring Settings...');
-        await window.SupabaseClient.upsert('settings', backup.settings);
+        console.log('Restoring Settings (Targeting key column)...');
+        // The settings table uses 'key' as a unique constraint, not 'id'
+        await window.SupabaseClient.upsert('settings', backup.settings, { onConflict: 'key' });
         console.log('✅ Settings restored.');
 
         console.log('%c🎉 RESTORATION COMPLETE!', 'color: green; font-weight: bold; font-size: 16px;');
@@ -847,6 +850,6 @@
 
     } catch (error) {
         console.error('❌ Restoration failed:', error);
-        alert('Restoration failed: ' + error.message);
+        alert('Restoration failed: ' + (error.message || JSON.stringify(error)));
     }
 })();
