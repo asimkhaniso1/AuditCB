@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <base href="/">
+    <!-- Removed: <base href="/"> - Breaking paths on local filesystem -->
 
     <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
@@ -26,10 +26,10 @@
     <title>AuditCB360 – ISO CB Auditor & Audit Management</title>
     <meta name="description"
         content="Manage ISO Certification Body operations including clients, auditors, audits, and certification decisions.">
-    <link rel="stylesheet" href="/styles.css?v=16.1">
-    <link rel="preload" href="/styles.css?v=16.1" as="style">
-    <link rel="stylesheet" href="/required-fields.css">
-    <link rel="stylesheet" href="/font-fallback.css">
+    <link rel="stylesheet" href="./styles.css?v=16.1">
+    <link rel="preload" href="./styles.css?v=16.1" as="style">
+    <link rel="stylesheet" href="./required-fields.css">
+    <link rel="stylesheet" href="./font-fallback.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"
@@ -320,56 +320,56 @@
 
     <!-- New Security & Utility Modules (Load BEFORE core script) -->
     <!-- Core Utilities (Load BEFORE everything else) -->
-    <script src="/logger.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/error-handler.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/safe-dom.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/utils.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/sanitization.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/constants.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/debounce.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./logger.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./error-handler.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./safe-dom.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./utils.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./sanitization.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./constants.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./debounce.js?v=16.1_EMERGENCY_PROTECT"></script>
 
     <!-- Load core script to initialize window.state -->
-    <script src="/script.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./script.js?v=16.1_EMERGENCY_PROTECT"></script>
 
     <!-- Core Modules load after state is initialized -->
-    <script src="/event-manager.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/validation.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/auth-manager.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/email-service.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/supabase-config.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/supabase-client.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/api-cache.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/data-migration.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/password-utils.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/form-validator.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/audit-logger.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/notifications-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/advanced-modules.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/planning-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/api-usage-tracker.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/ai-service.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/execution-tab-helpers.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/execution-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/reporting-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/dashboard-module.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/clients-module.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/clients-list-v16.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/clients-detail.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/clients-modals.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/client-workspace.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/checklist-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/export-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/documents-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/certifications-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/appeals-complaints-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/impartiality-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/management-review-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/record-retention-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
-    <script src="/ncr-capa-module.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/settings-module.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/settings-system-defaults.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/audit-trail-module.js?v=16.1_EMERGENCY_PROTECT"></script>
-    <script src="/auditor-form-module.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./event-manager.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./validation.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./auth-manager.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./email-service.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./supabase-config.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./supabase-client.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./api-cache.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./data-migration.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./password-utils.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./form-validator.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./audit-logger.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./notifications-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./advanced-modules.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./planning-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./api-usage-tracker.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./ai-service.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./execution-tab-helpers.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./execution-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./reporting-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./dashboard-module.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./clients-module.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./clients-list-v16.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./clients-detail.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./clients-modals.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./client-workspace.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./checklist-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./export-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./documents-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./certifications-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./appeals-complaints-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./impartiality-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./management-review-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./record-retention-module.js?v=16.1_EMERGENCY_PROTECT" defer></script>
+    <script src="./ncr-capa-module.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./settings-module.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./settings-system-defaults.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./audit-trail-module.js?v=16.1_EMERGENCY_PROTECT"></script>
+    <script src="./auditor-form-module.js?v=16.1_EMERGENCY_PROTECT"></script>
     <!-- REMOVED: offline-manager.js - sync/offline functionality disabled -->
     <!-- <script src="offline-manager.js?v=20260108220000"></script> -->
 
