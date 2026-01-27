@@ -1,0 +1,4 @@
+id,email,full_name,role,avatar_url,qualification_standards,created_at,updated_at,avatar
+14523ad3-a633-43d5-8461-a454bc2cfd8d,info@companycertification.com,System Admin,Admin,https://ui-avatars.com/api/?name=System%20Admin&background=random,,2026-01-06 07:35:50.601181+00,2026-01-22 11:23:34.281961+00,
+1e45550a-ab5a-4a69-a8e9-ee1cd510c596,admin@companycertification.com,Admin User,Admin,https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff,,2026-01-10 05:29:09.078619+00,2026-01-22 10:51:53.304417+00,
+8896eae1-8da7-4415-9c51-c7b6c6cd0c75,info@craftychocolates.com,MAK,Lead Auditor,https://ui-avatars.com/api/?name=MAK&background=random,,2026-01-22 11:33:34.780237+00,2026-01-22 11:33:34.780237+00,
