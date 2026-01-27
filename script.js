@@ -2344,3 +2344,7 @@ window.logoutUser = function () {
         console.log('[DEBUG] User cancelled logout');
     }
 };
+
+// GLOBAL EXPORTS
+window.saveState = saveState;
+window.saveData = saveState;
