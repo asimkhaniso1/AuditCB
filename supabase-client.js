@@ -1037,11 +1037,12 @@ const SupabaseClient = {
             // Upsert won't remove deleted clients from database
             Logger.info('Replacing all clients in database...');
 
-            // Delete all existing clients
-            await this.client
-                .from('clients')
-                .delete()
-                .gte('id', 0); // Delete all (id >= 0 matches everything)
+            // DELETED 2026-01-27: This was causing mass data loss when local state was empty or stale.
+            // Using a safe upsert-only approach instead.
+            // await this.client
+            //     .from('clients')
+            //     .delete()
+            //     .gte('id', 0); // Delete all (id >= 0 matches everything)
 
             // Insert current clients if any
             if (clients?.length > 0) {
@@ -1069,7 +1070,7 @@ const SupabaseClient = {
 
                 const { error } = await this.client
                     .from('clients')
-                    .insert(clientsData);
+                    .upsert(clientsData);
 
                 if (error) throw error;
             }
