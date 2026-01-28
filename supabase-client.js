@@ -1010,6 +1010,8 @@ const SupabaseClient = {
                 contact_person: client.contactPerson || (client.contacts?.[0]?.name) || null,
                 next_audit: client.nextAudit || null,
                 last_audit: client.lastAudit || null,
+                logo_url: client.logoUrl || null,
+                created_by: client.createdBy || 'System', // Fix NOT NULL constraint
                 updated_at: new Date().toISOString()
             };
 
