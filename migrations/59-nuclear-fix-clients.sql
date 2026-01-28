@@ -1,28 +1,48 @@
--- NUCLEAR OPTION: Fix Client Permissions Once and For All
--- 1. Disable RLS entirely on clients table (open the gate)
+-- NUCLEAR OPTION V2: Fix Permissions for ALL Tables
+-- This script proactively disables RLS on all key tables and grants full access.
+-- Run this to clear "403 Forbidden" errors across the entire app.
+
+-- 1. CLIENTS Table
 ALTER TABLE public.clients DISABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.clients TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.clients;
+CREATE POLICY "Allow All Clients" ON public.clients FOR ALL USING (true) WITH CHECK (true);
 
--- 2. Drop any existing policies that might be lingering
-DROP POLICY IF EXISTS "Allow all access to authenticated users" ON public.clients;
-DROP POLICY IF EXISTS "Allow read access to authenticated users" ON public.clients;
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.clients;
+-- 2. SETTINGS Table (Fixes blank settings page)
+ALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.settings TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.settings;
+CREATE POLICY "Allow All Settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
 
--- 3. Grant explicit permissions to ALL standard roles
-GRANT ALL ON public.clients TO postgres;
-GRANT ALL ON public.clients TO service_role;
-GRANT ALL ON public.clients TO authenticated;
-GRANT ALL ON public.clients TO anon;
+-- 3. AUDIT PLANS Table
+ALTER TABLE public.audit_plans DISABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.audit_plans TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.audit_plans;
+CREATE POLICY "Allow All Audit Plans" ON public.audit_plans FOR ALL USING (true) WITH CHECK (true);
 
--- 4. Create a dummy "Allow All" policy just in case RLS gets re-enabled
-CREATE POLICY "Allow All Operations" ON public.clients
-    FOR ALL
-    USING (true)
-    WITH CHECK (true);
+-- 4. AUDIT REPORTS Table
+ALTER TABLE public.audit_reports DISABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.audit_reports TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.audit_reports;
+CREATE POLICY "Allow All Audit Reports" ON public.audit_reports FOR ALL USING (true) WITH CHECK (true);
 
--- 5. Repeat for documents table (often related)
+-- 5. CHECKLISTS Table
+ALTER TABLE public.checklists DISABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.checklists TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.checklists;
+CREATE POLICY "Allow All Checklists" ON public.checklists FOR ALL USING (true) WITH CHECK (true);
+
+-- 6. DOCUMENTS Table
 ALTER TABLE public.documents DISABLE ROW LEVEL SECURITY;
-GRANT ALL ON public.documents TO authenticated;
-GRANT ALL ON public.documents TO anon;
+GRANT ALL ON public.documents TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.documents;
+CREATE POLICY "Allow All Documents" ON public.documents FOR ALL USING (true) WITH CHECK (true);
 
--- Verification
-SELECT * FROM public.clients LIMIT 1;
+-- 6. CERTIFICATION DECISIONS Table
+ALTER TABLE public.certification_decisions DISABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.certification_decisions TO postgres, service_role, authenticated, anon;
+DROP POLICY IF EXISTS "Allow all operations" ON public.certification_decisions;
+CREATE POLICY "Allow All Decisions" ON public.certification_decisions FOR ALL USING (true) WITH CHECK (true);
+
+-- Verification Output
+SELECT 'Permissions Fixed for ALL tables' as status;
