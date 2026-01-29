@@ -1011,7 +1011,9 @@ const SupabaseClient = {
                 next_audit: client.nextAudit || null,
                 last_audit: client.lastAudit || null,
                 logo_url: client.logoUrl || null,
-                created_by: client.createdBy || 'System', // Fix NOT NULL constraint
+                // created_by: client.createdBy || (this.auth?.user?.id) || null, // Send UUID or NULL (never string "System")
+                // Use a safe fallback if explicit ID missing, but don't send string to UUID column
+                created_by: client.createdBy || (this.auth?.user?.id) || null,
                 updated_at: new Date().toISOString()
             };
 
