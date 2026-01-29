@@ -35,11 +35,21 @@ function renderClientsEnhanced() {
 
     const rows = paginatedClients.map(client => `
     <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;" onclick="renderClientDetail('${client.id}')">
-            <td>${window.UTILS.escapeHtml(client.name)}</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 6px; overflow: hidden; background: #fff; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;">
+                        ${client.logoUrl
+            ? `<img src="${client.logoUrl}" style="width: 100%; height: 100%; object-fit: contain;">`
+            : `<i class="fa-solid fa-building" style="font-size: 0.9rem; color: #cbd5e1;"></i>`
+        }
+                    </div>
+                    <span style="font-weight: 500; color: #1e293b;">${window.UTILS.escapeHtml(client.name)}</span>
+                </div>
+            </td>
             <td>
                 ${(client.standard || '').split(',').map(s =>
-        `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.75em;">${window.UTILS.escapeHtml(s.trim())}</span>`
-    ).join('')}
+            `<span class="badge" style="background: #e0f2fe; color: #0284c7; margin-right: 4px; font-size: 0.75em;">${window.UTILS.escapeHtml(s.trim())}</span>`
+        ).join('')}
             </td>
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
             <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
@@ -274,9 +284,21 @@ function renderClientDetail(clientId, options = {}) {
             <!--Header Card with Client Info-->
     <div class="card" style="margin-bottom: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <div>
-                <h2 style="margin: 0;">${window.UTILS.escapeHtml(client.name)}</h2>
-                <p style="color: var(--text-secondary); margin: 0.25rem 0;">${window.UTILS.escapeHtml(client.industry || 'N/A')} • ${window.UTILS.escapeHtml(client.standard || 'N/A')}</p>
+            <div style="display: flex; align-items: center; gap: 1.25rem;">
+                 <div style="width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: #fff; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    ${client.logoUrl
+            ? `<img src="${client.logoUrl}" style="width: 100%; height: 100%; object-fit: contain;">`
+            : `<i class="fa-solid fa-building" style="font-size: 1.75rem; color: #e2e8f0;"></i>`
+        }
+                </div>
+                <div>
+                    <h2 style="margin: 0; line-height: 1.2;">${window.UTILS.escapeHtml(client.name)}</h2>
+                    <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+                        ${window.UTILS.escapeHtml(client.industry || 'N/A')} 
+                        <span style="margin: 0 0.5rem; color: #cbd5e1;">|</span> 
+                        ${window.UTILS.escapeHtml(client.standard || 'N/A')}
+                    </p>
+                </div>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
@@ -1414,6 +1436,13 @@ window.handleLogoUpload = function (input) {
 
 window.renderAddClient = function () {
     console.log('[DEBUG] renderAddClient called');
+
+    const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
+        ? window.state.cbSettings.standardsOffered
+        : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
+            ? window.state.cbSettings.availableStandards
+            : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
+
     const html = `
     <div class="fade-in" style="max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;">
         <!-- Header -->
@@ -1479,7 +1508,7 @@ window.renderAddClient = function () {
                         <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-                                ${((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map((std, i) => `
+                                ${standardsToShow.map((std, i) => `
                                     <label class="standard-checkbox-btn" style="cursor: pointer;">
                                         <input type="checkbox" name="client_standards" value="${std}" style="display: none;" onchange="this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#2563eb' : '#64748b'; this.nextElementSibling.style.background = this.checked ? '#eff6ff' : '#fff';">
                                         <span style="display: inline-block; padding: 0.4rem 0.8rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 0.85rem; color: #64748b; transition: all 0.2s;">
@@ -1774,6 +1803,12 @@ window.renderEditClient = function (clientId) {
     window._originalClientLogo = client.logoUrl;
     window._tempClientLogo = null; // Reset temp
 
+    const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
+        ? window.state.cbSettings.standardsOffered
+        : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
+            ? window.state.cbSettings.availableStandards
+            : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
+
     const html = `
     <div class="fade-in" style="max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;">
         <!-- Header -->
@@ -1851,7 +1886,7 @@ window.renderEditClient = function (clientId) {
                         <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
                              <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-                                ${((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map((std) => {
+                                ${standardsToShow.map((std) => {
         const isChecked = standards.includes(std);
         return `
                                     <label class="standard-checkbox-btn ${isChecked ? 'active' : ''}" style="cursor: pointer;">
@@ -2216,6 +2251,13 @@ function addSite(clientId) {
     const modalSave = document.getElementById('modal-save');
 
     modalTitle.textContent = 'Add Site Location';
+
+    const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
+        ? window.state.cbSettings.standardsOffered
+        : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
+            ? window.state.cbSettings.availableStandards
+            : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
+
     modalBody.innerHTML = `
         <form id="site-form">
             <div class="form-group">
@@ -2242,7 +2284,7 @@ function addSite(clientId) {
                 <div class="form-group">
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
-                        ${((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
+                        ${standardsToShow.map(std =>
         `<option value="${std}" ${(client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
     ).join('')}
                     </select>
