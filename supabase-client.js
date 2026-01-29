@@ -615,6 +615,51 @@ const SupabaseClient = {
          * @param {string} entityId - Related entity ID
          * @returns {object} { url, path } or null
          */
+        /**
+         * Upload client logo
+         * @param {File} file - The image file
+         * @param {string} clientId - Client ID
+         * @returns {object} { url, path } or null
+         */
+        uploadClientLogo: async function (file, clientId) {
+            if (!SupabaseClient.isInitialized) return null;
+
+            // Use 'public' bucket if available or 'audit-images'
+            // We'll use 'audit-images/client-logos'
+            const bucket = 'audit-images';
+            const timestamp = Date.now();
+            const cleanFileName = file.name ? file.name.replace(/[^a-zA-Z0-9.-]/g, '_') : 'logo';
+            const path = `client-logos/${clientId}_${timestamp}_${cleanFileName}`;
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Try to get Public URL first (preferred for logos)
+                const { data: publicUrlData } = SupabaseClient.client.storage
+                    .from(bucket)
+                    .getPublicUrl(path);
+
+                if (publicUrlData && publicUrlData.publicUrl) {
+                    Logger.info('Client logo uploaded (public):', publicUrlData.publicUrl);
+                    return { url: publicUrlData.publicUrl, path };
+                }
+
+                // Fallback to signed URL if public fails (though publicUrl usually returns something)
+                const signedUrl = await this.getSignedUrl(bucket, path, 86400 * 365); // 1 year
+                return { url: signedUrl, path };
+            } catch (error) {
+                Logger.error('Client logo upload failed:', error);
+                return null;
+            }
+        },
+
         uploadAuditImage: async function (file, context, entityId) {
             return this.uploadGenericFile(file, 'audit-images', context, entityId);
         },
@@ -1010,7 +1055,7 @@ const SupabaseClient = {
                 contact_person: client.contactPerson || (client.contacts?.[0]?.name) || null,
                 next_audit: client.nextAudit || null,
                 last_audit: client.lastAudit || null,
-                // logo_url: REMOVED - column doesn't exist in DB
+                logo_url: client.logoUrl || null,
                 // Use current user ID from app state
                 created_by: client.createdBy || window.state?.currentUser?.id || null,
                 updated_at: new Date().toISOString()
@@ -1173,7 +1218,8 @@ const SupabaseClient = {
                     contactPerson: client.contact_person,
                     nextAudit: client.next_audit,
                     lastAudit: client.last_audit,
-                    updatedAt: client.updated_at
+                    updatedAt: client.updated_at,
+                    logoUrl: client.logo_url
                 };
 
                 const existing = localClients.find(c => String(c.id) === String(client.id));

@@ -1419,6 +1419,7 @@ function renderClientTab(client, tabName) {
 
 window.handleLogoUpload = function (input) {
     if (input.files && input.files[0]) {
+        window._tempLogoFile = input.files[0];
         const reader = new FileReader();
         reader.onload = function (e) {
             window._tempClientLogo = e.target.result;
@@ -1644,7 +1645,7 @@ window.renderAddClient = function () {
     }
 };
 
-window.saveNewClient = function () {
+window.saveNewClient = async function () {
     // 1. Define Fields
     const fieldIds = {
         name: 'client-name',
@@ -1757,6 +1758,20 @@ window.saveNewClient = function () {
         logoUrl: window._tempClientLogo || ''
     };
 
+    // Handle Logo Upload via Storage
+    if (window._tempLogoFile && window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        try {
+            window.showNotification('Uploading logo...', 'info');
+            const uploadResult = await window.SupabaseClient.storage.uploadClientLogo(window._tempLogoFile, newClient.id);
+            if (uploadResult && uploadResult.url) {
+                newClient.logoUrl = uploadResult.url;
+                Logger.info('Logo uploaded via Storage:', newClient.logoUrl);
+            }
+        } catch (e) {
+            console.error('Logo upload failed, falling back to base64 if available', e);
+        }
+    }
+
     // 6. Save
     window.state.clients.push(newClient);
     window.saveData();
@@ -1781,6 +1796,10 @@ window.saveNewClient = function () {
     setTimeout(() => {
         document.querySelector('.tab-btn[data-tab="client_org"]')?.click();
     }, 500);
+
+    // Clear temp
+    window._tempLogoFile = null;
+    window._tempClientLogo = null;
 };
 
 window.renderEditClient = function (clientId) {
@@ -2024,7 +2043,7 @@ window.renderEditClient = function (clientId) {
     }
 };
 
-window.saveAuditClient = function (clientId) {
+window.saveAuditClient = async function (clientId) {
     const client = window.state.clients.find(c => c.id == clientId);
     if (!client) return;
 
@@ -2113,8 +2132,20 @@ window.saveAuditClient = function (clientId) {
     client.nextAudit = cleanData.nextAudit;
 
     // Update Logo if changed
-    if (window._tempClientLogo) {
-        console.log('Saving new logo...');
+    if (window._tempLogoFile && window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        try {
+            window.showNotification('Uploading logo...', 'info');
+            const uploadResult = await window.SupabaseClient.storage.uploadClientLogo(window._tempLogoFile, client.id);
+            if (uploadResult && uploadResult.url) {
+                client.logoUrl = uploadResult.url;
+                Logger.info('Logo updated via Storage:', client.logoUrl);
+            }
+        } catch (e) {
+            console.error('Logo upload failed', e);
+            if (window._tempClientLogo) client.logoUrl = window._tempClientLogo; // Fallback
+        }
+    } else if (window._tempClientLogo) {
+        console.log('Saving new logo (Base64 or existing)...');
         client.logoUrl = window._tempClientLogo;
     }
     // If user cleared it or didn't change it, we keep current (or can implement clear logic if needed)
@@ -2151,6 +2182,7 @@ window.saveAuditClient = function (clientId) {
 
     // Clean up
     delete window._tempClientLogo;
+    delete window._tempLogoFile;
     delete window._originalClientLogo;
 
     // Return to list
