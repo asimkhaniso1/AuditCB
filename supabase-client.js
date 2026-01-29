@@ -1011,9 +1011,11 @@ const SupabaseClient = {
                 next_audit: client.nextAudit || null,
                 last_audit: client.lastAudit || null,
                 logo_url: client.logoUrl || null,
-                // Use current user ID from app state, not from supabase auth (simpler and works)
+                // Use current user ID from app state
                 created_by: client.createdBy || window.state?.currentUser?.id || null,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
+                // Include the full client object in 'data' column (JSONB)
+                data: client
             };
 
             console.log('[upsertClient] Sending payload:', JSON.stringify(clientData, null, 2));
