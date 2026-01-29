@@ -250,6 +250,9 @@ function renderClientDetail(clientId, options = {}) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
 
+    // Set active client ID so tabs like "Account Setup" are visible
+    window.state.activeClientId = String(clientId);
+
     // Options: showAccountSetup (default: true), showAnalytics (default: true)
     const showAccountSetup = options.showAccountSetup !== false;
     const showAnalytics = options.showAnalytics !== false;
