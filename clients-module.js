@@ -5193,7 +5193,7 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
             }, 100);
         }
 
-        const auditor = auditors.find(a => String(a.id) === String(auditorId));
+        // auditor variable already exists from line 5155, reuse it
         window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
     };
 
