@@ -403,7 +403,11 @@ function switchSettingsTab(tabName, btnElement) {
 // ============================================
 
 function getCBProfileHTML() {
-    const settings = window.state.cbSettings;
+    const settings = window.state.cbSettings || {};
+
+    // Ensure default values exist for color pickers
+    if (!settings.primaryColor) settings.primaryColor = '#4f46e5';
+    if (!settings.secondaryColor) settings.secondaryColor = '#64748b';
 
     // Ensure cbSites exists in state to prevent "Office location not found" errors
     if (!settings.cbSites || !Array.isArray(settings.cbSites) || settings.cbSites.length === 0) {
