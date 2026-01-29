@@ -369,6 +369,10 @@ function renderAuditTrendsChart() {
     const ctx = document.getElementById('auditTrendsChart');
     if (!ctx) return;
 
+    // Destroy existing chart if present to prevent "Canvas already in use" error
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
     // Initialize arrays for last 6 months
     const months = [];
     const completed = new Array(6).fill(0);
@@ -461,6 +465,10 @@ function renderNCRDistributionChart(major, minor) {
     const ctx = document.getElementById('ncrDistributionChart');
     if (!ctx) return;
 
+    // Destroy existing chart if present
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
     window.dashboardCharts.ncrDistribution = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -488,6 +496,10 @@ function renderNCRDistributionChart(major, minor) {
 function renderIndustryChart(industryStats) {
     const ctx = document.getElementById('industryChart');
     if (!ctx) return;
+
+    // Destroy existing chart if present
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
 
     const labels = Object.keys(industryStats);
     const data = Object.values(industryStats);
@@ -529,6 +541,10 @@ function renderStandardsChart(standardStats) {
     const ctx = document.getElementById('standardsChart');
     if (!ctx) return;
 
+    // Destroy existing chart if present
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
     const labels = Object.keys(standardStats);
     const data = Object.values(standardStats);
     const colors = ['#667eea', '#11998e', '#f093fb', '#fa709a', '#fee140'];
@@ -561,6 +577,10 @@ function renderStandardsChart(standardStats) {
 function renderNCRTrendsChart() {
     const ctx = document.getElementById('ncrTrendsChart');
     if (!ctx) return;
+
+    // Destroy existing chart if present
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
 
     const months = [];
     const openNCRs = new Array(6).fill(0);
@@ -623,6 +643,10 @@ function renderNCRTrendsChart() {
 function renderClientGrowthChart() {
     const ctx = document.getElementById('clientGrowthChart');
     if (!ctx) return;
+
+    // Destroy existing chart if present
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
 
     const months = [];
     const newClients = new Array(6).fill(0);
