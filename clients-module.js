@@ -1737,23 +1737,18 @@ window.saveNewClient = function () {
             })
             .catch(err => {
                 console.error('Supabase sync failed:', err);
-                // 🔔 URGENT DEBUG: Show error to user
                 alert('Cloud Sync Failed: ' + (err.message || JSON.stringify(err)));
                 window.showNotification('Saved locally, but Cloud Sync Failed: ' + err.message, 'error');
             });
-        alert('Cloud Sync Failed: ' + (err.message || JSON.stringify(err)));
-        window.showNotification('Saved locally, but Cloud Sync Failed: ' + err.message, 'error');
-    });
-} else {
-    window.showNotification('Client created locally (Cloud offline)', 'warning');
-}
-// window.showNotification('Client created! Redirecting to Workspace...', 'success'); // Duplicate
+    } else {
+        window.showNotification('Client created locally (Cloud offline)', 'warning');
+    }
 
-// Redirect to Client Workspace Settings
-renderClientDetail(newClient.id);
-setTimeout(() => {
-    document.querySelector('.tab-btn[data-tab="client_org"]')?.click();
-}, 500);
+    // Redirect to Client Workspace Settings
+    renderClientDetail(newClient.id);
+    setTimeout(() => {
+        document.querySelector('.tab-btn[data-tab="client_org"]')?.click();
+    }, 500);
 };
 
 window.renderEditClient = function (clientId) {
