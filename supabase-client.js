@@ -1011,22 +1011,27 @@ const SupabaseClient = {
                 next_audit: client.nextAudit || null,
                 last_audit: client.lastAudit || null,
                 logo_url: client.logoUrl || null,
-                // created_by: client.createdBy || (this.auth?.user?.id) || null, // Send UUID or NULL (never string "System")
-                // Use a safe fallback if explicit ID missing, but don't send string to UUID column
-                created_by: client.createdBy || (this.auth?.user?.id) || null,
+                // Use current user ID from app state, not from supabase auth (simpler and works)
+                created_by: client.createdBy || window.state?.currentUser?.id || null,
                 updated_at: new Date().toISOString()
             };
+
+            console.log('[upsertClient] Sending payload:', JSON.stringify(clientData, null, 2));
 
             const { data, error } = await this.client
                 .from('clients')
                 .upsert(clientData, { onConflict: 'id' })
                 .select();
 
-            if (error) throw error;
+            if (error) {
+                console.error('[upsertClient] Supabase Error:', error);
+                throw error;
+            }
             Logger.info('Client saved to Supabase:', client.name);
             return data;
         } catch (error) {
             Logger.error('Failed to save client:', error);
+            throw error; // Re-throw to let caller handle it
         }
     },
 
