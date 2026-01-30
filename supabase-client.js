@@ -2234,7 +2234,7 @@ const SupabaseClient = {
 
         try {
             const { data, error } = await this.client.storage
-                .from('Documents')
+                .from('documents')
                 .download(filePath);
 
             if (error) throw error;
@@ -2258,7 +2258,7 @@ const SupabaseClient = {
 
         try {
             const { error } = await this.client.storage
-                .from('Documents')
+                .from('documents')
                 .remove([filePath]);
 
             if (error) throw error;
@@ -2283,7 +2283,7 @@ const SupabaseClient = {
 
         try {
             const { data, error } = await this.client.storage
-                .from('Documents')
+                .from('documents')
                 .list(folder, {
                     limit: 100,
                     offset: 0,
