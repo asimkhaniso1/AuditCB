@@ -1418,20 +1418,38 @@ function renderClientTab(client, tabName) {
 }
 
 window.handleLogoUpload = function (input) {
+    console.log('[handleLogoUpload] Triggered', input);
     if (input.files && input.files[0]) {
-        window._tempLogoFile = input.files[0];
+        const file = input.files[0];
+        console.log('[handleLogoUpload] File selected:', file.name, file.size, file.type);
+
+        window._tempLogoFile = file;
+
         const reader = new FileReader();
         reader.onload = function (e) {
+            console.log('[handleLogoUpload] File read successfully');
             window._tempClientLogo = e.target.result;
+
             const previewImg = document.getElementById('client-logo-preview-img');
             const placeholder = document.getElementById('client-logo-placeholder');
+
+            console.log('[handleLogoUpload] Elements found:', { previewImg, placeholder });
+
             if (previewImg && placeholder) {
                 previewImg.style.backgroundImage = `url(${e.target.result})`;
                 previewImg.style.display = 'block';
                 placeholder.style.display = 'none';
+                console.log('[handleLogoUpload] Preview updated');
+            } else {
+                console.error('[handleLogoUpload] Preview elements missing from DOM');
             }
         };
-        reader.readAsDataURL(input.files[0]);
+        reader.onerror = function (err) {
+            console.error('[handleLogoUpload] FileReader error:', err);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        console.warn('[handleLogoUpload] No files selected');
     }
 };
 
@@ -1486,26 +1504,7 @@ window.renderAddClient = function () {
                             </div>
                         </div>
 
-                        <!-- Logo Upload Section -->
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Company Logo</label>
-                             <div style="display: flex; gap: 1rem; align-items: center;">
-                                 <!-- Preview Circle -->
-                                 <div id="client-logo-preview-img" style="width: 64px; height: 64px; border-radius: 50%; background-color: #f1f5f9; background-size: cover; background-position: center; border: 2px solid #e2e8f0; display: none;"></div>
-                                 <div id="client-logo-placeholder" style="width: 64px; height: 64px; border-radius: 50%; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; border: 2px dashed #cbd5e1; color: #94a3b8;">
-                                     <i class="fa-solid fa-image"></i>
-                                 </div>
-                                 
-                                 <!-- Upload Button & Info -->
-                                 <div style="flex: 1;">
-                                     <button class="btn btn-sm btn-secondary" type="button" onclick="document.getElementById('client-logo-input').click()" style="margin-bottom: 0.25rem;">
-                                         <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Logo
-                                     </button>
-                                     <input type="file" id="client-logo-input" accept="image/*" style="display: none;" onchange="window.handleLogoUpload(this)">
-                                     <p style="margin: 0; font-size: 0.75rem; color: #64748b;">Recommended: Square image, max 2MB (PNG/JPG)</p>
-                                 </div>
-                             </div>
-                        </div>
+                        <!-- Logo Upload Section Removed (Duplicated in Right Column) -->
 
                         <div class="form-group">
                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector</label>
