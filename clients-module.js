@@ -2148,20 +2148,26 @@ window.saveAuditClient = async function (clientId) {
     client.nextAudit = cleanData.nextAudit;
 
     // Update Logo if changed
+    // Update Logo if changed
     if (window._tempLogoFile && window.SupabaseClient && window.SupabaseClient.isInitialized) {
         try {
+            // alert('Starting logo upload to Supabase...'); // Removed aggressive alert
             window.showNotification('Uploading logo...', 'info');
             const uploadResult = await window.SupabaseClient.storage.uploadClientLogo(window._tempLogoFile, client.id);
             if (uploadResult && uploadResult.url) {
+                // alert('Upload SUCCESS! URL: ' + uploadResult.url); // Removed aggressive alert
                 client.logoUrl = uploadResult.url;
-                Logger.info('Logo updated via Storage:', client.logoUrl);
+                Logger.info('Logo uploaded via Storage:', newClient.logoUrl);
+            } else {
+                alert('Upload returned no URL!');
             }
         } catch (e) {
             console.error('Logo upload failed', e);
-            alert('Logo Upload Failed: ' + (e.message || 'Unknown error') + '\nFalling back to text storage (may be too large).');
+            alert('Logo Upload Failed: ' + (e.message || 'Unknown error') + '\nFalling back to text storage.');
             if (window._tempClientLogo) client.logoUrl = window._tempClientLogo; // Fallback
         }
     } else if (window._tempClientLogo) {
+        // alert('No file for upload (or Supabase not init), using base64/existing'); // Removed aggressive alert
         console.log('Saving new logo (Base64 or existing)...');
         client.logoUrl = window._tempClientLogo;
     }
