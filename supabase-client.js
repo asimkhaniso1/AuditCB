@@ -674,6 +674,9 @@ const SupabaseClient = {
                 return { url: signedUrl, path };
             } catch (error) {
                 Logger.error('Client logo upload failed:', error);
+                console.error('[SupabaseStorage] Upload Error Details:', error);
+                if (error.message) console.error('Error Message:', error.message);
+                if (error.statusCode) console.error('Status Code:', error.statusCode);
                 return null;
             }
         },
