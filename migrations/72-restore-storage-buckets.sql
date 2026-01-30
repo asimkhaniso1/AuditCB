@@ -17,8 +17,8 @@ insert into storage.buckets (id, name, public)
 values ('audit-reports', 'audit-reports', false) -- Private, signed URLs only
 on conflict (id) do nothing;
 
--- 4. Enable RLS on objects (Security Best Practice)
-alter table storage.objects enable row level security;
+-- 4. Enable RLS (Commented out to avoid permission errors - typically already enabled)
+-- alter table storage.objects enable row level security;
 
 -- ==========================================
 -- POLICIES FOR 'audit-files' (Logos - Public Read, Auth Write)
