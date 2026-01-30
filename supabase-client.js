@@ -674,9 +674,12 @@ const SupabaseClient = {
                 return { url: signedUrl, path };
             } catch (error) {
                 Logger.error('Client logo upload failed:', error);
+
+                // DEBUG: Show explicit alert for the user
+                const msg = error.message || JSON.stringify(error);
+                window.alert(`LOGO UPLOAD FAILED DETAILS:\n${msg}\n\nCheck console for more info.`);
                 console.error('[SupabaseStorage] Upload Error Details:', error);
-                if (error.message) console.error('Error Message:', error.message);
-                if (error.statusCode) console.error('Status Code:', error.statusCode);
+
                 return null;
             }
         },
@@ -2218,6 +2221,11 @@ const SupabaseClient = {
             };
         } catch (error) {
             Logger.error('Failed to upload file:', error);
+
+            // DEBUG: Show explicit alert
+            const msg = error.message || JSON.stringify(error);
+            window.alert(`FILE UPLOAD FAILED:\n${msg}`);
+
             throw error;
         }
     },
