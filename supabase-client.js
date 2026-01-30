@@ -643,9 +643,8 @@ const SupabaseClient = {
         uploadClientLogo: async function (file, clientId) {
             if (!SupabaseClient.isInitialized) return null;
 
-            // Use 'public' bucket if available or 'audit-images'
-            // We'll use 'audit-images/client-logos'
-            const bucket = 'audit-images';
+            // Use 'audit-files' bucket (public)
+            const bucket = 'audit-files';
             const timestamp = Date.now();
             const cleanFileName = file.name ? file.name.replace(/[^a-zA-Z0-9.-]/g, '_') : 'logo';
             const path = `client-logos/${clientId}_${timestamp}_${cleanFileName}`;
@@ -1135,8 +1134,6 @@ const SupabaseClient = {
                     goods_services: client.goodsServices || [],
                     key_processes: client.keyProcesses || [],
                     contact_person: client.contactPerson || null,
-                    next_audit: client.nextAudit || null,
-                    last_audit: client.lastAudit || null,
                     updated_at: new Date().toISOString()
                 }));
 
