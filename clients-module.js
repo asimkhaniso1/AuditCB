@@ -4403,12 +4403,33 @@ window.updateSiteScope = function (clientId, certIndex, siteName, value) {
 window.saveCertificateDetails = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
+
+    // Save locally first
     window.saveData();
-    // Sync to Supabase
-    if (window.SupabaseClient?.isInitialized) {
-        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+
+    // Sync specific certificates to Supabase (certification_decisions table)
+    if (window.SupabaseClient?.isInitialized && client.certificates && client.certificates.length > 0) {
+        let successCount = 0;
+        const promises = client.certificates.map(cert => {
+            // Ensure the cert has the client name attached for mapping
+            if (!cert.client) cert.client = client.name;
+
+            return window.SupabaseClient.upsertCertificate(cert)
+                .then(() => successCount++)
+                .catch(err => console.error(`Failed to save cert ${cert.id}:`, err));
+        });
+
+        Promise.all(promises).then(() => {
+            if (successCount > 0) {
+                window.showNotification(`Saved ${successCount} certificates successfully`, 'success');
+            } else {
+                window.showNotification('Failed to save certificates to cloud', 'error');
+            }
+        });
+    } else {
+        // Fallback for local-only or no certs to save
+        window.showNotification('Certificate details saved locally', 'success');
     }
-    window.showNotification('Certificate details and scopes saved successfully', 'success');
 };
 
 window.viewCertRevisionHistory = function (clientId, certIndex) {

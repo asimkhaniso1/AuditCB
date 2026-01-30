@@ -374,6 +374,25 @@ const SupabaseClient = {
                 Logger.warn('Certification Decisions sync failed:', e);
             }
 
+            // 6. HYDRATION: Link Certifications to Clients
+            // This ensures that when we load clients, they have their certificates attached
+            if (window.state.clients && window.state.certifications) {
+                let hydrationCount = 0;
+                window.state.clients.forEach(client => {
+                    // Find certs matching this client Name or ID
+                    // certification_decisions.client is usually the Client Name
+                    const clientCerts = window.state.certifications.filter(c =>
+                        c.client === client.name || String(c.client) === String(client.id)
+                    );
+
+                    if (clientCerts.length > 0) {
+                        client.certificates = clientCerts;
+                        hydrationCount++;
+                    }
+                });
+                Logger.info(`Hydrated certificates for ${hydrationCount} clients`);
+            }
+
             // CRITICAL: Save to localStorage directly (don't call saveData - it triggers upload!)
             localStorage.setItem('auditCB360State', JSON.stringify(window.state));
 
@@ -1053,8 +1072,6 @@ const SupabaseClient = {
                 key_processes: client.keyProcesses || [],
                 // Derived fields if not present
                 contact_person: client.contactPerson || (client.contacts?.[0]?.name) || null,
-                next_audit: client.nextAudit || null,
-                last_audit: client.lastAudit || null,
                 logo_url: client.logoUrl || null,
                 // Use current user ID from app state
                 created_by: client.createdBy || window.state?.currentUser?.id || null,
