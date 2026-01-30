@@ -2052,7 +2052,7 @@ const SupabaseClient = {
     },
 
     /**
-     * Fetch certification decisions from Supabase
+     * Fetch certification decisions from Supabase and map to Certificates
      */
     async syncCertificationDecisionsFromSupabase() {
         if (!this.isInitialized) {
@@ -2072,19 +2072,95 @@ const SupabaseClient = {
                 return { added: 0, updated: 0 };
             }
 
+            // ONE SOURCE OF TRUTH: Map these decisions to window.state.certifications
+            // If they have an 'id', 'issue_date', etc, they are treated as Issued Certificates
+            const localCerts = data.filter(d => d.id && d.status).map(c => ({
+                id: c.id,
+                client: c.client,
+                standard: c.standard,
+                issueDate: c.issue_date,
+                expiryDate: c.expiry_date,
+                status: c.status,
+                scope: c.scope,
+                history: c.history || [],
+                decisionRecord: c.decision_record || {}
+            }));
+
+            // Also keep the raw decisions for other uses if needed
             window.state.certificationDecisions = data;
+
+            // Overwrite local certifications with Cloud Truth
+            if (localCerts.length > 0) {
+                window.state.certifications = localCerts;
+            }
+
             window.saveState();
-            Logger.info(`Synced ${data.length} certification decisions from Supabase`);
+            Logger.info(`Synced ${data.length} certification decisions (Mapped ${localCerts.length} active certs)`);
             return { added: 0, updated: data.length };
         } catch (error) {
-            Logger.error('Failed to fetch certification decisions from Supabase:', error);
+            Logger.error('Failed to fetch certification decisions:', error);
             return { added: 0, updated: 0 };
         }
     },
 
     /**
+     * Upsert certificate (actually writes to certification_decisions)
+     */
+    async upsertCertificate(cert) {
+        if (!this.isInitialized) return;
+
+        try {
+            const payload = {
+                id: cert.id,
+                client: cert.client,
+                standard: cert.standard,
+                issue_date: cert.issueDate,
+                expiry_date: cert.expiryDate,
+                status: cert.status,
+                scope: cert.scope,
+                history: cert.history,
+                decision_record: cert.decisionRecord,
+                // Ensure legacy fields required by constraint are present if needed
+                date: cert.history?.[0]?.date || new Date().toISOString().split('T')[0],
+                decision: 'Certified',
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await this.client
+                .from('certification_decisions')
+                .upsert(payload)
+                .select();
+
+            if (error) throw error;
+            Logger.info('Certificate synced to certification_decisions:', cert.id);
+        } catch (error) {
+            Logger.error('Failed to sync certificate:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete certificate
+     */
+    async deleteCertificate(certId) {
+        if (!this.isInitialized) return;
+
+        try {
+            const { error } = await this.client
+                .from('certification_decisions')
+                .delete()
+                .eq('id', certId);
+
+            if (error) throw error;
+            Logger.info('Certificate deleted from certification_decisions:', certId);
+        } catch (error) {
+            Logger.error('Failed to delete certificate:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Upload file to Supabase Storage
-     * @param {File} file - The file to upload
      * @param {string} folder - Optional folder path (e.g., 'audit-reports', 'certificates')
      * @returns {Promise<{url: string, path: string}>}
      */

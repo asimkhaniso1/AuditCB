@@ -131,6 +131,7 @@ function renderCertificationModule() {
                                             <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View/Print"><i class="fa-solid fa-eye"></i></button>
                                             <button class="btn btn-sm btn-icon" onclick="editCertificate('${cert.id}')" title="Edit Details"><i class="fa-solid fa-pen"></i></button>
                                             <button class="btn btn-sm btn-icon" onclick="openCertActionModal('${cert.id}')" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
+                                            <button class="btn btn-sm btn-icon btn-danger" onclick="deleteCertificate('${cert.id}')" title="Delete Permanent"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join('') || '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">No active certificates found.</td></tr>'}
@@ -478,12 +479,38 @@ window.openIssueCertificateModal = function (reportId) {
 
         state.certifications.push(newCert);
         window.saveData();
+
+        // Sync to Supabase
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            window.SupabaseClient.upsertCertificate(newCert).catch(console.error);
+        }
+
         window.closeModal();
         renderCertificationModule();
         // Also pop up the certificate immediately
         window.viewCertificate(newCert.id);
         window.showNotification('Certificate issued successfully', 'success');
     };
+};
+
+window.deleteCertificate = function (certId) {
+    if (confirm('Are you sure you want to permanently delete this certificate? This action cannot be undone.')) {
+        // Remove locally
+        window.state.certifications = window.state.certifications.filter(c => String(c.id) !== String(certId));
+        window.saveData();
+
+        // Remove from Cloud
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            window.SupabaseClient.deleteCertificate(certId).then(() => {
+                window.showNotification('Certificate deleted from cloud', 'success');
+            }).catch(err => {
+                console.error('Delete failed:', err);
+                window.showNotification('Deleted locally but cloud delete failed', 'warning');
+            });
+        }
+
+        renderCertificationModule();
+    }
 };
 
 window.viewCertificate = function (certId) {

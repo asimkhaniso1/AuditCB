@@ -2142,6 +2142,7 @@ window.saveAuditClient = async function (clientId) {
             }
         } catch (e) {
             console.error('Logo upload failed', e);
+            alert('Logo Upload Failed: ' + (e.message || 'Unknown error') + '\nFalling back to text storage (may be too large).');
             if (window._tempClientLogo) client.logoUrl = window._tempClientLogo; // Fallback
         }
     } else if (window._tempClientLogo) {
@@ -2176,7 +2177,16 @@ window.saveAuditClient = async function (clientId) {
 
     // Sync to Supabase
     if (window.SupabaseClient?.isInitialized) {
-        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        window.SupabaseClient.upsertClient(client)
+            .then(() => {
+                console.log('Sync successful');
+                // Optional: Verify persistence
+                // alert('Saved to Cloud! URL: ' + (client.logoUrl ? client.logoUrl.substring(0, 50) + '...' : 'None'));
+            })
+            .catch(err => {
+                console.error('Supabase sync failed:', err);
+                alert('Warning: Saved locally, but Cloud Sync Failed. \nReason: ' + (err.message || JSON.stringify(err)));
+            });
     }
     window.showNotification('Client details updated successfully', 'success');
 
