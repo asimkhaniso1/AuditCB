@@ -1486,6 +1486,27 @@ window.renderAddClient = function () {
                             </div>
                         </div>
 
+                        <!-- Logo Upload Section -->
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Company Logo</label>
+                             <div style="display: flex; gap: 1rem; align-items: center;">
+                                 <!-- Preview Circle -->
+                                 <div id="client-logo-preview-img" style="width: 64px; height: 64px; border-radius: 50%; background-color: #f1f5f9; background-size: cover; background-position: center; border: 2px solid #e2e8f0; display: none;"></div>
+                                 <div id="client-logo-placeholder" style="width: 64px; height: 64px; border-radius: 50%; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; border: 2px dashed #cbd5e1; color: #94a3b8;">
+                                     <i class="fa-solid fa-image"></i>
+                                 </div>
+                                 
+                                 <!-- Upload Button & Info -->
+                                 <div style="flex: 1;">
+                                     <button class="btn btn-sm btn-secondary" type="button" onclick="document.getElementById('client-logo-input').click()" style="margin-bottom: 0.25rem;">
+                                         <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Logo
+                                     </button>
+                                     <input type="file" id="client-logo-input" accept="image/*" style="display: none;" onchange="window.handleLogoUpload(this)">
+                                     <p style="margin: 0; font-size: 0.75rem; color: #64748b;">Recommended: Square image, max 2MB (PNG/JPG)</p>
+                                 </div>
+                             </div>
+                        </div>
+
                         <div class="form-group">
                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector</label>
                             <select class="form-control" id="client-industry" style="background-image: none;" onchange="window.handleIndustryChange(this)">
