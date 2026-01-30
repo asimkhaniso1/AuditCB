@@ -38,7 +38,7 @@ if (!window.state.cbSettings) {
 
         // System Defaults
         certificateNumberFormat: 'CB-{YEAR}-{SEQ}',
-        dateFormat: 'YYYY-MM-DD',
+        dateFormat: 'DD/MM/YYYY',
         defaultStage1Duration: 1,
         defaultStage2Duration: 2,
         manDayCalculationMode: 'ISO 17021',

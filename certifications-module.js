@@ -354,6 +354,14 @@ window.openIssueCertificateModal = function (reportId) {
                 <label>Certification Scope (Critical)</label>
                 <textarea class="form-control" id="cert-scope" rows="4" placeholder="Enter the precise scope of certification...">${window.UTILS.escapeHtml(prefillScope)}</textarea>
             </div>
+
+             <!-- Site Selection -->
+            <div class="form-group" id="site-selection-container" style="display: none; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Covered Sites (Select all that apply)</label>
+                <div id="cert-sites-list" style="display: grid; gap: 0.5rem;">
+                    <!-- Sites will be injected here via JS -->
+                </div>
+            </div>
             
             <!-- ISO 17021-1 Decision Fields -->
             <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; border: 1px solid #bfdbfe; margin-top: 1rem;">
@@ -391,7 +399,88 @@ window.openIssueCertificateModal = function (reportId) {
         </form>
     `;
 
-    window.openModal();
+    // Logic to handle Client Change -> Populate Sites
+    const clientSelect = document.getElementById('cert-client');
+    const sitesContainer = document.getElementById('site-selection-container');
+    const sitesList = document.getElementById('cert-sites-list');
+    const scopeInput = document.getElementById('cert-scope');
+
+    function loadSitesForClient(clientName) {
+        const client = state.clients.find(c => c.name === clientName);
+        sitesList.innerHTML = ''; // Clear
+
+        if (client && client.sites && client.sites.length > 0) {
+            sitesContainer.style.display = 'block';
+            client.sites.forEach((site, index) => {
+                const siteId = `site-${index}`;
+                // Default check 'Head Office' or first site
+                const isChecked = index === 0;
+
+                const div = document.createElement('div');
+                div.style.cssText = 'display: flex; align-items: start; gap: 0.5rem; font-size: 0.9rem;';
+                div.innerHTML = `
+                    <input type="checkbox" id="${siteId}" value="${index}" ${isChecked ? 'checked' : ''} style="margin-top: 4px;">
+                    <label for="${siteId}" style="cursor: pointer; line-height: 1.4;">
+                        <strong>${window.UTILS.escapeHtml(site.name)}</strong><br>
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">${window.UTILS.escapeHtml(site.address)}, ${window.UTILS.escapeHtml(site.city)}</span>
+                    </label>
+                `;
+                sitesList.appendChild(div);
+
+                // Add listener to update scope
+                div.querySelector('input').addEventListener('change', updateScopeFromSites);
+            });
+            // Initial update if scope is empty
+            if (!scopeInput.value.trim()) {
+                updateScopeFromSites();
+            }
+        } else {
+            sitesContainer.style.display = 'none';
+        }
+    }
+
+    function updateScopeFromSites() {
+        const client = state.clients.find(c => c.name === clientSelect.value);
+        if (!client || !client.sites) return;
+
+        const selectedIndices = Array.from(sitesList.querySelectorAll('input:checked')).map(input => parseInt(input.value));
+        const selectedSites = client.sites.filter((_, i) => selectedIndices.includes(i));
+
+        if (selectedSites.length > 0) {
+            const baseScope = "Activities performed at: " + selectedSites.map(s => `${s.name} (${s.city})`).join(', ');
+            scopeInput.value = baseScope;
+        }
+    }
+
+    // Attach Listener
+    if (clientSelect) {
+        clientSelect.addEventListener('change', (e) => {
+            loadSitesForClient(e.target.value);
+        });
+    }
+
+    // Trigger immediately if client prefilled
+    if (prefillClient) {
+        // Wait for modal to be potentially in DOM or just run it
+        // Since we building string, we run this AFTER openModal usually, but here we are modifying the function body
+        // We need to run this *after* the HTML is in the DOM.
+    }
+
+    // Note: The original code does `contentArea.innerHTML = html` or similar, but this is a modal.
+    // The previous code block ended with `window.openModal()`.
+    // We need to execute the listeners AFTER the modal content is set.
+
+    // Changing the logic: We inject the HTML into the modal container first.
+    // The original code uses `modalBody.innerHTML = ...`. 
+    // So we should execute our logic AFTER that assignment.
+
+    window.openModal('certificate-action-modal');
+
+    // Make sure we run logic after modal is open and elements exist
+    setTimeout(() => {
+        if (prefillClient) loadSitesForClient(prefillClient);
+    }, 100);
+
 
     // Auto-update expiry date when issue date changes
     const issueDateInput = document.getElementById('cert-issue-date');
@@ -457,6 +546,11 @@ window.openIssueCertificateModal = function (reportId) {
         const reviewer = document.getElementById('cert-reviewer').value; // Readonly, safe
         const independent = document.getElementById('cert-independent').value;
 
+        // Capture Selected Sites
+        const selectedSiteIndices = Array.from(document.querySelectorAll('#cert-sites-list input:checked')).map(input => parseInt(input.value));
+        const activeClient = state.clients.find(c => c.name === document.getElementById('cert-client').value) || {};
+        const sitesCovered = (activeClient.sites || []).filter((_, i) => selectedSiteIndices.includes(i));
+
         const newCert = {
             id: document.getElementById('cert-id').value,
             client: prefillClient || document.getElementById('cert-client').value,
@@ -465,6 +559,7 @@ window.openIssueCertificateModal = function (reportId) {
             expiryDate: expiryDate,
             status: window.CONSTANTS.CERT_STATUS.VALID,
             scope: scope,
+            sitesCovered: sitesCovered,
             // ISO 17021-1 Decision Record
             decisionRecord: {
                 justification: justification,
@@ -482,7 +577,12 @@ window.openIssueCertificateModal = function (reportId) {
 
         // Sync to Supabase
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            window.SupabaseClient.upsertCertificate(newCert).catch(console.error);
+            window.SupabaseClient.upsertCertificate(newCert)
+                .then(() => window.showNotification('Certificate saved to cloud', 'success'))
+                .catch(err => {
+                    console.error('Sync failed:', err);
+                    window.showNotification(`Saved locally, but Cloud Sync Failed: ${err.message || JSON.stringify(err)}`, 'error');
+                });
         }
 
         window.closeModal();
@@ -791,7 +891,7 @@ window.printCertificateRegister = function () {
         </head>
         <body>
             <h1>Certificate Register</h1>
-            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+            <p>Generated on: ${window.UTILS.formatDate(new Date())}</p>
             <table>
                 <thead>
                     <tr>
@@ -959,7 +1059,7 @@ window.generateEmbedCode = function () {
     }
 
     // Generate HTML embed code
-    let embedHTML = `<!-- Certified Clients Directory - Generated ${new Date().toLocaleDateString()} -->
+    let embedHTML = `<!-- Certified Clients Directory - Generated ${window.UTILS.formatDate(new Date())} -->
 <div style="font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto;">
     <h2 style="color: #0284c7; margin-bottom: 1rem;">
         <span style="margin-right: 0.5rem;">🌐</span>Certified Clients Directory
@@ -1000,7 +1100,7 @@ window.generateEmbedCode = function () {
         </tbody>
     </table>
     <p style="color: #64748b; font-size: 0.875rem; margin-top: 1rem;">
-        Last updated: ${new Date().toLocaleDateString()} | Total certified clients: ${filteredCerts.length}
+        Last updated: ${window.UTILS.formatDate(new Date())} | Total certified clients: ${filteredCerts.length}
     </p>
 </div>`;
 

@@ -1627,10 +1627,7 @@ window.renderAddClient = function () {
                                 <option value="Yes">Yes (Multiple Shifts)</option>
                              </select>
                         </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                             <label style="font-size: 0.8rem;">Target Audit Date</label>
-                             <input type="date" class="form-control" id="client-next-audit">
-                        </div>
+
                     </div>
                 </div>
 
@@ -1660,8 +1657,7 @@ window.saveNewClient = async function () {
         country: 'client-country',
         geotag: 'client-geotag',
         employees: 'client-employees',
-        siteCount: 'client-sites',
-        nextAudit: 'client-next-audit'
+        siteCount: 'client-sites'
     };
 
     // 2. Define Rules
@@ -1745,7 +1741,7 @@ window.saveNewClient = async function () {
         id: Date.now(),
         name: cleanData.name,
         standard: standard,
-        nextAudit: cleanData.nextAudit,
+        nextAudit: '', // Removed as per request
         industry: document.getElementById('client-industry').value === 'Other' ?
             document.getElementById('client-industry-custom').value :
             document.getElementById('client-industry').value,

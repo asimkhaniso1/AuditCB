@@ -813,7 +813,7 @@ function generateReportHTML(report, plan, client) {
                         <p style="text-align: center; font-weight: 500; font-size: 1.3rem;">${h(report.client)}</p>
                         <p style="text-align: center; font-size: 1.1rem;">${h(plan.standard || 'ISO Standard Audit')}</p>
                         <p style="text-align: center;">Audit Date: ${h(report.date)}</p>
-                        <p style="text-align: center; color: #64748b;">Report Generated: ${new Date().toLocaleDateString()}</p>
+                        <p style="text-align: center; color: #64748b;">Report Generated: ${window.UTILS.formatDate(new Date())}</p>
                     </div>
                     
                     <div style="margin-top: 2rem;">

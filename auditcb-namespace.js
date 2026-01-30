@@ -78,8 +78,7 @@
                 .replace(/'/g, "&#039;");
         },
         formatDate: function (dateStr) {
-            if (!dateStr) return '';
-            return new Date(dateStr).toLocaleDateString();
+            return window.UTILS.formatDate(dateStr);
         },
         generateId: function () {
             return Date.now() + Math.random().toString(36).substr(2, 9);

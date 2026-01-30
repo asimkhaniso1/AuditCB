@@ -768,14 +768,15 @@ function renderCertificationCycleWidget(client) {
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Next Audit</div>
                                 <div style="font-size: 1.1rem; font-weight: 600; color: ${isUrgent ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">
-                                    ${nextAudit.toLocaleDateString()}
+                                    ${window.UTILS.formatDate(nextAudit)}
                                     ${isUrgent ? `<span style="font-size: 0.75rem; color: #dc2626; margin-left: 0.5rem;">(${daysToNext} days!)</span>` : ''}
                                 </div>
                             </div>
+
                             ` : ''}
                             <div>
                                 <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Expiry Date</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: ${today > expiry ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${expiry.toLocaleDateString()}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: ${today > expiry ? '#dc2626' : '#1e293b'}; margin-top: 0.25rem;">${window.UTILS.formatDate(expiry)}</div>
                             </div>
                         </div>
                     </div>
@@ -882,13 +883,13 @@ function renderAuditCycleTimeline(client) {
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
                     <i class="fa-solid fa-calendar-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${nextAudit ? nextAudit.toLocaleDateString() : 'N/A'}</p>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${nextAudit ? window.UTILS.formatDate(nextAudit) : 'N/A'}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Next Scheduled Audit</p>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${daysToNext > 0 ? daysToNext + ' days remaining' : 'Due/Overdue'}</p>
                 </div>
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
                     <i class="fa-solid fa-hourglass-half" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${expiry.toLocaleDateString()}</p>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0;">${window.UTILS.formatDate(expiry)}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Cycle Expiry Date</p>
                 </div>
             </div>
@@ -908,34 +909,34 @@ function renderAuditCycleTimeline(client) {
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: #10b981; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-check"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Certification</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${issueDate.toLocaleDateString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(issueDate)}</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: ${new Date() > surv1 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Surv 1</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${surv1.toLocaleDateString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(surv1)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 1</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: ${new Date() > surv2 ? '#10b981' : '#3b82f6'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-eye"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Surv 2</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${surv2.toLocaleDateString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(surv2)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 2</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: ${new Date() > recertAudit ? '#10b981' : '#f59e0b'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-sync"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Recert Audit</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${recertAudit.toLocaleDateString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(recertAudit)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">60 days before</div>
                     </div>
                     
                     <div style="text-align: center; z-index: 1;">
                         <div style="width: 40px; height: 40px; background: ${new Date() > expiry ? '#dc2626' : '#94a3b8'}; border-radius: 50%; margin: 0 auto 0.5rem; display: flex; align-items: center; justify-content: center; color: white;"><i class="fa-solid fa-hourglass-end"></i></div>
                         <div style="font-weight: 500; font-size: 0.9rem;">Expiry</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${expiry.toLocaleDateString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.formatDate(expiry)}</div>
                         <div style="font-size: 0.7rem; color: #64748b;">Year 3</div>
                     </div>
                 </div>
@@ -1250,7 +1251,7 @@ function renderClientReporting(client) {
                     <tbody>
                         ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
         const findingsCount = (r.ncrs || r.findings || []).length;
-        const finalizedDate = r.finalizedAt ? new Date(r.finalizedAt).toLocaleDateString() : '-';
+        const finalizedDate = r.finalizedAt ? window.UTILS.formatDate(r.finalizedAt) : '-';
 
         return `
                             <tr>
