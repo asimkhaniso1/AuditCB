@@ -25,21 +25,25 @@ on conflict (id) do nothing;
 -- ==========================================
 
 -- Allow Public Read
+drop policy if exists "Public Access to Audit Files" on storage.objects;
 create policy "Public Access to Audit Files"
 on storage.objects for select
 using ( bucket_id = 'audit-files' );
 
 -- Allow Authenticated Insert
+drop policy if exists "Authenticated Insert to Audit Files" on storage.objects;
 create policy "Authenticated Insert to Audit Files"
 on storage.objects for insert
 with check ( bucket_id = 'audit-files' and auth.role() = 'authenticated' );
 
 -- Allow Users to Update their own uploads (or Admin)
+drop policy if exists "Authenticated Update to Audit Files" on storage.objects;
 create policy "Authenticated Update to Audit Files"
 on storage.objects for update
 using ( bucket_id = 'audit-files' and auth.role() = 'authenticated' );
 
 -- Allow Users to Delete their own uploads (or Admin)
+drop policy if exists "Authenticated Delete from Audit Files" on storage.objects;
 create policy "Authenticated Delete from Audit Files"
 on storage.objects for delete
 using ( bucket_id = 'audit-files' and auth.role() = 'authenticated' );
@@ -48,22 +52,26 @@ using ( bucket_id = 'audit-files' and auth.role() = 'authenticated' );
 -- POLICIES FOR 'documents' (Knowledge Base - Public Read, Auth Write)
 -- ==========================================
 
--- Allow Public Read (or restricting to authenticated? KB uses public URL often for convenience, lets stick to Public for now to fix sync)
+-- Allow Public Read
+drop policy if exists "Public Access to Documents" on storage.objects;
 create policy "Public Access to Documents"
 on storage.objects for select
 using ( bucket_id = 'documents' );
 
 -- Allow Authenticated Insert
+drop policy if exists "Authenticated Insert to Documents" on storage.objects;
 create policy "Authenticated Insert to Documents"
 on storage.objects for insert
 with check ( bucket_id = 'documents' and auth.role() = 'authenticated' );
 
 -- Allow Authenticated Update
+drop policy if exists "Authenticated Update to Documents" on storage.objects;
 create policy "Authenticated Update to Documents"
 on storage.objects for update
 using ( bucket_id = 'documents' and auth.role() = 'authenticated' );
 
 -- Allow Authenticated Delete
+drop policy if exists "Authenticated Delete from Documents" on storage.objects;
 create policy "Authenticated Delete from Documents"
 on storage.objects for delete
 using ( bucket_id = 'documents' and auth.role() = 'authenticated' );
@@ -72,19 +80,20 @@ using ( bucket_id = 'documents' and auth.role() = 'authenticated' );
 -- POLICIES FOR 'audit-reports' (Private - Signed URL only)
 -- ==========================================
 
--- Allow Authenticated Read (Correct way for signed URLs involves checking owner or allowing auth.role() if loose)
--- For signed URLs to work, we need a policy that allows the SELECT if the user has access.
--- Simplest for this app: Allow any authenticated user to read reports.
+-- Allow Authenticated Read
+drop policy if exists "Authenticated Read Audit Reports" on storage.objects;
 create policy "Authenticated Read Audit Reports"
 on storage.objects for select
 using ( bucket_id = 'audit-reports' and auth.role() = 'authenticated' );
 
 -- Allow Authenticated Insert
+drop policy if exists "Authenticated Insert Audit Reports" on storage.objects;
 create policy "Authenticated Insert Audit Reports"
 on storage.objects for insert
 with check ( bucket_id = 'audit-reports' and auth.role() = 'authenticated' );
 
 -- Allow Authenticated Delete
+drop policy if exists "Authenticated Delete Audit Reports" on storage.objects;
 create policy "Authenticated Delete Audit Reports"
 on storage.objects for delete
 using ( bucket_id = 'audit-reports' and auth.role() = 'authenticated' );
