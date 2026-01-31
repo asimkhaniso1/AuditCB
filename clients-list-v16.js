@@ -3,7 +3,7 @@
 // ============================================
 // Handles client list view, search, filter, and pagination
 // Loaded AFTER clients-module.js - overrides the original function
-// CACHE BUST: 2026-01-26 15:35
+// CACHE BUST: 2026-01-31 17:03
 
 function renderClientsEnhanced() {
     const searchTerm = window.state.clientSearchTerm || '';
