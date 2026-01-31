@@ -677,7 +677,11 @@ const SupabaseClient = {
 
                 // DEBUG: Show explicit alert for the user
                 const msg = error.message || JSON.stringify(error);
-                window.alert(`LOGO UPLOAD FAILED DETAILS:\n${msg}\n\nCheck console for more info.`);
+                let hint = '';
+                if (msg.includes('policies')) hint = '\nHINT: Storage bucket policies may be blocking writes. Check "audit-files" bucket permissions.';
+                if (msg.includes('403')) hint = '\nHINT: 403 Forbidden - Permission denied.';
+
+                window.alert(`LOGO UPLOAD FAILED:\n${msg}${hint}\n\nCheck console for details.`);
                 console.error('[SupabaseStorage] Upload Error Details:', error);
 
                 return null;
@@ -2135,10 +2139,15 @@ const SupabaseClient = {
                 id: cert.id,
                 client: cert.client,
                 standard: cert.standard,
+                certificate_no: cert.certificateNo, // Add mapping
+                revision: cert.revision,            // Add mapping
                 issue_date: cert.issueDate,
                 expiry_date: cert.expiryDate,
+                initial_date: cert.initialDate,     // Add mapping
+                current_issue: cert.currentIssue,   // Add mapping
                 status: cert.status,
                 scope: cert.scope,
+                site_scopes: cert.siteScopes,       // Add mapping
                 history: cert.history,
                 decision_record: cert.decisionRecord,
                 // Ensure legacy fields required by constraint are present if needed
@@ -2149,13 +2158,17 @@ const SupabaseClient = {
 
             const { error } = await this.client
                 .from('certification_decisions')
-                .upsert(payload)
+                .upsert(payload, { onConflict: 'id' }) // Explicitly specify conflict key
                 .select();
 
-            if (error) throw error;
+            if (error) {
+                Logger.error('Supabase UPSERT Error:', error); // Log full error object
+                throw error;
+            }
             Logger.info('Certificate synced to certification_decisions:', cert.id);
         } catch (error) {
             Logger.error('Failed to sync certificate:', error);
+            // alert('Certificate Sync Failed: ' + (error.message || JSON.stringify(error))); // Optional alert
             throw error;
         }
     },
