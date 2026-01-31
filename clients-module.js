@@ -4439,9 +4439,15 @@ window.saveCertificateDetails = function (clientId) {
     // Sync specific certificates to Supabase (certification_decisions table)
     if (window.SupabaseClient?.isInitialized && client.certificates && client.certificates.length > 0) {
         let successCount = 0;
-        const promises = client.certificates.map(cert => {
+        const promises = client.certificates.map((cert, i) => {
             // Ensure the cert has the client name attached for mapping
             if (!cert.client) cert.client = client.name;
+
+            // SELF-HEAL: If cert has no ID (legacy bug), generate one now
+            if (!cert.id) {
+                cert.id = 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i;
+                console.log('Generated missing ID for cert:', cert.id);
+            }
 
             return window.SupabaseClient.upsertCertificate(cert)
                 .then(() => successCount++)
