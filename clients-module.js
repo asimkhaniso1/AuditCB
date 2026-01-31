@@ -1423,6 +1423,11 @@ window.handleLogoUpload = function (input) {
         const file = input.files[0];
         console.log('[handleLogoUpload] File selected:', file.name, file.size, file.type);
 
+        // IMMEDIATE FEEDBACK: Show notification that file was accepted
+        if (window.showNotification) {
+            window.showNotification(`File "${file.name}" selected for upload`, 'info');
+        }
+
         window._tempLogoFile = file;
 
         const reader = new FileReader();
@@ -1430,22 +1435,32 @@ window.handleLogoUpload = function (input) {
             console.log('[handleLogoUpload] File read successfully');
             window._tempClientLogo = e.target.result;
 
-            const previewImg = document.getElementById('client-logo-preview-img');
-            const placeholder = document.getElementById('client-logo-placeholder');
+            // Robust element finding: Try ID first, then relative search if ID fails or finds wrong element
+            let previewImg = document.getElementById('client-logo-preview-img');
+            let placeholder = document.getElementById('client-logo-placeholder');
 
-            console.log('[handleLogoUpload] Elements found:', { previewImg, placeholder });
+            // If the triggered input is inside a naming card, find elements relative to it
+            const parentCard = input.closest('.card');
+            if (parentCard) {
+                previewImg = parentCard.querySelector('#client-logo-preview-img') || previewImg;
+                placeholder = parentCard.querySelector('#client-logo-placeholder') || placeholder;
+            }
+
+            console.log('[handleLogoUpload] UI Elements:', { previewImg, placeholder });
 
             if (previewImg && placeholder) {
                 previewImg.style.backgroundImage = `url(${e.target.result})`;
                 previewImg.style.display = 'block';
                 placeholder.style.display = 'none';
-                console.log('[handleLogoUpload] Preview updated');
+                console.log('[handleLogoUpload] Thumbnail preview updated');
             } else {
-                console.error('[handleLogoUpload] Preview elements missing from DOM');
+                console.error('[handleLogoUpload] UI Elements missing from DOM. Check your template.');
+                alert('Thumbnail preview failed: UI elements not found.');
             }
         };
         reader.onerror = function (err) {
             console.error('[handleLogoUpload] FileReader error:', err);
+            alert('Failed to read image file.');
         };
         reader.readAsDataURL(file);
     } else {
@@ -1782,9 +1797,15 @@ window.saveNewClient = async function () {
             if (uploadResult && uploadResult.url) {
                 newClient.logoUrl = uploadResult.url;
                 Logger.info('Logo uploaded via Storage:', newClient.logoUrl);
+                // Clear temp data after successful upload
+                window._tempLogoFile = null;
+                window._tempClientLogo = null;
+            } else {
+                console.warn('[saveNewClient] Logo upload returned no URL. falling back to state.');
             }
         } catch (e) {
-            console.error('Logo upload failed, falling back to base64 if available', e);
+            console.error('Logo upload failed during client creation:', e);
+            window.showNotification('Logo upload failed, but client saved locally.', 'warning');
         }
     }
 
@@ -2148,30 +2169,27 @@ window.saveAuditClient = async function (clientId) {
     client.nextAudit = cleanData.nextAudit;
 
     // Update Logo if changed
-    // Update Logo if changed
     if (window._tempLogoFile && window.SupabaseClient && window.SupabaseClient.isInitialized) {
         try {
-            // alert('Starting logo upload to Supabase...'); // Removed aggressive alert
             window.showNotification('Uploading logo...', 'info');
             const uploadResult = await window.SupabaseClient.storage.uploadClientLogo(window._tempLogoFile, client.id);
             if (uploadResult && uploadResult.url) {
-                // alert('Upload SUCCESS! URL: ' + uploadResult.url); // Removed aggressive alert
                 client.logoUrl = uploadResult.url;
                 Logger.info('Logo uploaded via Storage:', client.logoUrl);
+                // Clear temp data after successful upload
+                window._tempLogoFile = null;
+                window._tempClientLogo = null;
             } else {
-                alert('Upload returned no URL!');
+                console.warn('[saveAuditClient] Logo upload returned no URL');
             }
         } catch (e) {
-            console.error('Logo upload failed', e);
-            alert('Logo Upload Failed: ' + (e.message || 'Unknown error') + '\nFalling back to text storage.');
-            if (window._tempClientLogo) client.logoUrl = window._tempClientLogo; // Fallback
+            console.error('Logo upload failed during client edit:', e);
+            window.showNotification('Logo upload failed, but client data saved.', 'warning');
         }
     } else if (window._tempClientLogo) {
-        // alert('No file for upload (or Supabase not init), using base64/existing'); // Removed aggressive alert
         console.log('Saving new logo (Base64 or existing)...');
         client.logoUrl = window._tempClientLogo;
     }
-    // If user cleared it or didn't change it, we keep current (or can implement clear logic if needed)
 
     // Update Primary Contact (Index 0)
     if (!client.contacts) client.contacts = [];
@@ -2202,8 +2220,6 @@ window.saveAuditClient = async function (clientId) {
         window.SupabaseClient.upsertClient(client)
             .then(() => {
                 console.log('Sync successful');
-                // Optional: Verify persistence
-                // alert('Saved to Cloud! URL: ' + (client.logoUrl ? client.logoUrl.substring(0, 50) + '...' : 'None'));
             })
             .catch(err => {
                 console.error('Supabase sync failed:', err);
@@ -2227,21 +2243,11 @@ window.handleIndustryChange = function (select) {
         customContainer.style.display = select.value === 'Other' ? 'block' : 'none';
         if (select.value === 'Other') {
             document.getElementById('client-industry-custom')?.focus();
-        }
-    }
-};
+            const modalBody = document.getElementById('modal-body');
+            const modalSave = document.getElementById('modal-save');
 
-// Add Contact Person Modal
-function addContactPerson(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Add Contact Person';
-    modalBody.innerHTML = `
+            modalTitle.textContent = 'Add Contact Person';
+            modalBody.innerHTML = `
         <form id="contact-form">
             <div class="form-group">
                 <label>Name <span style="color: var(--danger-color);">*</span></label>
@@ -2262,29 +2268,29 @@ function addContactPerson(clientId) {
         </form >
     `;
 
-    window.openModal();
+            window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('contact-name').value;
-        const designation = document.getElementById('contact-designation').value;
-        const phone = document.getElementById('contact-phone').value;
-        const email = document.getElementById('contact-email').value;
+            modalSave.onclick = () => {
+                const name = document.getElementById('contact-name').value;
+                const designation = document.getElementById('contact-designation').value;
+                const phone = document.getElementById('contact-phone').value;
+                const email = document.getElementById('contact-email').value;
 
-        if (name) {
-            if (!client.contacts) client.contacts = [];
-            client.contacts.push({ name, designation, phone, email });
-            window.saveData();
+                if (name) {
+                    if (!client.contacts) client.contacts = [];
+                    client.contacts.push({ name, designation, phone, email });
+                    window.saveData();
 
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            // renderClientDetail(clientId); // Don't reset view
-            if (document.getElementById('tab-contacts')) {
-                // Workspace mode: update table directly
-                const tableBody = document.querySelector('#tab-contacts tbody');
-                if (tableBody) {
-                    const html = (client.contacts || []).map(contact => `
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    // renderClientDetail(clientId); // Don't reset view
+                    if (document.getElementById('tab-contacts')) {
+                        // Workspace mode: update table directly
+                        const tableBody = document.querySelector('#tab-contacts tbody');
+                        if (tableBody) {
+                            const html = (client.contacts || []).map(contact => `
                         <tr>
                             <td style="font-weight: 500;">${contact.name}</td>
                             <td>${contact.designation || '-'}</td>
@@ -2293,36 +2299,36 @@ function addContactPerson(clientId) {
                             <td>${contact.department || '-'}</td>
                         </tr>
                     `).join('') || '<tr><td colspan="5" style="text-align: center;">No contacts found.</td></tr>';
-                    tableBody.innerHTML = html;
+                            tableBody.innerHTML = html;
+                        }
+                    } else {
+                        renderClientTab(client, 'client_org');
+                    }
+                    window.showNotification('Contact added successfully');
+                } else {
+                    window.showNotification('Name is required', 'error');
                 }
-            } else {
-                renderClientTab(client, 'client_org');
-            }
-            window.showNotification('Contact added successfully');
-        } else {
-            window.showNotification('Name is required', 'error');
+            };
         }
-    };
-}
 
-// Add Site Modal
-function addSite(clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        // Add Site Modal
+        function addSite(clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalSave = document.getElementById('modal-save');
 
-    modalTitle.textContent = 'Add Site Location';
+            modalTitle.textContent = 'Add Site Location';
 
-    const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
-        ? window.state.cbSettings.standardsOffered
-        : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
-            ? window.state.cbSettings.availableStandards
-            : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
+            const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
+                ? window.state.cbSettings.standardsOffered
+                : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
+                    ? window.state.cbSettings.availableStandards
+                    : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
 
-    modalBody.innerHTML = `
+            modalBody.innerHTML = `
         <form id="site-form">
             <div class="form-group">
                 <label>Site Name <span style="color: var(--danger-color);">*</span></label>
@@ -2349,8 +2355,8 @@ function addSite(clientId) {
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
                         ${standardsToShow.map(std =>
-        `<option value="${std}" ${(client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
-    ).join('')}
+                `<option value="${std}" ${(client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
+            ).join('')}
                     </select>
                     <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple (Defaults to client standards)</small>
                 </div>
@@ -2382,48 +2388,48 @@ function addSite(clientId) {
         </form >
     `;
 
-    window.openModal();
+            window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('site-name').value;
-        const address = document.getElementById('site-address').value;
-        const city = document.getElementById('site-city').value;
-        const country = document.getElementById('site-country').value;
-        const geotag = document.getElementById('site-geotag').value;
-        const employees = parseInt(document.getElementById('site-employees').value) || null;
-        const shift = document.getElementById('site-shift').value || null;
+            modalSave.onclick = () => {
+                const name = document.getElementById('site-name').value;
+                const address = document.getElementById('site-address').value;
+                const city = document.getElementById('site-city').value;
+                const country = document.getElementById('site-country').value;
+                const geotag = document.getElementById('site-geotag').value;
+                const employees = parseInt(document.getElementById('site-employees').value) || null;
+                const shift = document.getElementById('site-shift').value || null;
 
-        if (name) {
-            if (!client.sites) client.sites = [];
-            const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
-            client.sites.push({ name, address, city, country, geotag, employees, shift, standards });
-            window.saveData();
+                if (name) {
+                    if (!client.sites) client.sites = [];
+                    const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
+                    client.sites.push({ name, address, city, country, geotag, employees, shift, standards });
+                    window.saveData();
 
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            renderClientDetail(clientId);
-            window.setSetupWizardStep(clientId, 2); // Ensure they are on sites step
-            window.showNotification('Site added successfully');
-        } else {
-            window.showNotification('Site name is required', 'error');
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    renderClientDetail(clientId);
+                    window.setSetupWizardStep(clientId, 2); // Ensure they are on sites step
+                    window.showNotification('Site added successfully');
+                } else {
+                    window.showNotification('Site name is required', 'error');
+                }
+            };
         }
-    };
-}
 
-// Upload Document Modal
-window.openUploadDocumentModal = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        // Upload Document Modal
+        window.openUploadDocumentModal = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalSave = document.getElementById('modal-save');
 
-    modalTitle.textContent = 'Upload Document';
-    modalBody.innerHTML = `
+            modalTitle.textContent = 'Upload Document';
+            modalBody.innerHTML = `
         <form id="upload-form">
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
@@ -2461,84 +2467,84 @@ window.openUploadDocumentModal = function (clientId) {
         </form >
     `;
 
-    window.openModal();
+            window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('doc-name').value;
-        const category = document.getElementById('doc-category').value;
-        const fileInput = document.getElementById('doc-file');
+            modalSave.onclick = () => {
+                const name = document.getElementById('doc-name').value;
+                const category = document.getElementById('doc-category').value;
+                const fileInput = document.getElementById('doc-file');
 
-        if (name) {
-            // Final validation before save
-            if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
-                alert('File is too large! Max limit is 5MB.');
-                return;
-            }
+                if (name) {
+                    // Final validation before save
+                    if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
+                        alert('File is too large! Max limit is 5MB.');
+                        return;
+                    }
 
-            if (!client.documents) client.documents = [];
+                    if (!client.documents) client.documents = [];
 
-            const newDoc = {
-                id: Date.now().toString(),
-                name: name,
-                category: category,
-                type: name.split('.').pop().toUpperCase() || 'FILE',
-                date: new Date().toISOString().split('T')[0],
-                size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+                    const newDoc = {
+                        id: Date.now().toString(),
+                        name: name,
+                        category: category,
+                        type: name.split('.').pop().toUpperCase() || 'FILE',
+                        date: new Date().toISOString().split('T')[0],
+                        size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+                    };
+
+                    client.documents.push(newDoc);
+
+                    window.saveData();
+                    window.closeModal();
+                    renderClientDetail(clientId); // Refresh to show new doc in tab
+                    // Force switch back to documents tab
+                    setTimeout(() => {
+                        document.querySelector('.tab-btn[data-tab="documents"]')?.click();
+                    }, 100);
+                    window.showNotification('Document uploaded successfully');
+                } else {
+                    alert('Please enter a document name');
+                }
             };
-
-            client.documents.push(newDoc);
-
-            window.saveData();
-            window.closeModal();
-            renderClientDetail(clientId); // Refresh to show new doc in tab
-            // Force switch back to documents tab
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="documents"]')?.click();
-            }, 100);
-            window.showNotification('Document uploaded successfully');
-        } else {
-            alert('Please enter a document name');
         }
-    };
-}
 
-// Delete Document Helper
-window.deleteDocument = function (clientId, docId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.documents) return;
+        // Delete Document Helper
+        window.deleteDocument = function (clientId, docId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.documents) return;
 
-    if (confirm('Are you sure you want to delete this document?')) {
-        client.documents = client.documents.filter(d => d.id !== docId);
-        window.saveData();
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="documents"]')?.click();
-        }, 100);
-        window.showNotification('Document deleted');
-    }
-};
+            if (confirm('Are you sure you want to delete this document?')) {
+                client.documents = client.documents.filter(d => d.id !== docId);
+                window.saveData();
+                renderClientDetail(clientId);
+                setTimeout(() => {
+                    document.querySelector('.tab-btn[data-tab="documents"]')?.click();
+                }, 100);
+                window.showNotification('Document deleted');
+            }
+        };
 
-window.renderClientsEnhanced = renderClientsEnhanced;
-window.renderClientDetail = renderClientDetail;
+        window.renderClientsEnhanced = renderClientsEnhanced;
+        window.renderClientDetail = renderClientDetail;
 
 
-window.addContactPerson = addContactPerson;
-window.addSite = addSite;
+        window.addContactPerson = addContactPerson;
+        window.addSite = addSite;
 
-// Edit Site Modal
-window.editSite = function (clientId, siteIndex) {
-    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.sites || !client.sites[siteIndex]) return;
+        // Edit Site Modal
+        window.editSite = function (clientId, siteIndex) {
+            if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.sites || !client.sites[siteIndex]) return;
 
-    const site = client.sites[siteIndex];
+            const site = client.sites[siteIndex];
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalSave = document.getElementById('modal-save');
 
-    modalTitle.textContent = 'Edit Site Location';
-    modalBody.innerHTML = `
+            modalTitle.textContent = 'Edit Site Location';
+            modalBody.innerHTML = `
         <form id="site-form">
             <div class="form-group">
                 <label>Site Name <span style="color: var(--danger-color);">*</span></label>
@@ -2564,8 +2570,8 @@ window.editSite = function (clientId, siteIndex) {
                     <label>Applicable Standards</label>
                     <select class="form-control" id="site-standards" multiple style="height: 100px;">
                         ${((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]).map(std =>
-        `<option value="${std}" ${(site.standards || client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
-    ).join('')}
+                `<option value="${std}" ${(site.standards || client.standard || '').includes(std) ? 'selected' : ''}>${std}</option>`
+            ).join('')}
                     </select>
                     <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
                 </div>
@@ -2597,62 +2603,62 @@ window.editSite = function (clientId, siteIndex) {
         </form >
     `;
 
-    window.openModal();
+            window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('site-name').value;
-        const address = document.getElementById('site-address').value;
-        const city = document.getElementById('site-city').value;
-        const country = document.getElementById('site-country').value;
-        const geotag = document.getElementById('site-geotag').value;
-        const employees = parseInt(document.getElementById('site-employees').value) || null;
-        const shift = document.getElementById('site-shift').value || null;
+            modalSave.onclick = () => {
+                const name = document.getElementById('site-name').value;
+                const address = document.getElementById('site-address').value;
+                const city = document.getElementById('site-city').value;
+                const country = document.getElementById('site-country').value;
+                const geotag = document.getElementById('site-geotag').value;
+                const employees = parseInt(document.getElementById('site-employees').value) || null;
+                const shift = document.getElementById('site-shift').value || null;
 
-        if (name) {
-            const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
-            client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift, standards };
-            window.saveData();
+                if (name) {
+                    const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
+                    client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift, standards };
+                    window.saveData();
 
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    renderClientDetail(clientId);
+                    window.showNotification('Site updated successfully');
+                } else {
+                    window.showNotification('Site name is required', 'error');
+                }
+            };
+        };
+
+        // Delete Site
+        window.deleteSite = function (clientId, siteIndex) {
+            if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.sites) return;
+
+            if (confirm('Are you sure you want to delete this site?')) {
+                client.sites.splice(siteIndex, 1);
+                window.saveData();
+
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                renderClientDetail(clientId);
+                window.showNotification('Site deleted');
             }
-            window.closeModal();
-            renderClientDetail(clientId);
-            window.showNotification('Site updated successfully');
-        } else {
-            window.showNotification('Site name is required', 'error');
-        }
-    };
-};
+        };
 
-// Delete Site
-window.deleteSite = function (clientId, siteIndex) {
-    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.sites) return;
+        // Bulk Upload Sites
+        window.bulkUploadSites = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    if (confirm('Are you sure you want to delete this site?')) {
-        client.sites.splice(siteIndex, 1);
-        window.saveData();
-
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        renderClientDetail(clientId);
-        window.showNotification('Site deleted');
-    }
-};
-
-// Bulk Upload Sites
-window.bulkUploadSites = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-
-    window.openModal(
-        'Bulk Upload Sites',
-        `
+            window.openModal(
+                'Bulk Upload Sites',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste site list in CSV format (one per line):
@@ -2676,78 +2682,78 @@ window.bulkUploadSites = function (clientId) {
             </div>
         </form>
         `,
-        () => {
-            const bulkData = document.getElementById('sites-bulk-data').value.trim();
-            const replace = document.getElementById('sites-replace').checked;
+                () => {
+                    const bulkData = document.getElementById('sites-bulk-data').value.trim();
+                    const replace = document.getElementById('sites-replace').checked;
 
-            if (!bulkData) {
-                window.showNotification('Please enter site data', 'error');
-                return;
-            }
+                    if (!bulkData) {
+                        window.showNotification('Please enter site data', 'error');
+                        return;
+                    }
 
-            const lines = bulkData.split('\n').filter(line => line.trim());
-            const newSites = [];
-            let errors = 0;
+                    const lines = bulkData.split('\n').filter(line => line.trim());
+                    const newSites = [];
+                    let errors = 0;
 
-            lines.forEach((line, index) => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 1 && parts[0]) {
-                    newSites.push({
-                        name: parts[0],
-                        address: parts[1] || '',
-                        city: parts[2] || '',
-                        country: parts[3] || '',
-                        employees: parseInt(parts[4]) || 0,
-                        shift: parts[5]?.toLowerCase() === 'yes' ? 'Yes' : 'No',
-                        standards: client.standard || ''
+                    lines.forEach((line, index) => {
+                        const parts = line.split(',').map(p => p.trim());
+                        if (parts.length >= 1 && parts[0]) {
+                            newSites.push({
+                                name: parts[0],
+                                address: parts[1] || '',
+                                city: parts[2] || '',
+                                country: parts[3] || '',
+                                employees: parseInt(parts[4]) || 0,
+                                shift: parts[5]?.toLowerCase() === 'yes' ? 'Yes' : 'No',
+                                standards: client.standard || ''
+                            });
+                        } else {
+                            errors++;
+                        }
                     });
-                } else {
-                    errors++;
+
+                    if (newSites.length === 0) {
+                        window.showNotification('No valid sites found in the data', 'error');
+                        return;
+                    }
+
+                    if (replace) {
+                        client.sites = newSites;
+                    } else {
+                        if (!client.sites) client.sites = [];
+                        client.sites.push(...newSites);
+                    }
+
+                    window.saveData();
+
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    renderClientDetail(clientId);
+                    window.setSetupWizardStep(clientId, 2);
+
+                    const message = `${newSites.length} site(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+                    window.showNotification(message);
                 }
-            });
-
-            if (newSites.length === 0) {
-                window.showNotification('No valid sites found in the data', 'error');
-                return;
-            }
-
-            if (replace) {
-                client.sites = newSites;
-            } else {
-                if (!client.sites) client.sites = [];
-                client.sites.push(...newSites);
-            }
-
-            window.saveData();
-
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            renderClientDetail(clientId);
-            window.setSetupWizardStep(clientId, 2);
-
-            const message = `${newSites.length} site(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
-            window.showNotification(message);
-        }
-    );
-};
+            );
+        };
 
 
-// Edit Contact Modal
-window.editContact = function (clientId, contactIndex) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.contacts || !client.contacts[contactIndex]) return;
+        // Edit Contact Modal
+        window.editContact = function (clientId, contactIndex) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.contacts || !client.contacts[contactIndex]) return;
 
-    const contact = client.contacts[contactIndex];
+            const contact = client.contacts[contactIndex];
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalSave = document.getElementById('modal-save');
 
-    modalTitle.textContent = 'Edit Contact Person';
-    modalBody.innerHTML = `
+            modalTitle.textContent = 'Edit Contact Person';
+            modalBody.innerHTML = `
         <form id="contact-form">
             <div class="form-group">
                 <label>Name <span style="color: var(--danger-color);">*</span></label>
@@ -2768,57 +2774,57 @@ window.editContact = function (clientId, contactIndex) {
         </form >
     `;
 
-    window.openModal();
+            window.openModal();
 
-    modalSave.onclick = () => {
-        const name = document.getElementById('contact-name').value;
-        const designation = document.getElementById('contact-designation').value;
-        const phone = document.getElementById('contact-phone').value;
-        const email = document.getElementById('contact-email').value;
+            modalSave.onclick = () => {
+                const name = document.getElementById('contact-name').value;
+                const designation = document.getElementById('contact-designation').value;
+                const phone = document.getElementById('contact-phone').value;
+                const email = document.getElementById('contact-email').value;
 
-        if (name) {
-            client.contacts[contactIndex] = { ...contact, name, designation, phone, email };
-            window.saveData();
+                if (name) {
+                    client.contacts[contactIndex] = { ...contact, name, designation, phone, email };
+                    window.saveData();
 
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    renderClientDetail(clientId);
+                    window.showNotification('Contact updated successfully');
+                } else {
+                    window.showNotification('Name is required', 'error');
+                }
+            };
+        };
+
+        // Delete Contact
+        window.deleteContact = function (clientId, contactIndex) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.contacts) return;
+
+            if (confirm('Are you sure you want to delete this contact?')) {
+                client.contacts.splice(contactIndex, 1);
+                window.saveData();
+
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                renderClientDetail(clientId);
+                window.showNotification('Contact deleted');
             }
-            window.closeModal();
-            renderClientDetail(clientId);
-            window.showNotification('Contact updated successfully');
-        } else {
-            window.showNotification('Name is required', 'error');
-        }
-    };
-};
+        };
 
-// Delete Contact
-window.deleteContact = function (clientId, contactIndex) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.contacts) return;
+        // Bulk Upload Contacts/Personnel
+        window.bulkUploadContacts = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    if (confirm('Are you sure you want to delete this contact?')) {
-        client.contacts.splice(contactIndex, 1);
-        window.saveData();
-
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        renderClientDetail(clientId);
-        window.showNotification('Contact deleted');
-    }
-};
-
-// Bulk Upload Contacts/Personnel
-window.bulkUploadContacts = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-
-    window.openModal(
-        'Bulk Upload Personnel',
-        `
+            window.openModal(
+                'Bulk Upload Personnel',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste contact list in CSV format (one per line):
@@ -2844,91 +2850,91 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
             </div>
         </form>
         `,
-        () => {
-            const bulkData = document.getElementById('contacts-bulk-data').value.trim();
-            const replace = document.getElementById('contacts-replace').checked;
+                () => {
+                    const bulkData = document.getElementById('contacts-bulk-data').value.trim();
+                    const replace = document.getElementById('contacts-replace').checked;
 
-            if (!bulkData) {
-                window.showNotification('Please enter contact data', 'error');
-                return;
-            }
+                    if (!bulkData) {
+                        window.showNotification('Please enter contact data', 'error');
+                        return;
+                    }
 
-            const lines = bulkData.split('\n').filter(line => line.trim());
-            const newContacts = [];
-            let errors = 0;
+                    const lines = bulkData.split('\n').filter(line => line.trim());
+                    const newContacts = [];
+                    let errors = 0;
 
-            lines.forEach((line, index) => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 1 && parts[0]) {
-                    newContacts.push({
-                        name: parts[0],
-                        designation: parts[1] || '',
-                        email: parts[2] || '',
-                        phone: parts[3] || ''
+                    lines.forEach((line, index) => {
+                        const parts = line.split(',').map(p => p.trim());
+                        if (parts.length >= 1 && parts[0]) {
+                            newContacts.push({
+                                name: parts[0],
+                                designation: parts[1] || '',
+                                email: parts[2] || '',
+                                phone: parts[3] || ''
+                            });
+                        } else {
+                            errors++;
+                        }
                     });
-                } else {
-                    errors++;
+
+                    if (newContacts.length === 0) {
+                        window.showNotification('No valid contacts found in the data', 'error');
+                        return;
+                    }
+
+                    if (replace) {
+                        client.contacts = newContacts;
+                    } else {
+                        if (!client.contacts) client.contacts = [];
+                        client.contacts.push(...newContacts);
+                    }
+
+                    window.saveData();
+
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    window.setSetupWizardStep(clientId, 5);
+
+                    const message = `${newContacts.length} contact(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+                    window.showNotification(message);
                 }
-            });
+            );
+        };
 
-            if (newContacts.length === 0) {
-                window.showNotification('No valid contacts found in the data', 'error');
-                return;
-            }
+        // Helper function to initiate audit planning from client detail page
+        // Helper function to initiate audit planning from client detail page
+        window.initiateAuditPlanFromClient = function (clientId) {
+            // Navigate to Audit Planning module
+            window.renderModule('planning');
 
-            if (replace) {
-                client.contacts = newContacts;
-            } else {
-                if (!client.contacts) client.contacts = [];
-                client.contacts.push(...newContacts);
-            }
+            const client = window.window.state.clients.find(c => c.id === clientId);
+            const clientName = client ? client.name : '';
 
-            window.saveData();
+            if (!clientName) return;
 
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            window.setSetupWizardStep(clientId, 5);
+            // Use a short timeout to ensure the planning module scripts/DOM are ready if needed,
+            // though typically renderModule is synchronous for the shell.
+            // We then render the create form directly.
+            setTimeout(() => {
+                if (typeof window.renderCreateAuditPlanForm === 'function') {
+                    window.renderCreateAuditPlanForm(clientName);
+                } else {
+                    console.error('renderCreateAuditPlanForm function not found');
+                }
+            }, 100);
+        };
 
-            const message = `${newContacts.length} contact(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
-            window.showNotification(message);
-        }
-    );
-};
+        // Department Management Functions
+        function addDepartment(clientId) {
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-// Helper function to initiate audit planning from client detail page
-// Helper function to initiate audit planning from client detail page
-window.initiateAuditPlanFromClient = function (clientId) {
-    // Navigate to Audit Planning module
-    window.renderModule('planning');
-
-    const client = window.window.state.clients.find(c => c.id === clientId);
-    const clientName = client ? client.name : '';
-
-    if (!clientName) return;
-
-    // Use a short timeout to ensure the planning module scripts/DOM are ready if needed,
-    // though typically renderModule is synchronous for the shell.
-    // We then render the create form directly.
-    setTimeout(() => {
-        if (typeof window.renderCreateAuditPlanForm === 'function') {
-            window.renderCreateAuditPlanForm(clientName);
-        } else {
-            console.error('renderCreateAuditPlanForm function not found');
-        }
-    }, 100);
-};
-
-// Department Management Functions
-function addDepartment(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    window.openModal(
-        'Add Department',
-        `
+            window.openModal(
+                'Add Department',
+                `
         <form id="dept-form">
             <div class="form-group">
                 <label>Department Name <span style="color: var(--danger-color);">*</span></label>
@@ -2940,55 +2946,55 @@ function addDepartment(clientId) {
             </div>
         </form >
     `,
-        () => {
-            const name = document.getElementById('dept-name').value.trim();
-            if (!name) {
-                window.showNotification('Department name is required', 'error');
-                return;
-            }
+                () => {
+                    const name = document.getElementById('dept-name').value.trim();
+                    if (!name) {
+                        window.showNotification('Department name is required', 'error');
+                        return;
+                    }
 
-            const department = {
-                name,
-                head: document.getElementById('dept-head').value.trim()
-            };
+                    const department = {
+                        name,
+                        head: document.getElementById('dept-head').value.trim()
+                    };
 
-            if (!client.departments) client.departments = [];
-            client.departments.push(department);
+                    if (!client.departments) client.departments = [];
+                    client.departments.push(department);
 
-            window.saveData();
+                    window.saveData();
 
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            if (document.getElementById('tab-organization')) {
-                const ul = document.querySelector('#tab-organization .card:first-child ul') || document.querySelector('#tab-organization ul');
-                if (ul) {
-                    ul.innerHTML = (client.departments || []).map(dept => `
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    if (document.getElementById('tab-organization')) {
+                        const ul = document.querySelector('#tab-organization .card:first-child ul') || document.querySelector('#tab-organization ul');
+                        if (ul) {
+                            ul.innerHTML = (client.departments || []).map(dept => `
                         <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
                             <span>${typeof dept === 'object' ? (dept.name || 'Unnamed') : dept}</span>
                             <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
                         </li>
                      `).join('');
+                        }
+                    } else {
+                        renderClientTab(client, 'client_org');
+                    }
+                    window.showNotification('Department added successfully');
                 }
-            } else {
-                renderClientTab(client, 'client_org');
-            }
-            window.showNotification('Department added successfully');
+            );
         }
-    );
-}
 
-function editDepartment(clientId, deptIndex) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+        function editDepartment(clientId, deptIndex) {
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-    const dept = client.departments[deptIndex];
+            const dept = client.departments[deptIndex];
 
-    window.openModal(
-        'Edit Department',
-        `
+            window.openModal(
+                'Edit Department',
+                `
         <form id="dept-form">
             <div class="form-group">
                 <label>Department Name <span style="color: var(--danger-color);">*</span></label>
@@ -3000,59 +3006,59 @@ function editDepartment(clientId, deptIndex) {
             </div>
         </form >
     `,
-        () => {
-            const name = document.getElementById('dept-name').value.trim();
-            if (!name) {
-                window.showNotification('Department name is required', 'error');
-                return;
-            }
+                () => {
+                    const name = document.getElementById('dept-name').value.trim();
+                    if (!name) {
+                        window.showNotification('Department name is required', 'error');
+                        return;
+                    }
 
-            client.departments[deptIndex] = {
-                name,
-                head: document.getElementById('dept-head').value.trim()
-            };
+                    client.departments[deptIndex] = {
+                        name,
+                        head: document.getElementById('dept-head').value.trim()
+                    };
 
-            window.saveData();
+                    window.saveData();
 
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            renderClientDetail(clientId);
-            renderClientTab(client, 'departments');
-            window.showNotification('Department updated successfully');
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    renderClientDetail(clientId);
+                    renderClientTab(client, 'departments');
+                    window.showNotification('Department updated successfully');
+                }
+            );
         }
-    );
-}
 
-function deleteDepartment(clientId, deptIndex) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+        function deleteDepartment(clientId, deptIndex) {
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-    const dept = client.departments[deptIndex];
+            const dept = client.departments[deptIndex];
 
-    if (confirm(`Are you sure you want to delete the department "${dept.name}" ? `)) {
-        client.departments.splice(deptIndex, 1);
-        window.saveData();
+            if (confirm(`Are you sure you want to delete the department "${dept.name}" ? `)) {
+                client.departments.splice(deptIndex, 1);
+                window.saveData();
 
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                renderClientDetail(clientId);
+                renderClientTab(client, 'departments');
+                window.showNotification('Department deleted successfully');
+            }
         }
-        renderClientDetail(clientId);
-        renderClientTab(client, 'departments');
-        window.showNotification('Department deleted successfully');
-    }
-}
 
-function bulkUploadDepartments(clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        function bulkUploadDepartments(clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    window.openModal(
-        'Bulk Upload Departments',
-        `
+            window.openModal(
+                'Bulk Upload Departments',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste department list in CSV format (one per line):
@@ -3079,74 +3085,74 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
             </div>
         </form>
         `,
-        () => {
-            const bulkData = document.getElementById('dept-bulk-data').value.trim();
-            const replace = document.getElementById('dept-replace').checked;
+                () => {
+                    const bulkData = document.getElementById('dept-bulk-data').value.trim();
+                    const replace = document.getElementById('dept-replace').checked;
 
-            if (!bulkData) {
-                window.showNotification('Please enter department data', 'error');
-                return;
-            }
+                    if (!bulkData) {
+                        window.showNotification('Please enter department data', 'error');
+                        return;
+                    }
 
-            const lines = bulkData.split('\n').filter(line => line.trim());
-            const newDepartments = [];
-            let errors = 0;
+                    const lines = bulkData.split('\n').filter(line => line.trim());
+                    const newDepartments = [];
+                    let errors = 0;
 
-            lines.forEach((line, index) => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 1 && parts[0]) {
-                    newDepartments.push({
-                        name: parts[0],
-                        head: parts[1] || '',
-                        employeeCount: parseInt(parts[2]) || 0
+                    lines.forEach((line, index) => {
+                        const parts = line.split(',').map(p => p.trim());
+                        if (parts.length >= 1 && parts[0]) {
+                            newDepartments.push({
+                                name: parts[0],
+                                head: parts[1] || '',
+                                employeeCount: parseInt(parts[2]) || 0
+                            });
+                        } else {
+                            errors++;
+                        }
                     });
-                } else {
-                    errors++;
+
+                    if (newDepartments.length === 0) {
+                        window.showNotification('No valid departments found in the data', 'error');
+                        return;
+                    }
+
+                    if (replace) {
+                        client.departments = newDepartments;
+                    } else {
+                        if (!client.departments) client.departments = [];
+                        client.departments.push(...newDepartments);
+                    }
+
+                    window.saveData();
+
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    window.setSetupWizardStep(clientId, 3);
+
+
+                    const message = `${newDepartments.length} department(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+                    window.showNotification(message);
                 }
-            });
-
-            if (newDepartments.length === 0) {
-                window.showNotification('No valid departments found in the data', 'error');
-                return;
-            }
-
-            if (replace) {
-                client.departments = newDepartments;
-            } else {
-                if (!client.departments) client.departments = [];
-                client.departments.push(...newDepartments);
-            }
-
-            window.saveData();
-
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            window.setSetupWizardStep(clientId, 3);
-
-
-            const message = `${newDepartments.length} department(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
-            window.showNotification(message);
+            );
         }
-    );
-}
 
-// Export department functions
-window.addDepartment = addDepartment;
-window.editDepartment = editDepartment;
-window.deleteDepartment = deleteDepartment;
-window.bulkUploadDepartments = bulkUploadDepartments;
+        // Export department functions
+        window.addDepartment = addDepartment;
+        window.editDepartment = editDepartment;
+        window.deleteDepartment = deleteDepartment;
+        window.bulkUploadDepartments = bulkUploadDepartments;
 
-// ============================================
-// GOODS/SERVICES CRUD FUNCTIONS
-// ============================================
-window.addGoodsService = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        // ============================================
+        // GOODS/SERVICES CRUD FUNCTIONS
+        // ============================================
+        window.addGoodsService = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    window.openModal('Add Goods/Service', `
+            window.openModal('Add Goods/Service', `
         <form id="goods-form">
             <div class="form-group">
                 <label>Name *</label>
@@ -3165,61 +3171,61 @@ window.addGoodsService = function (clientId) {
             </div>
         </form>
     `, () => {
-        const name = document.getElementById('goods-name').value.trim();
-        if (!name) { window.showNotification('Name is required', 'error'); return; }
-        if (!client.goodsServices) client.goodsServices = [];
-        client.goodsServices.push({ name, category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() });
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.closeModal();
-        window.setSetupWizardStep(clientId, 6);
-        window.showNotification('Goods/Service added');
-    });
-};
+                const name = document.getElementById('goods-name').value.trim();
+                if (!name) { window.showNotification('Name is required', 'error'); return; }
+                if (!client.goodsServices) client.goodsServices = [];
+                client.goodsServices.push({ name, category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() });
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.closeModal();
+                window.setSetupWizardStep(clientId, 6);
+                window.showNotification('Goods/Service added');
+            });
+        };
 
-window.editGoodsService = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.goodsServices || !client.goodsServices[index]) return;
-    const item = client.goodsServices[index];
-    window.openModal('Edit Goods/Service', `
+        window.editGoodsService = function (clientId, index) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.goodsServices || !client.goodsServices[index]) return;
+            const item = client.goodsServices[index];
+            window.openModal('Edit Goods/Service', `
         <form id="goods-form">
             <div class="form-group"><label>Name *</label><input type="text" id="goods-name" value="${window.UTILS.escapeHtml(item.name)}" required></div>
             <div class="form-group"><label>Category</label><select id="goods-category"><option value="Product" ${item.category === 'Product' ? 'selected' : ''}>Product</option><option value="Service" ${item.category === 'Service' ? 'selected' : ''}>Service</option></select></div>
             <div class="form-group"><label>Description</label><textarea id="goods-desc" rows="3">${window.UTILS.escapeHtml(item.description || '')}</textarea></div>
         </form>
     `, () => {
-        client.goodsServices[index] = { name: document.getElementById('goods-name').value.trim(), category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() };
-        window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 6);
-        window.showNotification('Goods/Service updated');
-    });
-};
+                client.goodsServices[index] = { name: document.getElementById('goods-name').value.trim(), category: document.getElementById('goods-category').value, description: document.getElementById('goods-desc').value.trim() };
+                window.saveData(); window.closeModal(); window.setSetupWizardStep(clientId, 6);
+                window.showNotification('Goods/Service updated');
+            });
+        };
 
-window.deleteGoodsService = function (clientId, index) {
-    if (!confirm('Delete this item?')) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.goodsServices) {
-        client.goodsServices.splice(index, 1);
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.setSetupWizardStep(clientId, 6);
-        window.showNotification('Goods/Service deleted');
-    }
-};
+        window.deleteGoodsService = function (clientId, index) {
+            if (!confirm('Delete this item?')) return;
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (client && client.goodsServices) {
+                client.goodsServices.splice(index, 1);
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.setSetupWizardStep(clientId, 6);
+                window.showNotification('Goods/Service deleted');
+            }
+        };
 
-// Bulk Upload Goods/Services
-window.bulkUploadGoodsServices = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        // Bulk Upload Goods/Services
+        window.bulkUploadGoodsServices = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    window.openModal(
-        'Bulk Upload Goods & Services',
-        `
+            window.openModal(
+                'Bulk Upload Goods & Services',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste goods/services list in CSV format (one per line):
@@ -3246,132 +3252,132 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
             </div>
         </form>
         `,
-        () => {
-            const bulkData = document.getElementById('goods-bulk-data').value.trim();
-            const replace = document.getElementById('goods-replace').checked;
+                () => {
+                    const bulkData = document.getElementById('goods-bulk-data').value.trim();
+                    const replace = document.getElementById('goods-replace').checked;
 
-            if (!bulkData) {
-                window.showNotification('Please enter goods/services data', 'error');
-                return;
-            }
+                    if (!bulkData) {
+                        window.showNotification('Please enter goods/services data', 'error');
+                        return;
+                    }
 
-            const lines = bulkData.split('\n').filter(line => line.trim());
-            const newItems = [];
-            let errors = 0;
+                    const lines = bulkData.split('\n').filter(line => line.trim());
+                    const newItems = [];
+                    let errors = 0;
 
-            lines.forEach((line, index) => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 1 && parts[0]) {
-                    newItems.push({
-                        name: parts[0],
-                        category: parts[1] || 'Goods',
-                        description: parts[2] || ''
+                    lines.forEach((line, index) => {
+                        const parts = line.split(',').map(p => p.trim());
+                        if (parts.length >= 1 && parts[0]) {
+                            newItems.push({
+                                name: parts[0],
+                                category: parts[1] || 'Goods',
+                                description: parts[2] || ''
+                            });
+                        } else {
+                            errors++;
+                        }
                     });
-                } else {
-                    errors++;
+
+                    if (newItems.length === 0) {
+                        window.showNotification('No valid items found in the data', 'error');
+                        return;
+                    }
+
+                    if (replace) {
+                        client.goodsServices = newItems;
+                    } else {
+                        if (!client.goodsServices) client.goodsServices = [];
+                        client.goodsServices.push(...newItems);
+                    }
+
+                    window.saveData();
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    window.setSetupWizardStep(clientId, 6);
+
+                    const message = `${newItems.length} item(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+                    window.showNotification(message);
                 }
-            });
+            );
+        };
 
-            if (newItems.length === 0) {
-                window.showNotification('No valid items found in the data', 'error');
-                return;
-            }
-
-            if (replace) {
-                client.goodsServices = newItems;
-            } else {
-                if (!client.goodsServices) client.goodsServices = [];
-                client.goodsServices.push(...newItems);
-            }
-
-            window.saveData();
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            window.setSetupWizardStep(clientId, 6);
-
-            const message = `${newItems.length} item(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
-            window.showNotification(message);
-        }
-    );
-};
-
-// ============================================
-// KEY PROCESSES CRUD FUNCTIONS
-// ============================================
-window.addKeyProcess = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-    window.openModal('Add Key Process', `
+        // ============================================
+        // KEY PROCESSES CRUD FUNCTIONS
+        // ============================================
+        window.addKeyProcess = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
+            window.openModal('Add Key Process', `
         <form id="process-form">
             <div class="form-group"><label>Process Name *</label><input type="text" id="process-name" required placeholder="e.g., Production Planning"></div>
             <div class="form-group"><label>Category</label><select id="process-category"><option value="Core">Core Process</option><option value="Support">Support Process</option></select></div>
             <div class="form-group"><label>Process Owner</label><input type="text" id="process-owner" placeholder="e.g., Operations Manager"></div>
         </form>
     `, () => {
-        const name = document.getElementById('process-name').value.trim();
-        if (!name) { window.showNotification('Process name is required', 'error'); return; }
-        if (!client.keyProcesses) client.keyProcesses = [];
-        client.keyProcesses.push({ name, category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() });
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.closeModal();
-        window.setSetupWizardStep(clientId, 7);
-        window.showNotification('Process added');
-    });
-};
+                const name = document.getElementById('process-name').value.trim();
+                if (!name) { window.showNotification('Process name is required', 'error'); return; }
+                if (!client.keyProcesses) client.keyProcesses = [];
+                client.keyProcesses.push({ name, category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() });
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.closeModal();
+                window.setSetupWizardStep(clientId, 7);
+                window.showNotification('Process added');
+            });
+        };
 
-window.editKeyProcess = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
-    const proc = client.keyProcesses[index];
-    window.openModal('Edit Key Process', `
+        window.editKeyProcess = function (clientId, index) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
+            const proc = client.keyProcesses[index];
+            window.openModal('Edit Key Process', `
         <form id="process-form">
             <div class="form-group"><label>Process Name *</label><input type="text" id="process-name" value="${window.UTILS.escapeHtml(proc.name)}" required></div>
             <div class="form-group"><label>Category</label><select id="process-category"><option value="Core" ${proc.category === 'Core' ? 'selected' : ''}>Core Process</option><option value="Support" ${proc.category === 'Support' ? 'selected' : ''}>Support Process</option></select></div>
             <div class="form-group"><label>Process Owner</label><input type="text" id="process-owner" value="${window.UTILS.escapeHtml(proc.owner || '')}"></div>
         </form>
     `, () => {
-        client.keyProcesses[index] = { name: document.getElementById('process-name').value.trim(), category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() };
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.closeModal();
-        window.setSetupWizardStep(clientId, 7);
-        window.showNotification('Process updated');
-    });
-};
+                client.keyProcesses[index] = { name: document.getElementById('process-name').value.trim(), category: document.getElementById('process-category').value, owner: document.getElementById('process-owner').value.trim() };
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.closeModal();
+                window.setSetupWizardStep(clientId, 7);
+                window.showNotification('Process updated');
+            });
+        };
 
-window.deleteKeyProcess = function (clientId, index) {
-    if (!confirm('Delete this process?')) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.keyProcesses) {
-        client.keyProcesses.splice(index, 1);
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.setSetupWizardStep(clientId, 7);
-        window.showNotification('Process deleted');
-    }
-};
+        window.deleteKeyProcess = function (clientId, index) {
+            if (!confirm('Delete this process?')) return;
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (client && client.keyProcesses) {
+                client.keyProcesses.splice(index, 1);
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.setSetupWizardStep(clientId, 7);
+                window.showNotification('Process deleted');
+            }
+        };
 
-// Bulk Upload Key Processes
-window.bulkUploadKeyProcesses = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        // Bulk Upload Key Processes
+        window.bulkUploadKeyProcesses = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    window.openModal(
-        'Bulk Upload Key Processes',
-        `
+            window.openModal(
+                'Bulk Upload Key Processes',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste process list in CSV format (one per line):
@@ -3399,126 +3405,126 @@ HR Management, Support," style="font-family: monospace;"></textarea>
             </div>
         </form>
         `,
-        () => {
-            const bulkData = document.getElementById('process-bulk-data').value.trim();
-            const replace = document.getElementById('process-replace').checked;
+                () => {
+                    const bulkData = document.getElementById('process-bulk-data').value.trim();
+                    const replace = document.getElementById('process-replace').checked;
 
-            if (!bulkData) {
-                window.showNotification('Please enter process data', 'error');
-                return;
-            }
+                    if (!bulkData) {
+                        window.showNotification('Please enter process data', 'error');
+                        return;
+                    }
 
-            const lines = bulkData.split('\n').filter(line => line.trim());
-            const newProcesses = [];
-            let errors = 0;
+                    const lines = bulkData.split('\n').filter(line => line.trim());
+                    const newProcesses = [];
+                    let errors = 0;
 
-            lines.forEach((line, index) => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 1 && parts[0]) {
-                    newProcesses.push({
-                        name: parts[0],
-                        category: parts[1] || 'Support',
-                        owner: parts[2] || ''
+                    lines.forEach((line, index) => {
+                        const parts = line.split(',').map(p => p.trim());
+                        if (parts.length >= 1 && parts[0]) {
+                            newProcesses.push({
+                                name: parts[0],
+                                category: parts[1] || 'Support',
+                                owner: parts[2] || ''
+                            });
+                        } else {
+                            errors++;
+                        }
                     });
-                } else {
-                    errors++;
+
+                    if (newProcesses.length === 0) {
+                        window.showNotification('No valid processes found in the data', 'error');
+                        return;
+                    }
+
+                    if (replace) {
+                        client.keyProcesses = newProcesses;
+                    } else {
+                        if (!client.keyProcesses) client.keyProcesses = [];
+                        client.keyProcesses.push(...newProcesses);
+                    }
+
+                    window.saveData();
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    window.setSetupWizardStep(clientId, 7);
+
+                    const message = `${newProcesses.length} process(es) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+                    window.showNotification(message);
                 }
-            });
+            );
+        };
 
-            if (newProcesses.length === 0) {
-                window.showNotification('No valid processes found in the data', 'error');
-                return;
-            }
-
-            if (replace) {
-                client.keyProcesses = newProcesses;
-            } else {
-                if (!client.keyProcesses) client.keyProcesses = [];
-                client.keyProcesses.push(...newProcesses);
-            }
-
-            window.saveData();
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            window.setSetupWizardStep(clientId, 7);
-
-            const message = `${newProcesses.length} process(es) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
-            window.showNotification(message);
-        }
-    );
-};
-
-// ============================================
-// DESIGNATIONS CRUD FUNCTIONS
-// ============================================
-window.addClientDesignation = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-    const deptOptions = (client.departments || []).map(d => `<option value="${window.UTILS.escapeHtml(d.name)}">${window.UTILS.escapeHtml(d.name)}</option>`).join('');
-    window.openModal('Add Designation', `
+        // ============================================
+        // DESIGNATIONS CRUD FUNCTIONS
+        // ============================================
+        window.addClientDesignation = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
+            const deptOptions = (client.departments || []).map(d => `<option value="${window.UTILS.escapeHtml(d.name)}">${window.UTILS.escapeHtml(d.name)}</option>`).join('');
+            window.openModal('Add Designation', `
         <form id="des-form">
             <div class="form-group"><label>Job Title *</label><input type="text" id="des-title" required placeholder="e.g., Quality Manager"></div>
             <div class="form-group"><label>Department (Optional)</label><select id="des-dept"><option value="">-- Not Assigned --</option>${deptOptions}</select></div>
         </form>
     `, () => {
-        const title = document.getElementById('des-title').value.trim();
-        if (!title) { window.showNotification('Job title is required', 'error'); return; }
-        if (!client.designations) client.designations = [];
-        client.designations.push({ title, department: document.getElementById('des-dept').value });
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.closeModal();
-        window.setSetupWizardStep(clientId, 4);
-        if (document.getElementById('tab-organization')) {
-            const ul = document.querySelector('#tab-organization .card:nth-child(2) ul');
-            if (ul) {
-                const designations = Array.from(new Set([
-                    ...(client.designations || []).map(d => d.title || d),
-                    ...(client.contacts || []).map(c => c.designation)
-                ].filter(Boolean)));
-                ul.innerHTML = designations.map(desig => `
+                const title = document.getElementById('des-title').value.trim();
+                if (!title) { window.showNotification('Job title is required', 'error'); return; }
+                if (!client.designations) client.designations = [];
+                client.designations.push({ title, department: document.getElementById('des-dept').value });
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.closeModal();
+                window.setSetupWizardStep(clientId, 4);
+                if (document.getElementById('tab-organization')) {
+                    const ul = document.querySelector('#tab-organization .card:nth-child(2) ul');
+                    if (ul) {
+                        const designations = Array.from(new Set([
+                            ...(client.designations || []).map(d => d.title || d),
+                            ...(client.contacts || []).map(c => c.designation)
+                        ].filter(Boolean)));
+                        ul.innerHTML = designations.map(desig => `
                     <li style="padding: 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
                         <span>${desig}</span>
                         <span style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"><i class="fa-solid fa-pen"></i></span>
                     </li>
                  `).join('');
+                    }
+                } else {
+                    renderClientTab(client, 'client_org');
+                }
+                window.showNotification('Designation added');
+            });
+        };
+
+        window.deleteClientDesignation = function (clientId, index) {
+            if (!confirm('Delete this designation?')) return;
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (client && client.designations) {
+                client.designations.splice(index, 1);
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.setSetupWizardStep(clientId, 4);
+                window.showNotification('Designation deleted');
             }
-        } else {
-            renderClientTab(client, 'client_org');
-        }
-        window.showNotification('Designation added');
-    });
-};
+        };
 
-window.deleteClientDesignation = function (clientId, index) {
-    if (!confirm('Delete this designation?')) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.designations) {
-        client.designations.splice(index, 1);
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
-        window.setSetupWizardStep(clientId, 4);
-        window.showNotification('Designation deleted');
-    }
-};
+        // Bulk Upload Designations
+        window.bulkUploadDesignations = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-// Bulk Upload Designations
-window.bulkUploadDesignations = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-
-    window.openModal(
-        'Bulk Upload Designations',
-        `
+            window.openModal(
+                'Bulk Upload Designations',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
                 <i class="fa-solid fa-info-circle"></i> Paste designation list in CSV format (one per line):
@@ -3547,219 +3553,219 @@ CFO," style="font-family: monospace;"></textarea>
             </div>
         </form>
         `,
-        () => {
-            const bulkData = document.getElementById('designation-bulk-data').value.trim();
-            const replace = document.getElementById('designation-replace').checked;
+                () => {
+                    const bulkData = document.getElementById('designation-bulk-data').value.trim();
+                    const replace = document.getElementById('designation-replace').checked;
 
-            if (!bulkData) {
-                window.showNotification('Please enter designation data', 'error');
-                return;
-            }
+                    if (!bulkData) {
+                        window.showNotification('Please enter designation data', 'error');
+                        return;
+                    }
 
-            const lines = bulkData.split('\n').filter(line => line.trim());
-            const newDesignations = [];
-            let errors = 0;
+                    const lines = bulkData.split('\n').filter(line => line.trim());
+                    const newDesignations = [];
+                    let errors = 0;
 
-            lines.forEach((line, index) => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 1 && parts[0]) {
-                    newDesignations.push({
-                        title: parts[0],
-                        department: parts[1] || ''
+                    lines.forEach((line, index) => {
+                        const parts = line.split(',').map(p => p.trim());
+                        if (parts.length >= 1 && parts[0]) {
+                            newDesignations.push({
+                                title: parts[0],
+                                department: parts[1] || ''
+                            });
+                        } else {
+                            errors++;
+                        }
                     });
-                } else {
-                    errors++;
-                }
-            });
 
-            if (newDesignations.length === 0) {
-                window.showNotification('No valid designations found in the data', 'error');
+                    if (newDesignations.length === 0) {
+                        window.showNotification('No valid designations found in the data', 'error');
+                        return;
+                    }
+
+                    if (replace) {
+                        client.designations = newDesignations;
+                    } else {
+                        if (!client.designations) client.designations = [];
+                        client.designations.push(...newDesignations);
+                    }
+
+                    window.saveData();
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    window.closeModal();
+                    window.setSetupWizardStep(clientId, 4);
+
+                    const message = `${newDesignations.length} designation(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
+                    window.showNotification(message);
+                }
+            );
+        };
+
+        // Company Profile Functions
+        function generateCompanyProfile(clientId) {
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client || !client.website) {
+                window.showNotification('Website URL is required for AI generation', 'error');
                 return;
             }
 
-            if (replace) {
-                client.designations = newDesignations;
-            } else {
-                if (!client.designations) client.designations = [];
-                client.designations.push(...newDesignations);
+            // Show loading notification
+            window.showNotification('Generating company profile from website...', 'info');
+
+            // Simulated AI generation (in production, this would call an API)
+            setTimeout(() => {
+                // Save previous version to history
+                if (client.profile) {
+                    if (!client.profileHistory) client.profileHistory = [];
+                    client.profileHistory.push({
+                        content: client.profile,
+                        updatedAt: client.profileUpdated || new Date().toISOString(),
+                        updatedBy: 'System',
+                        method: 'Manual'
+                    });
+                }
+
+                // Generate a professional company profile based on available data
+                const parts = [];
+
+                parts.push(`${client.name} - Company Overview`);
+                parts.push(`\nIndustry: ${client.industry || 'Not specified'}`);
+                parts.push(`Website: ${client.website}`);
+                parts.push(`\nAbout the Organization:`);
+                parts.push(`${client.name} is a ${client.industry || 'professional'} organization ${client.employees ? `with approximately ${client.employees} employees` : ''} ${client.sites && client.sites.length > 1 ? `operating across ${client.sites.length} locations` : 'operating from a single location'}.`);
+
+                if (client.standard) {
+                    parts.push(`\nThe organization maintains certification to ${client.standard} standards, demonstrating its commitment to quality management and continuous improvement.`);
+                }
+
+                if (client.sites && client.sites.length > 0) {
+                    parts.push(`\nOperational Locations:`);
+                    client.sites.forEach(s => {
+                        parts.push(`• ${s.name}${s.city ? ` - ${s.city}` : ''}${s.employees ? ` (${s.employees} employees)` : ''}`);
+                    });
+                }
+
+                if (client.departments && client.departments.length > 0) {
+                    parts.push(`\nKey Departments:`);
+                    client.departments.forEach(d => {
+                        parts.push(`• ${d.name}${d.head ? ` - Led by ${d.head}` : ''}${d.employeeCount ? ` (${d.employeeCount} staff)` : ''}`);
+                    });
+                }
+
+                if (client.shifts === 'Yes') {
+                    parts.push(`\nThe organization operates multiple shifts to ensure continuous operations and meet customer demands.`);
+                }
+
+                parts.push(`\nThis profile provides context for audit activities and helps auditors understand the organizational structure and scope of operations.`);
+                parts.push(`\n---`);
+                parts.push(`Note: This profile was AI-generated from available client data. Please review and edit as needed to ensure accuracy.`);
+
+                const profile = parts.join('\n');
+
+                // Save the generated profile
+                client.profile = profile;
+                client.profileUpdated = new Date().toISOString();
+
+                // ============================================
+                // AI-GENERATE GOODS/SERVICES (Based on Industry)
+                // ============================================
+                const industryGoods = {
+                    'Manufacturing': [
+                        { name: 'Industrial Components', category: 'Product', description: 'Manufacturing of precision components' },
+                        { name: 'Assembly Services', category: 'Service', description: 'Product assembly and integration' },
+                        { name: 'Custom Fabrication', category: 'Product', description: 'Custom metal/plastic fabrication' }
+                    ],
+                    'IT Services': [
+                        { name: 'Software Development', category: 'Service', description: 'Custom software solutions' },
+                        { name: 'Cloud Services', category: 'Service', description: 'Cloud infrastructure and hosting' },
+                        { name: 'IT Support', category: 'Service', description: 'Technical support and maintenance' }
+                    ],
+                    'Healthcare': [
+                        { name: 'Medical Devices', category: 'Product', description: 'Healthcare equipment and devices' },
+                        { name: 'Patient Care', category: 'Service', description: 'Clinical and patient care services' },
+                        { name: 'Laboratory Services', category: 'Service', description: 'Diagnostic and testing services' }
+                    ],
+                    'Food Processing': [
+                        { name: 'Processed Foods', category: 'Product', description: 'Ready-to-eat food products' },
+                        { name: 'Raw Materials', category: 'Product', description: 'Agricultural inputs and ingredients' },
+                        { name: 'Packaging Services', category: 'Service', description: 'Food packaging and labeling' }
+                    ],
+                    'default': [
+                        { name: 'Primary Product/Service', category: 'Product', description: 'Main offering - please update' },
+                        { name: 'Secondary Service', category: 'Service', description: 'Support service - please update' }
+                    ]
+                };
+                client.goodsServices = industryGoods[client.industry] || industryGoods['default'];
+
+                // ============================================
+                // AI-GENERATE KEY PROCESSES
+                // ============================================
+                const industryProcesses = {
+                    'Manufacturing': [
+                        { name: 'Design & Development', category: 'Core', owner: '' },
+                        { name: 'Production Planning', category: 'Core', owner: '' },
+                        { name: 'Manufacturing Operations', category: 'Core', owner: '' },
+                        { name: 'Quality Control', category: 'Core', owner: '' },
+                        { name: 'Procurement', category: 'Support', owner: '' },
+                        { name: 'Warehouse & Logistics', category: 'Support', owner: '' }
+                    ],
+                    'IT Services': [
+                        { name: 'Requirements Analysis', category: 'Core', owner: '' },
+                        { name: 'Software Development', category: 'Core', owner: '' },
+                        { name: 'Testing & QA', category: 'Core', owner: '' },
+                        { name: 'Deployment & Release', category: 'Core', owner: '' },
+                        { name: 'Customer Support', category: 'Support', owner: '' },
+                        { name: 'Infrastructure Management', category: 'Support', owner: '' }
+                    ],
+                    'default': [
+                        { name: 'Order Management', category: 'Core', owner: '' },
+                        { name: 'Service Delivery', category: 'Core', owner: '' },
+                        { name: 'Quality Assurance', category: 'Core', owner: '' },
+                        { name: 'Human Resources', category: 'Support', owner: '' },
+                        { name: 'Finance & Administration', category: 'Support', owner: '' }
+                    ]
+                };
+                client.keyProcesses = industryProcesses[client.industry] || industryProcesses['default'];
+
+                // ============================================
+                // AI-GENERATE COMMON DESIGNATIONS
+                // ============================================
+                client.designations = client.designations || [];
+                if (client.designations.length === 0) {
+                    client.designations = [
+                        { title: 'Managing Director', department: '' },
+                        { title: 'Quality Manager', department: 'Quality' },
+                        { title: 'Operations Manager', department: 'Operations' },
+                        { title: 'HR Manager', department: 'Human Resources' },
+                        { title: 'Management Representative (MR)', department: '' }
+                    ];
+                }
+
+                window.saveData();
+                renderClientDetail(clientId);
+                window.setSetupWizardStep(clientId, 1);
+                window.showNotification('Organization data generated successfully! Review Goods/Services and Key Processes.', 'success');
+            }, 1500); // Simulate API delay
+        }
+
+        function editCompanyProfile(clientId) {
+            // RBAC Check
+            if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+                window.showNotification('Access Denied', 'error');
+                return;
             }
 
-            window.saveData();
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-            }
-            window.closeModal();
-            window.setSetupWizardStep(clientId, 4);
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-            const message = `${newDesignations.length} designation(s) ${replace ? 'uploaded' : 'added'}${errors > 0 ? ` (${errors} line(s) skipped)` : ''}`;
-            window.showNotification(message);
-        }
-    );
-};
+            const currentProfile = client.profile || '';
 
-// Company Profile Functions
-function generateCompanyProfile(clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client || !client.website) {
-        window.showNotification('Website URL is required for AI generation', 'error');
-        return;
-    }
-
-    // Show loading notification
-    window.showNotification('Generating company profile from website...', 'info');
-
-    // Simulated AI generation (in production, this would call an API)
-    setTimeout(() => {
-        // Save previous version to history
-        if (client.profile) {
-            if (!client.profileHistory) client.profileHistory = [];
-            client.profileHistory.push({
-                content: client.profile,
-                updatedAt: client.profileUpdated || new Date().toISOString(),
-                updatedBy: 'System',
-                method: 'Manual'
-            });
-        }
-
-        // Generate a professional company profile based on available data
-        const parts = [];
-
-        parts.push(`${client.name} - Company Overview`);
-        parts.push(`\nIndustry: ${client.industry || 'Not specified'}`);
-        parts.push(`Website: ${client.website}`);
-        parts.push(`\nAbout the Organization:`);
-        parts.push(`${client.name} is a ${client.industry || 'professional'} organization ${client.employees ? `with approximately ${client.employees} employees` : ''} ${client.sites && client.sites.length > 1 ? `operating across ${client.sites.length} locations` : 'operating from a single location'}.`);
-
-        if (client.standard) {
-            parts.push(`\nThe organization maintains certification to ${client.standard} standards, demonstrating its commitment to quality management and continuous improvement.`);
-        }
-
-        if (client.sites && client.sites.length > 0) {
-            parts.push(`\nOperational Locations:`);
-            client.sites.forEach(s => {
-                parts.push(`• ${s.name}${s.city ? ` - ${s.city}` : ''}${s.employees ? ` (${s.employees} employees)` : ''}`);
-            });
-        }
-
-        if (client.departments && client.departments.length > 0) {
-            parts.push(`\nKey Departments:`);
-            client.departments.forEach(d => {
-                parts.push(`• ${d.name}${d.head ? ` - Led by ${d.head}` : ''}${d.employeeCount ? ` (${d.employeeCount} staff)` : ''}`);
-            });
-        }
-
-        if (client.shifts === 'Yes') {
-            parts.push(`\nThe organization operates multiple shifts to ensure continuous operations and meet customer demands.`);
-        }
-
-        parts.push(`\nThis profile provides context for audit activities and helps auditors understand the organizational structure and scope of operations.`);
-        parts.push(`\n---`);
-        parts.push(`Note: This profile was AI-generated from available client data. Please review and edit as needed to ensure accuracy.`);
-
-        const profile = parts.join('\n');
-
-        // Save the generated profile
-        client.profile = profile;
-        client.profileUpdated = new Date().toISOString();
-
-        // ============================================
-        // AI-GENERATE GOODS/SERVICES (Based on Industry)
-        // ============================================
-        const industryGoods = {
-            'Manufacturing': [
-                { name: 'Industrial Components', category: 'Product', description: 'Manufacturing of precision components' },
-                { name: 'Assembly Services', category: 'Service', description: 'Product assembly and integration' },
-                { name: 'Custom Fabrication', category: 'Product', description: 'Custom metal/plastic fabrication' }
-            ],
-            'IT Services': [
-                { name: 'Software Development', category: 'Service', description: 'Custom software solutions' },
-                { name: 'Cloud Services', category: 'Service', description: 'Cloud infrastructure and hosting' },
-                { name: 'IT Support', category: 'Service', description: 'Technical support and maintenance' }
-            ],
-            'Healthcare': [
-                { name: 'Medical Devices', category: 'Product', description: 'Healthcare equipment and devices' },
-                { name: 'Patient Care', category: 'Service', description: 'Clinical and patient care services' },
-                { name: 'Laboratory Services', category: 'Service', description: 'Diagnostic and testing services' }
-            ],
-            'Food Processing': [
-                { name: 'Processed Foods', category: 'Product', description: 'Ready-to-eat food products' },
-                { name: 'Raw Materials', category: 'Product', description: 'Agricultural inputs and ingredients' },
-                { name: 'Packaging Services', category: 'Service', description: 'Food packaging and labeling' }
-            ],
-            'default': [
-                { name: 'Primary Product/Service', category: 'Product', description: 'Main offering - please update' },
-                { name: 'Secondary Service', category: 'Service', description: 'Support service - please update' }
-            ]
-        };
-        client.goodsServices = industryGoods[client.industry] || industryGoods['default'];
-
-        // ============================================
-        // AI-GENERATE KEY PROCESSES
-        // ============================================
-        const industryProcesses = {
-            'Manufacturing': [
-                { name: 'Design & Development', category: 'Core', owner: '' },
-                { name: 'Production Planning', category: 'Core', owner: '' },
-                { name: 'Manufacturing Operations', category: 'Core', owner: '' },
-                { name: 'Quality Control', category: 'Core', owner: '' },
-                { name: 'Procurement', category: 'Support', owner: '' },
-                { name: 'Warehouse & Logistics', category: 'Support', owner: '' }
-            ],
-            'IT Services': [
-                { name: 'Requirements Analysis', category: 'Core', owner: '' },
-                { name: 'Software Development', category: 'Core', owner: '' },
-                { name: 'Testing & QA', category: 'Core', owner: '' },
-                { name: 'Deployment & Release', category: 'Core', owner: '' },
-                { name: 'Customer Support', category: 'Support', owner: '' },
-                { name: 'Infrastructure Management', category: 'Support', owner: '' }
-            ],
-            'default': [
-                { name: 'Order Management', category: 'Core', owner: '' },
-                { name: 'Service Delivery', category: 'Core', owner: '' },
-                { name: 'Quality Assurance', category: 'Core', owner: '' },
-                { name: 'Human Resources', category: 'Support', owner: '' },
-                { name: 'Finance & Administration', category: 'Support', owner: '' }
-            ]
-        };
-        client.keyProcesses = industryProcesses[client.industry] || industryProcesses['default'];
-
-        // ============================================
-        // AI-GENERATE COMMON DESIGNATIONS
-        // ============================================
-        client.designations = client.designations || [];
-        if (client.designations.length === 0) {
-            client.designations = [
-                { title: 'Managing Director', department: '' },
-                { title: 'Quality Manager', department: 'Quality' },
-                { title: 'Operations Manager', department: 'Operations' },
-                { title: 'HR Manager', department: 'Human Resources' },
-                { title: 'Management Representative (MR)', department: '' }
-            ];
-        }
-
-        window.saveData();
-        renderClientDetail(clientId);
-        window.setSetupWizardStep(clientId, 1);
-        window.showNotification('Organization data generated successfully! Review Goods/Services and Key Processes.', 'success');
-    }, 1500); // Simulate API delay
-}
-
-function editCompanyProfile(clientId) {
-    // RBAC Check
-    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
-        window.showNotification('Access Denied', 'error');
-        return;
-    }
-
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    const currentProfile = client.profile || '';
-
-    window.openModal(
-        'Edit Company Profile',
-        `
+            window.openModal(
+                'Edit Company Profile',
+                `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); font-size: 0.9rem;">
                 <i class="fa-solid fa-info-circle"></i> Write a comprehensive overview of the organization. This will be included in audit reports.
@@ -3783,159 +3789,159 @@ function editCompanyProfile(clientId) {
             </div>
         </form>
         `,
-        () => {
-            const profileText = document.getElementById('profile-text').value.trim();
+                () => {
+                    const profileText = document.getElementById('profile-text').value.trim();
 
-            client.profile = profileText;
-            client.profileUpdated = new Date().toISOString();
+                    client.profile = profileText;
+                    client.profileUpdated = new Date().toISOString();
 
-            window.saveData();
-            window.closeModal();
-            renderClientDetail(clientId);
-            renderClientTab(client, 'profile');
-            window.showNotification('Company profile updated successfully');
+                    window.saveData();
+                    window.closeModal();
+                    renderClientDetail(clientId);
+                    renderClientTab(client, 'profile');
+                    window.showNotification('Company profile updated successfully');
+                }
+            );
         }
-    );
-}
 
-// Export department functions
-window.addDepartment = addDepartment;
-window.editDepartment = editDepartment;
-window.deleteDepartment = deleteDepartment;
-window.bulkUploadDepartments = bulkUploadDepartments;
+        // Export department functions
+        window.addDepartment = addDepartment;
+        window.editDepartment = editDepartment;
+        window.deleteDepartment = deleteDepartment;
+        window.bulkUploadDepartments = bulkUploadDepartments;
 
-// Export profile functions
-window.generateCompanyProfile = generateCompanyProfile;
-window.editCompanyProfile = editCompanyProfile;
+        // Export profile functions
+        window.generateCompanyProfile = generateCompanyProfile;
+        window.editCompanyProfile = editCompanyProfile;
 
-// Upload Company Profile Document
-window.uploadCompanyProfileDoc = async function (clientId, file) {
-    // RBAC Check
-    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
-        window.showNotification('Access Denied', 'error');
-        return;
-    }
-
-    if (!file) return;
-
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|txt)$/i)) {
-        window.showNotification('Please upload a PDF, Word document, or text file', 'error');
-        return;
-    }
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-        window.showNotification('File size must be less than 10MB', 'error');
-        return;
-    }
-
-    window.showNotification('Processing document...', 'info');
-
-    try {
-        // Read file content
-        const reader = new FileReader();
-        reader.onload = async function (e) {
-            const fileContent = e.target.result;
-
-            // Store document metadata
-            client.profileDocument = {
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                uploadedAt: new Date().toISOString()
-            };
-
-            // For text files, extract content directly
-            if (file.type === 'text/plain') {
-                client.profileDocumentText = fileContent;
-            } else {
-                // For PDF/DOC, store base64 and note that text extraction may be limited
-                client.profileDocumentBase64 = fileContent.split(',')[1]; // Remove data URL prefix
-                client.profileDocumentText = `[Content from uploaded document: ${file.name}]\n\nNote: For best results, please use the "Edit Manually" option to paste the key information from your company profile document, or use "AI Generate" if you have a website configured.`;
+        // Upload Company Profile Document
+        window.uploadCompanyProfileDoc = async function (clientId, file) {
+            // RBAC Check
+            if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+                window.showNotification('Access Denied', 'error');
+                return;
             }
 
-            window.saveData();
+            if (!file) return;
 
-            // Refresh the view
-            if (window.setSetupWizardStep) {
-                window.setSetupWizardStep(clientId, 1);
-            } else {
-                renderClientDetail(clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
+
+            // Validate file type
+            const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+            if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|txt)$/i)) {
+                window.showNotification('Please upload a PDF, Word document, or text file', 'error');
+                return;
             }
 
-            window.showNotification(`Document "${file.name}" uploaded successfully! You can now use AI Generate to create a profile summary.`, 'success');
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                window.showNotification('File size must be less than 10MB', 'error');
+                return;
+            }
+
+            window.showNotification('Processing document...', 'info');
+
+            try {
+                // Read file content
+                const reader = new FileReader();
+                reader.onload = async function (e) {
+                    const fileContent = e.target.result;
+
+                    // Store document metadata
+                    client.profileDocument = {
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        uploadedAt: new Date().toISOString()
+                    };
+
+                    // For text files, extract content directly
+                    if (file.type === 'text/plain') {
+                        client.profileDocumentText = fileContent;
+                    } else {
+                        // For PDF/DOC, store base64 and note that text extraction may be limited
+                        client.profileDocumentBase64 = fileContent.split(',')[1]; // Remove data URL prefix
+                        client.profileDocumentText = `[Content from uploaded document: ${file.name}]\n\nNote: For best results, please use the "Edit Manually" option to paste the key information from your company profile document, or use "AI Generate" if you have a website configured.`;
+                    }
+
+                    window.saveData();
+
+                    // Refresh the view
+                    if (window.setSetupWizardStep) {
+                        window.setSetupWizardStep(clientId, 1);
+                    } else {
+                        renderClientDetail(clientId);
+                    }
+
+                    window.showNotification(`Document "${file.name}" uploaded successfully! You can now use AI Generate to create a profile summary.`, 'success');
+                };
+
+                if (file.type === 'text/plain') {
+                    reader.readAsText(file);
+                } else {
+                    reader.readAsDataURL(file);
+                }
+            } catch (error) {
+                console.error('Error uploading document:', error);
+                window.showNotification('Error uploading document. Please try again.', 'error');
+            }
         };
 
-        if (file.type === 'text/plain') {
-            reader.readAsText(file);
-        } else {
-            reader.readAsDataURL(file);
-        }
-    } catch (error) {
-        console.error('Error uploading document:', error);
-        window.showNotification('Error uploading document. Please try again.', 'error');
-    }
-};
+        // Remove Profile Document
+        window.removeProfileDocument = function (clientId) {
+            const client = window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-// Remove Profile Document
-window.removeProfileDocument = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+            if (confirm('Are you sure you want to remove the uploaded document?')) {
+                delete client.profileDocument;
+                delete client.profileDocumentText;
+                delete client.profileDocumentBase64;
 
-    if (confirm('Are you sure you want to remove the uploaded document?')) {
-        delete client.profileDocument;
-        delete client.profileDocumentText;
-        delete client.profileDocumentBase64;
+                window.saveData();
 
-        window.saveData();
+                // Refresh the view
+                if (window.setSetupWizardStep) {
+                    window.setSetupWizardStep(clientId, 1);
+                } else {
+                    renderClientDetail(clientId);
+                }
 
-        // Refresh the view
-        if (window.setSetupWizardStep) {
-            window.setSetupWizardStep(clientId, 1);
-        } else {
+                window.showNotification('Document removed', 'success');
+            }
+        };
+
+        // ============================================
+        // ISO 17021-1 CLIENT COMPLIANCE FUNCTIONS
+        // ============================================
+
+        window.updateClientApplicationStatus = function (clientId, newStatus) {
+            const client = window.window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
+
+            if (!client.compliance) client.compliance = {};
+            client.compliance.applicationStatus = newStatus;
+
+            window.saveData();
+            window.showNotification(`Application status updated to: ${newStatus}`, 'success');
             renderClientDetail(clientId);
-        }
 
-        window.showNotification('Document removed', 'success');
-    }
-};
+            // Switch to compliance tab
+            setTimeout(() => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector('.tab-btn[data-tab="compliance"]')?.classList.add('active');
+                renderClientTab(client, 'compliance');
+            }, 100);
+        };
 
-// ============================================
-// ISO 17021-1 CLIENT COMPLIANCE FUNCTIONS
-// ============================================
+        window.editClientContract = function (clientId) {
+            const client = window.window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-window.updateClientApplicationStatus = function (clientId, newStatus) {
-    const client = window.window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
+            const contract = client.compliance?.contract || {};
 
-    if (!client.compliance) client.compliance = {};
-    client.compliance.applicationStatus = newStatus;
-
-    window.saveData();
-    window.showNotification(`Application status updated to: ${newStatus}`, 'success');
-    renderClientDetail(clientId);
-
-    // Switch to compliance tab
-    setTimeout(() => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector('.tab-btn[data-tab="compliance"]')?.classList.add('active');
-        renderClientTab(client, 'compliance');
-    }, 100);
-};
-
-window.editClientContract = function (clientId) {
-    const client = window.window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    const contract = client.compliance?.contract || {};
-
-    document.getElementById('modal-title').textContent = 'Certification Contract Details';
-    document.getElementById('modal-body').innerHTML = `
+            document.getElementById('modal-title').textContent = 'Certification Contract Details';
+            document.getElementById('modal-body').innerHTML = `
         <form id="contract-form">
             <div class="form-group">
                 <label>Contract Number</label>
@@ -3960,35 +3966,35 @@ window.editClientContract = function (clientId) {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = function () {
-        if (!client.compliance) client.compliance = {};
-        client.compliance.contract = {
-            number: document.getElementById('contract-number').value,
-            signedDate: document.getElementById('contract-signed-date').value,
-            validUntil: document.getElementById('contract-valid-until').value,
-            signed: document.getElementById('contract-signed').checked
+            document.getElementById('modal-save').onclick = function () {
+                if (!client.compliance) client.compliance = {};
+                client.compliance.contract = {
+                    number: document.getElementById('contract-number').value,
+                    signedDate: document.getElementById('contract-signed-date').value,
+                    validUntil: document.getElementById('contract-valid-until').value,
+                    signed: document.getElementById('contract-signed').checked
+                };
+
+                window.saveData();
+                window.closeModal();
+                window.showNotification('Contract details updated', 'success');
+                renderClientDetail(clientId);
+                setTimeout(() => {
+                    document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
+                }, 100);
+            };
+
+            window.openModal();
         };
 
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Contract details updated', 'success');
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
-        }, 100);
-    };
+        window.editClientNDA = function (clientId) {
+            const client = window.window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-    window.openModal();
-};
+            const nda = client.compliance?.nda || {};
 
-window.editClientNDA = function (clientId) {
-    const client = window.window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    const nda = client.compliance?.nda || {};
-
-    document.getElementById('modal-title').textContent = 'Confidentiality Agreement (NDA)';
-    document.getElementById('modal-body').innerHTML = `
+            document.getElementById('modal-title').textContent = 'Confidentiality Agreement (NDA)';
+            document.getElementById('modal-body').innerHTML = `
         <form id="nda-form">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
@@ -4015,32 +4021,32 @@ window.editClientNDA = function (clientId) {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = function () {
-        if (!client.compliance) client.compliance = {};
-        client.compliance.nda = {
-            signedDate: document.getElementById('nda-signed-date').value,
-            signedBy: document.getElementById('nda-signed-by').value,
-            signed: document.getElementById('nda-signed').checked
+            document.getElementById('modal-save').onclick = function () {
+                if (!client.compliance) client.compliance = {};
+                client.compliance.nda = {
+                    signedDate: document.getElementById('nda-signed-date').value,
+                    signedBy: document.getElementById('nda-signed-by').value,
+                    signed: document.getElementById('nda-signed').checked
+                };
+
+                window.saveData();
+                window.closeModal();
+                window.showNotification('NDA details updated', 'success');
+                renderClientDetail(clientId);
+                setTimeout(() => {
+                    document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
+                }, 100);
+            };
+
+            window.openModal();
         };
 
-        window.saveData();
-        window.closeModal();
-        window.showNotification('NDA details updated', 'success');
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
-        }, 100);
-    };
+        window.addClientChangeLog = function (clientId) {
+            const client = window.window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-    window.openModal();
-};
-
-window.addClientChangeLog = function (clientId) {
-    const client = window.window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    document.getElementById('modal-title').textContent = 'Log Client Change';
-    document.getElementById('modal-body').innerHTML = `
+            document.getElementById('modal-title').textContent = 'Log Client Change';
+            document.getElementById('modal-body').innerHTML = `
         <form id="change-log-form">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
@@ -4077,57 +4083,57 @@ window.addClientChangeLog = function (clientId) {
         </form>
     `;
 
-    document.getElementById('modal-save').onclick = function () {
-        const description = document.getElementById('change-description').value;
-        if (!description) {
-            window.showNotification('Please enter a description of the change', 'error');
-            return;
-        }
+            document.getElementById('modal-save').onclick = function () {
+                const description = document.getElementById('change-description').value;
+                if (!description) {
+                    window.showNotification('Please enter a description of the change', 'error');
+                    return;
+                }
 
-        if (!client.compliance) client.compliance = {};
-        if (!client.compliance.changesLog) client.compliance.changesLog = [];
+                if (!client.compliance) client.compliance = {};
+                if (!client.compliance.changesLog) client.compliance.changesLog = [];
 
-        client.compliance.changesLog.unshift({
-            date: document.getElementById('change-date').value,
-            type: document.getElementById('change-type').value,
-            description: description,
-            reportedBy: document.getElementById('change-reported-by').value
-        });
+                client.compliance.changesLog.unshift({
+                    date: document.getElementById('change-date').value,
+                    type: document.getElementById('change-type').value,
+                    description: description,
+                    reportedBy: document.getElementById('change-reported-by').value
+                });
 
-        window.saveData();
-        window.closeModal();
-        window.showNotification('Client change logged', 'success');
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
-        }, 100);
-    };
+                window.saveData();
+                window.closeModal();
+                window.showNotification('Client change logged', 'success');
+                renderClientDetail(clientId);
+                setTimeout(() => {
+                    document.querySelector('.tab-btn[data-tab="compliance"]')?.click();
+                }, 100);
+            };
 
-    window.openModal();
-};
+            window.openModal();
+        };
 
-// ============================================
-// BULK IMPORT / EXPORT FUNCTIONS
-// ============================================
+        // ============================================
+        // BULK IMPORT / EXPORT FUNCTIONS
+        // ============================================
 
-function getClientOrgSetupHTML(client) {
-    // Initialize wizard step if not exists
-    if (!client._wizardStep) client._wizardStep = 1;
-    const currentStep = client._wizardStep;
+        function getClientOrgSetupHTML(client) {
+            // Initialize wizard step if not exists
+            if (!client._wizardStep) client._wizardStep = 1;
+            const currentStep = client._wizardStep;
 
-    const steps = [
-        { id: 1, title: 'Org Context', icon: 'fa-building', color: '#6366f1' },
-        { id: 2, title: 'Sites', icon: 'fa-map-location-dot', color: '#ec4899' },
-        { id: 3, title: 'Departments', icon: 'fa-sitemap', color: '#8b5cf6' },
-        { id: 4, title: 'Designations', icon: 'fa-id-badge', color: '#84cc16' },
-        { id: 5, title: 'Personnel', icon: 'fa-address-book', color: '#10b981' },
-        { id: 6, title: 'Goods/Services', icon: 'fa-boxes-stacked', color: '#f59e0b' },
-        { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' }
-    ];
+            const steps = [
+                { id: 1, title: 'Org Context', icon: 'fa-building', color: '#6366f1' },
+                { id: 2, title: 'Sites', icon: 'fa-map-location-dot', color: '#ec4899' },
+                { id: 3, title: 'Departments', icon: 'fa-sitemap', color: '#8b5cf6' },
+                { id: 4, title: 'Designations', icon: 'fa-id-badge', color: '#84cc16' },
+                { id: 5, title: 'Personnel', icon: 'fa-address-book', color: '#10b981' },
+                { id: 6, title: 'Goods/Services', icon: 'fa-boxes-stacked', color: '#f59e0b' },
+                { id: 7, title: 'Key Processes', icon: 'fa-diagram-project', color: '#06b6d4' }
+            ];
 
-    const progressWidth = ((currentStep - 1) / (steps.length - 1)) * 100;
+            const progressWidth = ((currentStep - 1) / (steps.length - 1)) * 100;
 
-    return `
+            return `
         <div class="wizard-container fade-in" style="background: #fff; border-radius: 12px; overflow: hidden;">
             <!-- Wizard Header / Progress -->
             <div style="background: #f8fafc; padding: 2rem; border-bottom: 1px solid var(--border-color);">
@@ -4193,50 +4199,50 @@ function getClientOrgSetupHTML(client) {
             </p>
         </div>
     `;
-}
-
-// Helper to render the specific step content
-getClientOrgSetupHTML.renderWizardStep = function (client, step) {
-    switch (step) {
-        case 1: return getClientProfileHTML(client);
-        case 2: return getClientSitesHTML(client);
-        case 3: return getClientDepartmentsHTML(client);
-        case 4: return getClientDesignationsHTML(client);
-        case 5: return getClientContactsHTML(client);
-        case 6: return getClientGoodsServicesHTML(client);
-        case 7: return getClientKeyProcessesHTML(client);
-        default: return getClientProfileHTML(client);
-    }
-};
-
-window.setSetupWizardStep = function (clientId, step) {
-    if (step < 1 || step > 7) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client) {
-        client._wizardStep = step;
-        const tabContent = document.getElementById('tab-content');
-        if (tabContent) {
-            tabContent.innerHTML = getClientOrgSetupHTML(client);
-            // Re-initialize any components if needed
-            window.saveData(); // Save step progress
         }
-    }
-};
 
-function getClientCertificatesHTML(client) {
-    const certs = client.certificates || [];
-    const allStandards = new Set();
+        // Helper to render the specific step content
+        getClientOrgSetupHTML.renderWizardStep = function (client, step) {
+            switch (step) {
+                case 1: return getClientProfileHTML(client);
+                case 2: return getClientSitesHTML(client);
+                case 3: return getClientDepartmentsHTML(client);
+                case 4: return getClientDesignationsHTML(client);
+                case 5: return getClientContactsHTML(client);
+                case 6: return getClientGoodsServicesHTML(client);
+                case 7: return getClientKeyProcessesHTML(client);
+                default: return getClientProfileHTML(client);
+            }
+        };
 
-    // Collect all standards from client global and sites
-    if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-    if (client.sites) {
-        client.sites.forEach(site => {
-            if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-        });
-    }
+        window.setSetupWizardStep = function (clientId, step) {
+            if (step < 1 || step > 7) return;
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (client) {
+                client._wizardStep = step;
+                const tabContent = document.getElementById('tab-content');
+                if (tabContent) {
+                    tabContent.innerHTML = getClientOrgSetupHTML(client);
+                    // Re-initialize any components if needed
+                    window.saveData(); // Save step progress
+                }
+            }
+        };
 
-    if (certs.length === 0 && allStandards.size > 0) {
-        return `
+        function getClientCertificatesHTML(client) {
+            const certs = client.certificates || [];
+            const allStandards = new Set();
+
+            // Collect all standards from client global and sites
+            if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+            if (client.sites) {
+                client.sites.forEach(site => {
+                    if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+                });
+            }
+
+            if (certs.length === 0 && allStandards.size > 0) {
+                return `
             <div class="fade-in" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
                 <h3>Initialize Certification Records</h3>
@@ -4249,9 +4255,9 @@ function getClientCertificatesHTML(client) {
                 </button>
             </div>
         `;
-    }
+            }
 
-    return `
+            return `
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
@@ -4263,13 +4269,13 @@ function getClientCertificatesHTML(client) {
             </div>
             
             ${certs.map((cert, index) => {
-        // Find sites relevant to this standard
-        const relevantSites = (client.sites || []).filter(s =>
-            (s.standards && s.standards.includes(cert.standard)) ||
-            (!s.standards && client.standard && client.standard.includes(cert.standard)) // Fallback if site has no standards defined but client does
-        );
+                // Find sites relevant to this standard
+                const relevantSites = (client.sites || []).filter(s =>
+                    (s.standards && s.standards.includes(cert.standard)) ||
+                    (!s.standards && client.standard && client.standard.includes(cert.standard)) // Fallback if site has no standards defined but client does
+                );
 
-        return `
+                return `
                 <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--primary-color);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                         <div>
@@ -4318,10 +4324,10 @@ function getClientCertificatesHTML(client) {
                             </thead>
                             <tbody>
                                 ${relevantSites.map(site => {
-            const siteScope = (cert.siteScopes && cert.siteScopes[site.name])
-                ? cert.siteScopes[site.name]
-                : (cert.scope || ''); // Default to global scope if empty
-            return `
+                    const siteScope = (cert.siteScopes && cert.siteScopes[site.name])
+                        ? cert.siteScopes[site.name]
+                        : (cert.scope || ''); // Default to global scope if empty
+                    return `
                                     <tr style="border-bottom: 1px solid #e2e8f0;">
                                         <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
                                             <strong>${site.name}</strong><br>
@@ -4335,7 +4341,7 @@ function getClientCertificatesHTML(client) {
                                         </td>
                                     </tr>
                                     `;
-        }).join('')}
+                }).join('')}
                             </tbody>
                         </table>
                         ` : '<p style="font-style: italic; color: #94a3b8;">No sites linked to this standard.</p>'}
@@ -4364,122 +4370,122 @@ function getClientCertificatesHTML(client) {
                     </div>
                 </div>
                 `;
-    }).join('')}
+            }).join('')}
         </div>
     `;
-}
+        }
 
-window.generateCertificatesFromStandards = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        window.generateCertificatesFromStandards = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-    const allStandards = new Set();
-    if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-    if (client.sites) {
-        client.sites.forEach(site => {
-            if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-        });
-    }
+            const allStandards = new Set();
+            if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+            if (client.sites) {
+                client.sites.forEach(site => {
+                    if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
+                });
+            }
 
-    if (!client.certificates) client.certificates = [];
+            if (!client.certificates) client.certificates = [];
 
-    allStandards.forEach(std => {
-        if (!client.certificates.find(c => c.standard === std)) {
-            client.certificates.push({
-                id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), // Generate ID
-                standard: std,
-                certificateNo: '',
-                status: 'Active',
-                revision: '00',
-                scope: client.scope || '', // Default global scope
-                siteScopes: {}
+            allStandards.forEach(std => {
+                if (!client.certificates.find(c => c.standard === std)) {
+                    client.certificates.push({
+                        id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), // Generate ID
+                        standard: std,
+                        certificateNo: '',
+                        status: 'Active',
+                        revision: '00',
+                        scope: client.scope || '', // Default global scope
+                        siteScopes: {}
+                    });
+                }
             });
-        }
-    });
 
-    window.saveData();
-    // Sync to Supabase
-    if (window.SupabaseClient?.isInitialized) {
-        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-    }
-    renderClientDetail(clientId);
-    // Switch to scopes tab
-    setTimeout(() => {
-        document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
-    }, 100);
-    window.showNotification('Certificate records generated');
-};
-
-window.updateCertField = function (clientId, certIndex, field, value) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.certificates && client.certificates[certIndex]) {
-        client.certificates[certIndex][field] = value;
-        // Autosave turned off to allow bulk edits, but for single inputs we might want to save?
-        // Let's rely on the explicit "Save" button for major changes, but keep local state updated.
-    }
-};
-
-window.updateSiteScope = function (clientId, certIndex, siteName, value) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.certificates && client.certificates[certIndex]) {
-        if (!client.certificates[certIndex].siteScopes) {
-            client.certificates[certIndex].siteScopes = {};
-        }
-        client.certificates[certIndex].siteScopes[siteName] = value;
-    }
-};
-
-window.saveCertificateDetails = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-
-    // Save locally first
-    window.saveData();
-
-    // Sync specific certificates to Supabase (certification_decisions table)
-    if (window.SupabaseClient?.isInitialized && client.certificates && client.certificates.length > 0) {
-        let successCount = 0;
-        const promises = client.certificates.map((cert, i) => {
-            // Ensure the cert has the client name attached for mapping
-            if (!cert.client) cert.client = client.name;
-
-            // SELF-HEAL: If cert has no ID (legacy bug), generate one now
-            if (!cert.id) {
-                cert.id = 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i;
-                console.log('Generated missing ID for cert:', cert.id);
+            window.saveData();
+            // Sync to Supabase
+            if (window.SupabaseClient?.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
             }
+            renderClientDetail(clientId);
+            // Switch to scopes tab
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
+            }, 100);
+            window.showNotification('Certificate records generated');
+        };
 
-            return window.SupabaseClient.upsertCertificate(cert)
-                .then(() => successCount++)
-                .catch(err => console.error(`Failed to save cert ${cert.id}:`, err));
-        });
+        window.updateCertField = function (clientId, certIndex, field, value) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (client && client.certificates && client.certificates[certIndex]) {
+                client.certificates[certIndex][field] = value;
+                // Autosave turned off to allow bulk edits, but for single inputs we might want to save?
+                // Let's rely on the explicit "Save" button for major changes, but keep local state updated.
+            }
+        };
 
-        Promise.all(promises).then(() => {
-            if (successCount > 0) {
-                window.showNotification(`Saved ${successCount} certificates successfully`, 'success');
+        window.updateSiteScope = function (clientId, certIndex, siteName, value) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (client && client.certificates && client.certificates[certIndex]) {
+                if (!client.certificates[certIndex].siteScopes) {
+                    client.certificates[certIndex].siteScopes = {};
+                }
+                client.certificates[certIndex].siteScopes[siteName] = value;
+            }
+        };
+
+        window.saveCertificateDetails = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
+
+            // Save locally first
+            window.saveData();
+
+            // Sync specific certificates to Supabase (certification_decisions table)
+            if (window.SupabaseClient?.isInitialized && client.certificates && client.certificates.length > 0) {
+                let successCount = 0;
+                const promises = client.certificates.map((cert, i) => {
+                    // Ensure the cert has the client name attached for mapping
+                    if (!cert.client) cert.client = client.name;
+
+                    // SELF-HEAL: If cert has no ID (legacy bug), generate one now
+                    if (!cert.id) {
+                        cert.id = 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i;
+                        console.log('Generated missing ID for cert:', cert.id);
+                    }
+
+                    return window.SupabaseClient.upsertCertificate(cert)
+                        .then(() => successCount++)
+                        .catch(err => console.error(`Failed to save cert ${cert.id}:`, err));
+                });
+
+                Promise.all(promises).then(() => {
+                    if (successCount > 0) {
+                        window.showNotification(`Saved ${successCount} certificates successfully`, 'success');
+                    } else {
+                        window.showNotification('Failed to save certificates to cloud', 'error');
+                    }
+                }).catch(error => {
+                    console.error('Save Certificate Error:', error);
+                    // Alert user to specific error (e.g. RLS policy)
+                    alert('Cloud Save Failed:\n' + (error.message || JSON.stringify(error)));
+                });
             } else {
-                window.showNotification('Failed to save certificates to cloud', 'error');
+                // Fallback for local-only or no certs to save
+                window.showNotification('Certificate details saved locally', 'success');
             }
-        }).catch(error => {
-            console.error('Save Certificate Error:', error);
-            // Alert user to specific error (e.g. RLS policy)
-            alert('Cloud Save Failed:\n' + (error.message || JSON.stringify(error)));
-        });
-    } else {
-        // Fallback for local-only or no certs to save
-        window.showNotification('Certificate details saved locally', 'success');
-    }
-};
+        };
 
-window.viewCertRevisionHistory = function (clientId, certIndex) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.certificates || !client.certificates[certIndex]) return;
+        window.viewCertRevisionHistory = function (clientId, certIndex) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.certificates || !client.certificates[certIndex]) return;
 
-    const cert = client.certificates[certIndex];
-    const history = cert.revisionHistory || [];
+            const cert = client.certificates[certIndex];
+            const history = cert.revisionHistory || [];
 
-    document.getElementById('modal-title').textContent = `Revision History - ${cert.standard}`;
-    document.getElementById('modal-body').innerHTML = `
+            document.getElementById('modal-title').textContent = `Revision History - ${cert.standard}`;
+            document.getElementById('modal-body').innerHTML = `
         \u003cdiv style="margin-bottom: 1rem;"\u003e
             \u003cp\u003e\u003cstrong\u003eCertificate:\u003c/strong\u003e ${cert.certificateNo || 'Not assigned'}\u003c/p\u003e
             \u003cp\u003e\u003cstrong\u003eCurrent Revision:\u003c/strong\u003e ${cert.revision || '00'}\u003c/p\u003e
@@ -4532,383 +4538,383 @@ window.viewCertRevisionHistory = function (clientId, certIndex) {
         \u003c/div\u003e
     `;
 
-    document.getElementById('modal-save').style.display = 'none';
-    window.openModal();
-};
+            document.getElementById('modal-save').style.display = 'none';
+            window.openModal();
+        };
 
-window.addCertRevision = function (clientId, certIndex) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.certificates || !client.certificates[certIndex]) return;
+        window.addCertRevision = function (clientId, certIndex) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.certificates || !client.certificates[certIndex]) return;
 
-    const cert = client.certificates[certIndex];
-    const revisionNumber = document.getElementById('new-revision-number').value.trim();
-    const description = document.getElementById('new-revision-description').value.trim();
+            const cert = client.certificates[certIndex];
+            const revisionNumber = document.getElementById('new-revision-number').value.trim();
+            const description = document.getElementById('new-revision-description').value.trim();
 
-    if (!revisionNumber || !description) {
-        window.showNotification('Please enter revision number and description', 'error');
-        return;
-    }
+            if (!revisionNumber || !description) {
+                window.showNotification('Please enter revision number and description', 'error');
+                return;
+            }
 
-    if (!cert.revisionHistory) cert.revisionHistory = [];
+            if (!cert.revisionHistory) cert.revisionHistory = [];
 
-    cert.revisionHistory.push({
-        revision: revisionNumber,
-        date: new Date().toISOString().split('T')[0],
-        description: description,
-        changedBy: window.state.currentUser?.name || 'Admin'
-    });
+            cert.revisionHistory.push({
+                revision: revisionNumber,
+                date: new Date().toISOString().split('T')[0],
+                description: description,
+                changedBy: window.state.currentUser?.name || 'Admin'
+            });
 
-    cert.revision = revisionNumber;
+            cert.revision = revisionNumber;
 
-    window.saveData();
-    window.closeModal();
-    window.showNotification('Revision added successfully', 'success');
-    renderClientDetail(clientId);
-    setTimeout(() => {
-        document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
-    }, 100);
-};
+            window.saveData();
+            window.closeModal();
+            window.showNotification('Revision added successfully', 'success');
+            renderClientDetail(clientId);
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
+            }, 100);
+        };
 
-window.deleteCertificationScope = function (clientId, certIndex) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.certificates || !client.certificates[certIndex]) return;
+        window.deleteCertificationScope = function (clientId, certIndex) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client || !client.certificates || !client.certificates[certIndex]) return;
 
-    const cert = client.certificates[certIndex];
+            const cert = client.certificates[certIndex];
 
-    if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history.`)) {
-        client.certificates.splice(certIndex, 1);
-        window.saveData();
-        window.showNotification('Certification scope removed', 'success');
-        renderClientDetail(clientId);
-        setTimeout(() => {
-            document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
-        }, 100);
-    }
-};
-
-
-// Sub-Tab Switching for Org Setup
-window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
-    const client = window.window.state.clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    // UI Feedback
-    const container = btn.parentElement;
-    container.querySelectorAll('.sub-tab-btn').forEach(b => {
-        b.classList.remove('active');
-        b.style.color = 'var(--text-secondary)';
-        b.style.borderBottom = 'none';
-        b.style.fontWeight = 'normal';
-    });
-    btn.classList.add('active');
-    btn.style.color = 'var(--primary-color)';
-    btn.style.borderBottom = '2px solid var(--primary-color)';
-    btn.style.fontWeight = '500';
-
-    // Content Switching
-    const contentArea = document.getElementById('org-setup-content');
-    if (!contentArea) return;
-
-    if (subTabId === 'certificates') {
-        contentArea.innerHTML = getClientCertificatesHTML(client);
-    } else if (subTabId === 'sites') {
-        contentArea.innerHTML = getClientSitesHTML(client);
-    } else if (subTabId === 'departments') {
-        contentArea.innerHTML = getClientDepartmentsHTML(client);
-    } else if (subTabId === 'contacts') {
-        contentArea.innerHTML = getClientContactsHTML(client);
-    }
-};
+            if (confirm(`Are you sure you want to remove the certification scope for ${cert.standard}?\n\nThis will delete all associated scope data and revision history.`)) {
+                client.certificates.splice(certIndex, 1);
+                window.saveData();
+                window.showNotification('Certification scope removed', 'success');
+                renderClientDetail(clientId);
+                setTimeout(() => {
+                    document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
+                }, 100);
+            }
+        };
 
 
-// Update Template Download for Simplified Bulk Clients
-window.downloadImportTemplate = function () {
-    // Simplified template with only 6 essential fields
-    const headers = ["Name", "Industry", "Standard", "Contact Person", "Email", "Phone"];
-    const row1 = ["Tech Solutions Ltd", "Information Technology", "ISO 9001", "John Doe", "john@techsolutions.com", "+1234567890"];
-    const row2 = ["Global Manufacturing Inc", "Manufacturing", "ISO 9001:2015", "Jane Smith", "jane@globalmanuf.com", "+1987654321"];
+        // Sub-Tab Switching for Org Setup
+        window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
+            const client = window.window.state.clients.find(c => c.id === clientId);
+            if (!client) return;
 
-    const csvContent = [headers, row1, row2]
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        .join('\n');
+            // UI Feedback
+            const container = btn.parentElement;
+            container.querySelectorAll('.sub-tab-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.color = 'var(--text-secondary)';
+                b.style.borderBottom = 'none';
+                b.style.fontWeight = 'normal';
+            });
+            btn.classList.add('active');
+            btn.style.color = 'var(--primary-color)';
+            btn.style.borderBottom = '2px solid var(--primary-color)';
+            btn.style.fontWeight = '500';
 
-    const filename = 'AuditCB_Client_Import_Template.csv';
+            // Content Switching
+            const contentArea = document.getElementById('org-setup-content');
+            if (!contentArea) return;
 
-    // Add BOM for Excel compatibility
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+            if (subTabId === 'certificates') {
+                contentArea.innerHTML = getClientCertificatesHTML(client);
+            } else if (subTabId === 'sites') {
+                contentArea.innerHTML = getClientSitesHTML(client);
+            } else if (subTabId === 'departments') {
+                contentArea.innerHTML = getClientDepartmentsHTML(client);
+            } else if (subTabId === 'contacts') {
+                contentArea.innerHTML = getClientContactsHTML(client);
+            }
+        };
 
-    // Try multiple download methods for maximum compatibility
 
-    // Method 1: IE/Edge msSaveBlob
-    if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-        window.navigator.msSaveOrOpenBlob(blob, filename);
-        window.showNotification('Template downloaded as CSV', 'success');
-        return;
-    }
+        // Update Template Download for Simplified Bulk Clients
+        window.downloadImportTemplate = function () {
+            // Simplified template with only 6 essential fields
+            const headers = ["Name", "Industry", "Standard", "Contact Person", "Email", "Phone"];
+            const row1 = ["Tech Solutions Ltd", "Information Technology", "ISO 9001", "John Doe", "john@techsolutions.com", "+1234567890"];
+            const row2 = ["Global Manufacturing Inc", "Manufacturing", "ISO 9001:2015", "Jane Smith", "jane@globalmanuf.com", "+1987654321"];
 
-    // Method 2: Modern browsers with download attribute
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+            const csvContent = [headers, row1, row2]
+                .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
 
-    // Set multiple attributes for maximum compatibility
-    link.href = url;
-    link.download = filename;
-    link.setAttribute('download', filename);
-    link.type = 'text/csv';
-    link.rel = 'noopener';
+            const filename = 'AuditCB_Client_Import_Template.csv';
 
-    // Make link invisible but keep in DOM
-    link.style.position = 'fixed';
-    link.style.top = '-9999px';
-    link.style.left = '-9999px';
+            // Add BOM for Excel compatibility
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
 
-    document.body.appendChild(link);
+            // Try multiple download methods for maximum compatibility
 
-    // Force click with multiple methods
-    if (link.click) {
-        link.click();
-    } else if (document.createEvent) {
-        const event = document.createEvent('MouseEvents');
-        event.initEvent('click', true, true);
-        link.dispatchEvent(event);
-    }
+            // Method 1: IE/Edge msSaveBlob
+            if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                window.navigator.msSaveOrOpenBlob(blob, filename);
+                window.showNotification('Template downloaded as CSV', 'success');
+                return;
+            }
 
-    // Cleanup after a delay
-    setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }, 250);
+            // Method 2: Modern browsers with download attribute
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
 
-    window.showNotification('Template downloaded as CSV (opens in Excel)', 'success');
-};
+            // Set multiple attributes for maximum compatibility
+            link.href = url;
+            link.download = filename;
+            link.setAttribute('download', filename);
+            link.type = 'text/csv';
+            link.rel = 'noopener';
 
-// Fallback: Download template as CSV
-function downloadTemplateAsCSV() {
-    const headers = ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"];
-    const row1 = ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"];
-    const row2 = ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15", "ISO 27001:2022", "Alice Tech", "alice@techsol.com", "789 Tech Blvd", "San Francisco", "USA"];
+            // Make link invisible but keep in DOM
+            link.style.position = 'fixed';
+            link.style.top = '-9999px';
+            link.style.left = '-9999px';
 
-    const csvContent = [headers, row1, row2]
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        .join('\n');
+            document.body.appendChild(link);
 
-    // Add BOM for Excel compatibility
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+            // Force click with multiple methods
+            if (link.click) {
+                link.click();
+            } else if (document.createEvent) {
+                const event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                link.dispatchEvent(event);
+            }
 
-    // Create download link
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'AuditCB_Client_Import_Template.csv');
-    link.style.visibility = 'hidden';
+            // Cleanup after a delay
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 250);
 
-    document.body.appendChild(link);
+            window.showNotification('Template downloaded as CSV (opens in Excel)', 'success');
+        };
 
-    // Trigger download with a small delay to ensure DOM is ready
-    setTimeout(() => {
-        link.click();
-        document.body.removeChild(link);
+        // Fallback: Download template as CSV
+        function downloadTemplateAsCSV() {
+            const headers = ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"];
+            const row1 = ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"];
+            const row2 = ["Tech Solutions Inc", "Active", "IT Services", "50", "https://techsol.com", "2025-03-15", "ISO 27001:2022", "Alice Tech", "alice@techsol.com", "789 Tech Blvd", "San Francisco", "USA"];
 
-        // Clean up blob URL after a delay
-        setTimeout(() => {
-            URL.revokeObjectURL(url);
-        }, 100);
-    }, 10);
+            const csvContent = [headers, row1, row2]
+                .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
 
-    window.showNotification('Template downloaded as CSV (open in Excel)', 'success');
-}
+            // Add BOM for Excel compatibility
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
 
-// Update Import Logic for Simplified Bulk Clients (supports CSV and Excel)
-window.importClientsFromExcel = function (file) {
-    window.showNotification('Reading file...', 'info');
-    const reader = new FileReader();
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'AuditCB_Client_Import_Template.csv');
+            link.style.visibility = 'hidden';
 
-    // Check if it's a CSV file
-    const isCSV = file.name.toLowerCase().endsWith('.csv');
+            document.body.appendChild(link);
 
-    reader.onload = function (e) {
-        try {
-            let clientsRaw = [];
+            // Trigger download with a small delay to ensure DOM is ready
+            setTimeout(() => {
+                link.click();
+                document.body.removeChild(link);
 
-            if (isCSV) {
-                // Parse CSV file properly from ArrayBuffer
-                const decoder = new TextDecoder('utf-8');
-                const text = decoder.decode(new Uint8Array(e.target.result));
+                // Clean up blob URL after a delay
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 100);
+            }, 10);
 
-                // Simple CSV Parser handling quotes
-                const parseCSVLine = (line) => {
-                    const result = [];
-                    let start = 0;
-                    let inQuotes = false;
-                    for (let i = 0; i < line.length; i++) {
-                        if (line[i] === '"') {
-                            inQuotes = !inQuotes;
-                        } else if (line[i] === ',' && !inQuotes) {
-                            let field = line.substring(start, i).trim();
-                            // Remove surrounding quotes and handle escaped quotes
+            window.showNotification('Template downloaded as CSV (open in Excel)', 'success');
+        }
+
+        // Update Import Logic for Simplified Bulk Clients (supports CSV and Excel)
+        window.importClientsFromExcel = function (file) {
+            window.showNotification('Reading file...', 'info');
+            const reader = new FileReader();
+
+            // Check if it's a CSV file
+            const isCSV = file.name.toLowerCase().endsWith('.csv');
+
+            reader.onload = function (e) {
+                try {
+                    let clientsRaw = [];
+
+                    if (isCSV) {
+                        // Parse CSV file properly from ArrayBuffer
+                        const decoder = new TextDecoder('utf-8');
+                        const text = decoder.decode(new Uint8Array(e.target.result));
+
+                        // Simple CSV Parser handling quotes
+                        const parseCSVLine = (line) => {
+                            const result = [];
+                            let start = 0;
+                            let inQuotes = false;
+                            for (let i = 0; i < line.length; i++) {
+                                if (line[i] === '"') {
+                                    inQuotes = !inQuotes;
+                                } else if (line[i] === ',' && !inQuotes) {
+                                    let field = line.substring(start, i).trim();
+                                    // Remove surrounding quotes and handle escaped quotes
+                                    if (field.startsWith('"') && field.endsWith('"')) {
+                                        field = field.slice(1, -1).replace(/""/g, '"');
+                                    }
+                                    result.push(field);
+                                    start = i + 1;
+                                }
+                            }
+                            // Last field
+                            let field = line.substring(start).trim();
                             if (field.startsWith('"') && field.endsWith('"')) {
                                 field = field.slice(1, -1).replace(/""/g, '"');
                             }
                             result.push(field);
-                            start = i + 1;
+                            return result;
+                        };
+
+                        const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+                        if (lines.length < 2) {
+                            throw new Error('CSV file is empty or has no data rows');
                         }
+
+                        // Parse header
+                        const headers = parseCSVLine(lines[0]);
+
+                        // Parse data rows
+                        for (let i = 1; i < lines.length; i++) {
+                            const values = parseCSVLine(lines[i]);
+                            const row = {};
+                            headers.forEach((header, index) => {
+                                // Clean header name (remove BOM if present)
+                                const cleanHeader = header.replace(/^\ufeff/, '').trim();
+                                row[cleanHeader] = values[index] || '';
+                            });
+                            clientsRaw.push(row);
+                        }
+                    } else {
+                        // Parse Excel file
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+
+                        // Validate Sheets
+                        if (!workbook.Sheets['Clients']) throw new Error("Missing 'Clients' sheet");
+
+                        clientsRaw = XLSX.utils.sheet_to_json(workbook.Sheets['Clients']);
                     }
-                    // Last field
-                    let field = line.substring(start).trim();
-                    if (field.startsWith('"') && field.endsWith('"')) {
-                        field = field.slice(1, -1).replace(/""/g, '"');
-                    }
-                    result.push(field);
-                    return result;
-                };
 
-                const lines = text.split(/\r?\n/).filter(line => line.trim());
+                    let importedCount = 0;
+                    let updatedCount = 0;
 
-                if (lines.length < 2) {
-                    throw new Error('CSV file is empty or has no data rows');
-                }
+                    clientsRaw.forEach(row => {
+                        // Support both old and new template formats
+                        const name = row['Name'] || row['Client Name'];
+                        if (!name) return;
 
-                // Parse header
-                const headers = parseCSVLine(lines[0]);
+                        // Check existing
+                        let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
 
-                // Parse data rows
-                for (let i = 1; i < lines.length; i++) {
-                    const values = parseCSVLine(lines[i]);
-                    const row = {};
-                    headers.forEach((header, index) => {
-                        // Clean header name (remove BOM if present)
-                        const cleanHeader = header.replace(/^\ufeff/, '').trim();
-                        row[cleanHeader] = values[index] || '';
+                        if (client) {
+                            updatedCount++;
+                        } else {
+                            client = {
+                                id: Date.now() + Math.floor(Math.random() * 1000),
+                                name: window.Sanitizer.sanitizeText(name),
+                                status: 'Active', // Default status
+                                contacts: [],
+                                sites: [],
+                                certificates: []
+                            };
+                            window.state.clients.push(client);
+                            importedCount++;
+                        }
+
+                        // Update fields from simplified template (6 fields)
+                        client.industry = window.Sanitizer.sanitizeText(row['Industry'] || client.industry || '');
+                        client.standard = window.Sanitizer.sanitizeText(row['Standard'] || row['Applicable Standards'] || client.standard || '');
+
+                        // Handle contact information
+                        const contactPerson = row['Contact Person'] || row['Contact Name'];
+                        const contactEmail = row['Email'] || row['Contact Email'];
+                        const contactPhone = row['Phone'];
+
+                        if (contactPerson || contactEmail || contactPhone) {
+                            // Update or create primary contact
+                            if (!client.contacts || client.contacts.length === 0) {
+                                client.contacts = [{
+                                    name: window.Sanitizer.sanitizeText(contactPerson || ''),
+                                    email: window.Sanitizer.sanitizeEmail(contactEmail || ''),
+                                    phone: window.Sanitizer.sanitizeText(contactPhone || ''),
+                                    role: 'Primary Contact'
+                                }];
+                            } else {
+                                // Update existing primary contact
+                                client.contacts[0].name = window.Sanitizer.sanitizeText(contactPerson || client.contacts[0].name);
+                                client.contacts[0].email = window.Sanitizer.sanitizeEmail(contactEmail || client.contacts[0].email);
+                                client.contacts[0].phone = window.Sanitizer.sanitizeText(contactPhone || client.contacts[0].phone);
+                            }
+                        }
+
+                        // Backward compatibility with old template fields
+                        if (row['Status']) client.status = window.Sanitizer.sanitizeText(row['Status']);
+                        if (row['Employee Count']) client.employees = parseInt(row['Employee Count']) || 0;
+                        if (row['Website']) client.website = window.Sanitizer.sanitizeURL(row['Website']);
+                        if (row['Next Audit Date']) client.nextAudit = row['Next Audit Date'];
+
+                        // Update Contact
+                        if (row['Contact Name']) {
+                            const contact = {
+                                name: window.Sanitizer.sanitizeText(row['Contact Name']),
+                                email: window.Sanitizer.sanitizeText(row['Contact Email'] || ''),
+                                designation: 'Primary Contact'
+                            };
+                            // Simplified: Replace first contact if it exists, otherwise add
+                            if (client.contacts && client.contacts.length > 0) {
+                                client.contacts[0] = { ...client.contacts[0], ...contact };
+                            } else {
+                                client.contacts = [contact];
+                            }
+                        }
+
+                        // Update Site (Head Office)
+                        if (row['Address'] || row['City'] || row['Country']) {
+                            const site = {
+                                name: 'Head Office',
+                                address: window.Sanitizer.sanitizeText(row['Address'] || ''),
+                                city: window.Sanitizer.sanitizeText(row['City'] || ''),
+                                country: window.Sanitizer.sanitizeText(row['Country'] || ''),
+                                standards: client.standard
+                            };
+                            // Simplified: Replace first site if it exists, otherwise add
+                            if (client.sites && client.sites.length > 0) {
+                                client.sites[0] = { ...client.sites[0], ...site };
+                            } else {
+                                client.sites = [site];
+                            }
+                        }
                     });
-                    clientsRaw.push(row);
+
+                    window.saveData();
+                    window.showNotification(`Import Successful: ${importedCount} created, ${updatedCount} updated`, 'success');
+                    renderClientsEnhanced();
+
+                } catch (err) {
+                    console.error(err);
+                    window.showNotification('Import Failed: ' + err.message, 'error');
                 }
-            } else {
-                // Parse Excel file
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
+            };
+            reader.readAsArrayBuffer(file);
+        };
 
-                // Validate Sheets
-                if (!workbook.Sheets['Clients']) throw new Error("Missing 'Clients' sheet");
+        // ============================================
+        // ACCOUNT SETUP BULK IMPORT (MASTER UPLOAD)
+        // ============================================
 
-                clientsRaw = XLSX.utils.sheet_to_json(workbook.Sheets['Clients']);
-            }
+        window.openImportAccountSetupModal = function (clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
 
-            let importedCount = 0;
-            let updatedCount = 0;
-
-            clientsRaw.forEach(row => {
-                // Support both old and new template formats
-                const name = row['Name'] || row['Client Name'];
-                if (!name) return;
-
-                // Check existing
-                let client = window.state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
-
-                if (client) {
-                    updatedCount++;
-                } else {
-                    client = {
-                        id: Date.now() + Math.floor(Math.random() * 1000),
-                        name: window.Sanitizer.sanitizeText(name),
-                        status: 'Active', // Default status
-                        contacts: [],
-                        sites: [],
-                        certificates: []
-                    };
-                    window.state.clients.push(client);
-                    importedCount++;
-                }
-
-                // Update fields from simplified template (6 fields)
-                client.industry = window.Sanitizer.sanitizeText(row['Industry'] || client.industry || '');
-                client.standard = window.Sanitizer.sanitizeText(row['Standard'] || row['Applicable Standards'] || client.standard || '');
-
-                // Handle contact information
-                const contactPerson = row['Contact Person'] || row['Contact Name'];
-                const contactEmail = row['Email'] || row['Contact Email'];
-                const contactPhone = row['Phone'];
-
-                if (contactPerson || contactEmail || contactPhone) {
-                    // Update or create primary contact
-                    if (!client.contacts || client.contacts.length === 0) {
-                        client.contacts = [{
-                            name: window.Sanitizer.sanitizeText(contactPerson || ''),
-                            email: window.Sanitizer.sanitizeEmail(contactEmail || ''),
-                            phone: window.Sanitizer.sanitizeText(contactPhone || ''),
-                            role: 'Primary Contact'
-                        }];
-                    } else {
-                        // Update existing primary contact
-                        client.contacts[0].name = window.Sanitizer.sanitizeText(contactPerson || client.contacts[0].name);
-                        client.contacts[0].email = window.Sanitizer.sanitizeEmail(contactEmail || client.contacts[0].email);
-                        client.contacts[0].phone = window.Sanitizer.sanitizeText(contactPhone || client.contacts[0].phone);
-                    }
-                }
-
-                // Backward compatibility with old template fields
-                if (row['Status']) client.status = window.Sanitizer.sanitizeText(row['Status']);
-                if (row['Employee Count']) client.employees = parseInt(row['Employee Count']) || 0;
-                if (row['Website']) client.website = window.Sanitizer.sanitizeURL(row['Website']);
-                if (row['Next Audit Date']) client.nextAudit = row['Next Audit Date'];
-
-                // Update Contact
-                if (row['Contact Name']) {
-                    const contact = {
-                        name: window.Sanitizer.sanitizeText(row['Contact Name']),
-                        email: window.Sanitizer.sanitizeText(row['Contact Email'] || ''),
-                        designation: 'Primary Contact'
-                    };
-                    // Simplified: Replace first contact if it exists, otherwise add
-                    if (client.contacts && client.contacts.length > 0) {
-                        client.contacts[0] = { ...client.contacts[0], ...contact };
-                    } else {
-                        client.contacts = [contact];
-                    }
-                }
-
-                // Update Site (Head Office)
-                if (row['Address'] || row['City'] || row['Country']) {
-                    const site = {
-                        name: 'Head Office',
-                        address: window.Sanitizer.sanitizeText(row['Address'] || ''),
-                        city: window.Sanitizer.sanitizeText(row['City'] || ''),
-                        country: window.Sanitizer.sanitizeText(row['Country'] || ''),
-                        standards: client.standard
-                    };
-                    // Simplified: Replace first site if it exists, otherwise add
-                    if (client.sites && client.sites.length > 0) {
-                        client.sites[0] = { ...client.sites[0], ...site };
-                    } else {
-                        client.sites = [site];
-                    }
-                }
-            });
-
-            window.saveData();
-            window.showNotification(`Import Successful: ${importedCount} created, ${updatedCount} updated`, 'success');
-            renderClientsEnhanced();
-
-        } catch (err) {
-            console.error(err);
-            window.showNotification('Import Failed: ' + err.message, 'error');
-        }
-    };
-    reader.readAsArrayBuffer(file);
-};
-
-// ============================================
-// ACCOUNT SETUP BULK IMPORT (MASTER UPLOAD)
-// ============================================
-
-window.openImportAccountSetupModal = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
-
-    window.openModal(
-        'Bulk Import Account Setup',
-        `
+            window.openModal(
+                'Bulk Import Account Setup',
+                `
         <div style="text-align: center; margin-bottom: 2rem;">
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
                 Upload a single Excel file containing multiple sheets to populate Sites, Departments, Designations, Personnel, Goods/Services, and Key Processes.
@@ -4950,324 +4956,324 @@ window.openImportAccountSetupModal = function (clientId) {
             </div>
         </div>
         `
-    );
-    // Hide default Save button
-    document.getElementById('modal-save').style.display = 'none';
-};
-
-window.downloadAccountSetupTemplate = function (clientName) {
-    const wb = XLSX.utils.book_new();
-
-    // 1. Sites Sheet
-    const sitesData = [
-        ["Site Name", "Address", "City", "Country", "Employees", "Shift (Yes/No)", "Standards"],
-        ["Head Office", "123 Main St", "New York", "USA", "50", "No", "ISO 9001:2015"],
-        ["Factory 1", "456 Industrial Rd", "Chicago", "USA", "200", "Yes", "ISO 9001:2015, ISO 14001:2015"]
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sitesData), "Sites");
-
-    // 2. Departments Sheet
-    const deptsData = [
-        ["Department Name", "Risk Level"],
-        ["HR", "Low"],
-        ["Production", "High"],
-        ["Quality", "Medium"]
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(deptsData), "Departments");
-
-    // 3. Designations Sheet
-    const desigData = [
-        ["Designation"],
-        ["Manager"],
-        ["Supervisor"],
-        ["Operator"]
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(desigData), "Designations");
-
-    // 4. Personnel Sheet
-    const personnelData = [
-        ["Name", "Designation", "Email", "Phone", "Role"],
-        ["John Doe", "Manager", "john@example.com", "555-0101", "Management Rep"],
-        ["Jane Smith", "Supervisor", "jane@example.com", "555-0102", "Audit Contact"]
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(personnelData), "Personnel");
-
-    // 5. Goods/Services Sheet
-    const goodsData = [
-        ["Name", "Category", "Description"],
-        ["Widget A", "Product", "Main product line"],
-        ["Consulting", "Service", "Technical consultancy"]
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(goodsData), "GoodsServices");
-
-    // 6. Key Processes Sheet
-    const processData = [
-        ["Process Name", "Category", "Owner"],
-        ["Procurement", "Support", "Purchasing Manager"],
-        ["Manufacturing", "Core", "Production Manager"],
-        ["Sales", "Core", "Sales Director"]
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(processData), "KeyProcesses");
-
-    const fileName = `${clientName.replace(/[^a-z0-9]/gi, '_')}_Setup_Template.xlsx`;
-    XLSX.writeFile(wb, fileName);
-};
-
-window.processAccountSetupImport = function (clientId, input) {
-    // RBAC Check
-    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
-        window.showNotification('Access Denied: Only Certification Managers or Admins can perform this action.', 'error');
-        return;
-    }
-
-    const file = input.files[0];
-    if (!file) return;
-
-    window.closeModal(); // Close modal immediately to show notification
-    window.showNotification(`Reading ${file.name}...`, 'info');
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const client = window.state.clients.find(c => String(c.id) === String(clientId));
-
-            if (!client) throw new Error("Client not found");
-
-            let log = { sites: 0, depts: 0, desig: 0, people: 0, goods: 0, procs: 0 };
-
-            // Helper to clean string
-            const clean = (val) => val ? String(val).trim() : '';
-
-            // 1. Process Sites
-            if (workbook.Sheets['Sites']) {
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Sites']);
-                if (!client.sites) client.sites = [];
-                rows.forEach(r => {
-                    client.sites.push({
-                        name: clean(r['Site Name']),
-                        address: clean(r['Address']),
-                        city: clean(r['City']),
-                        country: clean(r['Country']),
-                        employees: parseInt(r['Employees']) || 0,
-                        shift: clean(r['Shift (Yes/No)']),
-                        standards: clean(r['Standards'])
-                    });
-                });
-                log.sites = rows.length;
-            }
-
-            // 2. Process Departments
-            if (workbook.Sheets['Departments']) {
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Departments']);
-                if (!client.departments) client.departments = [];
-                rows.forEach(r => {
-                    const name = clean(r['Department Name']);
-                    if (name && !client.departments.some(d => d.name === name)) {
-                        client.departments.push({
-                            name: name,
-                            risk: clean(r['Risk Level']) || 'Medium',
-                            head: '' // Not in template
-                        });
-                    }
-                });
-                log.depts = rows.length;
-            }
-
-            // 3. Process Designations
-            if (workbook.Sheets['Designations']) {
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Designations']);
-                if (!client.designations) client.designations = [];
-                rows.forEach(r => {
-                    const desig = clean(r['Designation']);
-                    if (desig && !client.designations.includes(desig)) {
-                        client.designations.push(desig);
-                    }
-                });
-                log.desig = rows.length;
-            }
-
-            // 4. Process Personnel
-            if (workbook.Sheets['Personnel']) {
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Personnel']);
-                if (!client.contacts) client.contacts = [];
-                rows.forEach(r => {
-                    client.contacts.push({
-                        name: clean(r['Name']),
-                        designation: clean(r['Designation']),
-                        email: clean(r['Email']),
-                        phone: clean(r['Phone']),
-                        role: clean(r['Role'])
-                    });
-                });
-                log.people = rows.length;
-            }
-
-            // 5. Process Goods/Services
-            if (workbook.Sheets['GoodsServices']) {
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['GoodsServices']);
-                if (!client.goodsServices) client.goodsServices = [];
-                rows.forEach(r => {
-                    client.goodsServices.push({
-                        name: clean(r['Name']),
-                        category: clean(r['Category']) || 'Product',
-                        description: clean(r['Description'])
-                    });
-                });
-                log.goods = rows.length;
-            }
-
-            // 6. Process Key Processes
-            if (workbook.Sheets['KeyProcesses']) {
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets['KeyProcesses']);
-                if (!client.keyProcesses) client.keyProcesses = [];
-                rows.forEach(r => {
-                    client.keyProcesses.push({
-                        name: clean(r['Process Name']),
-                        category: clean(r['Category']) || 'Core',
-                        owner: clean(r['Owner'])
-                    });
-                });
-                log.procs = rows.length;
-            }
-
-            window.saveData();
-            renderClientDetail(clientId);
-            window.showNotification(
-                `Import Complete: ${log.sites} Sites, ${log.depts} Depts, ${log.desig} Roles, ${log.people} Staff, ${log.goods} Goods, ${log.procs} Processes`,
-                'success'
             );
+            // Hide default Save button
+            document.getElementById('modal-save').style.display = 'none';
+        };
 
-        } catch (err) {
-            console.error('Import Error:', err);
-            window.showNotification('Import Failed: ' + err.message, 'error');
-        }
-    };
-    reader.readAsArrayBuffer(file);
-};
+        window.downloadAccountSetupTemplate = function (clientName) {
+            const wb = XLSX.utils.book_new();
 
-// Exports
-window.renderClientsModule = renderClientsEnhanced;
-// Ensure other helpers are exposed if defined locally but used in HTML
-if (typeof openNewClientModal !== 'undefined') window.openNewClientModal = openNewClientModal;
+            // 1. Sites Sheet
+            const sitesData = [
+                ["Site Name", "Address", "City", "Country", "Employees", "Shift (Yes/No)", "Standards"],
+                ["Head Office", "123 Main St", "New York", "USA", "50", "No", "ISO 9001:2015"],
+                ["Factory 1", "456 Industrial Rd", "Chicago", "USA", "200", "Yes", "ISO 9001:2015, ISO 14001:2015"]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sitesData), "Sites");
 
-if (typeof initiateAuditPlanFromClient !== 'undefined') window.initiateAuditPlanFromClient = initiateAuditPlanFromClient;
-if (typeof renderClientDetail !== 'undefined') window.renderClientDetail = renderClientDetail;
+            // 2. Departments Sheet
+            const deptsData = [
+                ["Department Name", "Risk Level"],
+                ["HR", "Low"],
+                ["Production", "High"],
+                ["Quality", "Medium"]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(deptsData), "Departments");
 
-// Client Logo Upload Functions
-window._tempClientLogo = '';
+            // 3. Designations Sheet
+            const desigData = [
+                ["Designation"],
+                ["Manager"],
+                ["Supervisor"],
+                ["Operator"]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(desigData), "Designations");
 
-window.previewClientLogo = function (input) {
-    const file = input.files[0];
-    if (!file) return;
+            // 4. Personnel Sheet
+            const personnelData = [
+                ["Name", "Designation", "Email", "Phone", "Role"],
+                ["John Doe", "Manager", "john@example.com", "555-0101", "Management Rep"],
+                ["Jane Smith", "Supervisor", "jane@example.com", "555-0102", "Audit Contact"]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(personnelData), "Personnel");
 
-    if (file.size > 1024 * 1024) {
-        window.showNotification('Logo too large. Max 1MB', 'error');
-        input.value = '';
-        return;
-    }
+            // 5. Goods/Services Sheet
+            const goodsData = [
+                ["Name", "Category", "Description"],
+                ["Widget A", "Product", "Main product line"],
+                ["Consulting", "Service", "Technical consultancy"]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(goodsData), "GoodsServices");
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        window._tempClientLogo = e.target.result;
-        const preview = document.getElementById('client-logo-preview');
-        if (preview) {
-            preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
-        }
-    };
-    reader.readAsDataURL(file);
-};
+            // 6. Key Processes Sheet
+            const processData = [
+                ["Process Name", "Category", "Owner"],
+                ["Procurement", "Support", "Purchasing Manager"],
+                ["Manufacturing", "Core", "Production Manager"],
+                ["Sales", "Core", "Sales Director"]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(processData), "KeyProcesses");
 
-window.handleClientLogoUpload = function (input, clientId) {
-    const file = input.files[0];
-    if (!file) return;
+            const fileName = `${clientName.replace(/[^a-z0-9]/gi, '_')}_Setup_Template.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        };
 
-    if (file.size > 1024 * 1024) {
-        window.showNotification('Logo too large. Max 1MB', 'error');
-        input.value = '';
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
-        if (client) {
-            client.logoUrl = e.target.result;
-            window.saveData();
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        window.processAccountSetupImport = function (clientId, input) {
+            // RBAC Check
+            if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+                window.showNotification('Access Denied: Only Certification Managers or Admins can perform this action.', 'error');
+                return;
             }
-            const preview = document.getElementById('edit-client-logo-preview');
-            if (preview) {
-                preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
+
+            const file = input.files[0];
+            if (!file) return;
+
+            window.closeModal(); // Close modal immediately to show notification
+            window.showNotification(`Reading ${file.name}...`, 'info');
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+
+                    if (!client) throw new Error("Client not found");
+
+                    let log = { sites: 0, depts: 0, desig: 0, people: 0, goods: 0, procs: 0 };
+
+                    // Helper to clean string
+                    const clean = (val) => val ? String(val).trim() : '';
+
+                    // 1. Process Sites
+                    if (workbook.Sheets['Sites']) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Sites']);
+                        if (!client.sites) client.sites = [];
+                        rows.forEach(r => {
+                            client.sites.push({
+                                name: clean(r['Site Name']),
+                                address: clean(r['Address']),
+                                city: clean(r['City']),
+                                country: clean(r['Country']),
+                                employees: parseInt(r['Employees']) || 0,
+                                shift: clean(r['Shift (Yes/No)']),
+                                standards: clean(r['Standards'])
+                            });
+                        });
+                        log.sites = rows.length;
+                    }
+
+                    // 2. Process Departments
+                    if (workbook.Sheets['Departments']) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Departments']);
+                        if (!client.departments) client.departments = [];
+                        rows.forEach(r => {
+                            const name = clean(r['Department Name']);
+                            if (name && !client.departments.some(d => d.name === name)) {
+                                client.departments.push({
+                                    name: name,
+                                    risk: clean(r['Risk Level']) || 'Medium',
+                                    head: '' // Not in template
+                                });
+                            }
+                        });
+                        log.depts = rows.length;
+                    }
+
+                    // 3. Process Designations
+                    if (workbook.Sheets['Designations']) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Designations']);
+                        if (!client.designations) client.designations = [];
+                        rows.forEach(r => {
+                            const desig = clean(r['Designation']);
+                            if (desig && !client.designations.includes(desig)) {
+                                client.designations.push(desig);
+                            }
+                        });
+                        log.desig = rows.length;
+                    }
+
+                    // 4. Process Personnel
+                    if (workbook.Sheets['Personnel']) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Personnel']);
+                        if (!client.contacts) client.contacts = [];
+                        rows.forEach(r => {
+                            client.contacts.push({
+                                name: clean(r['Name']),
+                                designation: clean(r['Designation']),
+                                email: clean(r['Email']),
+                                phone: clean(r['Phone']),
+                                role: clean(r['Role'])
+                            });
+                        });
+                        log.people = rows.length;
+                    }
+
+                    // 5. Process Goods/Services
+                    if (workbook.Sheets['GoodsServices']) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['GoodsServices']);
+                        if (!client.goodsServices) client.goodsServices = [];
+                        rows.forEach(r => {
+                            client.goodsServices.push({
+                                name: clean(r['Name']),
+                                category: clean(r['Category']) || 'Product',
+                                description: clean(r['Description'])
+                            });
+                        });
+                        log.goods = rows.length;
+                    }
+
+                    // 6. Process Key Processes
+                    if (workbook.Sheets['KeyProcesses']) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets['KeyProcesses']);
+                        if (!client.keyProcesses) client.keyProcesses = [];
+                        rows.forEach(r => {
+                            client.keyProcesses.push({
+                                name: clean(r['Process Name']),
+                                category: clean(r['Category']) || 'Core',
+                                owner: clean(r['Owner'])
+                            });
+                        });
+                        log.procs = rows.length;
+                    }
+
+                    window.saveData();
+                    renderClientDetail(clientId);
+                    window.showNotification(
+                        `Import Complete: ${log.sites} Sites, ${log.depts} Depts, ${log.desig} Roles, ${log.people} Staff, ${log.goods} Goods, ${log.procs} Processes`,
+                        'success'
+                    );
+
+                } catch (err) {
+                    console.error('Import Error:', err);
+                    window.showNotification('Import Failed: ' + err.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        // Exports
+        window.renderClientsModule = renderClientsEnhanced;
+        // Ensure other helpers are exposed if defined locally but used in HTML
+        if (typeof openNewClientModal !== 'undefined') window.openNewClientModal = openNewClientModal;
+
+        if (typeof initiateAuditPlanFromClient !== 'undefined') window.initiateAuditPlanFromClient = initiateAuditPlanFromClient;
+        if (typeof renderClientDetail !== 'undefined') window.renderClientDetail = renderClientDetail;
+
+        // Client Logo Upload Functions
+        window._tempClientLogo = '';
+
+        window.previewClientLogo = function (input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (file.size > 1024 * 1024) {
+                window.showNotification('Logo too large. Max 1MB', 'error');
+                input.value = '';
+                return;
             }
-            window.showNotification('Logo uploaded', 'success');
-            // Update header if in client workspace
-            updateClientWorkspaceHeader(clientId);
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                window._tempClientLogo = e.target.result;
+                const preview = document.getElementById('client-logo-preview');
+                if (preview) {
+                    preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.handleClientLogoUpload = function (input, clientId) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (file.size > 1024 * 1024) {
+                window.showNotification('Logo too large. Max 1MB', 'error');
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const client = window.state.clients.find(c => String(c.id) === String(clientId));
+                if (client) {
+                    client.logoUrl = e.target.result;
+                    window.saveData();
+                    // Sync to Supabase
+                    if (window.SupabaseClient?.isInitialized) {
+                        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                    }
+                    const preview = document.getElementById('edit-client-logo-preview');
+                    if (preview) {
+                        preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
+                    }
+                    window.showNotification('Logo uploaded', 'success');
+                    // Update header if in client workspace
+                    updateClientWorkspaceHeader(clientId);
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function updateClientWorkspaceHeader(clientId) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            if (!client) return;
+
+            const logoContainer = document.getElementById('cb-logo-display');
+            if (logoContainer) {
+                if (client.logoUrl) {
+                    logoContainer.innerHTML = `<img src="${client.logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${client.name}">`;
+                } else {
+                    logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${client.name.length > 20 ? client.name.substring(0, 20) + '...' : client.name}</h1>`;
+                }
+            }
         }
-    };
-    reader.readAsDataURL(file);
-};
+        window.updateClientWorkspaceHeader = updateClientWorkspaceHeader;
 
-function updateClientWorkspaceHeader(clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client) return;
+        // ============================================
+        // CLIENT-LEVEL AUDITOR ASSIGNMENT FUNCTIONS
+        // ============================================
 
-    const logoContainer = document.getElementById('cb-logo-display');
-    if (logoContainer) {
-        if (client.logoUrl) {
-            logoContainer.innerHTML = `<img src="${client.logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${client.name}">`;
-        } else {
-            logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${client.name.length > 20 ? client.name.substring(0, 20) + '...' : client.name}</h1>`;
-        }
-    }
-}
-window.updateClientWorkspaceHeader = updateClientWorkspaceHeader;
+        // Open modal to assign an auditor to this client
+        window.openClientAuditorAssignmentModal = function (clientId, clientName) {
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            const auditors = window.state.auditors || [];
+            const assignments = window.state.auditorAssignments || [];
 
-// ============================================
-// CLIENT-LEVEL AUDITOR ASSIGNMENT FUNCTIONS
-// ============================================
+            console.log('[openClientAuditorAssignmentModal] Debug Info:', {
+                clientId,
+                clientName,
+                totalAuditors: auditors.length,
+                totalAssignments: assignments.length,
+                auditorsList: auditors.map(a => ({ id: a.id, name: a.name }))
+            });
 
-// Open modal to assign an auditor to this client
-window.openClientAuditorAssignmentModal = function (clientId, clientName) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    const auditors = window.state.auditors || [];
-    const assignments = window.state.auditorAssignments || [];
+            // Check if there are any auditors in the system
+            if (auditors.length === 0) {
+                window.showNotification('No auditors found in the system. Please add auditors first from the Auditors module.', 'warning');
+                return;
+            }
 
-    console.log('[openClientAuditorAssignmentModal] Debug Info:', {
-        clientId,
-        clientName,
-        totalAuditors: auditors.length,
-        totalAssignments: assignments.length,
-        auditorsList: auditors.map(a => ({ id: a.id, name: a.name }))
-    });
+            // Get auditors not yet assigned to this client
+            const assignedAuditorIds = assignments
+                .filter(a => String(a.clientId) === String(clientId))
+                .map(a => String(a.auditorId));
+            const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(String(a.id)));
 
-    // Check if there are any auditors in the system
-    if (auditors.length === 0) {
-        window.showNotification('No auditors found in the system. Please add auditors first from the Auditors module.', 'warning');
-        return;
-    }
+            console.log('[openClientAuditorAssignmentModal] Assignment Info:', {
+                assignedAuditorIds,
+                availableAuditors: availableAuditors.length
+            });
 
-    // Get auditors not yet assigned to this client
-    const assignedAuditorIds = assignments
-        .filter(a => String(a.clientId) === String(clientId))
-        .map(a => String(a.auditorId));
-    const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(String(a.id)));
+            if (availableAuditors.length === 0) {
+                window.showNotification('All auditors are already assigned to this client.', 'info');
+                return;
+            }
 
-    console.log('[openClientAuditorAssignmentModal] Assignment Info:', {
-        assignedAuditorIds,
-        availableAuditors: availableAuditors.length
-    });
-
-    if (availableAuditors.length === 0) {
-        window.showNotification('All auditors are already assigned to this client.', 'info');
-        return;
-    }
-
-    document.getElementById('modal-title').textContent = `Assign Auditor to ${clientName}`;
-    document.getElementById('modal-body').innerHTML = `
+            document.getElementById('modal-title').textContent = `Assign Auditor to ${clientName}`;
+            document.getElementById('modal-body').innerHTML = `
         <div class="form-group">
             <label>Select Auditor to Assign</label>
             <select id="client-assign-auditor" class="form-control" required>
@@ -5281,146 +5287,146 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
         </div>
     `;
 
-    document.getElementById('modal-save').style.display = '';
-    document.getElementById('modal-save').onclick = function () {
-        const auditorId = document.getElementById('client-assign-auditor').value;
+            document.getElementById('modal-save').style.display = '';
+            document.getElementById('modal-save').onclick = function () {
+                const auditorId = document.getElementById('client-assign-auditor').value;
 
-        if (!auditorId) {
-            window.showNotification('Please select an auditor.', 'error');
-            return;
-        }
+                if (!auditorId) {
+                    window.showNotification('Please select an auditor.', 'error');
+                    return;
+                }
 
-        // Initialize if not exists
-        if (!window.state.auditorAssignments) {
-            window.state.auditorAssignments = [];
-        }
+                // Initialize if not exists
+                if (!window.state.auditorAssignments) {
+                    window.state.auditorAssignments = [];
+                }
 
-        const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
+                const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
 
-        const assignment = {
-            id: Date.now(),
-            auditorId: String(auditorId),
-            userId: auditor?.userId || auditor?.user_id || null, // Include UUID if available
-            clientId: String(clientId),
-            role: auditor?.role || 'Auditor',
-            assignedBy: window.state.currentUser?.name || 'System',
-            assignedAt: new Date().toISOString()
+                const assignment = {
+                    id: Date.now(),
+                    auditorId: String(auditorId),
+                    userId: auditor?.userId || auditor?.user_id || null, // Include UUID if available
+                    clientId: String(clientId),
+                    role: auditor?.role || 'Auditor',
+                    assignedBy: window.state.currentUser?.name || 'System',
+                    assignedAt: new Date().toISOString()
+                };
+
+                // Add new assignment
+                window.state.auditorAssignments.push(assignment);
+
+                window.saveData();
+
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
+                        .then(() => console.log('Auditor assignment synced to Supabase'))
+                        .catch(e => console.error('Auditor assignment sync failed:', e));
+                }
+
+                window.closeModal();
+
+                // Direct UI Refresh
+                const container = document.getElementById('client-audit-team-container');
+                if (container) {
+                    const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
+                    // parse the string returned by getClientAuditTeamHTML or just replace outerHTML
+                    // getClientAuditTeamHTML returns a template string starting with <div class="card" id="...">
+                    container.outerHTML = getClientAuditTeamHTML(updatedClient);
+                } else {
+                    // Fallback if not currently on the tab
+                    renderClientDetail(clientId);
+                    setTimeout(() => {
+                        document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
+                    }, 100);
+                }
+
+                // auditor variable already exists from line 5155, reuse it
+                window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
+            };
+
+            window.openModal();
         };
 
-        // Add new assignment
-        window.state.auditorAssignments.push(assignment);
+        // Remove auditor assignment from a client
+        window.removeClientAuditorAssignment = function (clientId, auditorId) {
+            console.log('[removeClientAuditorAssignment] Called with:', {
+                clientId,
+                auditorId,
+                typeC: typeof clientId,
+                typeA: typeof auditorId
+            });
 
-        window.saveData();
+            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
 
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
-                .then(() => console.log('Auditor assignment synced to Supabase'))
-                .catch(e => console.error('Auditor assignment sync failed:', e));
-        }
+            if (!client || !auditor) {
+                console.error('[removeClientAuditorAssignment] Client or Auditor not found');
+                window.showNotification('Error: Client or Auditor not found', 'error');
+                return;
+            }
 
-        window.closeModal();
-
-        // Direct UI Refresh
-        const container = document.getElementById('client-audit-team-container');
-        if (container) {
-            const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
-            // parse the string returned by getClientAuditTeamHTML or just replace outerHTML
-            // getClientAuditTeamHTML returns a template string starting with <div class="card" id="...">
-            container.outerHTML = getClientAuditTeamHTML(updatedClient);
-        } else {
-            // Fallback if not currently on the tab
-            renderClientDetail(clientId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
-            }, 100);
-        }
-
-        // auditor variable already exists from line 5155, reuse it
-        window.showNotification(`${auditor?.name || 'Auditor'} assigned to ${clientName}`, 'success');
-    };
-
-    window.openModal();
-};
-
-// Remove auditor assignment from a client
-window.removeClientAuditorAssignment = function (clientId, auditorId) {
-    console.log('[removeClientAuditorAssignment] Called with:', {
-        clientId,
-        auditorId,
-        typeC: typeof clientId,
-        typeA: typeof auditorId
-    });
-
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
-
-    if (!client || !auditor) {
-        console.error('[removeClientAuditorAssignment] Client or Auditor not found');
-        window.showNotification('Error: Client or Auditor not found', 'error');
-        return;
-    }
-
-    const confirmMsg = `Remove ${auditor.name} from ${client.name}?
+            const confirmMsg = `Remove ${auditor.name} from ${client.name}?
 
 Note: All audit history and records will be RETAINED. The auditor will still have access to past audits they participated in.`;
 
-    if (confirm(confirmMsg)) {
-        const cid = String(clientId);
-        const aid = String(auditorId);
+            if (confirm(confirmMsg)) {
+                const cid = String(clientId);
+                const aid = String(auditorId);
 
-        const initialLength = (window.state.auditorAssignments || []).length;
+                const initialLength = (window.state.auditorAssignments || []).length;
 
-        window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
-            const match = (String(a.clientId) === cid && String(a.auditorId) === aid);
-            return !match;
-        });
+                window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => {
+                    const match = (String(a.clientId) === cid && String(a.auditorId) === aid);
+                    return !match;
+                });
 
-        const removedCount = initialLength - window.state.auditorAssignments.length;
+                const removedCount = initialLength - window.state.auditorAssignments.length;
 
-        if (removedCount === 0) {
-            console.warn('[removeClientAuditorAssignment] No assignment found to remove locally');
-            // We still attempt to delete from Supabase just in case
-        }
+                if (removedCount === 0) {
+                    console.warn('[removeClientAuditorAssignment] No assignment found to remove locally');
+                    // We still attempt to delete from Supabase just in case
+                }
 
-        window.saveData();
+                window.saveData();
 
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.deleteAuditorAssignment(aid, cid)
-                .then(() => console.log('Auditor assignment removed from Supabase'))
-                .catch(e => console.error('Auditor assignment removal failed:', e));
-        }
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.deleteAuditorAssignment(aid, cid)
+                        .then(() => console.log('Auditor assignment removed from Supabase'))
+                        .catch(e => console.error('Auditor assignment removal failed:', e));
+                }
 
-        // Direct UI Refresh
-        const container = document.getElementById('client-audit-team-container');
-        if (container) {
-            const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
-            container.outerHTML = getClientAuditTeamHTML(updatedClient);
-        } else {
-            // Fallback
-            renderClientDetail(clientId);
-            setTimeout(() => {
-                document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
-            }, 100);
-        }
+                // Direct UI Refresh
+                const container = document.getElementById('client-audit-team-container');
+                if (container) {
+                    const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
+                    container.outerHTML = getClientAuditTeamHTML(updatedClient);
+                } else {
+                    // Fallback
+                    renderClientDetail(clientId);
+                    setTimeout(() => {
+                        document.querySelector('.tab-btn[data-tab="audit_team"]')?.click();
+                    }, 100);
+                }
 
-        window.showNotification(`${auditor.name} removed from ${client.name}. Historical records retained.`, 'success');
-    }
-};
+                window.showNotification(`${auditor.name} removed from ${client.name}. Historical records retained.`, 'success');
+            }
+        };
 
-// ============================================
-// CLIENT DELETION & ARCHIVING
-// ============================================
-// Note: deleteClient and archiveClient functions are defined in clients-list-v16.js
-// which provides the enhanced implementation including Supabase cloud sync.
+        // ============================================
+        // CLIENT DELETION & ARCHIVING
+        // ============================================
+        // Note: deleteClient and archiveClient functions are defined in clients-list-v16.js
+        // which provides the enhanced implementation including Supabase cloud sync.
 
-// ============================================
-// CLIENT SETTINGS TAB HTML
-// ============================================
+        // ============================================
+        // CLIENT SETTINGS TAB HTML
+        // ============================================
 
-function getClientSettingsHTML(client) {
-    return `
+        function getClientSettingsHTML(client) {
+            return `
         <div class="fade-in">
              <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
                 <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i> Client Settings
@@ -5463,4 +5469,4 @@ function getClientSettingsHTML(client) {
             </div>
         </div>
     `;
-}
+        }
