@@ -643,8 +643,8 @@ const SupabaseClient = {
         uploadClientLogo: async function (file, clientId) {
             if (!SupabaseClient.isInitialized) return null;
 
-            // Use 'audit-files' bucket (public)
-            const bucket = 'audit-files';
+            // Use 'audit-logos' bucket (matches user's existing bucket)
+            const bucket = 'audit-logos';
             const timestamp = Date.now();
             const cleanFileName = file.name ? file.name.replace(/[^a-zA-Z0-9.-]/g, '_') : 'logo';
             const path = `client-logos/${clientId}_${timestamp}_${cleanFileName}`;
@@ -657,7 +657,10 @@ const SupabaseClient = {
                         upsert: true
                     });
 
-                if (error) throw error;
+                if (error) {
+                    console.error('[SupabaseStorage] Upload Action Error:', error);
+                    throw error;
+                }
 
                 // Try to get Public URL first (preferred for logos)
                 const { data: publicUrlData } = SupabaseClient.client.storage
@@ -669,20 +672,28 @@ const SupabaseClient = {
                     return { url: publicUrlData.publicUrl, path };
                 }
 
-                // Fallback to signed URL if public fails (though publicUrl usually returns something)
+                // Fallback to signed URL if public fails
                 const signedUrl = await this.getSignedUrl(bucket, path, 86400 * 365); // 1 year
                 return { url: signedUrl, path };
             } catch (error) {
                 Logger.error('Client logo upload failed:', error);
 
                 // DEBUG: Show explicit alert for the user
-                const msg = error.message || JSON.stringify(error);
+                const msg = error.message || (error.error_description) || JSON.stringify(error);
                 let hint = '';
-                if (msg.includes('policies')) hint = '\nHINT: Storage bucket policies may be blocking writes. Check "audit-files" bucket permissions.';
-                if (msg.includes('403')) hint = '\nHINT: 403 Forbidden - Permission denied.';
+                if (msg.includes('policies')) hint = '\nHINT: Storage bucket policies may be blocking writes. Check "audit-logos" bucket permissions.';
+                if (msg.includes('403')) hint = '\nHINT: 403 Forbidden - Permission denied. Check role permissions on storage objects.';
+                if (msg.includes('bucket')) hint = '\nHINT: Bucket might not exist or is not public.';
+                if (msg.includes('Payload Too Large')) hint = '\nHINT: File size too large.';
 
                 window.alert(`LOGO UPLOAD FAILED:\n${msg}${hint}\n\nCheck console for details.`);
-                console.error('[SupabaseStorage] Upload Error Details:', error);
+                console.error('[SupabaseStorage] Full Error Metadata:', {
+                    error,
+                    bucket,
+                    path,
+                    fileType: file.type,
+                    fileSize: file.size
+                });
 
                 return null;
             }
