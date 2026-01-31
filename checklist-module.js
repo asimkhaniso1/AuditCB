@@ -681,22 +681,12 @@ function renderChecklistEditor(checklistId) {
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Type</label>
                             <select class="form-control" id="checklist-type">
                                 <option value="custom" ${checklist?.type === 'custom' || !checklist ? 'selected' : ''}>Custom (Personal)</option>
                                 ${canEditGlobal ? `<option value="global" ${checklist?.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                             </select>
                         </div>
-                        
-                         <div class="form-group">
-                             <label>Start from Template</label>
-                             <select class="form-control" id="checklist-template-select" onchange="loadChecklistTemplate(this.value)">
-                                 <option value="">-- Blank Checklist --</option>
-                                 <option value="ISO 9001:2015">ISO 9001:2015 (Quality)</option>
-                                 <option value="ISO 14001:2015">ISO 14001:2015 (Environment)</option>
-                                 <option value="ISO 45001:2018">ISO 45001:2018 (Safety)</option>
-                                 <option value="ISO 27001:2022">ISO 27001:2022 (InfoSec)</option>
-                             </select>
-                         </div>
                         <!-- Audit Type field removed -->
                         <div class="form-group">
                             <label>Audit Scope</label>
