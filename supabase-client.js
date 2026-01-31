@@ -1140,6 +1140,7 @@ const SupabaseClient = {
                     goods_services: client.goodsServices || [],
                     key_processes: client.keyProcesses || [],
                     contact_person: client.contactPerson || null,
+                    logo_url: client.logoUrl || null,
                     updated_at: new Date().toISOString()
                 }));
 
