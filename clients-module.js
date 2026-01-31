@@ -2157,7 +2157,7 @@ window.saveAuditClient = async function (clientId) {
             if (uploadResult && uploadResult.url) {
                 // alert('Upload SUCCESS! URL: ' + uploadResult.url); // Removed aggressive alert
                 client.logoUrl = uploadResult.url;
-                Logger.info('Logo uploaded via Storage:', newClient.logoUrl);
+                Logger.info('Logo uploaded via Storage:', client.logoUrl);
             } else {
                 alert('Upload returned no URL!');
             }
@@ -4258,7 +4258,7 @@ function getClientCertificatesHTML(client) {
                     <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
                 </h3>
                 <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards(${client.id})">
-                    <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Refresh from Sites
+                    <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Sync Standards
                 </button>
             </div>
             
@@ -4293,13 +4293,15 @@ function getClientCertificatesHTML(client) {
                         </div>
                     </div>
 
-                    <!-- Main Scope -->
+                    <!-- Main Scope (Hidden/Removed per request) -->
+                    <!-- 
                     <div style="margin-bottom: 1.5rem;">
                         <label style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem;">Global / Main Scope Text (Fallback)</label>
                         <textarea class="form-control" rows="2" 
                             onchange="window.updateCertField(${client.id}, ${index}, 'scope', this.value)"
                             placeholder="Enter the main scope statement...">${cert.scope || ''}</textarea>
-                    </div>
+                    </div> 
+                    -->
 
                     <!-- Site Specific Scopes -->
                     <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
