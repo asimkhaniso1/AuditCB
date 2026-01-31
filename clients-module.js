@@ -4386,6 +4386,7 @@ window.generateCertificatesFromStandards = function (clientId) {
     allStandards.forEach(std => {
         if (!client.certificates.find(c => c.standard === std)) {
             client.certificates.push({
+                id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), // Generate ID
                 standard: std,
                 certificateNo: '',
                 status: 'Active',
@@ -4453,6 +4454,10 @@ window.saveCertificateDetails = function (clientId) {
             } else {
                 window.showNotification('Failed to save certificates to cloud', 'error');
             }
+        }).catch(error => {
+            console.error('Save Certificate Error:', error);
+            // Alert user to specific error (e.g. RLS policy)
+            alert('Cloud Save Failed:\n' + (error.message || JSON.stringify(error)));
         });
     } else {
         // Fallback for local-only or no certs to save
