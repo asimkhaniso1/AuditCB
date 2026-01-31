@@ -2108,7 +2108,13 @@ const SupabaseClient = {
                 status: c.status,
                 scope: c.scope,
                 history: c.history || [],
-                decisionRecord: c.decision_record || {}
+                decisionRecord: c.decision_record || {},
+                // Unpack Details from JSONB
+                certificateNo: c.decision_record?.certificate_no || '',
+                revision: c.decision_record?.revision || '00',
+                siteScopes: c.decision_record?.site_scopes || {},
+                initialDate: c.decision_record?.initial_date || '',
+                currentIssue: c.decision_record?.current_issue || ''
             }));
 
             // Also keep the raw decisions for other uses if needed
@@ -2135,21 +2141,26 @@ const SupabaseClient = {
         if (!this.isInitialized) return;
 
         try {
+            // Pack details into decision_record (JSONB) to avoid schema changes
+            const decisionRecord = {
+                ...(cert.decisionRecord || {}),
+                certificate_no: cert.certificateNo,
+                revision: cert.revision,
+                site_scopes: cert.siteScopes,
+                initial_date: cert.initialDate,
+                current_issue: cert.currentIssue
+            };
+
             const payload = {
                 id: cert.id,
                 client: cert.client,
                 standard: cert.standard,
-                certificate_no: cert.certificateNo, // Add mapping
-                revision: cert.revision,            // Add mapping
                 issue_date: cert.issueDate,
                 expiry_date: cert.expiryDate,
-                initial_date: cert.initialDate,     // Add mapping
-                current_issue: cert.currentIssue,   // Add mapping
                 status: cert.status,
                 scope: cert.scope,
-                site_scopes: cert.siteScopes,       // Add mapping
                 history: cert.history,
-                decision_record: cert.decisionRecord,
+                decision_record: decisionRecord, // Stored here
                 // Ensure legacy fields required by constraint are present if needed
                 date: cert.history?.[0]?.date || new Date().toISOString().split('T')[0],
                 decision: 'Certified',
@@ -2158,17 +2169,17 @@ const SupabaseClient = {
 
             const { error } = await this.client
                 .from('certification_decisions')
-                .upsert(payload, { onConflict: 'id' }) // Explicitly specify conflict key
+                .upsert(payload, { onConflict: 'id' })
                 .select();
 
             if (error) {
-                Logger.error('Supabase UPSERT Error:', error); // Log full error object
+                Logger.error('Supabase UPSERT Error:', error);
                 throw error;
             }
-            Logger.info('Certificate synced to certification_decisions:', cert.id);
+            Logger.info('Certificate synced to certification_decisions (JSONB):', cert.id);
         } catch (error) {
             Logger.error('Failed to sync certificate:', error);
-            // alert('Certificate Sync Failed: ' + (error.message || JSON.stringify(error))); // Optional alert
+            // alert('Certificate Sync Failed: ' + (error.message || JSON.stringify(error))); 
             throw error;
         }
     },
