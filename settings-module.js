@@ -4465,7 +4465,7 @@ function getAssignmentsHTML() {
                                     <span style="display: inline-flex; align-items: center; gap: 0.5rem; background: #f1f5f9; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
                                         <i class="fa-solid fa-building" style="color: var(--text-secondary);"></i>
                                         ${window.UTILS.escapeHtml(client.name)}
-                                        <button onclick="removeAssignment(${auditor.id}, ${client.id})" style="background: none; border: none; cursor: pointer; color: #94a3b8; padding: 0 0 0 4px;" title="Remove assignment">
+                                        <button onclick="removeAssignment('${auditor.id}', '${client.id}')" style="background: none; border: none; cursor: pointer; color: #94a3b8; padding: 0 0 0 4px;" title="Remove assignment">
                                             <i class="fa-solid fa-times-circle" style="font-size: 0.9rem;"></i>
                                         </button>
                                     </span>

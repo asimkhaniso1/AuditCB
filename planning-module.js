@@ -22,7 +22,7 @@ function renderAuditPlanningEnhanced() {
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
-                <a href="javascript:void(0)" onclick="window.viewAuditPlan(${plan.id})" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(plan.client)}</a>
+                <a href="javascript:void(0)" onclick="window.viewAuditPlan('${plan.id}')" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(plan.client)}</a>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(plan.standard) || 'ISO 9001:2015'}</div>
             </td>
             <td>${window.UTILS.escapeHtml(plan.type) || 'Surveillance'}</td>
@@ -42,7 +42,7 @@ function renderAuditPlanningEnhanced() {
                     ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
                         <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
                     </button>` : ''}
-                    <button class="btn btn-sm" onclick="window.viewAuditPlan(${plan.id})" title="View Details">
+                    <button class="btn btn-sm" onclick="window.viewAuditPlan('${plan.id}')" title="View Details">
                         <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                     </button>
                     ${isManager ? `<button class="btn btn-sm delete-plan-btn" data-plan-id="${plan.id}" title="Delete Plan">
@@ -1794,7 +1794,7 @@ function saveAuditPlan(shouldPrint = false) {
                     state.auditPlans[index] = { ...state.auditPlans[index], ...planData };
                 }
             } else {
-                const newPlanId = String(Date.now());
+                const newPlanId = crypto.randomUUID();
                 const clientObj = state.clients.find(c => c.name === planData.client);
                 const clientId = clientObj ? String(clientObj.id) : null;
                 const newPlan = {

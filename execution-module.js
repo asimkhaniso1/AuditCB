@@ -1058,7 +1058,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 Showing ${allNCRs.length} finding(s) - ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
                             </p>
                         </div>
-                        <button class="btn btn-primary" onclick="createNCR(${report.id})">
+                        <button class="btn btn-primary" onclick="createNCR('${report.id}')">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create NCR
                         </button>
                     </div>
@@ -1108,7 +1108,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                         <h3>Corrective & Preventive Actions (CAPA)</h3>
-                        <button class="btn btn-primary" onclick="createCAPA(${report.id})">
+                        <button class="btn btn-primary" onclick="createCAPA('${report.id}')">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create CAPA
                         </button>
                     </div>
@@ -1171,7 +1171,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </div>
                     </div>
 
-                    <button class="btn btn-primary" style="margin-top: 1.5rem;" onclick="saveObservations(${report.id})">
+                    <button class="btn btn-primary" style="margin-top: 1.5rem;" onclick="saveObservations('${report.id}')">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Observations
                     </button>
                 </div>
@@ -1247,10 +1247,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review all flagged items before submitting to Lead Auditor for classification.</p>
                         </div>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-secondary" onclick="window.saveChecklist(${report.id})">
+                            <button class="btn btn-secondary" onclick="window.saveChecklist('${report.id}')">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
                             </button>
-                            <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;" onclick="window.submitToLeadAuditor(${report.id})" ${!isReadyToSubmit ? '' : ''}>
+                            <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;" onclick="window.submitToLeadAuditor('${report.id}')" ${!isReadyToSubmit ? '' : ''}>
                                 <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit to Lead Auditor
                             </button>
                         </div>
@@ -1400,7 +1400,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
                 
                 <div style="margin-top: 1.5rem; text-align: right;">
-                    <button class="btn btn-primary" onclick="window.saveMeetingRecords(${report.id})">
+                    <button class="btn btn-primary" onclick="window.saveMeetingRecords('${report.id}')">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>Save Meeting Records
                     </button>
                 </div>

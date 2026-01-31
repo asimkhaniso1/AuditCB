@@ -1773,7 +1773,7 @@ window.saveNewClient = async function () {
     }];
 
     const newClient = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         name: cleanData.name,
         standard: standard,
         nextAudit: '', // Removed as per request
@@ -1882,7 +1882,7 @@ window.renderEditClient = function (clientId) {
             </div>
             <div style="display: flex; gap: 1rem;">
                 <button class="btn btn-secondary" onclick="renderClientsEnhanced()">Cancel</button>
-                <button class="btn btn-primary" onclick="window.saveAuditClient(${client.id})" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                <button class="btn btn-primary" onclick="window.saveAuditClient('${client.id}')" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
                     <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
                 </button>
             </div>
@@ -4816,7 +4816,7 @@ CFO," style="font-family: monospace;"></textarea>
                             updatedCount++;
                         } else {
                             client = {
-                                id: Date.now() + Math.floor(Math.random() * 1000),
+                                id: crypto.randomUUID(),
                                 name: window.Sanitizer.sanitizeText(name),
                                 status: 'Active', // Default status
                                 contacts: [],

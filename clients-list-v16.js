@@ -48,8 +48,8 @@ function renderClientsEnhanced() {
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="Edit"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
                 ${(window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm" onclick="event.stopPropagation(); window.archiveClient(${client.id})" style="color: #f59e0b;" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
-                <button class="btn btn-sm" onclick="event.stopPropagation(); window.deleteClient(${client.id})" style="color: #ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn btn-sm" onclick="event.stopPropagation(); window.archiveClient('${client.id}')" style="color: #f59e0b;" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
+                <button class="btn btn-sm" onclick="event.stopPropagation(); window.deleteClient('${client.id}')" style="color: #ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
                 ` : ''}
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="View"><i class="fa-solid fa-eye"></i></button>
                 </div>
