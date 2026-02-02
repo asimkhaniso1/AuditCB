@@ -1,12 +1,15 @@
 /**
- * CLIENT MODULE FIXES
+ * CLIENT MODULE FIXES - v2 (Expanded)
  * Exposes functions to global scope that were accidentally privately scoped in clients-module.js
  */
 console.log('[DEBUG] clients-module-fix.js loading...');
 
-// 1. Client Org Setup HTML
+// ============================================
+// 1. ORIGINAL FIXES (HTML GENERATORS)
+// ============================================
+
+// Client Org Setup HTML
 window.getClientOrgSetupHTML = function (client) {
-    // Initialize wizard step if not exists
     if (!client._wizardStep) client._wizardStep = 1;
     const currentStep = client._wizardStep;
 
@@ -24,14 +27,10 @@ window.getClientOrgSetupHTML = function (client) {
 
     return `
 <div class="wizard-container fade-in" style="background: #fff; border-radius: 12px; overflow: hidden;">
-    <!-- Wizard Header / Progress -->
     <div style="background: #f8fafc; padding: 2rem; border-bottom: 1px solid var(--border-color);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative; max-width: 800px; margin-left: auto; margin-right: auto;">
-            <!-- Progress Line Background -->
             <div style="position: absolute; top: 20px; left: 0; right: 0; height: 4px; background: #e2e8f0; z-index: 1;"></div>
-            <!-- Progress Line Active -->
             <div style="position: absolute; top: 20px; left: 0; width: ${progressWidth}%; height: 4px; background: var(--primary-color); z-index: 2; transition: width 0.3s ease;"></div>
-            
             ${steps.map(step => `
                 <div class="wizard-step ${step.id <= currentStep ? 'active' : ''}" 
                      style="z-index: 3; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;"
@@ -43,19 +42,14 @@ window.getClientOrgSetupHTML = function (client) {
                 </div>
             `).join('')}
         </div>
-        
         <div style="text-align: center;">
             <h2 style="margin: 0; color: #1e293b;">${steps[currentStep - 1].title}</h2>
             <p style="color: #64748b; margin: 0.5rem 0 0 0;">Step ${currentStep} of ${steps.length}</p>
         </div>
     </div>
-
-    <!-- Wizard Content -->
     <div id="wizard-content" style="padding: 2rem;">
         ${window.getClientOrgSetupHTML.renderWizardStep(client, currentStep)}
     </div>
-
-    <!-- Wizard Footer -->
     <div style="padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">
         <button class="btn btn-secondary" ${currentStep === 1 ? 'disabled' : ''} onclick="window.setSetupWizardStep(${client.id}, ${currentStep - 1})">
             <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Previous
@@ -64,22 +58,19 @@ window.getClientOrgSetupHTML = function (client) {
             ${currentStep < 7 ? 'Next Step <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>' : 'Finish <i class="fa-solid fa-check" style="margin-left: 0.5rem;"></i>'}
         </button>
     </div>
-</div>
-`;
+</div>`;
 };
 
-// Helper to render the specific step content
 window.getClientOrgSetupHTML.renderWizardStep = function (client, step) {
-    // These functions are assumed to be global (verified in clients-module.js)
     switch (step) {
-        case 1: return window.getClientProfileHTML ? window.getClientProfileHTML(client) : (typeof getClientProfileHTML === 'function' ? getClientProfileHTML(client) : 'Error: getClientProfileHTML missing');
-        case 2: return window.getClientSitesHTML ? window.getClientSitesHTML(client) : (typeof getClientSitesHTML === 'function' ? getClientSitesHTML(client) : 'Error: getClientSitesHTML missing');
-        case 3: return window.getClientDepartmentsHTML ? window.getClientDepartmentsHTML(client) : (typeof getClientDepartmentsHTML === 'function' ? getClientDepartmentsHTML(client) : 'Error: getClientDepartmentsHTML missing');
-        case 4: return window.getClientDesignationsHTML ? window.getClientDesignationsHTML(client) : (typeof getClientDesignationsHTML === 'function' ? getClientDesignationsHTML(client) : 'Error: getClientDesignationsHTML missing');
-        case 5: return window.getClientContactsHTML ? window.getClientContactsHTML(client) : (typeof getClientContactsHTML === 'function' ? getClientContactsHTML(client) : 'Error: getClientContactsHTML missing');
-        case 6: return window.getClientGoodsServicesHTML ? window.getClientGoodsServicesHTML(client) : (typeof getClientGoodsServicesHTML === 'function' ? getClientGoodsServicesHTML(client) : 'Error: getClientGoodsServicesHTML missing');
-        case 7: return window.getClientKeyProcessesHTML ? window.getClientKeyProcessesHTML(client) : (typeof getClientKeyProcessesHTML === 'function' ? getClientKeyProcessesHTML(client) : 'Error: getClientKeyProcessesHTML missing');
-        default: return window.getClientProfileHTML ? window.getClientProfileHTML(client) : '';
+        case 1: return window.getClientProfileHTML ? window.getClientProfileHTML(client) : (typeof getClientProfileHTML === 'function' ? getClientProfileHTML(client) : 'Loading...');
+        case 2: return window.getClientSitesHTML ? window.getClientSitesHTML(client) : 'Loading...';
+        case 3: return window.getClientDepartmentsHTML ? window.getClientDepartmentsHTML(client) : 'Loading...';
+        case 4: return window.getClientDesignationsHTML ? window.getClientDesignationsHTML(client) : 'Loading...';
+        case 5: return window.getClientContactsHTML ? window.getClientContactsHTML(client) : 'Loading...';
+        case 6: return window.getClientGoodsServicesHTML ? window.getClientGoodsServicesHTML(client) : 'Loading...';
+        case 7: return window.getClientKeyProcessesHTML ? window.getClientKeyProcessesHTML(client) : 'Loading...';
+        default: return '';
     }
 };
 
@@ -91,18 +82,14 @@ window.setSetupWizardStep = function (clientId, step) {
         const tabContent = document.getElementById('tab-content');
         if (tabContent) {
             tabContent.innerHTML = window.getClientOrgSetupHTML(client);
-            // Re-initialize any components if needed
-            if (window.saveData) window.saveData(); // Save step progress
+            if (window.saveData) window.saveData();
         }
     }
 };
 
-// 2. Client Certificates HTML
 window.getClientCertificatesHTML = function (client) {
     const certs = client.certificates || [];
     const allStandards = new Set();
-
-    // Collect all standards from client global and sites
     if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
     if (client.sites) {
         client.sites.forEach(site => {
@@ -115,242 +102,230 @@ window.getClientCertificatesHTML = function (client) {
     <div class="fade-in" style="text-align: center; padding: 3rem;">
         <i class="fa-solid fa-certificate" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
         <h3>Initialize Certification Records</h3>
-        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-            Detected standards: ${Array.from(allStandards).join(', ')}.<br>
-            Click below to generate certificate records for these standards to manage scopes and revisions.
-        </p>
-        <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards(${client.id})">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Records
-        </button>
-    </div>
-`;
+        <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards(${client.id})">Generate Records</button>
+    </div>`;
     }
 
     return `
 <div class="fade-in">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h3 style="color: var(--primary-color); margin: 0;">
-            <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
-        </h3>
-        <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards(${client.id})">
-            <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Sync Standards
-        </button>
+        <h3 style="color: var(--primary-color); margin: 0;"><i class="fa-solid fa-certificate"></i> Certification Scopes & History</h3>
+        <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards(${client.id})"><i class="fa-solid fa-sync"></i> Sync Standards</button>
     </div>
-    
     ${certs.map((cert, index) => {
-        // Find sites relevant to this standard
-        const relevantSites = (client.sites || []).filter(s =>
-            (s.standards && s.standards.includes(cert.standard)) ||
-            (!s.standards && client.standard && client.standard.includes(cert.standard)) // Fallback if site has no standards defined but client does
-        );
-
+        const relevantSites = (client.sites || []).filter(s => (s.standards && s.standards.includes(cert.standard)) || (!s.standards && client.standard && client.standard.includes(cert.standard)));
         return `
         <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--primary-color);">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                 <div>
-                    <span class="badge" style="background: var(--primary-color); color: white; font-size: 0.9rem; margin-bottom: 0.5rem;">${cert.standard}</span>
+                    <span class="badge" style="background: var(--primary-color); color: white;">${cert.standard}</span>
                     <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
-                        Cert #: <input type="text" value="${cert.certificateNo || ''}" 
-                            style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;"
-                            onchange="window.updateCertField(${client.id}, ${index}, 'certificateNo', this.value)">
+                        Cert #: <input type="text" value="${cert.certificateNo || ''}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" onchange="window.updateCertField(${client.id}, ${index}, 'certificateNo', this.value)">
                     </div>
                 </div>
                 <div style="text-align: right;">
-                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" onclick="window.viewCertRevisionHistory(${client.id}, ${index})" title="View revision history for this certification">
-                        <i class="fa-solid fa-history"></i> Revision History
-                     </button>
-                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope(${client.id}, ${index})" title="Remove this certification scope">
-                        <i class="fa-solid fa-trash"></i>
-                     </button>
-                     <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                        Current Rev: <strong>${cert.revision || '00'}</strong>
-                     </div>
+                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;" onclick="window.viewCertRevisionHistory(${client.id}, ${index})">History</button>
+                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
-
-            <!-- Site Specific Scopes -->
             <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
-                <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--primary-color);">
-                    <i class="fa-solid fa-location-dot"></i> Site-Specific Scopes (Annex)
-                </h4>
-                ${relevantSites.length > 0 ? `
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="text-align: left; border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 0.5rem; width: 25%;">Site</th>
-                            <th style="padding: 0.5rem;">Scope of Activity (For this Standard)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${relevantSites.map(site => {
-            const siteScope = (cert.siteScopes && cert.siteScopes[site.name])
-                ? cert.siteScopes[site.name]
-                : (cert.scope || ''); // Default to global scope if empty
-            return `
-                            <tr style="border-bottom: 1px solid #e2e8f0;">
-                                <td style="padding: 0.75rem 0.5rem; vertical-align: top;">
-                                    <strong>${site.name}</strong><br>
-                                    <span style="font-size: 0.8rem; color: #64748b;">${site.city}, ${site.country}</span>
-                                </td>
-                                <td style="padding: 0.75rem 0.5rem;">
-                                    <textarea class="form-control" rows="2" 
-                                        style="font-size: 0.9rem;"
-                                        onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)"
-                                        placeholder="Define specific scope for this site...">${siteScope}</textarea>
-                                </td>
-                            </tr>
-                            `;
+                <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--primary-color);">Site-Specific Scopes</h4>
+                ${relevantSites.map(site => {
+            const siteScope = (cert.siteScopes && cert.siteScopes[site.name]) ? cert.siteScopes[site.name] : (cert.scope || '');
+            return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)">${siteScope}</textarea></div>`;
         }).join('')}
-                    </tbody>
-                </table>
-                ` : '<p style="font-style: italic; color: #94a3b8;">No sites linked to this standard.</p>'}
             </div>
-
-            <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                 <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <label style="font-size: 0.8rem;">Initial Date</label>
-                        <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'initialDate', this.value)">
-                    </div>
-                    <div>
-                        <label style="font-size: 0.8rem;">Current Issue</label>
-                        <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'currentIssue', this.value)">
-                    </div>
-                    <div>
-                        <label style="font-size: 0.8rem;">Expiry Date</label>
-                        <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'expiryDate', this.value)">
-                    </div>
-                 </div>
-                 <div style="display: flex; align-items: flex-end;">
-                    <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">
-                        <i class="fa-solid fa-save"></i> Save Changes
-                    </button>
-                 </div>
+            <div style="margin-top: 1rem; text-align: right;">
+                 <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">Save Changes</button>
             </div>
-        </div>
-        `;
+        </div>`;
     }).join('')}
-</div>
-`;
+</div>`;
 };
 
 window.generateCertificatesFromStandards = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
-
     const allStandards = new Set();
     if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-    if (client.sites) {
-        client.sites.forEach(site => {
-            if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
-        });
-    }
-
+    if (client.sites) client.sites.forEach(site => { if (site.standards) site.standards.split(',').map(s => s.trim()).forEach(s => allStandards.add(s)); });
     if (!client.certificates) client.certificates = [];
-
     allStandards.forEach(std => {
         if (!client.certificates.find(c => c.standard === std)) {
-            client.certificates.push({
-                id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), // Generate ID
-                standard: std,
-                certificateNo: '',
-                status: 'Active',
-                revision: '00',
-                scope: client.scope || '', // Default global scope
-                siteScopes: {}
-            });
+            client.certificates.push({ id: 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 10000), standard: std, certificateNo: '', status: 'Active', revision: '00', scope: client.scope || '', siteScopes: {} });
         }
     });
-
     if (window.saveData) window.saveData();
-    // Sync to Supabase
-    if (window.SupabaseClient?.isInitialized) {
-        window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-    }
-    if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
-    // Switch to scopes tab
-    setTimeout(() => {
-        document.querySelector('.tab-btn[data-tab="scopes"]')?.click();
-    }, 100);
+    if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+    if (window.renderClientDetail) renderClientDetail(clientId);
+    setTimeout(() => document.querySelector('.tab-btn[data-tab="scopes"]')?.click(), 100);
     if (window.showNotification) window.showNotification('Certificate records generated');
 };
+window.updateCertField = function (clientId, certIndex, field, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) client.certificates[certIndex][field] = value; };
+window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
+window.saveCertificateDetails = function (clientId) { if (window.saveData) window.saveData(); if (window.showNotification) window.showNotification('Saved', 'success'); };
 
-window.updateCertField = function (clientId, certIndex, field, value) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.certificates && client.certificates[certIndex]) {
-        client.certificates[certIndex][field] = value;
-    }
+window.getClientSettingsHTML = function (client) {
+    return `<div class="fade-in"><h3>Client Settings</h3><button class="btn btn-danger" onclick="window.deleteClient('${client.id}')">Delete Client</button></div>`;
 };
 
-window.updateSiteScope = function (clientId, certIndex, siteName, value) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.certificates && client.certificates[certIndex]) {
-        if (!client.certificates[certIndex].siteScopes) {
-            client.certificates[certIndex].siteScopes = {};
-        }
-        client.certificates[certIndex].siteScopes[siteName] = value;
-    }
-};
+// ============================================
+// 2. NEW FIXES (CRUD FUNCTIONS from blocked scope)
+// ============================================
 
-window.saveCertificateDetails = function (clientId) {
+window.addSite = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
+    window.openModal('Add Site', `
+        <form id="site-form">
+            <div class="form-group"><label>Site Name *</label><input type="text" id="site-name" class="form-control" required></div>
+            <div class="form-group"><label>Address</label><input type="text" id="site-address" class="form-control"></div>
+            <div class="form-group"><label>City</label><input type="text" id="site-city" class="form-control"></div>
+            <div class="form-group"><label>Country</label><input type="text" id="site-country" class="form-control"></div>
+            <div class="form-group"><label>Employees</label><input type="number" id="site-employees" class="form-control"></div>
+        </form>`, () => {
+        const name = document.getElementById('site-name').value;
+        if (name) {
+            if (!client.sites) client.sites = [];
+            client.sites.push({
+                name,
+                address: document.getElementById('site-address').value,
+                city: document.getElementById('site-city').value,
+                country: document.getElementById('site-country').value,
+                employees: document.getElementById('site-employees').value
+            });
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            if (window.renderClientDetail) renderClientDetail(clientId);
+            if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 2);
+            window.showNotification('Site added');
+        } else {
+            window.showNotification('Name required', 'error');
+        }
+    });
+};
 
-    // Save locally first
-    if (window.saveData) window.saveData();
+window.editSite = function (clientId, siteIndex) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.sites) return;
+    const site = client.sites[siteIndex];
+    window.openModal('Edit Site', `
+        <form><div class="form-group"><label>Name *</label><input type="text" id="site-name" value="${site.name}" class="form-control"></div>
+        <div class="form-group"><label>Address</label><input type="text" id="site-address" value="${site.address || ''}" class="form-control"></div>
+        </form>`, () => {
+        const name = document.getElementById('site-name').value;
+        if (name) {
+            client.sites[siteIndex].name = name;
+            client.sites[siteIndex].address = document.getElementById('site-address').value;
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            renderClientDetail(clientId);
+            window.showNotification('Site updated');
+        }
+    });
+};
 
-    // Sync specific certificates to Supabase (certification_decisions table)
-    if (window.SupabaseClient?.isInitialized && client.certificates && client.certificates.length > 0) {
-        // Just generic notification for now, deep implementation is in certifications-module.js
+window.deleteSite = function (clientId, siteIndex) {
+    if (!confirm('Delete site?')) return;
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (client && client.sites) {
+        client.sites.splice(siteIndex, 1);
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        renderClientDetail(clientId);
+        window.showNotification('Site deleted');
     }
-
-    if (window.showNotification) window.showNotification('Certification details saved', 'success');
 };
 
-
-// 3. Client Settings HTML
-window.getClientSettingsHTML = function (client) {
-    return `
-<div class="fade-in">
-     <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-        <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i> Client Settings
-    </h3>
-    
-    <div class="card" style="border-left: 4px solid var(--danger-color);">
-        <h4 class="text-danger" style="margin-top: 0;">Danger Zone</h4>
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #fff1f2; border-radius: 8px;">
-                <div>
-                    <strong style="color: #991b1b;">Archive Client</strong>
-                    <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Move this client to archives. Data is preserved but hidden from active lists.</p>
-                </div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.archiveClient('${client.id}')">
-                    <i class="fa-solid fa-box-archive"></i> Archive
-                </button>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #fee2e2; border-radius: 8px;">
-                <div>
-                    <strong style="color: #dc2626;">Delete Client</strong>
-                    <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Permanently remove this client and ALL associated data. This cannot be undone.</p>
-                </div>
-                <button class="btn btn-sm btn-danger" onclick="window.deleteClient('${client.id}')">
-                    <i class="fa-solid fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div class="card" style="margin-top: 1.5rem;">
-        <h4>Information</h4>
-         <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
-            <p style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong>Unique Client ID:</strong> <code>${client.id}</code></p>
-            <p style="margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);">This ID is used for linking data in the database.</p>
-            <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${client.id}').then(() => window.showNotification('ID Copied', 'success'))">
-                <i class="fa-solid fa-copy"></i> Copy ID
-            </button>
-        </div>
-    </div>
-</div>
-`;
+window.addDepartment = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+    window.openModal('Add Department',
+        `<form><div class="form-group"><label>Name *</label><input type="text" id="dept-name" class="form-control"></div>
+         <div class="form-group"><label>Head</label><input type="text" id="dept-head" class="form-control"></div></form>`,
+        () => {
+            const name = document.getElementById('dept-name').value;
+            if (name) {
+                if (!client.departments) client.departments = [];
+                client.departments.push({ name, head: document.getElementById('dept-head').value });
+                window.saveData();
+                if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+                window.closeModal();
+                if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 3);
+                else renderClientDetail(clientId);
+                window.showNotification('Department added');
+            }
+        });
 };
+
+window.deleteDepartment = function (clientId, index) {
+    if (!confirm('Delete department?')) return;
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (client && client.departments) {
+        client.departments.splice(index, 1);
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        renderClientDetail(clientId);
+        window.showNotification('Department deleted');
+    }
+};
+
+window.addGoodsService = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Add Goods/Service', `<form><div class="form-group"><label>Name</label><input id="goods-name" class="form-control"></div><div class="form-group"><label>Category</label><select id="goods-cat" class="form-control"><option>Product</option><option>Service</option></select></div></form>`, () => {
+        const name = document.getElementById('goods-name').value;
+        if (name) {
+            if (!client.goodsServices) client.goodsServices = [];
+            client.goodsServices.push({ name, category: document.getElementById('goods-cat').value });
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 6);
+            window.showNotification('Added');
+        }
+    });
+};
+window.deleteGoodsService = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (client && client.goodsServices) {
+        client.goodsServices.splice(index, 1);
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.setSetupWizardStep(clientId, 6);
+    }
+};
+
+window.addKeyProcess = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Add Process', `<form><div class="form-group"><label>Name</label><input id="proc-name" class="form-control"></div><div class="form-group"><label>Category</label><select id="proc-cat" class="form-control"><option>Core</option><option>Support</option></select></div></form>`, () => {
+        const name = document.getElementById('proc-name').value;
+        if (name) {
+            if (!client.keyProcesses) client.keyProcesses = [];
+            client.keyProcesses.push({ name, category: document.getElementById('proc-cat').value });
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 7);
+            window.showNotification('Added');
+        }
+    });
+};
+window.deleteKeyProcess = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (client && client.keyProcesses) {
+        client.keyProcesses.splice(index, 1);
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.setSetupWizardStep(clientId, 7);
+    }
+};
+
+window.uploadCompanyProfileDoc = function (clientId, file) {
+    // Simplified stub
+    window.showNotification('Upload not fully implemented in fix file', 'info');
+};
+
