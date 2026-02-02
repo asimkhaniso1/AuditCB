@@ -1548,7 +1548,7 @@ window.addAgendaRow = addAgendaRow;
 window.saveAuditPlan = saveAuditPlan;
 window.editAuditPlan = editAuditPlan;
 window.viewAuditPlan = viewAuditPlan;
-window.openChecklistSelectionModal = openChecklistSelectionModal;
+window.openChecklistSelectionModal = window.renderConfigureChecklist; // Legacy alias
 
 window.printAuditPlanDetails = function (planId) {
     const plan = state.auditPlans.find(p => p.id == planId);
