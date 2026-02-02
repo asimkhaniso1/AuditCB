@@ -1,6 +1,6 @@
 /**
- * CLIENT MODULE FIXES - v2 (Expanded)
- * Exposes functions to global scope that were accidentally privately scoped in clients-module.js
+ * CLIENT MODULE FIXES - v4 (Complete)
+ * Exposes ALL functions to global scope that were accidentally privately scoped in clients-module.js
  */
 console.log('[DEBUG] clients-module-fix.js loading...');
 
@@ -8,7 +8,6 @@ console.log('[DEBUG] clients-module-fix.js loading...');
 // 1. ORIGINAL FIXES (HTML GENERATORS)
 // ============================================
 
-// Client Org Setup HTML
 window.getClientOrgSetupHTML = function (client) {
     if (!client._wizardStep) client._wizardStep = 1;
     const currentStep = client._wizardStep;
@@ -164,13 +163,11 @@ window.generateCertificatesFromStandards = function (clientId) {
 window.updateCertField = function (clientId, certIndex, field, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) client.certificates[certIndex][field] = value; };
 window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
 window.saveCertificateDetails = function (clientId) { if (window.saveData) window.saveData(); if (window.showNotification) window.showNotification('Saved', 'success'); };
+window.getClientSettingsHTML = function (client) { return `<div class="fade-in"><h3>Client Settings</h3><button class="btn btn-danger" onclick="window.deleteClient('${client.id}')">Delete Client</button></div>`; };
 
-window.getClientSettingsHTML = function (client) {
-    return `<div class="fade-in"><h3>Client Settings</h3><button class="btn btn-danger" onclick="window.deleteClient('${client.id}')">Delete Client</button></div>`;
-};
 
 // ============================================
-// 2. NEW FIXES (CRUD FUNCTIONS from blocked scope)
+// 2. CRUD FUNCTIONS (SITES)
 // ============================================
 
 window.addSite = function (clientId) {
@@ -191,8 +188,7 @@ window.addSite = function (clientId) {
                 name,
                 address: document.getElementById('site-address').value,
                 city: document.getElementById('site-city').value,
-                country: document.getElementById('site-country').value,
-                employees: document.getElementById('site-employees').value
+                country: document.getElementById('site-country').value
             });
             window.saveData();
             if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
@@ -200,44 +196,42 @@ window.addSite = function (clientId) {
             if (window.renderClientDetail) renderClientDetail(clientId);
             if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 2);
             window.showNotification('Site added');
-        } else {
-            window.showNotification('Name required', 'error');
         }
     });
 };
 
-window.editSite = function (clientId, siteIndex) {
+window.bulkUploadSites = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (!client || !client.sites) return;
-    const site = client.sites[siteIndex];
-    window.openModal('Edit Site', `
-        <form><div class="form-group"><label>Name *</label><input type="text" id="site-name" value="${site.name}" class="form-control"></div>
-        <div class="form-group"><label>Address</label><input type="text" id="site-address" value="${site.address || ''}" class="form-control"></div>
-        </form>`, () => {
-        const name = document.getElementById('site-name').value;
-        if (name) {
-            client.sites[siteIndex].name = name;
-            client.sites[siteIndex].address = document.getElementById('site-address').value;
-            window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
-            window.closeModal();
-            renderClientDetail(clientId);
-            window.showNotification('Site updated');
-        }
-    });
-};
-
-window.deleteSite = function (clientId, siteIndex) {
-    if (!confirm('Delete site?')) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.sites) {
-        client.sites.splice(siteIndex, 1);
+    if (!client) return;
+    window.openModal('Bulk Upload Sites', `
+        <div style="margin-bottom: 1rem;"><p style="color: grey;">Format: Name, Address, City</p></div>
+        <textarea id="bulk-data" rows="5" class="form-control" placeholder="Factory 1, 123 Main St, New York"></textarea>
+        `, () => {
+        const data = document.getElementById('bulk-data').value;
+        if (!data) return;
+        const lines = data.split('\n');
+        if (!client.sites) client.sites = [];
+        lines.forEach(line => {
+            const parts = line.split(',');
+            if (parts[0]) client.sites.push({ name: parts[0].trim(), address: parts[1]?.trim() || '', city: parts[2]?.trim() || '' });
+        });
         window.saveData();
         if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
-        renderClientDetail(clientId);
-        window.showNotification('Site deleted');
-    }
+        window.closeModal();
+        window.setSetupWizardStep(clientId, 2);
+        window.showNotification('Sites uploaded');
+    });
 };
+
+window.deleteSite = function (clientId, index) {
+    if (!confirm('Delete?')) return;
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (client && client.sites) { client.sites.splice(index, 1); window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client); renderClientDetail(clientId); window.showNotification('Deleted'); }
+};
+
+// ============================================
+// 3. CRUD FUNCTIONS (DEPARTMENTS)
+// ============================================
 
 window.addDepartment = function (clientId) {
     const client = window.state.clients.find(c => c.id === clientId);
@@ -261,9 +255,8 @@ window.addDepartment = function (clientId) {
 };
 
 window.deleteDepartment = function (clientId, index) {
-    if (!confirm('Delete department?')) return;
     const client = window.state.clients.find(c => c.id === clientId);
-    if (client && client.departments) {
+    if (client && client.departments && confirm('Delete?')) {
         client.departments.splice(index, 1);
         window.saveData();
         if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
@@ -271,7 +264,104 @@ window.deleteDepartment = function (clientId, index) {
         window.showNotification('Department deleted');
     }
 };
+window.bulkUploadDepartments = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+    window.openModal('Bulk Upload Departments', `<textarea id="bulk-dept" rows="5" class="form-control" placeholder="Name, Head"></textarea>`, () => {
+        const lines = document.getElementById('bulk-dept').value.split('\n');
+        if (!client.departments) client.departments = [];
+        lines.forEach(l => { const p = l.split(','); if (p[0]) client.departments.push({ name: p[0].trim(), head: p[1]?.trim() || '' }); });
+        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.closeModal(); window.setSetupWizardStep(clientId, 3);
+    });
+};
 
+// ============================================
+// 4. CRUD FUNCTIONS (CONTACTS)
+// ============================================
+
+window.addContactPerson = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Add Contact', `
+        <form><div class="form-group"><label>Name *</label><input id="contact-name" class="form-control"></div><div class="form-group"><label>Email</label><input id="contact-email" class="form-control"></div></form>`, () => {
+        const name = document.getElementById('contact-name').value;
+        if (name) {
+            if (!client.contacts) client.contacts = [];
+            client.contacts.push({ name, email: document.getElementById('contact-email').value });
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.showNotification('Contact added');
+            if (window.renderClientDetail) renderClientDetail(clientId);
+        }
+    });
+};
+window.deleteContact = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (client && client.contacts && confirm('Delete?')) {
+        client.contacts.splice(index, 1);
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        renderClientDetail(clientId);
+    }
+};
+window.bulkUploadContacts = function (clientId) {
+    const client = window.state.clients.find(c => c.id === clientId);
+    if (!client) return;
+    window.openModal('Bulk Contacts', `<textarea id="bulk-cont" rows="5" class="form-control" placeholder="Name, Email"></textarea>`, () => {
+        const lines = document.getElementById('bulk-cont').value.split('\n');
+        if (!client.contacts) client.contacts = [];
+        lines.forEach(l => { const p = l.split(','); if (p[0]) client.contacts.push({ name: p[0].trim(), email: p[1]?.trim() || '' }); });
+        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.closeModal(); if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 5); else renderClientDetail(clientId);
+    });
+};
+
+// ============================================
+// 5. CRUD FUNCTIONS (DESIGNATIONS)
+// ============================================
+
+window.addClientDesignation = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Add Designation', `<form><div class="form-group"><label>Title *</label><input id="des-title" class="form-control"></div></form>`, () => {
+        const title = document.getElementById('des-title').value;
+        if (title) {
+            if (!client.designations) client.designations = [];
+            client.designations.push({ title });
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 4);
+            window.showNotification('Designation added');
+        }
+    });
+};
+window.deleteClientDesignation = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (client && client.designations && confirm('Delete?')) {
+        client.designations.splice(index, 1);
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.setSetupWizardStep(clientId, 4);
+    }
+};
+window.bulkUploadDesignations = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Bulk Designations', `<textarea id="bulk-des" rows="5" class="form-control" placeholder="Title"></textarea>`, () => {
+        const lines = document.getElementById('bulk-des').value.split('\n');
+        if (!client.designations) client.designations = [];
+        lines.forEach(l => { if (l.trim()) client.designations.push({ title: l.trim() }); });
+        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.closeModal(); window.setSetupWizardStep(clientId, 4);
+    });
+};
+
+// ============================================
+// 6. GOODS & PROCESSES
+// ============================================
 window.addGoodsService = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
@@ -296,6 +386,17 @@ window.deleteGoodsService = function (clientId, index) {
         if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
         window.setSetupWizardStep(clientId, 6);
     }
+};
+window.bulkUploadGoodsServices = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Bulk Goods', `<textarea id="bulk-goods" rows="5" class="form-control" placeholder="Name, Category"></textarea>`, () => {
+        const lines = document.getElementById('bulk-goods').value.split('\n');
+        if (!client.goodsServices) client.goodsServices = [];
+        lines.forEach(l => { const p = l.split(','); if (p[0]) client.goodsServices.push({ name: p[0].trim(), category: p[1]?.trim() || 'Product' }); });
+        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.closeModal(); window.setSetupWizardStep(clientId, 6);
+    });
 };
 
 window.addKeyProcess = function (clientId) {
@@ -323,9 +424,61 @@ window.deleteKeyProcess = function (clientId, index) {
         window.setSetupWizardStep(clientId, 7);
     }
 };
+window.bulkUploadKeyProcesses = function (clientId) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client) return;
+    window.openModal('Bulk Processes', `<textarea id="bulk-proc" rows="5" class="form-control" placeholder="Name, Category"></textarea>`, () => {
+        const lines = document.getElementById('bulk-proc').value.split('\n');
+        if (!client.keyProcesses) client.keyProcesses = [];
+        lines.forEach(l => { const p = l.split(','); if (p[0]) client.keyProcesses.push({ name: p[0].trim(), category: p[1]?.trim() || 'Core' }); });
+        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.closeModal(); window.setSetupWizardStep(clientId, 7);
+    });
+};
 
-window.uploadCompanyProfileDoc = function (clientId, file) {
-    // Simplified stub
-    window.showNotification('Upload not fully implemented in fix file', 'info');
+// ============================================
+// 7. AUDITOR ASSIGNMENT
+// ============================================
+
+window.openClientAuditorAssignmentModal = function (clientId, clientName) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!window.state.auditors) { window.showNotification('No auditors loaded', 'error'); return; }
+
+    window.openModal(`Assign Auditor to ${clientName}`, `
+        <div class="form-group"><label>Select Auditor</label>
+        <select id="assign-auditor" class="form-control">
+            <option value="">-- Select --</option>
+            ${window.state.auditors.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+        </select></div>`, () => {
+        const auditorId = document.getElementById('assign-auditor').value;
+        if (auditorId) {
+            if (!window.state.auditorAssignments) window.state.auditorAssignments = [];
+            window.state.auditorAssignments.push({
+                id: Date.now(),
+                clientId: String(clientId),
+                auditorId: String(auditorId),
+                assignedAt: new Date().toISOString()
+            });
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.syncAuditorAssignmentsToSupabase(window.state.auditorAssignments);
+            window.closeModal();
+            if (window.renderClientDetail) renderClientDetail(clientId);
+            if (document.getElementById('client-audit-team-container')) {
+                // Force refresh of audit team tab if visible
+                document.getElementById('client-audit-team-container').innerHTML = 'Refreshing...';
+                setTimeout(() => document.querySelector('.tab-btn[data-tab="audit_team"]')?.click(), 100);
+            }
+            window.showNotification('Auditor assigned');
+        }
+    });
+};
+
+window.removeClientAuditorAssignment = function (clientId, auditorId) {
+    if (!confirm('Remove assignment?')) return;
+    window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => !(String(a.clientId) === String(clientId) && String(a.auditorId) === String(auditorId)));
+    window.saveData();
+    if (window.SupabaseClient?.isInitialized) window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId);
+    if (window.renderClientDetail) renderClientDetail(clientId);
+    window.showNotification('Removed');
 };
 
