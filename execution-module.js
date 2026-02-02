@@ -712,7 +712,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const s = saved.status || ''; // 'conform', 'nc', 'na' or ''
 
                 // APPLY LOCAL OVERRIDES
-                let requirementText = item.requirement;
+                let requirementText = item.requirement || item.text || item.title || item.requirement_text || 'No requirement text provided';
                 if (overridesMap && overridesMap[checklistId] && overridesMap[checklistId][idx]) {
                     requirementText = overridesMap[checklistId][idx];
                 }
@@ -853,38 +853,18 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             if (validSubClauses.length === 0) return ''; // Skip empty clauses
 
                             const sectionId = `clause-${checklist.id}-${clause.mainClause}`;
-                            const clauseItems = validSubClauses.map((item, subIdx) => {
-                                // Find original index for ID generation if needed, but here we construct ID based on MAIN clause index which is fixed?
-                                // CAUTION: The ID used in progressMap is `${clause.mainClause}-${subIdx}`. 
-                                // `subIdx` comes from the original array index. 
-                                // If we filter, the `map` index will be shifted!
-
-                                // We MUST preserve the ORIGINAL subIdx for the ID to match what's saved/calculated.
-                                // Solution: Map first to objects with original index, then filter.
-                                return null; // Placeholder, see below logic
-                            });
-
-                            // CORRECT LOGIC:
-                            const itemsToRender = clause.subClauses.map((item, originalSubIdx) => {
-                                const itemId = `${clause.mainClause}-${originalSubIdx}`;
-                                if (isSelective && !allowedIds.includes(itemId)) return null;
-                                return { item, originalSubIdx, itemId };
-                            }).filter(x => x);
-
-                            if (itemsToRender.length === 0) return '';
-
                             const renderedItems = itemsToRender.map(obj => {
                                 const globalIdx = itemIdx++;
-                                return renderRow(obj.item, checklist.id, obj.itemId, false); // Use composite ID directly
+                                return renderRow(obj.item, checklist.id, obj.itemId, false);
                             }).join('');
 
                             // Calculate progress for this section
-                            const sectionProgress = clause.subClauses.map((_, subIdx) => {
-                                const key = `${checklist.id}-${clause.mainClause}-${subIdx}`;
+                            const sectionProgress = itemsToRender.map(obj => {
+                                const key = `${checklist.id}-${obj.itemId}`;
                                 return progressMap[key]?.status || '';
                             });
                             const completed = sectionProgress.filter(s => s === 'conform' || s === 'nc' || s === 'na').length;
-                            const total = clause.subClauses.length;
+                            const total = itemsToRender.length;
                             const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
                             return `
@@ -894,16 +874,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                     <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
                                                     <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">Clause ${clause.mainClause}</span>
                                                     <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" onclick="window.toggleAccordion('${sectionId}')">${clause.title}</span>
-                                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">(${clause.subClauses.length} items)</span>
+                                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">(${total} items)</span>
                                                 </div>
                                                 <div style="display: flex; align-items: center; gap: 1rem;">
-
                                                     <span style="font-size: 0.8rem; color: var(--text-secondary);">${completed}/${total}</span>
                                                     <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')"></i>
                                                 </div>
                                             </div>
                                             <div class="accordion-content" id="${sectionId}" style="display: ${clauseIdx === 0 ? 'block' : 'none'}; padding: 1rem; background: white;">
-                                                ${clauseItems}
+                                                ${renderedItems}
                                             </div>
                                         </div>
                                     `;

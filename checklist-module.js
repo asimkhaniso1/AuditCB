@@ -12,9 +12,9 @@ let checklistSearchTerm = '';
 
 function renderChecklistLibrary() {
     const contentArea = document.getElementById('content-area');
-    const userRole = state.currentUser?.role;
-    const isAdmin = state.settings?.isAdmin || false;
-    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const userRole = (window.state.currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
     const checklists = state.checklists || [];
 
@@ -236,21 +236,21 @@ function renderChecklistLibrary() {
 
     document.querySelectorAll('.view-checklist').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id = parseInt(btn.getAttribute('data-id'));
+            const id = btn.getAttribute('data-id');
             viewChecklistDetail(id);
         });
     });
 
     document.querySelectorAll('.edit-checklist').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id = parseInt(btn.getAttribute('data-id'));
+            const id = btn.getAttribute('data-id');
             openEditChecklistModal(id);
         });
     });
 
     document.querySelectorAll('.delete-checklist').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id = parseInt(btn.getAttribute('data-id'));
+            const id = btn.getAttribute('data-id');
             deleteChecklist(id);
         });
     });
@@ -630,7 +630,7 @@ function openAddChecklistModal() {
 function renderChecklistEditor(checklistId) {
     const contentArea = document.getElementById('content-area');
     const isEdit = !!checklistId;
-    const checklist = isEdit ? state.checklists?.find(c => c.id === checklistId) : null;
+    const checklist = isEdit ? state.checklists?.find(c => String(c.id) === String(checklistId)) : null;
 
     const standards = window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const userRole = state.currentUser?.role;
@@ -979,7 +979,7 @@ function openEditChecklistModal(id) {
 
 function viewChecklistDetail(id) {
     const contentArea = document.getElementById('content-area');
-    const checklist = state.checklists?.find(c => c.id === id);
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
     if (!checklist) return;
 
     const html = `
@@ -1078,15 +1078,15 @@ function viewChecklistDetail(id) {
 }
 
 function deleteChecklist(id) {
-    const checklist = state.checklists?.find(c => c.id === id);
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
     if (!checklist) {
         console.error('Checklist not found:', id);
         return;
     }
 
-    const userRole = state.currentUser?.role;
-    const isAdmin = state.settings?.isAdmin || false;
-    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const userRole = (window.state.currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     // Log attempt for debugging
@@ -1134,7 +1134,7 @@ function deleteChecklist(id) {
 }
 
 function printChecklist(id) {
-    const checklist = state.checklists.find(c => c.id == id);
+    const checklist = state.checklists.find(c => String(c.id) === String(id));
     if (!checklist) return;
 
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`CHECKLIST-${checklist.id}|${checklist.name}|${checklist.standard}`)}`;

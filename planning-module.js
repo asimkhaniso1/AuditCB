@@ -16,8 +16,8 @@ function renderAuditPlanningEnhanced() {
 
 
     // Permission Check
-    const userRole = window.state.currentUser?.role || 'Auditor';
-    const isManager = userRole === 'Certification Manager' || userRole === 'Admin';
+    const userRole = (window.state.currentUser?.role || 'Auditor').toLowerCase();
+    const isManager = userRole === 'certification manager' || userRole === 'admin' || window.state.settings?.isAdmin;
 
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
@@ -160,7 +160,7 @@ function renderAuditPlanningEnhanced() {
     document.querySelectorAll('.edit-plan-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const planId = parseInt(btn.getAttribute('data-plan-id'));
+            const planId = btn.getAttribute('data-plan-id');
             editAuditPlan(planId);
         });
     });
@@ -1292,13 +1292,15 @@ window.renderConfigureChecklist = function (planId) {
             cl.clauses.forEach(clause => {
                 if (clause.subClauses) {
                     clause.subClauses.forEach((sub, idx) => {
-                        items.push({ id: `${clause.mainClause}-${idx}`, text: sub.requirement, clause: clause.mainClause });
+                        const text = sub.requirement || sub.title || sub.requirement_text || 'No requirement text provided';
+                        items.push({ id: `${clause.mainClause}-${idx}`, text: text, clause: clause.mainClause });
                     });
                 }
             });
         } else if (cl.items) {
             cl.items.forEach((item, idx) => {
-                items.push({ id: String(idx), text: item.requirement, clause: item.clause });
+                const text = item.requirement || item.text || item.title || 'No requirement text provided';
+                items.push({ id: String(idx), text: text, clause: item.clause });
             });
         }
         return items;
