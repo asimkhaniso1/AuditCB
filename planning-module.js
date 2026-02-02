@@ -1276,6 +1276,7 @@ window.renderConfigureChecklist = function (planId) {
     const planStandardsList = (plan.standard || '').split(', ').map(s => s.trim()).filter(s => s);
     const allStandards = [...new Set([...planStandardsList, ...clientStandards])].map(s => s.toLowerCase());
 
+    const checklists = state.checklists || [];
     const matchingChecklists = checklists.filter(c => {
         if (!c.standard) return true;
         const clStd = c.standard.toLowerCase();
