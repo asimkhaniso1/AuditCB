@@ -3,15 +3,26 @@
 // ============================================
 
 function renderDashboardEnhanced() {
+    // Safety: Initialize if missing
+    if (!window.state) {
+        console.error('State missing in renderDashboardEnhanced');
+        return;
+    }
+
     // Calculate Real Stats from Actual Data (Filtered by User Role)
-    const visibleClients = window.getVisibleClients();
+    // Use optional chaining or fallbacks for global helper functions
+    const visibleClients = (typeof window.getVisibleClients === 'function') ? window.getVisibleClients() : [];
     const totalClients = visibleClients.length;
     const activeClients = visibleClients.filter(c => c.status === 'Active').length;
     const inactiveClients = visibleClients.filter(c => c.status === 'Inactive').length;
-    const totalAuditors = state.auditors.length;
-    const leadAuditors = state.auditors.filter(a => a.role === 'Lead Auditor').length;
-    const auditPlans = window.getVisiblePlans() || [];
-    const auditReports = window.getVisibleReports() || [];
+
+    // Safety check for auditors array
+    const auditors = window.state.auditors || [];
+    const totalAuditors = auditors.length;
+    const leadAuditors = auditors.filter(a => a.role === 'Lead Auditor').length;
+
+    const auditPlans = (typeof window.getVisiblePlans === 'function') ? window.getVisiblePlans() : [];
+    const auditReports = (typeof window.getVisibleReports === 'function') ? window.getVisibleReports() : [];
 
     // Advanced Calculations
     const upcomingAudits = auditPlans.filter(p => p.status !== 'Completed').length;
@@ -24,24 +35,32 @@ function renderDashboardEnhanced() {
     let minorNCRs = 0;
     let openNCRs = 0;
     let closedNCRs = 0;
+    let complianceScoreSum = 0;
+    let complianceCount = 0;
 
     auditReports.forEach(report => {
-        if (report.ncrs) {
-            totalNCRs += report.ncrs.length;
-            majorNCRs += report.ncrs.filter(n => n.type === 'major').length;
-            minorNCRs += report.ncrs.filter(n => n.type === 'minor').length;
-            openNCRs += report.ncrs.filter(n => n.status === 'Open').length;
-            closedNCRs += report.ncrs.filter(n => n.status === 'Closed').length;
+        const ncrs = report.ncrs || [];
+        // NCR Stats
+        totalNCRs += ncrs.length;
+        const major = ncrs.filter(n => n.type === 'major').length;
+        const minor = ncrs.filter(n => n.type === 'minor').length;
+
+        majorNCRs += major;
+        minorNCRs += minor;
+        openNCRs += ncrs.filter(n => n.status === 'Open').length;
+        closedNCRs += ncrs.filter(n => n.status === 'Closed').length;
+
+        // Compliance Score (Calculate per report then average)
+        if (report.status === 'Completed' || report.status === 'Review' || ncrs.length > 0) {
+            const reportScore = Math.max(0, 100 - (major * 15) - (minor * 5));
+            complianceScoreSum += reportScore;
+            complianceCount++;
         }
     });
 
     // Compliance Score Analysis
-    const avgComplianceScore = auditReports.length > 0
-        ? Math.round(auditReports.reduce((sum, r) => {
-            const major = (r.ncrs || []).filter(n => n.type === 'major').length;
-            const minor = (r.ncrs || []).filter(n => n.type === 'minor').length;
-            return sum + Math.max(0, 100 - (major * 15) - (minor * 5));
-        }, 0) / auditReports.length)
+    const avgComplianceScore = complianceCount > 0
+        ? Math.round(complianceScoreSum / complianceCount)
         : 95;
 
     // Industry Distribution
@@ -411,54 +430,58 @@ function renderAuditTrendsChart() {
         }
     });
 
-    window.dashboardCharts.auditTrends = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: months,
-            datasets: [{
-                label: 'Completed Audits',
-                data: completed,
-                borderColor: '#11998e',
-                backgroundColor: 'rgba(17, 153, 142, 0.1)',
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Planned Audits',
-                data: planned,
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (e) => window.renderModule('audit-planning'), // Corrected module name if needed, assuming 'audit-planning' maps to something valid
-            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
-            plugins: {
-                legend: {
-                    position: 'bottom'
+    try {
+        window.dashboardCharts.auditTrends = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Completed Audits',
+                    data: completed,
+                    borderColor: '#11998e',
+                    backgroundColor: 'rgba(17, 153, 142, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'Planned Audits',
+                    data: planned,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e) => window.renderModule('audit-planning'), // Corrected module name if needed, assuming 'audit-planning' maps to something valid
+                onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function (context) {
+                                return context.raw === 0 ? ' No audits' : '';
+                            }
+                        }
+                    }
                 },
-                tooltip: {
-                    callbacks: {
-                        afterLabel: function (context) {
-                            return context.raw === 0 ? ' No audits' : '';
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            precision: 0
                         }
                     }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                        precision: 0
-                    }
-                }
             }
-        }
-    });
+        });
+    } catch (err) {
+        console.error('Error rendering Audit Trends Chart:', err);
+    }
 }
 
 function renderNCRDistributionChart(major, minor) {
@@ -469,28 +492,32 @@ function renderNCRDistributionChart(major, minor) {
     const existingChart = Chart.getChart(ctx);
     if (existingChart) existingChart.destroy();
 
-    window.dashboardCharts.ncrDistribution = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Major NCRs', 'Minor NCRs'],
-            datasets: [{
-                data: [major || 1, minor || 1],
-                backgroundColor: ['#ef4444', '#f59e0b'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (e) => window.renderModule('audit-reporting'),
-            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
-            plugins: {
-                legend: {
-                    position: 'bottom'
+    try {
+        window.dashboardCharts.ncrDistribution = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Major NCRs', 'Minor NCRs'],
+                datasets: [{
+                    data: [major || 1, minor || 1],
+                    backgroundColor: ['#ef4444', '#f59e0b'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e) => window.renderModule('audit-reporting'),
+                onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (err) {
+        console.error('Error rendering NCR Distribution Chart:', err);
+    }
 }
 
 function renderIndustryChart(industryStats) {
@@ -504,37 +531,41 @@ function renderIndustryChart(industryStats) {
     const labels = Object.keys(industryStats);
     const data = Object.values(industryStats);
 
-    window.dashboardCharts.industry = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Number of Clients',
-                data: data,
-                backgroundColor: '#11998e',
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (e) => window.renderModule('clients'),
-            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
-            plugins: {
-                legend: {
-                    display: false
-                }
+    try {
+        window.dashboardCharts.industry = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Number of Clients',
+                    data: data,
+                    backgroundColor: '#11998e',
+                    borderRadius: 6
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e) => window.renderModule('clients'),
+                onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (err) {
+        console.error('Error rendering Industry Chart:', err);
+    }
 }
 
 function renderStandardsChart(standardStats) {
@@ -549,28 +580,32 @@ function renderStandardsChart(standardStats) {
     const data = Object.values(standardStats);
     const colors = ['#667eea', '#11998e', '#f093fb', '#fa709a', '#fee140'];
 
-    window.dashboardCharts.standards = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors.slice(0, labels.length),
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (e) => window.renderModule('clients'),
-            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
-            plugins: {
-                legend: {
-                    position: 'bottom'
+    try {
+        window.dashboardCharts.standards = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e) => window.renderModule('clients'),
+                onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (err) {
+        console.error('Error rendering Standards Chart:', err);
+    }
 }
 
 // NCR Trends Chart - Shows Open vs Closed NCRs over last 6 months
@@ -610,33 +645,37 @@ function renderNCRTrendsChart() {
         }
     });
 
-    window.dashboardCharts.ncrTrends = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: months,
-            datasets: [{
-                label: 'Open NCRs',
-                data: openNCRs,
-                backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                borderRadius: 4
-            }, {
-                label: 'Closed NCRs',
-                data: closedNCRs,
-                backgroundColor: 'rgba(34, 197, 94, 0.8)',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+    try {
+        window.dashboardCharts.ncrTrends = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Open NCRs',
+                    data: openNCRs,
+                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                    borderRadius: 4
+                }, {
+                    label: 'Closed NCRs',
+                    data: closedNCRs,
+                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                    borderRadius: 4
+                }]
             },
-            plugins: {
-                legend: { position: 'bottom' }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
             }
-        }
-    });
+        });
+    } catch (err) {
+        console.error('Error rendering NCR Trends Chart:', err);
+    }
 }
 
 // Client Growth Chart - Shows client acquisitions over time
@@ -673,28 +712,32 @@ function renderClientGrowthChart() {
         cumulativeTotal[i] = runningTotal;
     }
 
-    window.dashboardCharts.clientGrowth = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: months,
-            datasets: [{
-                label: 'Total Clients',
-                data: cumulativeTotal,
-                backgroundColor: 'rgba(102, 126, 234, 0.8)',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+    try {
+        window.dashboardCharts.clientGrowth = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Total Clients',
+                    data: cumulativeTotal,
+                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                    borderRadius: 4
+                }]
             },
-            plugins: {
-                legend: { position: 'bottom' }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
             }
-        }
-    });
+        });
+    } catch (err) {
+        console.error('Error rendering Client Growth Chart:', err);
+    }
 }
 
 // Export function

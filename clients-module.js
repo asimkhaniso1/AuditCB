@@ -1839,6 +1839,41 @@ window.saveNewClient = async function () {
     window._tempClientLogo = null;
 };
 
+};
+
+window.handleClientLogoUpload = function (input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 2 * 1024 * 1024) {
+            window.showNotification('File is too large. Max size is 2MB.', 'error');
+            input.value = ''; // Reset input
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const dataUrl = e.target.result;
+
+            // Store for saving (both file object for cloud and dataUrl for local fallback)
+            window._tempLogoFile = file;
+            window._tempClientLogo = dataUrl;
+
+            // Update Preview UI
+            const previewImg = document.getElementById('client-logo-preview-img');
+            const placeholder = document.getElementById('client-logo-placeholder');
+
+            if (previewImg) {
+                previewImg.style.backgroundImage = `url(${dataUrl})`;
+                previewImg.style.display = 'block';
+            }
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
 window.renderEditClient = function (clientId) {
     // Use loose equality to handle string/number ID mismatch
     const client = window.state.clients.find(c => c.id == clientId);
@@ -2008,7 +2043,7 @@ window.renderEditClient = function (clientId) {
                          <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
                             <i class="fa-solid fa-cloud-arrow-up"></i> Change Logo
                          </label>
-                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleLogoUpload(this)">
+                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleClientLogoUpload(this)">
                          <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
                     </div>
                  </div>
