@@ -7,12 +7,44 @@
 
 // Initialize client sidebar on page load
 document.addEventListener('DOMContentLoaded', function () {
-    // Reduced timeout for faster loading
-    setTimeout(() => {
+    // Use retry mechanism to wait for auth and client data
+    initClientSidebarWithRetry();
+});
+
+// Retry mechanism to wait for currentUser and clients to be loaded
+function initClientSidebarWithRetry(retryCount = 0, maxRetries = 50) {
+    const hasUser = window.state?.currentUser;
+    const hasClients = (window.state?.clients?.length > 0);
+    const isDataLoaded = window._dataFullyLoaded;
+
+    // If we have user and clients, OR if data is fully loaded (even with no clients), proceed
+    if ((hasUser && hasClients) || (hasUser && isDataLoaded)) {
+        console.log('[CLIENT SIDEBAR] Data ready, initializing sidebar', {
+            user: hasUser?.email,
+            clientsCount: window.state?.clients?.length,
+            dataLoaded: isDataLoaded
+        });
         populateClientSidebar();
         setupClientSearch();
-    }, 100);
-});
+        return;
+    }
+
+    // Keep trying up to maxRetries (50 * 100ms = 5 seconds)
+    if (retryCount < maxRetries) {
+        setTimeout(() => {
+            initClientSidebarWithRetry(retryCount + 1, maxRetries);
+        }, 100);
+    } else {
+        // Final attempt after timeout - render whatever state we have
+        console.warn('[CLIENT SIDEBAR] Timeout waiting for data, rendering with current state', {
+            hasUser: !!hasUser,
+            hasClients: hasClients,
+            dataLoaded: isDataLoaded
+        });
+        populateClientSidebar();
+        setupClientSearch();
+    }
+}
 
 // Populate the right sidebar with client list
 function populateClientSidebar() {

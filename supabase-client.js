@@ -133,6 +133,12 @@ const SupabaseClient = {
             Logger.warn('Failed to load cloud data, using local data:', error.message);
         }
 
+        // Refresh the client sidebar after sign-in completes
+        if (typeof window.populateClientSidebar === 'function') {
+            window.populateClientSidebar();
+            Logger.info('Client sidebar refreshed after sign-in');
+        }
+
         // Redirect to dashboard if on login page
         if (window.location.hash === '' || window.location.hash === '#login') {
             window.location.hash = 'dashboard';
