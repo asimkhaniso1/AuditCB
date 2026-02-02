@@ -1391,7 +1391,7 @@ function renderClientTab(client, tabName) {
         // Fallback for direct settings render from workspace
         const contentArea = document.getElementById('content-area');
         if (tabName === 'settings' && contentArea) {
-            contentArea.innerHTML = getClientSettingsHTML(client);
+            contentArea.innerHTML = window.getClientSettingsHTML(client);
             return;
         }
         console.warn('tab-content element not found. Client workspace may not be rendered.');
@@ -1401,11 +1401,11 @@ function renderClientTab(client, tabName) {
     if (tabName === 'info') {
         tabContent.innerHTML = getClientInfoHTML(client);
     } else if (tabName === 'client_org') {
-        tabContent.innerHTML = getClientOrgSetupHTML(client);
+        tabContent.innerHTML = window.getClientOrgSetupHTML(client);
     } else if (tabName === 'audit_team') {
         tabContent.innerHTML = getClientAuditTeamHTML(client);
     } else if (tabName === 'scopes') {
-        tabContent.innerHTML = getClientCertificatesHTML(client);
+        tabContent.innerHTML = window.getClientCertificatesHTML(client);
     } else if (tabName === 'audits') {
         tabContent.innerHTML = getClientAuditsHTML(client);
     } else if (tabName === 'documents') {
@@ -1413,7 +1413,7 @@ function renderClientTab(client, tabName) {
     } else if (tabName === 'compliance') {
         tabContent.innerHTML = getClientComplianceHTML(client);
     } else if (tabName === 'settings') {
-        tabContent.innerHTML = getClientSettingsHTML(client);
+        tabContent.innerHTML = window.getClientSettingsHTML(client);
     }
 }
 

@@ -2,6 +2,7 @@
  * CLIENT MODULE FIXES
  * Exposes functions to global scope that were accidentally privately scoped in clients-module.js
  */
+console.log('[DEBUG] clients-module-fix.js loading...');
 
 // 1. Client Org Setup HTML
 window.getClientOrgSetupHTML = function (client) {
