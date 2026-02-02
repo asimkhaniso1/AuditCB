@@ -26,35 +26,53 @@ window.handleBackToExecutionList = function () {
 
 function renderAuditExecutionEnhanced() {
     const state = window.state;
+    // Safety Check: Ensure state exists
+    if (!state) {
+        console.error('Critical Error: window.state is undefined in execution module');
+        return;
+    }
+
+    // Initialize auditReports if missing
+    if (!state.auditReports) {
+        state.auditReports = [];
+    }
+
+    // Initialize clients if missing (prevent crash in map)
+    if (!state.clients) {
+        state.clients = [];
+    }
+
     const searchTerm = state.executionSearchTerm || '';
 
-    let filteredReports = state.auditReports.filter(report => {
-        return (report.client || '').toLowerCase().includes(searchTerm.toLowerCase());
-    });
+    try {
 
-    const rows = filteredReports.map(report => {
-        const planRef = report.planId ? `PLN-${report.planId}` : '-';
-        const clientId = state.clients.find(c => c.name === report.client)?.id;
+        let filteredReports = state.auditReports.filter(report => {
+            return (report.client || '').toLowerCase().includes(searchTerm.toLowerCase());
+        });
 
-        return `
+        const rows = filteredReports.map(report => {
+            const planRef = report.planId ? `PLN-${report.planId}` : '-';
+            const clientId = state.clients.find(c => c.name === report.client)?.id;
+
+            return `
         <tr class="execution-row" data-report-id="${report.id}" style="cursor: pointer;">
             <td>
                 ${report.planId ?
-                `<span class="badge" style="background: #3b82f6; color: white; cursor: pointer; font-weight: 600;" 
+                    `<span class="badge" style="background: #3b82f6; color: white; cursor: pointer; font-weight: 600;" 
                            onclick="event.stopPropagation(); window.location.hash = 'client/${clientId}/plans';" 
                            title="View linked audit plan">
                         <i class="fa-solid fa-link" style="margin-right: 0.25rem;"></i>${planRef}
                     </span>` :
-                `<span style="color: var(--text-secondary); font-size: 0.85rem;">No Plan</span>`
-            }
+                    `<span style="color: var(--text-secondary); font-size: 0.85rem;">No Plan</span>`
+                }
             </td>
             <td>${report.client}</td>
             <td>${report.date}</td>
             <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.findings}</span></td>
             <td><span style="background: ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'var(--success-color)' :
-                report.status === 'Approved' ? '#7c3aed' :
-                    report.status === 'In Review' ? 'var(--warning-color)' :
-                        '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
+                    report.status === 'Approved' ? '#7c3aed' :
+                        report.status === 'In Review' ? 'var(--warning-color)' :
+                            '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
             <td>
                 <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report"><i class="fa-solid fa-eye"></i></button>
                 <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report"><i class="fa-solid fa-edit"></i></button>
@@ -62,9 +80,9 @@ function renderAuditExecutionEnhanced() {
             </td>
         </tr>
     `;
-    }).join('');
+        }).join('');
 
-    const html = `
+        const html = `
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Execution & Reports</h2>
@@ -151,55 +169,64 @@ function renderAuditExecutionEnhanced() {
         </div>
     `;
 
-    window.contentArea.innerHTML = html;
+        window.contentArea.innerHTML = html;
 
-    // Event listeners with EventManager (prevents memory leaks)
-    const searchInput = document.getElementById('execution-search');
-    if (searchInput) {
-        // Debounced search handler (300ms delay)
-        const debouncedSearch = debounce((value) => {
-            state.executionSearchTerm = value;
+        // Event listeners with EventManager (prevents memory leaks)
+        const searchInput = document.getElementById('execution-search');
+        if (searchInput) {
+            // Debounced search handler (300ms delay)
+            const debouncedSearch = debounce((value) => {
+                state.executionSearchTerm = value;
+                renderAuditExecutionEnhanced();
+            }, 300);
+
+            EventManager.add(searchInput, 'input', (e) => {
+                debouncedSearch(e.target.value);
+            }, 'execution-search-input');
+        }
+
+        document.querySelectorAll('.view-execution, .execution-row').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (!e.target.closest('.edit-execution')) {
+                    const reportId = parseInt(el.getAttribute('data-report-id'));
+                    renderExecutionDetail(reportId);
+                }
+            });
+        });
+
+        document.querySelectorAll('.edit-execution').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const reportId = parseInt(btn.getAttribute('data-report-id'));
+                openEditReportModal(reportId);
+            });
+        });
+
+        document.querySelectorAll('.delete-execution').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const reportId = parseInt(btn.getAttribute('data-report-id'));
+                deleteAuditReport(reportId);
+            });
+        });
+
+
+
+        // Helper for toggle
+        window.toggleExecutionAnalytics = function () {
+            if (state.showExecutionAnalytics === undefined) state.showExecutionAnalytics = true;
+            state.showExecutionAnalytics = !state.showExecutionAnalytics;
             renderAuditExecutionEnhanced();
-        }, 300);
-
-        EventManager.add(searchInput, 'input', (e) => {
-            debouncedSearch(e.target.value);
-        }, 'execution-search-input');
+        };
+    } catch (error) {
+        console.error('Error rendering execution module:', error);
+        if (window.ErrorHandler) {
+            window.ErrorHandler.handle(error, 'Render Execution Module', true);
+        }
+        if (window.contentArea) {
+            window.contentArea.innerHTML = '<div class="alert alert-danger" style="padding: 2rem; text-align: center; color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 1rem;"></i><br>Failed to load execution module. Please refresh the page.</div>';
+        }
     }
-
-    document.querySelectorAll('.view-execution, .execution-row').forEach(el => {
-        el.addEventListener('click', (e) => {
-            if (!e.target.closest('.edit-execution')) {
-                const reportId = parseInt(el.getAttribute('data-report-id'));
-                renderExecutionDetail(reportId);
-            }
-        });
-    });
-
-    document.querySelectorAll('.edit-execution').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const reportId = parseInt(btn.getAttribute('data-report-id'));
-            openEditReportModal(reportId);
-        });
-    });
-
-    document.querySelectorAll('.delete-execution').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const reportId = parseInt(btn.getAttribute('data-report-id'));
-            deleteAuditReport(reportId);
-        });
-    });
-
-
-
-    // Helper for toggle
-    window.toggleExecutionAnalytics = function () {
-        if (state.showExecutionAnalytics === undefined) state.showExecutionAnalytics = true;
-        state.showExecutionAnalytics = !state.showExecutionAnalytics;
-        renderAuditExecutionEnhanced();
-    };
 }
 
 function openCreateReportModal() {

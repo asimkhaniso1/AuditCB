@@ -6,8 +6,21 @@
 // CACHE BUST: 2026-01-31 17:03
 
 function renderClientsEnhanced() {
-    const searchTerm = window.state.clientSearchTerm || '';
-    const filterStatus = window.state.clientFilterStatus || 'All';
+    const state = window.state;
+    // Safety Check: Ensure state exists
+    if (!state) {
+        console.error('Critical Error: window.state is undefined in clients list');
+        return;
+    }
+
+    // Default clients to empty array if missing
+    if (!state.clients || !Array.isArray(state.clients)) {
+        console.warn('Warning: state.clients is missing or invalid. Initializing to empty array.');
+        state.clients = [];
+    }
+
+    const searchTerm = state.clientSearchTerm || '';
+    const filterStatus = state.clientFilterStatus || 'All';
 
     // Pagination State
     if (!window.state.clientPagination) {
