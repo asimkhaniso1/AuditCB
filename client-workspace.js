@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // Retry mechanism to wait for currentUser and clients to be loaded
-function initClientSidebarWithRetry(retryCount = 0, maxRetries = 50) {
+function initClientSidebarWithRetry(retryCount = 0, maxRetries = 100) {
     const hasUser = window.state?.currentUser;
     const hasClients = (window.state?.clients?.length > 0);
     const isDataLoaded = window._dataFullyLoaded;
@@ -29,7 +29,7 @@ function initClientSidebarWithRetry(retryCount = 0, maxRetries = 50) {
         return;
     }
 
-    // Keep trying up to maxRetries (50 * 100ms = 5 seconds)
+    // Keep trying up to maxRetries (100 * 100ms = 10 seconds)
     if (retryCount < maxRetries) {
         setTimeout(() => {
             initClientSidebarWithRetry(retryCount + 1, maxRetries);
