@@ -31,6 +31,12 @@ function initClientSidebarWithRetry(retryCount = 0, maxRetries = 100) {
 
     // Keep trying up to maxRetries (100 * 100ms = 10 seconds)
     if (retryCount < maxRetries) {
+        // Stop waiting if we are definitely not logged in (and not on login page)
+        if (window.AuthManager && !window.AuthManager.getSession() && !hasUser) {
+            console.warn('[CLIENT SIDEBAR] No session found, stopping retry loop');
+            return;
+        }
+
         setTimeout(() => {
             initClientSidebarWithRetry(retryCount + 1, maxRetries);
         }, 100);

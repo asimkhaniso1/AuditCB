@@ -402,15 +402,15 @@ const SupabaseClient = {
             // CRITICAL: Save to localStorage directly (don't call saveData - it triggers upload!)
             localStorage.setItem('auditCB360State', JSON.stringify(window.state));
 
-            // Mark that data is fully loaded from cloud
-            window._dataFullyLoaded = true;
-
             Logger.info('Cloud data load complete:', results);
             return results;
         } catch (error) {
             Logger.error('Failed to load user data from cloud:', error);
             window.showNotification('Failed to connect to cloud database. Working offline.', 'error');
             throw error;
+        } finally {
+            // Mark that data loading attempted (success or fail) to unblock UI
+            window._dataFullyLoaded = true;
         }
     },
 
