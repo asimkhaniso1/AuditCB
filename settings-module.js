@@ -2193,6 +2193,32 @@ function getDataManagementHTML() {
 function getCBPoliciesHTML() {
     const policies = window.state.cbPolicies;
 
+    // Safety check: Ensure ncrCriteria exists
+    if (!policies.ncrCriteria) {
+        policies.ncrCriteria = {
+            major: [
+                'Complete absence of a required process or procedure',
+                'Systematic failure affecting product/service conformity',
+                'Breakdown of the management system or major element',
+                'A minor NC from previous audit not corrected within agreed timeframe',
+                'Significant risk to health, safety, or environment',
+                'Fraudulent or misleading records or data'
+            ],
+            minor: [
+                'Isolated lapse in following a documented procedure',
+                'Single instance of incomplete documentation',
+                'Minor gap in record keeping that does not affect system effectiveness',
+                'Opportunity to strengthen existing controls identified'
+            ],
+            observation: [
+                'Potential for improvement identified',
+                'Emerging risk that may become NC if not addressed',
+                'Best practice recommendation',
+                'Clarification or enhancement of existing practice'
+            ]
+        };
+    }
+
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
