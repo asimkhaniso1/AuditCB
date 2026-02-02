@@ -1011,7 +1011,7 @@ function viewAuditPlan(id) {
                         </div>
                         <div>
                             <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditChecklist('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
-                            <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="openChecklistSelectionModal(${plan.id})">Configure</button>
+                            <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="window.renderConfigureChecklist('${plan.id}')">Configure</button>
                         </div>
                     </div>
 
@@ -1260,171 +1260,402 @@ window.closeAuditPlan = function (planId) {
 };
 
 // Checklist Selection Modal for Audit Plan
-function openChecklistSelectionModal(planId) {
-    const plan = state.auditPlans.find(p => p.id == planId);
+// FULL-FORM CHECKLIST CONFIGURATION (Local Overrides for Audit Plans)
+window.renderConfigureChecklist = function (planId) {
+    if (!window.state) return;
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
     if (!plan) return;
 
-    const checklists = state.checklists || [];
+    const savedItemSelections = plan.selectedChecklistItems || {};
+    const savedOverrides = plan.selectedChecklistOverrides || {};
+    const selectedIds = plan.selectedChecklists || [];
 
-    // Get client's standards (from client record - stored as comma-separated string)
+    // Match checklists to plan/client standards
     const client = state.clients.find(c => c.name === plan.client);
-    const clientStandardsStr = client?.standard || '';
-    const clientStandards = clientStandardsStr ? clientStandardsStr.split(', ').map(s => s.trim()).filter(s => s) : [];
+    const clientStandards = (client?.standard || '').split(', ').map(s => s.trim()).filter(s => s);
+    const planStandardsList = (plan.standard || '').split(', ').map(s => s.trim()).filter(s => s);
+    const allStandards = [...new Set([...planStandardsList, ...clientStandards])].map(s => s.toLowerCase());
 
-    // Combine plan standard and client standards
-    let allStandards = [];
-    if (plan.standard) {
-        allStandards = allStandards.concat(plan.standard.split(', ').map(s => s.trim()));
-    }
-    if (clientStandards.length > 0) {
-        allStandards = allStandards.concat(clientStandards);
-    }
-    // Remove duplicates and convert to lowercase for matching
-    const uniqueStandards = [...new Set(allStandards)];
-    const planStandards = uniqueStandards.map(s => s.toLowerCase());
-
-    // Improved matching: check if standard contains any of the plan/client standards
     const matchingChecklists = checklists.filter(c => {
-        if (!c.standard) return true; // If no standard specified, include it
-        const checklistStandard = c.standard.toLowerCase();
-        return planStandards.some(ps =>
-            checklistStandard.includes(ps.split(':')[0]) || // Check base standard (e.g., "iso 9001")
-            ps.includes(checklistStandard.split(':')[0])
-        );
+        if (!c.standard) return true;
+        const clStd = c.standard.toLowerCase();
+        return allStandards.length === 0 || allStandards.some(ps => clStd.includes(ps.split(':')[0]) || ps.includes(clStd.split(':')[0]));
     });
 
     const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
     const customChecklists = matchingChecklists.filter(c => c.type === 'custom' || !c.type);
-    const selectedIds = plan.selectedChecklists || [];
 
-    // Helper function to count items in a checklist (supports both flat and hierarchical)
-    const getItemCount = (cl) => {
+    const getFlattenedItems = (cl) => {
+        let items = [];
         if (cl.clauses && cl.clauses.length > 0) {
-            return cl.clauses.reduce((sum, clause) => sum + (clause.subClauses?.length || 0), 0);
+            cl.clauses.forEach(clause => {
+                if (clause.subClauses) {
+                    clause.subClauses.forEach((sub, idx) => {
+                        items.push({ id: `${clause.mainClause}-${idx}`, text: sub.requirement, clause: clause.mainClause });
+                    });
+                }
+            });
+        } else if (cl.items) {
+            cl.items.forEach((item, idx) => {
+                items.push({ id: String(idx), text: item.requirement, clause: item.clause });
+            });
         }
-        return cl.items?.length || 0;
+        return items;
     };
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+    const renderGroup = (title, list, icon, color) => {
+        if (list.length === 0) return '';
+        return `
+            <div style="margin-bottom: 2rem;">
+                <h3 style="padding-bottom: 0.5rem; border-bottom: 2px solid ${color}; color: ${color}; margin-bottom: 1rem;">
+                    <i class="${icon}" style="margin-right: 0.5rem;"></i> ${title}
+                </h3>
+                <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+                    ${list.map(cl => {
+            const isMainSelected = selectedIds.includes(cl.id);
+            const items = getFlattenedItems(cl);
+            const savedItems = savedItemSelections[cl.id];
 
-    // Display standards text
-    const standardsDisplay = uniqueStandards.length > 0 ? uniqueStandards.join(', ') : 'All Standards';
+            return `
+                            <div class="card checklist-card" style="margin: 0; border-left: 4px solid ${color};">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="display: flex; align-items: center; gap: 1rem;">
+                                        <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${isMainSelected ? 'checked' : ''} style="width: 20px; height: 20px; cursor: pointer;">
+                                        <div>
+                                            <h4 style="margin: 0; cursor: pointer;" onclick="this.closest('.card').querySelector('.items-list').classList.toggle('hidden')">${cl.name}</h4>
+                                            <small style="color: var(--text-secondary);">${items.length} items • ${cl.standard || 'General'}</small>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="this.closest('.card').querySelector('.items-list').classList.toggle('hidden')">
+                                        <i class="fa-solid fa-chevron-down"></i> Expand / Edit
+                                    </button>
+                                </div>
+                                <div class="items-list hidden" style="margin-top: 1rem; padding: 1.5rem; background: #f8fafc; border-radius: 8px; border: 1px inset #e2e8f0;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                                        <div style="display: flex; gap: 0.5rem;">
+                                            <button class="btn btn-xs btn-outline-primary" onclick="window.bulkSelectConfigItems('${cl.id}', true)">Select All</button>
+                                            <button class="btn btn-xs btn-outline-secondary" onclick="window.bulkSelectConfigItems('${cl.id}', false)">Deselect All</button>
+                                        </div>
+                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Toggle items to include in audit scope</span>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr; gap: 0.25rem;">
+                                        ${items.map(item => {
+                const itemSelected = isMainSelected ? (!savedItems || savedItems.map(String).includes(String(item.id))) : false;
+                const overrideText = (savedOverrides[cl.id] && savedOverrides[cl.id][item.id]) || item.text;
+                const isOverridden = !!(savedOverrides[cl.id] && savedOverrides[cl.id][item.id]);
 
-    modalTitle.textContent = 'Configure Checklists for Audit';
-    modalBody.innerHTML = `
+                return `
+                                                <div class="item-row" data-item-id="${item.id}" data-checklist-id="${cl.id}" style="display: flex; align-items: start; gap: 0.75rem; padding: 0.75rem; border-bottom: 1px solid #e2e8f0; background: white; border-radius: 4px;">
+                                                    <input type="checkbox" class="item-select-cb" data-item-id="${item.id}" data-checklist-id="${cl.id}" ${itemSelected ? 'checked' : ''} style="margin-top: 4px; cursor: pointer;">
+                                                    <div style="flex: 1; font-size: 0.9rem; line-height: 1.5;">
+                                                        <span style="font-weight: 600; color: #475569; margin-right: 0.5rem; font-family: monospace;">${item.clause || '-'}</span>
+                                                        <span class="item-text" style="${isOverridden ? 'color: #0369a1; font-style: italic; border-bottom: 1px dashed #0369a1;' : ''}">${window.UTILS.escapeHtml(overrideText)}</span>
+                                                    </div>
+                                                    <button class="btn btn-xs btn-icon" onclick="window.editConfigItemRequirement('${cl.id}', '${item.id}')" title="Override requirement text for this audit plan">
+                                                        <i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i>
+                                                    </button>
+                                                </div>
+                                            `;
+            }).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+        }).join('')}
+                </div>
+            </div>
+        `;
+    };
+
+    const headerHtml = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.viewAuditPlan('${planId}')" style="margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Plan
+                </button>
+                <h2 style="margin: 0;">Configure Checklists</h2>
+                <p style="color: var(--text-secondary); margin: 0;">Tailor the audit scope and requirements for <strong>${plan.client}</strong></p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-outline-secondary" onclick="window.viewAuditPlan('${planId}')">Cancel</button>
+                <button class="btn btn-primary" onclick="window.saveChecklistConfiguration('${planId}')" style="padding: 0.5rem 1.5rem;">
+                    <i class="fa-solid fa-save"></i> Save Configuration
+                </button>
+            </div>
+        </div>
+
+        <div class="alert alert-info" style="margin-bottom: 2rem; background: #eff6ff; border-left: 4px solid #3b82f6; color: #1e3a8a;">
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <i class="fa-solid fa-circle-info" style="font-size: 1.25rem;"></i>
+                <div>
+                    <strong>Pro-Tip:</strong> Edits made here are <strong>local overrides</strong>. They will appear in the execution view and reports for this audit, but WON'T affect the master database.
+                </div>
+            </div>
+        </div>
+    `;
+
+    const html = `
+        <div class="fade-in">
+            ${headerHtml}
+            <div style="max-width: 1200px; margin: 0 auto;">
+                ${renderGroup('Global Checklists', globalChecklists, 'fa-solid fa-globe', '#0369a1')}
+                ${renderGroup('Custom Checklists', customChecklists, 'fa-solid fa-user-gear', '#059669')}
+            </div>
+            
+            <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
+                 <button class="btn btn-primary btn-lg" onclick="window.saveChecklistConfiguration('${planId}')" style="min-width: 250px;">
+                    <i class="fa-solid fa-save"></i> Save & Return to Plan
+                 </button>
+            </div>
+        </div>
+    `;
+
+    window.contentArea.innerHTML = html;
+};
+
+// HELPER ACTIONS FOR CONFIG
+window.bulkSelectConfigItems = function (clId, status) {
+    document.querySelectorAll(`.item-select-cb[data-checklist-id="${clId}"]`).forEach(cb => cb.checked = status);
+    if (status) {
+        const clCb = document.querySelector(`.checklist-select-cb[data-id="${clId}"]`);
+        if (clCb) clCb.checked = true;
+    }
+};
+
+window.editConfigItemRequirement = function (clId, itemId) {
+    const row = document.querySelector(`.item-row[data-checklist-id="${clId}"][data-item-id="${itemId}"]`);
+    const textSpan = row.querySelector('.item-text');
+    const currentText = textSpan.textContent;
+
+    // Use a modal-like prompt for better UX than browser prompt if possible, but keeping it simple for now
+    const newText = prompt('Override Requirement Text (Local to this audit):', currentText);
+    if (newText !== null && newText.trim() !== '' && newText.trim() !== currentText) {
+        textSpan.textContent = newText.trim();
+        textSpan.style.color = '#0369a1';
+        textSpan.style.fontStyle = 'italic';
+        textSpan.style.borderBottom = '1px dashed #0369a1';
+        // Auto-select if edited
+        row.querySelector('.item-select-cb').checked = true;
+        const clCb = document.querySelector(`.checklist-select-cb[data-id="${clId}"]`);
+        if (clCb) clCb.checked = true;
+    }
+};
+
+window.saveChecklistConfiguration = async function (planId) {
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan) return;
+
+    const selectedChecklists = [];
+    const selectedItemsMap = {};
+    const overridesMap = {};
+
+    document.querySelectorAll('.checklist-card').forEach(card => {
+        const clCb = card.querySelector('.checklist-select-cb');
+        if (clCb.checked) {
+            const clId = parseInt(clCb.getAttribute('data-id'));
+            selectedChecklists.push(clId);
+
+            const selectedItems = [];
+            const clOverrides = {};
+
+            card.querySelectorAll('.item-row').forEach(row => {
+                const itemId = row.getAttribute('data-item-id');
+                if (row.querySelector('.item-select-cb').checked) {
+                    selectedItems.push(itemId);
+                }
+
+                const textSpan = row.querySelector('.item-text');
+                if (textSpan.style.fontStyle === 'italic') {
+                    clOverrides[itemId] = textSpan.textContent;
+                }
+            });
+
+            selectedItemsMap[clId] = selectedItems;
+            if (Object.keys(clOverrides).length > 0) {
+                overridesMap[clId] = clOverrides;
+            }
+        }
+    });
+
+    plan.selectedChecklists = selectedChecklists;
+    plan.selectedChecklistItems = selectedItemsMap;
+    plan.selectedChecklistOverrides = overridesMap;
+
+    window.showNotification('Saving configuration...', 'info');
+
+    try {
+        if (window.SupabaseClient) {
+            await window.SupabaseClient.db.update('audit_plans', String(planId), { data: plan });
+        }
+        window.saveData(); // Local backup
+        window.showNotification('Configuration saved successfully.', 'success');
+        window.viewAuditPlan(planId);
+    } catch (e) {
+        console.error('Save configuration error:', e);
+        window.showNotification('Error saving configuration.', 'danger');
+    }
+}; <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${getItemCount(cl)} items • ${cl.standard || 'Generic'} ${cl.type !== 'global' ? '• Custom' : ''}</p>
+                                </div >
+    <button class="btn btn-sm btn-icon expand-checklist-btn" data-target="items-${cl.id}" style="color: var(--text-secondary);">
+        <i class="fa-solid fa-chevron-down"></i>
+    </button>
+                             </div >
+                             
+                             < !--Body / Questions(Collapsed by default )-- >
+    <div id="items-${cl.id}" style="display: none; padding: 0.5rem 1rem 1rem 3rem; background: #f8fafc; border-top: 1px solid var(--border-color);">
+        <div style="margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <small style="font-weight: 600; color: var(--text-secondary);">Select Questions:</small>
+            <div>
+                <button class="btn btn-xs btn-link select-all-items-btn" data-checklist-id="${cl.id}">All</button>
+                <button class="btn btn-xs btn-link select-none-items-btn" data-checklist-id="${cl.id}">None</button>
+            </div>
+        </div>
+        ${itemsHtml}
+    </div>
+                        </div >
+    `;
+        }).join('')}
+                </div>
+            </div>
+        `;
+    };
+
+modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <p style="color: var(--text-secondary); margin: 0;">
-                Select checklists to use during this audit. Showing checklists for <strong>${standardsDisplay}</strong>.
+                Select checklists and specific questions to use during this audit.
             </p>
         </div>
 
-        <!-- Global Checklists -->
-        <div style="margin-bottom: 1.5rem;">
-            <h4 style="margin-bottom: 0.75rem;">
-                <i class="fa-solid fa-globe" style="color: #0369a1; margin-right: 0.5rem;"></i>
-                Global Checklists (${globalChecklists.length})
-            </h4>
-            ${globalChecklists.length > 0 ? `
-                <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                    ${globalChecklists.map(cl => `
-                        <label style="display: grid; grid-template-columns: 40px 1fr; align-items: center; text-align: left; padding: 1rem; background: #fff; border-radius: var(--radius-md); cursor: pointer; border: 1px solid ${selectedIds.includes(cl.id) ? 'var(--primary-color)' : 'var(--border-color)'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            <div style="display: flex; justify-content: center;">
-                                <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${selectedIds.includes(cl.id) ? 'checked' : ''} style="margin: 0; min-width: 18px; min-height: 18px; cursor: pointer;">
-                            </div>
-                            <div style="text-align: left;">
-                                <p style="font-weight: 600; margin: 0; color: var(--text-primary); text-align: left;">${cl.name}</p>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${getItemCount(cl)} items • ${cl.standard || 'Generic'}</p>
-                            </div>
-                        </label>
-                    `).join('')}
-                </div>
-            ` : '<p style="color: var(--text-secondary); padding: 0.5rem;">No global checklists available for this standard.</p>'}
-        </div>
-
-        <!-- Custom Checklists -->
-        <div>
-            <h4 style="margin-bottom: 0.75rem;">
-                <i class="fa-solid fa-user" style="color: #059669; margin-right: 0.5rem;"></i>
-                Custom Checklists (${customChecklists.length})
-            </h4>
-            ${customChecklists.length > 0 ? `
-                <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                    ${customChecklists.map(cl => `
-                        <label style="display: grid; grid-template-columns: 40px 1fr; align-items: center; text-align: left; padding: 1rem; background: #fff; border-radius: var(--radius-md); cursor: pointer; border: 1px solid ${selectedIds.includes(cl.id) ? 'var(--primary-color)' : 'var(--border-color)'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            <div style="display: flex; justify-content: center;">
-                                <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${selectedIds.includes(cl.id) ? 'checked' : ''} style="margin: 0; min-width: 18px; min-height: 18px; cursor: pointer;">
-                            </div>
-                            <div style="text-align: left;">
-                                <p style="font-weight: 600; margin: 0; color: var(--text-primary); text-align: left;">${cl.name}</p>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0; text-align: left;">${getItemCount(cl)} items • by ${cl.createdBy || 'Unknown'}</p>
-                            </div>
-                        </label>
-                    `).join('')}
-                </div>
-            ` : '<p style="color: var(--text-secondary); padding: 0.5rem;">No custom checklists available. <a href="#" onclick="window.renderModule(\'checklists\'); window.closeModal();">Create one</a></p>'}
-        </div>
+        ${renderChecklistGroup('Global Checklists', 'fa-solid fa-globe', '#0369a1', globalChecklists)}
+        ${renderChecklistGroup('Custom Checklists', 'fa-solid fa-user', '#059669', customChecklists)}
 
         <div id="checklist-selection-summary" style="margin-top: 1rem; padding: 0.75rem; background: #e0f2fe; border-radius: var(--radius-md); text-align: center;">
             <strong>${selectedIds.length}</strong> checklist(s) selected
         </div>
     `;
 
-    // Open modal first
-    window.openModal(
-        'Configure Checklists for Audit',
-        modalBody.innerHTML,
-        () => {
-            const selected = [];
-            document.querySelectorAll('.checklist-select-cb:checked').forEach(cb => {
-                selected.push(parseInt(cb.getAttribute('data-id')));
-            });
+// Open modal first
+window.openModal(
+    'Configure Checklists for Audit',
+    modalBody.innerHTML,
+    () => {
+        // SAVE LOGIC
+        const selectedChecklists = [];
+        const selectedItemsMap = {}; // ID -> [ItemIDs]
 
-            plan.selectedChecklists = selected;
+        document.querySelectorAll('.checklist-select-cb:checked').forEach(cb => {
+            const clId = parseInt(cb.getAttribute('data-id'));
+            selectedChecklists.push(clId);
 
-            // Persist to DB immediately
-            (async () => {
-                try {
-                    if (window.SupabaseClient) {
-                        // Update just the selected checklists field if possible, or full plan
-                        // But since plan structure is complex, we update the data blob and specific fields
-                        await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
-                            data: plan // Full plan has updated checklist IDs
-                        });
-                        window.showNotification('Checklists assigned and saved to database.', 'success');
-                    }
-                } catch (e) {
-                    console.error('DB Save Checklists Error:', e);
-                    window.showNotification('Checklists updated locally (DB Error)', 'warning');
-                }
-            })();
+            // Get selected items for this checklist
+            const itemCBs = document.querySelectorAll(`.checklist-item-select-cb[data-checklist-id="${clId}"]:checked`);
+            const allItemCBs = document.querySelectorAll(`.checklist-item-select-cb[data-checklist-id="${clId}"]`);
 
-            window.saveData();
-            window.closeModal();
-            viewAuditPlan(planId);
-        }
-    );
+            // Optimization: If ALL are selected, we don't strictly need to store the array (can use null/undefined to imply ALL like legacy)
+            // BUT for consistency and explicit control, let's store them if it's a subset.
+            // Or store all to be safe against future checklist changes (new items appearing).
+            // DECISION: Store explicit list of selected item IDs.
 
-    // Update summary on checkbox change (Post-render)
-    setTimeout(() => {
-        const checkboxes = document.querySelectorAll('.checklist-select-cb');
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', () => {
-                const count = document.querySelectorAll('.checklist-select-cb:checked').length;
-                const summary = document.getElementById('checklist-selection-summary');
-                if (summary) summary.innerHTML = `<strong>${count}</strong> checklist(s) selected`;
-            });
+            const selectedItemIds = Array.from(itemCBs).map(icb => icb.getAttribute('data-item-id'));
+            selectedItemsMap[clId] = selectedItemIds;
         });
 
-        // Ensure save button text is correct
-        const btnSave = document.getElementById('modal-save');
-        if (btnSave) {
-            btnSave.textContent = 'Save Configuration';
-            btnSave.style.display = 'inline-block'; // Ensure it's visible
-            btnSave.disabled = false;
-        }
-    }, 100);
+        plan.selectedChecklists = selectedChecklists;
+        plan.selectedChecklistItems = selectedItemsMap;
+
+        // Persist to DB immediately
+        (async () => {
+            try {
+                if (window.SupabaseClient) {
+                    await window.SupabaseClient.db.update('audit_plans', String(plan.id), {
+                        data: plan // Full plan has updated checklist IDs and Items
+                    });
+                    window.showNotification('Checklists assigned and saved to database.', 'success');
+                }
+            } catch (e) {
+                console.error('DB Save Checklists Error:', e);
+                window.showNotification('Checklists updated locally (DB Error)', 'warning');
+            }
+        })();
+
+        window.saveData();
+        window.closeModal();
+        viewAuditPlan(planId);
+    }
+);
+
+// Event Listeners (Post-render)
+setTimeout(() => {
+    // 1. Expand/Collapse
+    document.querySelectorAll('.expand-checklist-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent bubbling to label click if any
+            e.stopPropagation();
+            const targetId = btn.getAttribute('data-target');
+            const target = document.getElementById(targetId);
+            const isHidden = target.style.display === 'none';
+            target.style.display = isHidden ? 'block' : 'none';
+            btn.innerHTML = isHidden ? '<i class="fa-solid fa-chevron-up"></i>' : '<i class="fa-solid fa-chevron-down"></i>';
+        });
+    });
+
+    // 2. Select All / None Items
+    document.querySelectorAll('.select-all-items-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const clId = btn.getAttribute('data-checklist-id');
+            document.querySelectorAll(`.checklist-item-select-cb[data-checklist-id="${clId}"]`).forEach(cb => cb.checked = true);
+            // Also ensure main checklist check is checked
+            document.querySelector(`.checklist-select-cb[data-id="${clId}"]`).checked = true;
+            updateSummary();
+        });
+    });
+
+    document.querySelectorAll('.select-none-items-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const clId = btn.getAttribute('data-checklist-id');
+            document.querySelectorAll(`.checklist-item-select-cb[data-checklist-id="${clId}"]`).forEach(cb => cb.checked = false);
+            // If all items unchecked, maybe uncheck main? Or keep it checked with 0 items?
+            // Usually uncheck main if 0 items.
+            // document.querySelector(`.checklist-select-cb[data-id="${clId}"]`).checked = false;
+            // updateSummary();
+        });
+    });
+
+    // 3. Main Checklist Checkbox Logic
+    document.querySelectorAll('.checklist-select-cb').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const clId = cb.getAttribute('data-id');
+            const isChecked = cb.checked;
+            // Select/Deselect all items visual shortcut?
+            // Usually if I check the main box, I expect all items to be selected.
+            // If I uncheck, all deselected.
+            document.querySelectorAll(`.checklist-item-select-cb[data-checklist-id="${clId}"]`).forEach(itemCb => {
+                itemCb.checked = isChecked;
+            });
+            updateSummary();
+
+            // Auto-expand if checked? No, keep it clean.
+        });
+    });
+
+    // 4. Update Summary Helper
+    function updateSummary() {
+        const count = document.querySelectorAll('.checklist-select-cb:checked').length;
+        const summary = document.getElementById('checklist-selection-summary');
+        if (summary) summary.innerHTML = `<strong>${count}</strong> checklist(s) selected`;
+    }
+
+    // Ensure save button text is correct
+    const btnSave = document.getElementById('modal-save');
+    if (btnSave) {
+        btnSave.textContent = 'Save Configuration';
+        btnSave.style.display = 'inline-block'; // Ensure it's visible
+        btnSave.disabled = false;
+    }
+}, 100);
 }
 
 // Wizard logic removed - consolidated to 1 page

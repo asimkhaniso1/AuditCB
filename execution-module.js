@@ -552,19 +552,38 @@ function renderExecutionDetail(reportId) {
 
     // Calculate stats
     const allItems = [];
+    const selectionMap = plan?.selectedChecklistItems || {};
+    const overridesMap = plan?.selectedChecklistOverrides || {};
+
     assignedChecklists.forEach(cl => {
+        const allowedIds = selectionMap[cl.id]; // Array of strings/ints or undefined
+        const isSelective = Array.isArray(allowedIds);
+
         if (cl.clauses) {
             cl.clauses.forEach(clause => {
                 clause.subClauses.forEach((item, subIdx) => {
-                    allItems.push({ checklistId: cl.id, itemIdx: `${clause.mainClause}-${subIdx}` });
+                    const itemId = `${clause.mainClause}-${subIdx}`;
+                    // IF selective mode AND this ID is NOT in the list, skip it.
+                    if (isSelective && !allowedIds.includes(itemId)) {
+                        return;
+                    }
+
+                    allItems.push({ checklistId: cl.id, itemIdx: itemId });
                 });
             });
         } else {
             (cl.items || []).forEach((item, idx) => {
+                const itemId = String(idx); // Standardize to string for comparison usually, but ID in UI was idx
+                // UI saved it as attribute, which is string.
+
+                if (isSelective && !allowedIds.map(String).includes(String(idx))) {
+                    return;
+                }
                 allItems.push({ checklistId: cl.id, itemIdx: idx });
             });
         }
     });
+
     customItems.forEach((item, idx) => {
         allItems.push({ checklistId: 'custom', itemIdx: idx, isCustom: true });
     });
@@ -671,11 +690,11 @@ function renderExecutionDetail(reportId) {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments });
+            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments, selectionMap, overridesMap });
         });
     });
 
-    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments });
+    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments, selectionMap, overridesMap });
 }
 
 function renderExecutionTab(report, tabName, contextData = {}) {
@@ -683,7 +702,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     switch (tabName) {
         case 'checklist':
-            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [] } = contextData;
+            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], selectionMap = {}, overridesMap = {} } = contextData;
 
 
             // Helper to render row
@@ -691,6 +710,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const uniqueId = isCustom ? `custom-${idx}` : `${checklistId}-${idx}`;
                 const saved = progressMap[uniqueId] || {};
                 const s = saved.status || ''; // 'conform', 'nc', 'na' or ''
+
+                // APPLY LOCAL OVERRIDES
+                let requirementText = item.requirement;
+                if (overridesMap && overridesMap[checklistId] && overridesMap[checklistId][idx]) {
+                    requirementText = overridesMap[checklistId][idx];
+                }
 
                 return `
                     <div class="card checklist-item" id="row-${uniqueId}" style="margin-bottom: 0.5rem; padding: 1rem; border-left: 4px solid #e2e8f0;">
@@ -700,7 +725,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                             <div style="font-weight: bold; color: var(--primary-color);">${item.clause || 'N/A'}</div>
                             <div>
-                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(item.requirement)}</div>
+                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(requirementText)}</div>
                                 <div style="position: relative;">
                                     <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.comment || '')}" style="margin-bottom: 0; padding-right: 35px;">
                                     <button type="button" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
@@ -816,10 +841,41 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color); -webkit-text-fill-color: #667eea;"></i> ${checklist.name}
                                 </h4>
                                 ${checklist.clauses.map((clause, clauseIdx) => {
+                            const allowedIds = selectionMap[checklist.id];
+                            const isSelective = Array.isArray(allowedIds);
+
+                            // Filter valid items first
+                            const validSubClauses = clause.subClauses.filter((item, subIdx) => {
+                                const itemId = `${clause.mainClause}-${subIdx}`;
+                                return !isSelective || allowedIds.includes(itemId);
+                            });
+
+                            if (validSubClauses.length === 0) return ''; // Skip empty clauses
+
                             const sectionId = `clause-${checklist.id}-${clause.mainClause}`;
-                            const clauseItems = clause.subClauses.map((item, subIdx) => {
+                            const clauseItems = validSubClauses.map((item, subIdx) => {
+                                // Find original index for ID generation if needed, but here we construct ID based on MAIN clause index which is fixed?
+                                // CAUTION: The ID used in progressMap is `${clause.mainClause}-${subIdx}`. 
+                                // `subIdx` comes from the original array index. 
+                                // If we filter, the `map` index will be shifted!
+
+                                // We MUST preserve the ORIGINAL subIdx for the ID to match what's saved/calculated.
+                                // Solution: Map first to objects with original index, then filter.
+                                return null; // Placeholder, see below logic
+                            });
+
+                            // CORRECT LOGIC:
+                            const itemsToRender = clause.subClauses.map((item, originalSubIdx) => {
+                                const itemId = `${clause.mainClause}-${originalSubIdx}`;
+                                if (isSelective && !allowedIds.includes(itemId)) return null;
+                                return { item, originalSubIdx, itemId };
+                            }).filter(x => x);
+
+                            if (itemsToRender.length === 0) return '';
+
+                            const renderedItems = itemsToRender.map(obj => {
                                 const globalIdx = itemIdx++;
-                                return renderRow(item, checklist.id, `${clause.mainClause}-${subIdx}`, false);
+                                return renderRow(obj.item, checklist.id, obj.itemId, false); // Use composite ID directly
                             }).join('');
 
                             // Calculate progress for this section

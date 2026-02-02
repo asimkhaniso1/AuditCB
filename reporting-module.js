@@ -574,29 +574,43 @@ function generateReportHTML(report, plan, client) {
         .filter(item => item.status === 'nc')
         .map(item => {
             let clause = 'Checklist Item';
+            let requirement = 'Non-conformity identified in checklist.';
+
             if (item.checklistId) {
                 const cl = state.checklists.find(c => c.id == item.checklistId);
                 if (cl) {
+                    // Extract requirement text with overrides
+                    const plan = state.auditPlans.find(p => String(p.id) === String(report.planId));
+                    const overrides = plan?.selectedChecklistOverrides?.[item.checklistId] || {};
+
                     if (cl.clauses && (String(item.itemIdx).includes('-'))) {
                         const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
                         const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
                         if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
                             clause = mainObj.subClauses[subIdxVal].clause;
+                            requirement = overrides[item.itemIdx] || mainObj.subClauses[subIdxVal].requirement;
                         }
                     } else {
                         const clItem = cl.items?.[item.itemIdx];
-                        if (clItem) clause = clItem.clause;
+                        if (clItem) {
+                            clause = clItem.clause;
+                            requirement = overrides[item.itemIdx] || clItem.requirement;
+                        }
                     }
                 }
             } else if (item.isCustom) {
                 const customItem = (report.customItems || [])[item.itemIdx];
-                if (customItem) clause = customItem.clause;
+                if (customItem) {
+                    clause = customItem.clause;
+                    requirement = customItem.requirement;
+                }
             }
 
             return {
                 type: item.ncrType || 'minor',
                 clause: clause,
-                description: item.ncrDescription || item.comment || 'Non-conformity identified in checklist.',
+                description: item.ncrDescription || item.comment || requirement,
+                requirement: requirement,
                 evidence: 'Checklist Finding',
                 transcript: item.transcript,
                 evidenceImage: item.evidenceImage,
@@ -617,14 +631,27 @@ function generateReportHTML(report, plan, client) {
     const ncCount = totalProgress.filter(p => p.status === 'nc').length;
     const naCount = totalProgress.filter(p => p.status === 'na').length;
 
-    const totalItems = assignedChecklists.reduce((sum, c) => {
-        if (c.clauses) {
-            return sum + c.clauses.reduce((s, clause) => s + (clause.subClauses?.length || 0), 0);
-        }
-        return sum + (c.items?.length || 0);
-    }, 0) + (report.customItems?.length || 0);
-
     const answeredCount = totalProgress.length;
+
+    // CALCULATE CORRECT TOTAL ITEMS (RESPECTING SELECTIONS)
+    const selectionMap = plan.selectedChecklistItems || {};
+    let totalItems = 0;
+
+    assignedChecklists.forEach(c => {
+        const allowedIds = selectionMap[c.id];
+        if (Array.isArray(allowedIds)) {
+            totalItems += allowedIds.length;
+        } else {
+            // Fallback for legacy audits
+            if (c.clauses) {
+                totalItems += c.clauses.reduce((s, clause) => s + (clause.subClauses?.length || 0), 0);
+            } else {
+                totalItems += (c.items?.length || 0);
+            }
+        }
+    });
+    totalItems += (report.customItems?.length || 0);
+
     const progressPercent = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
 
     // QR Code URL
