@@ -1236,7 +1236,7 @@ function getAuditorClientsTabHTML(auditor) {
                                 <td>${window.UTILS.escapeHtml(client.city || '-')}</td>
                                 <td>${window.UTILS.escapeHtml(client.standard || '-')}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="window.renderClientDetail(${client.id})">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="window.renderClientDetail('${client.id}')">
                                         View Dashboard
                                     </button>
                                 </td>

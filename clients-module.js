@@ -302,7 +302,7 @@ function renderClientDetail(clientId, options = {}) {
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
-                    <button class="btn btn-primary" onclick="window.renderEditClient(${client.id})">
+                    <button class="btn btn-primary" onclick="window.renderEditClient('${client.id}')">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
                     ` : ''}
