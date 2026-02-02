@@ -7,68 +7,153 @@ window.ApiCache = (function () {
     const cache = new Map();
     const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
     const pendingRequests = new Map(); // Prevent duplicate concurrent requests
+    const STORAGE_PREFIX = 'auditcb_cache_'; // Prefix for localStorage keys
 
     /**
-     * Get cached data or fetch fresh
+     * Load from localStorage
+     */
+    function loadFromStorage(key) {
+        try {
+            const item = localStorage.getItem(STORAGE_PREFIX + key);
+            if (!item) return null;
+            return JSON.parse(item);
+        } catch (e) {
+            console.warn('[Cache] Failed to load from storage', e);
+            return null;
+        }
+    }
+
+    /**
+     * Save to localStorage
+     */
+    function saveToStorage(key, value) {
+        try {
+            localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+        } catch (e) {
+            console.warn('[Cache] Failed to save to storage', e);
+        }
+    }
+
+    /**
+     * Clear specific key from storage
+     */
+    function removeFromStorage(key) {
+        try {
+            localStorage.removeItem(STORAGE_PREFIX + key);
+        } catch (e) {
+            console.warn('[Cache] Failed to remove from storage', e);
+        }
+    }
+
+    /**
+     * Core Fetch & Cache Logic
+     */
+    async function fetchAndCache(key, fetchFn, ttl) {
+        // Check if request is already pending
+        if (pendingRequests.has(key)) {
+            return pendingRequests.get(key);
+        }
+
+        console.log(`[Cache] FETCH: ${key} - fetching fresh data...`);
+
+        try {
+            const promise = fetchFn().then(data => {
+                const cacheEntry = {
+                    data: data,
+                    expiry: Date.now() + ttl,
+                    fetchedAt: new Date().toISOString()
+                };
+
+                // Update Memory
+                cache.set(key, cacheEntry);
+                // Update Storage
+                saveToStorage(key, cacheEntry);
+
+                pendingRequests.delete(key);
+                return data;
+            });
+
+            pendingRequests.set(key, promise);
+            return await promise;
+        } catch (err) {
+            pendingRequests.delete(key);
+            console.error(`[Cache] FETCH FAILED: ${key}`, err);
+            throw err;
+        }
+    }
+
+    /**
+     * Get cached data or fetch fresh (Stale-While-Revalidate)
      * @param {string} key - Unique cache key
      * @param {Function} fetchFn - Async function to fetch data if cache miss
      * @param {number} ttl - Time to live in ms (default 5 min)
      */
     async function getOrFetch(key, fetchFn, ttl = DEFAULT_TTL) {
-        // Check cache first
-        const cached = cache.get(key);
-        if (cached && Date.now() < cached.expiry) {
-            console.log(`[Cache] HIT: ${key}`);
+        // 1. Check Memory Cache
+        let cached = cache.get(key);
+
+        // 2. Check Persistent Storage if memory miss
+        if (!cached) {
+            cached = loadFromStorage(key);
+            if (cached) {
+                cache.set(key, cached); // Hydrate memory
+            }
+        }
+
+        const now = Date.now();
+        const isExpired = cached ? now > cached.expiry : true;
+
+        // 3. HIT (Valid) -> Return immediately
+        if (cached && !isExpired) {
+            console.log(`[Cache] HIT: ${key} (Valid)`);
             return cached.data;
         }
 
-        // Check if request is already pending (prevent duplicate calls)
-        if (pendingRequests.has(key)) {
-            console.log(`[Cache] PENDING: ${key} - waiting for existing request`);
-            return pendingRequests.get(key);
+        // 4. STALE (Expired but exists) -> Return stale, update in background
+        if (cached && isExpired) {
+            console.log(`[Cache] STALE: ${key} - returning stale data, fetching background update`);
+            // Trigger background update (no await)
+            fetchAndCache(key, fetchFn, ttl).catch(e => {
+                console.warn(`[Cache] Background update failed for ${key}`, e);
+            });
+            return cached.data;
         }
 
-        // Fetch fresh data
-        console.log(`[Cache] MISS: ${key} - fetching...`);
-        const promise = fetchFn().then(data => {
-            cache.set(key, {
-                data: data,
-                expiry: Date.now() + ttl,
-                fetchedAt: new Date().toISOString()
-            });
-            pendingRequests.delete(key);
-            return data;
-        }).catch(err => {
-            pendingRequests.delete(key);
-            throw err;
-        });
-
-        pendingRequests.set(key, promise);
-        return promise;
+        // 5. MISS (No data) -> Must wait for fetch
+        // If fetch fails, we have no data to return, so we throw
+        console.log(`[Cache] MISS: ${key} - waiting for fetch`);
+        return fetchAndCache(key, fetchFn, ttl);
     }
 
     /**
      * Invalidate specific cache key
      */
     function invalidate(key) {
-        if (cache.has(key)) {
-            cache.delete(key);
-            console.log(`[Cache] INVALIDATED: ${key}`);
-        }
+        cache.delete(key);
+        removeFromStorage(key);
+        console.log(`[Cache] INVALIDATED: ${key}`);
     }
 
     /**
      * Invalidate all keys matching a pattern
      */
     function invalidatePattern(pattern) {
-        let count = 0;
+        // Memory
         for (const key of cache.keys()) {
             if (key.includes(pattern)) {
                 cache.delete(key);
-                count++;
+                removeFromStorage(key);
             }
         }
-        console.log(`[Cache] INVALIDATED ${count} keys matching: ${pattern}`);
+
+        // Storage cleanup (in case memory is out of sync)
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX) && key.includes(pattern)) {
+                localStorage.removeItem(key);
+            }
+        }
+        console.log(`[Cache] INVALIDATED pattern: ${pattern}`);
     }
 
     /**
@@ -76,6 +161,15 @@ window.ApiCache = (function () {
      */
     function clear() {
         cache.clear();
+        // Clear only our keys
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX)) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
         console.log('[Cache] CLEARED all entries');
     }
 
@@ -84,16 +178,33 @@ window.ApiCache = (function () {
      */
     function getStats() {
         const entries = [];
-        for (const [key, value] of cache.entries()) {
-            entries.push({
-                key,
-                fetchedAt: value.fetchedAt,
-                expiresIn: Math.round((value.expiry - Date.now()) / 1000) + 's',
-                isExpired: Date.now() >= value.expiry
-            });
+        // Check both memory and storage for stats
+        const allKeys = new Set([...cache.keys()]);
+
+        // Add keys from storage that might not be in memory
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX)) {
+                allKeys.add(key.replace(STORAGE_PREFIX, ''));
+            }
         }
+
+        for (const key of allKeys) {
+            // Prefer memory, then storage
+            let val = cache.get(key) || loadFromStorage(key);
+            if (val) {
+                entries.push({
+                    key,
+                    source: cache.has(key) ? 'Memory' : 'Disk',
+                    fetchedAt: val.fetchedAt,
+                    expiresIn: Math.round((val.expiry - Date.now()) / 1000) + 's',
+                    isExpired: Date.now() >= val.expiry
+                });
+            }
+        }
+
         return {
-            totalEntries: cache.size,
+            totalEntries: allKeys.size,
             pendingRequests: pendingRequests.size,
             entries
         };
