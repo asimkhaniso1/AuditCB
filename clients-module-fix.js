@@ -467,7 +467,7 @@ window.deleteSite = function (clientId, index) {
 // ============================================
 
 window.addDepartment = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
     window.openModal('Add Department',
         `<form><div class="form-group"><label>Name *</label><input type="text" id="dept-name" class="form-control"></div>
@@ -488,7 +488,7 @@ window.addDepartment = function (clientId) {
 };
 
 window.deleteDepartment = function (clientId, index) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client && client.departments && confirm('Delete?')) {
         client.departments.splice(index, 1);
         window.saveData();
@@ -498,7 +498,7 @@ window.deleteDepartment = function (clientId, index) {
     }
 };
 window.bulkUploadDepartments = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
     window.openModal('Bulk Upload Departments', `<textarea id="bulk-dept" rows="5" class="form-control" placeholder="Name, Head"></textarea>`, () => {
         const lines = document.getElementById('bulk-dept').value.split('\n');
@@ -540,7 +540,7 @@ window.deleteContact = function (clientId, index) {
     }
 };
 window.bulkUploadContacts = function (clientId) {
-    const client = window.state.clients.find(c => c.id === clientId);
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
     window.openModal('Bulk Contacts', `<textarea id="bulk-cont" rows="5" class="form-control" placeholder="Name, Email"></textarea>`, () => {
         const lines = document.getElementById('bulk-cont').value.split('\n');

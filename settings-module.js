@@ -692,7 +692,7 @@ function getAccreditationHTML() {
                     </div>
                     <div class="form-group">
                         <label>Accreditation Expiry</label>
-                        <input type="date" class="form-control" id="ab-expiry" value="${settings.accreditationExpiry || ''}">
+                        <input type="date" class="form-control" id="ab-expiry" value="${(settings.accreditationExpiry && settings.accreditationExpiry !== 'undefined') ? settings.accreditationExpiry : ''}">
                     </div>
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 0.5rem;">
