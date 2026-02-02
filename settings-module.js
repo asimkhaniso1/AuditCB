@@ -202,7 +202,7 @@ function getSettingsSubTabs(mainTab) {
         'system': [
             { id: 'defaults', label: 'Defaults', icon: 'fa-sliders' },
             { id: 'supabase', label: 'Supabase', icon: 'fa-cloud' },
-            // { id: 'data', label: 'Data Management', icon: 'fa-database' }, // Removed by user request
+            { id: 'data', label: 'Data Management', icon: 'fa-database' },
             { id: 'usage', label: 'Usage Analytics', icon: 'fa-chart-line' },
             { id: 'activity-log', label: 'Activity Log', icon: 'fa-history' }
         ]
