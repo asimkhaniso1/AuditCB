@@ -1992,7 +1992,7 @@ function getQualityPolicyHTML() {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                     <div class="form-group">
                         <label>Last Reviewed</label>
-                        <input type="date" class="form-control" id="policy-reviewed" value="${settings.policyLastReviewed}">
+                        <input type="date" class="form-control" id="policy-reviewed" value="${(settings.policyLastReviewed && settings.policyLastReviewed !== 'undefined') ? settings.policyLastReviewed : ''}">
                     </div>
                     <div class="form-group">
                         <label>Approved By</label>
@@ -2216,6 +2216,18 @@ function getCBPoliciesHTML() {
                 'Best practice recommendation',
                 'Clarification or enhancement of existing practice'
             ]
+        };
+    }
+
+    // Safety check: Ensure certDecisionRules exists
+    if (!policies.certDecisionRules) {
+        policies.certDecisionRules = {
+            grant: 'No Major NCs; all Minor NCs have acceptable corrective action plans',
+            deny: 'Unresolved Major NCs; multiple critical system failures',
+            suspend: 'Major NC identified during surveillance; client request; failure to permit audits',
+            withdraw: 'Continued suspension beyond 6 months; fraudulent use of certificate; client request',
+            reduce: 'Scope reduction when part of system no longer meets requirements',
+            expand: 'Successful audit of additional scope areas'
         };
     }
 
