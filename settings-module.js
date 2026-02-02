@@ -2231,6 +2231,25 @@ function getCBPoliciesHTML() {
         };
     }
 
+    // Safety check: Ensure capaTimelines exists
+    if (!policies.capaTimelines) {
+        policies.capaTimelines = {
+            majorCorrection: 90,
+            minorCorrection: 30,
+            observationResponse: 0,
+            capaVerification: 'Before next surveillance or within 90 days'
+        };
+    }
+
+    // Safety check: Ensure auditFrequency exists
+    if (!policies.auditFrequency) {
+        policies.auditFrequency = {
+            surveillance: '12 months (max)',
+            recertification: '36 months',
+            transferAudit: 'Before transfer completion'
+        };
+    }
+
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
