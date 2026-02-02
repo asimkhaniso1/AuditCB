@@ -1839,7 +1839,7 @@ window.saveNewClient = async function () {
     window._tempClientLogo = null;
 };
 
-};
+
 
 window.handleClientLogoUpload = function (input) {
     if (input.files && input.files[0]) {
