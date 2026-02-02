@@ -1339,26 +1339,41 @@ window.renderConfigureChecklist = function (planId) {
                                         </div>
                                         <span style="font-size: 0.8rem; color: var(--text-secondary);">Toggle items to include in audit scope</span>
                                     </div>
-                                    <div style="display: grid; grid-template-columns: 1fr; gap: 0.25rem;">
+                                    <table class="data-table" style="width: 100%; font-size: 0.9rem; border-collapse: collapse;">
+                                        <thead>
+                                            <tr style="background: #e2e8f0;">
+                                                <th style="width: 40px; padding: 8px; text-align: center;"><input type="checkbox" class="select-all-items-cb" data-checklist-id="${cl.id}" ${items.every(i => (!savedItems || savedItems.map(String).includes(String(i.id)))) ? 'checked' : ''} title="Select/Deselect All"></th>
+                                                <th style="width: 80px; padding: 8px; text-align: left;">Clause</th>
+                                                <th style="padding: 8px; text-align: left;">Requirement</th>
+                                                <th style="width: 50px; padding: 8px; text-align: center;">Edit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
                                         ${items.map(item => {
                 const itemSelected = isMainSelected ? (!savedItems || savedItems.map(String).includes(String(item.id))) : false;
                 const overrideText = (savedOverrides[cl.id] && savedOverrides[cl.id][item.id]) || item.text;
                 const isOverridden = !!(savedOverrides[cl.id] && savedOverrides[cl.id][item.id]);
 
                 return `
-                                                <div class="item-row" data-item-id="${item.id}" data-checklist-id="${cl.id}" style="display: flex; align-items: start; gap: 0.75rem; padding: 0.75rem; border-bottom: 1px solid #e2e8f0; background: white; border-radius: 4px;">
-                                                    <input type="checkbox" class="item-select-cb" data-item-id="${item.id}" data-checklist-id="${cl.id}" ${itemSelected ? 'checked' : ''} style="margin-top: 4px; cursor: pointer;">
-                                                    <div style="flex: 1; font-size: 0.9rem; line-height: 1.5;">
-                                                        <span style="font-weight: 600; color: #475569; margin-right: 0.5rem; font-family: monospace;">${item.clause || '-'}</span>
-                                                        <span class="item-text" style="${isOverridden ? 'color: #0369a1; font-style: italic; border-bottom: 1px dashed #0369a1;' : ''}">${window.UTILS.escapeHtml(overrideText)}</span>
-                                                    </div>
-                                                    <button class="btn btn-xs btn-icon" onclick="window.editConfigItemRequirement('${cl.id}', '${item.id}')" title="Override requirement text for this audit plan">
+                                            <tr class="item-row" data-item-id="${item.id}" data-checklist-id="${cl.id}" style="border-bottom: 1px solid #e2e8f0; ${isOverridden ? 'background: #eff6ff;' : ''}">
+                                                <td style="padding: 10px; text-align: center; vertical-align: top;">
+                                                    <input type="checkbox" class="item-select-cb" data-item-id="${item.id}" data-checklist-id="${cl.id}" ${itemSelected ? 'checked' : ''} style="cursor: pointer; width: 18px; height: 18px;">
+                                                </td>
+                                                <td style="padding: 10px; font-weight: 600; color: #475569; font-family: monospace; vertical-align: top;">${item.clause || '-'}</td>
+                                                <td style="padding: 10px; line-height: 1.5; vertical-align: top;">
+                                                    <span class="item-text" style="${isOverridden ? 'color: #0369a1; font-style: italic;' : ''}">${window.UTILS.escapeHtml(overrideText)}</span>
+                                                    ${isOverridden ? '<span style="margin-left: 8px; font-size: 0.7rem; background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 4px;">Overridden</span>' : ''}
+                                                </td>
+                                                <td style="padding: 10px; text-align: center; vertical-align: top;">
+                                                    <button class="btn btn-xs btn-icon" onclick="window.editConfigItemRequirement('${cl.id}', '${item.id}')" title="Override requirement text" style="background: none; border: none; cursor: pointer;">
                                                         <i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i>
                                                     </button>
-                                                </div>
-                                            `;
+                                                </td>
+                                            </tr>
+                                        `;
             }).join('')}
-                                    </div>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         `;
@@ -1412,6 +1427,20 @@ window.renderConfigureChecklist = function (planId) {
     `;
 
     window.contentArea.innerHTML = html;
+
+    // Add event listeners for table header select-all checkboxes
+    document.querySelectorAll('.select-all-items-cb').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const clId = cb.getAttribute('data-checklist-id');
+            const isChecked = cb.checked;
+            document.querySelectorAll(`.item-select-cb[data-checklist-id="${clId}"]`).forEach(itemCb => {
+                itemCb.checked = isChecked;
+            });
+            // Also toggle the main checklist checkbox
+            const mainCb = document.querySelector(`.checklist-select-cb[data-id="${clId}"]`);
+            if (mainCb && isChecked) mainCb.checked = true;
+        });
+    });
 };
 
 // HELPER ACTIONS FOR CONFIG
