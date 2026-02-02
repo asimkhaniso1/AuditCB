@@ -1,11 +1,12 @@
 /**
- * CLIENT MODULE FIXES - v4 (Complete)
+ * CLIENT MODULE FIXES - v5 (Complete with HTML Generators)
  * Exposes ALL functions to global scope that were accidentally privately scoped in clients-module.js
+ * INCLUDES HTML Generators to ensure they bind to the global functions.
  */
 console.log('[DEBUG] clients-module-fix.js loading...');
 
 // ============================================
-// 1. ORIGINAL FIXES (HTML GENERATORS)
+// 1. ORIGINAL FIXES (HTML GENERATORS - ORG SETUP)
 // ============================================
 
 window.getClientOrgSetupHTML = function (client) {
@@ -62,13 +63,13 @@ window.getClientOrgSetupHTML = function (client) {
 
 window.getClientOrgSetupHTML.renderWizardStep = function (client, step) {
     switch (step) {
-        case 1: return window.getClientProfileHTML ? window.getClientProfileHTML(client) : (typeof getClientProfileHTML === 'function' ? getClientProfileHTML(client) : 'Loading...');
-        case 2: return window.getClientSitesHTML ? window.getClientSitesHTML(client) : 'Loading...';
-        case 3: return window.getClientDepartmentsHTML ? window.getClientDepartmentsHTML(client) : 'Loading...';
-        case 4: return window.getClientDesignationsHTML ? window.getClientDesignationsHTML(client) : 'Loading...';
-        case 5: return window.getClientContactsHTML ? window.getClientContactsHTML(client) : 'Loading...';
-        case 6: return window.getClientGoodsServicesHTML ? window.getClientGoodsServicesHTML(client) : 'Loading...';
-        case 7: return window.getClientKeyProcessesHTML ? window.getClientKeyProcessesHTML(client) : 'Loading...';
+        case 1: return window.getClientProfileHTML(client);
+        case 2: return window.getClientSitesHTML(client);
+        case 3: return window.getClientDepartmentsHTML(client);
+        case 4: return window.getClientDesignationsHTML(client);
+        case 5: return window.getClientContactsHTML(client);
+        case 6: return window.getClientGoodsServicesHTML(client);
+        case 7: return window.getClientKeyProcessesHTML(client);
         default: return '';
     }
 };
@@ -165,9 +166,241 @@ window.updateSiteScope = function (clientId, certIndex, siteName, value) { const
 window.saveCertificateDetails = function (clientId) { if (window.saveData) window.saveData(); if (window.showNotification) window.showNotification('Saved', 'success'); };
 window.getClientSettingsHTML = function (client) { return `<div class="fade-in"><h3>Client Settings</h3><button class="btn btn-danger" onclick="window.deleteClient('${client.id}')">Delete Client</button></div>`; };
 
+// ============================================
+// 2. HTML GENERATORS (EXTRACTED)
+// ============================================
+
+window.getClientSitesHTML = function (client) {
+    // Redefined to use global window.addSite/editSite
+    return `
+    <!--Sites / Locations-->
+    <div class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites(${client.id})">
+                        <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.addSite(${client.id})">
+                        <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
+                    </button>
+                </div>
+                ` : ''}
+        </div>
+        ${(client.sites && client.sites.length > 0) ? `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Site Name</th><th>Standards</th><th>Address</th><th>City</th><th>Employees</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            ${client.sites.map((s, index) => `
+                                <tr>
+                                    <td style="font-weight: 500;">${window.UTILS.escapeHtml(s.name)}</td>
+                                    <td><span style="font-size: 0.85rem; color: var(--primary-color); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">${window.UTILS.escapeHtml(s.standards || 'Inherited')}</span></td>
+                                    <td>${window.UTILS.escapeHtml(s.address || '-')}</td>
+                                    <td>${window.UTILS.escapeHtml(s.city || '-')}</td>
+                                    <td>${s.employees || '-'}</td>
+                                    <td>
+                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                        <div style="display: flex; gap: 0.25rem;">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite(${client.id}, ${index})">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        ` : '-'}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <div style="text-align: center; padding: 2rem; background: #f8fafc;">
+                    <p style="color: var(--text-secondary); margin: 0;">No sites added yet.</p>
+                </div>
+            `}
+    </div>`;
+};
+
+window.getClientProfileHTML = function (client) {
+    const profile = client.profile || '';
+    const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div><h3 style="margin: 0;">Organization Context</h3><p>Last updated: ${lastUpdated}</p></div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">Edit Manually</button>
+                <button class="btn btn-sm" onclick="window.generateCompanyProfile(${client.id})">AI Generate</button>
+            </div>
+        </div>
+        ${profile ? `<div style="background: #f8fafc; padding: 1.5rem; white-space: pre-wrap;">${window.UTILS.escapeHtml(profile)}</div>` : `<div style="text-align: center; padding: 2rem;">No profile.</div>`}
+    </div>`;
+};
+
+window.getClientContactsHTML = function (client) {
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addContactPerson(${client.id})">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts(${client.id})">Bulk Upload</button>
+            </div>
+        </div>
+        ${(client.contacts && client.contacts.length > 0) ? `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
+                    <tbody>${client.contacts.map((c, index) => `
+                        <tr>
+                            <td>${window.UTILS.escapeHtml(c.name)}</td>
+                            <td>${window.UTILS.escapeHtml(c.email || '-')}</td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                        </tr>`).join('')}</tbody>
+                </table>
+            </div>` : `<p style="text-align: center;">No contacts added.</p>`}
+    </div>`;
+};
+
+window.getClientDepartmentsHTML = function (client) {
+    const departments = client.departments || [];
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                 <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
+                 <button class="btn btn-sm btn-secondary" onclick="window.addDepartment(${client.id})">Add Department</button>
+            </div>
+        </div>
+        ${departments.length > 0 ? `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Department Name</th><th>Head</th><th>Actions</th></tr></thead>
+                    <tbody>${departments.map((dept, index) => `
+                        <tr>
+                            <td>${window.UTILS.escapeHtml(dept.name)}</td>
+                            <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                        </tr>`).join('')}</tbody>
+                </table>
+            </div>` : `<div style="text-align: center; padding: 2rem;">No departments.</div>`}
+    </div>`;
+};
+
+window.getClientGoodsServicesHTML = function (client) {
+    const items = client.goodsServices || [];
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">Goods & Services</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices(${client.id})">Bulk Upload</button>
+            </div>
+        </div>
+        ${items.length > 0 ? `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Name</th><th>Category</th><th>Actions</th></tr></thead>
+                    <tbody>${items.map((item, index) => `
+                        <tr>
+                            <td>${window.UTILS.escapeHtml(item.name)}</td>
+                            <td>${window.UTILS.escapeHtml(item.category)}</td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                        </tr>`).join('')}</tbody>
+                </table>
+            </div>` : `<div style="text-align: center;">No items.</div>`}
+    </div>`;
+};
+
+window.getClientKeyProcessesHTML = function (client) {
+    const processes = client.keyProcesses || [];
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">Key Processes</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses(${client.id})">Bulk Upload</button>
+            </div>
+        </div>
+        ${processes.length > 0 ? `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Name</th><th>Category</th><th>Actions</th></tr></thead>
+                    <tbody>${processes.map((proc, index) => `
+                        <tr>
+                            <td>${window.UTILS.escapeHtml(proc.name)}</td>
+                            <td>${window.UTILS.escapeHtml(proc.category)}</td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                        </tr>`).join('')}</tbody>
+                </table>
+            </div>` : `<div style="text-align: center;">No processes.</div>`}
+    </div>`;
+};
+
+window.getClientDesignationsHTML = function (client) {
+    const designations = client.designations || [];
+    return `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">Designations</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation(${client.id})">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations(${client.id})">Bulk Upload</button>
+            </div>
+        </div>
+        ${designations.length > 0 ? `
+            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                ${designations.map((des, index) => `
+                    <div style="padding: 0.5rem 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 20px;">
+                        <span>${window.UTILS.escapeHtml(des.title)}</span>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); margin-left: 0.5rem;" onclick="window.deleteClientDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
+                    </div>`).join('')}
+            </div>` : `<div style="text-align: center;">No designations.</div>`}
+    </div>`;
+};
+
+window.getClientAuditTeamHTML = function (client) {
+    const assignments = window.state.auditorAssignments || [];
+    const auditors = window.state.auditors || [];
+    const assignedAuditorIds = assignments
+        .filter(a => String(a.clientId) === String(client.id))
+        .map(a => String(a.auditorId));
+    const assignedAuditors = auditors.filter(a => assignedAuditorIds.includes(String(a.id)));
+
+    return `
+    <div class="card" id="client-audit-team-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0;"><i class="fa-solid fa-user-shield" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Audit Team</h3>
+             <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal(${client.id}, '${window.UTILS.escapeHtml(client.name)}')">
+                <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
+            </button>
+        </div>
+        ${assignedAuditors.length > 0 ? `
+            <div style="display: grid; gap: 1rem;">
+                ${assignedAuditors.map(auditor => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                        <div>
+                            <div style="font-weight: 600;">${window.UTILS.escapeHtml(auditor.name)}</div>
+                            <div style="font-size: 0.85rem; color: #64748b;">${window.UTILS.escapeHtml(auditor.role || 'Auditor')}</div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment(${client.id}, ${auditor.id})"><i class="fa-solid fa-user-minus"></i> Remove</button>
+                    </div>`).join('')}
+            </div>` : `<div style="text-align: center; padding: 2rem;"><p>No auditors assigned.</p></div>`}
+    </div>`;
+};
+
 
 // ============================================
-// 2. CRUD FUNCTIONS (SITES)
+// 3. CRUD FUNCTIONS (SITES)
 // ============================================
 
 window.addSite = function (clientId) {
@@ -230,7 +463,7 @@ window.deleteSite = function (clientId, index) {
 };
 
 // ============================================
-// 3. CRUD FUNCTIONS (DEPARTMENTS)
+// 4. CRUD FUNCTIONS (DEPARTMENTS)
 // ============================================
 
 window.addDepartment = function (clientId) {
@@ -277,7 +510,7 @@ window.bulkUploadDepartments = function (clientId) {
 };
 
 // ============================================
-// 4. CRUD FUNCTIONS (CONTACTS)
+// 5. CRUD FUNCTIONS (CONTACTS)
 // ============================================
 
 window.addContactPerson = function (clientId) {
@@ -319,7 +552,7 @@ window.bulkUploadContacts = function (clientId) {
 };
 
 // ============================================
-// 5. CRUD FUNCTIONS (DESIGNATIONS)
+// 6. CRUD FUNCTIONS (DESIGNATIONS)
 // ============================================
 
 window.addClientDesignation = function (clientId) {
@@ -360,7 +593,7 @@ window.bulkUploadDesignations = function (clientId) {
 };
 
 // ============================================
-// 6. GOODS & PROCESSES
+// 7. GOODS & PROCESSES
 // ============================================
 window.addGoodsService = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
@@ -437,7 +670,7 @@ window.bulkUploadKeyProcesses = function (clientId) {
 };
 
 // ============================================
-// 7. AUDITOR ASSIGNMENT
+// 8. AUDITOR ASSIGNMENT
 // ============================================
 
 window.openClientAuditorAssignmentModal = function (clientId, clientName) {
@@ -482,3 +715,4 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
     window.showNotification('Removed');
 };
 
+console.log('[DEBUG] clients-module-fix.js loaded successfully with HTML generators.');
