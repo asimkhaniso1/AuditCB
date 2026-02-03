@@ -115,21 +115,55 @@ window.runAutoSummary = async function (reportId) {
     btn.disabled = true;
 
     try {
-        const result = await window.AI_SERVICE.draftExecutiveSummary(report);
+        // Gather compliant items for Positive Observations
+        const compliantItems = [];
+        const { assignedChecklists = [] } = window.state.auditPlans.find(p => p.id == report.planId) || {};
+
+        if (report.checklistProgress) {
+            report.checklistProgress.filter(p => p.status === 'compliant').forEach(item => {
+                let clauseTitle = '';
+                // Resolve clause title from checklist definition
+                const cl = assignedChecklists.find(c => c.id == item.checklistId);
+                if (cl) {
+                    if (cl.clauses) {
+                        const parts = String(item.itemIdx).split('-');
+                        if (parts.length === 2) {
+                            const main = cl.clauses.find(c => c.mainClause == parts[0]);
+                            if (main) clauseTitle = `${main.mainClause} ${main.title}`;
+                        }
+                    } else if (cl.items && cl.items[item.itemIdx]) {
+                        clauseTitle = cl.items[item.itemIdx].category || 'General';
+                    }
+                }
+                if (clauseTitle) compliantItems.push(clauseTitle);
+            });
+        }
+
+        // Deduplicate clauses
+        const uniqueCompliantAreas = [...new Set(compliantItems)];
+
+        const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas);
 
         if (result.executiveSummary) {
             report.executiveSummary = result.executiveSummary;
-            document.getElementById('exec-summary-' + reportId).value = result.executiveSummary;
+            const execInput = document.getElementById('exec-summary-' + reportId);
+            if (execInput) execInput.value = result.executiveSummary;
+        }
+
+        if (result.positiveObservations) {
+            report.positiveObservations = Array.isArray(result.positiveObservations) ? result.positiveObservations.join('\n') : result.positiveObservations;
+            const posInput = document.getElementById('positive-observations');
+            if (posInput) posInput.value = report.positiveObservations;
         }
 
         if (result.ofi && Array.isArray(result.ofi)) {
             report.ofi = result.ofi.join('\n');
-            // If there was an OFI field, update it. But in the unified view we currently mostly show Summary.
-            // We can assume it's saved in the object.
+            const ofiInput = document.getElementById('ofi');
+            if (ofiInput) ofiInput.value = report.ofi;
         }
 
         window.saveChecklist(reportId);
-        window.showNotification("Executive Summary drafted by AI.", "success");
+        window.showNotification("Executive Summary & Observations drafted by AI.", "success");
 
     } catch (error) {
         console.error("AI Summary Failed:", error);

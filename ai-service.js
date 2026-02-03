@@ -55,26 +55,38 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
     },
 
     // 2. Draft Executive Summary
-    draftExecutiveSummary: async (reportData) => {
+    draftExecutiveSummary: async (reportData, compliantAreas = []) => {
         const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc').length;
-        const prompt = `
-Act as a professional ISO Lead Auditor. Write an Executive Summary for an Audit Report.
 
-Client: ${reportData.client}
-Standard: ${reportData.standard || 'ISO Standard'}
-Date: ${reportData.date}
-Total Non-Conformities: ${ncCount}
+        let areaText = "No specific compliant areas recorded.";
+        if (compliantAreas.length > 0) {
+            areaText = compliantAreas.join(', ');
+        }
+
+        const prompt = `
+Act as a professional ISO Lead Auditor. Write an Executive Summary, Positive Observations, and Opportunities for Improvement for an Audit Report.
+
+Context:
+- Client: ${reportData.client}
+- Standard: ${reportData.standard || 'ISO Standard'}
+- Date: ${reportData.date}
+- Total Non-Conformities: ${ncCount}
+- Compliant Clauses/Areas: ${areaText}
 
 Instructions:
-1. Write a professional "Executive Summary" paragraph summarizing the overall audit conclusion (positive tone, highlighting cooperation).
-2. Write a bulleted list of "Key Strengths".
-3. Write a bulleted list of "Opportunities for Improvement" (general, not specific NCs).
-4. Return raw JSON: {"executiveSummary": "...", "strengths": ["...", "..."], "ofi": ["...", "..."]}
+1. Executive Summary: Write a professional paragraph summarizing the audit conclusion.
+2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above, generate 3-5 specific positive observations. Reference the specific clauses/headings provided (e.g. "Effective implementation of [Clause Name] was observed..."). Use professional reporting language.
+3. OFI: Write a list of general opportunities for improvement (not specific NCs).
+
+Return raw JSON:
+{
+  "executiveSummary": "...",
+  "positiveObservations": "...",  // Can be a single string with newlines or an array. Prefer a formatted string.
+  "ofi": ["...", "..."]
+}
 `;
         try {
             const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
-            // Parse logic might need to be slightly different if it's an object, but parseAgendaResponse handles JSON parsing generally.
-            // Let's reuse parseAgendaResponse but handle object return.
             const json = JSON.parse(apiResponseText.replace(/```json/g, '').replace(/```/g, '').trim());
             return json;
         } catch (error) {
