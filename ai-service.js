@@ -33,6 +33,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 - Total Man-Days: ${ctx.manDays}
 - On-Site Days: ${ctx.onsiteDays}
 - Audit Team: ${ctx.team.join(', ')}
+- Departments: ${ctx.departments && ctx.departments.length ? ctx.departments.join(', ') : 'All/General'}
 
 **Requirements:**
 1. Create a day-by-day schedule covering ${ctx.onsiteDays} days.
@@ -117,8 +118,12 @@ Example:
             }
         }
 
-        // FALLBACK: If proxy failed (likely running locally), try direct API call with client-side key
-        if (proxyFailed) {
+        // Determine if we should try fallback
+        const hasClientKey = window.state?.settings?.geminiApiKey || localStorage.getItem('geminiApiKey');
+        const shouldTryDirect = proxyFailed || (lastError && hasClientKey);
+
+        // FALLBACK: If proxy failed or errored (and we have a key), try direct API call
+        if (shouldTryDirect) {
             console.log('Proxy unavailable. Attempting direct Gemini API call...');
 
             // Get API key from settings
