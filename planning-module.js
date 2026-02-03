@@ -1031,7 +1031,7 @@ function viewAuditPlan(id) {
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-primary" style="width: 100%;" onclick="window.navigateToAuditExecution(${plan.id})">
+                        <button class="btn btn-primary" style="width: 100%;" onclick="window.navigateToAuditExecution('${plan.id}')">
                             ${report ? 'Continue Audit' : 'Start Audit'}
                         </button>
                     </div>
@@ -1484,7 +1484,7 @@ window.saveChecklistConfiguration = async function (planId) {
     document.querySelectorAll('.checklist-card').forEach(card => {
         const clCb = card.querySelector('.checklist-select-cb');
         if (clCb.checked) {
-            const clId = parseInt(clCb.getAttribute('data-id'));
+            const clId = clCb.getAttribute('data-id');
             selectedChecklists.push(clId);
 
             const selectedItems = [];

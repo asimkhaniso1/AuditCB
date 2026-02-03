@@ -188,7 +188,7 @@ function renderAuditExecutionEnhanced() {
         document.querySelectorAll('.view-execution, .execution-row').forEach(el => {
             el.addEventListener('click', (e) => {
                 if (!e.target.closest('.edit-execution')) {
-                    const reportId = parseInt(el.getAttribute('data-report-id'));
+                    const reportId = el.getAttribute('data-report-id');
                     renderExecutionDetail(reportId);
                 }
             });
@@ -197,7 +197,7 @@ function renderAuditExecutionEnhanced() {
         document.querySelectorAll('.edit-execution').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const reportId = parseInt(btn.getAttribute('data-report-id'));
+                const reportId = btn.getAttribute('data-report-id');
                 openEditReportModal(reportId);
             });
         });
@@ -205,7 +205,7 @@ function renderAuditExecutionEnhanced() {
         document.querySelectorAll('.delete-execution').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const reportId = parseInt(btn.getAttribute('data-report-id'));
+                const reportId = btn.getAttribute('data-report-id');
                 deleteAuditReport(reportId);
             });
         });
@@ -401,8 +401,8 @@ function openCreateReportModal() {
                 }).catch(err => console.error('Failed to insert report to cloud:', err));
 
                 // 2. Update Plan
-                window.SupabaseClient.db.update('audit_plans', parseInt(plan.id), {
-                    report_id: parseInt(newReport.id),
+                window.SupabaseClient.db.update('audit_plans', String(plan.id), {
+                    report_id: String(newReport.id),
                     status: 'Completed'
                 }).catch(err => console.error('Failed to update plan in cloud:', err));
             }
@@ -620,7 +620,7 @@ function renderExecutionDetail(reportId) {
                         <h2 style="margin-bottom: 0.5rem;">Audit Execution: ${report.client}</h2>
                         <p style="color: var(--text-secondary);">Audit Date: ${report.date} | Status: ${report.status}</p>
                     </div>
-                    <button class="btn btn-primary" onclick="window.generateAuditReport(${report.id})">
+                    <button class="btn btn-primary" onclick="window.generateAuditReport('${report.id}')">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report
                     </button>
                 </div>
@@ -945,7 +945,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
 
                         <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-secondary" onclick="window.addCustomQuestion(${report.id})">
+                            <button class="btn btn-secondary" onclick="window.addCustomQuestion('${report.id}')">
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
                             <div style="position: relative;">
@@ -975,7 +975,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-primary" onclick="window.saveChecklist(${report.id})" id="save-progress-btn">
+                            <button class="btn btn-primary" onclick="window.saveChecklist('${report.id}')" id="save-progress-btn">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                             </button>
                         </div>
@@ -984,7 +984,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     ${checklistHTML}
                     
                     <div style="text-align: center; margin-top: 2rem; padding: 2rem; background: #f8fafc; border-radius: 8px;">
-                        <button class="btn btn-primary btn-lg" onclick="window.saveChecklist(${report.id})">
+                        <button class="btn btn-primary btn-lg" onclick="window.saveChecklist('${report.id}')">
                             <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Save All Progress
                         </button>
                     </div>
