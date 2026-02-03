@@ -667,10 +667,10 @@ function renderExecutionDetail(reportId) {
             </div>
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
-                <button class="tab-btn active" data-tab="checklist">Checklist</button>
                 <button class="tab-btn" data-tab="meetings" style="background: #eff6ff; color: #1d4ed8;">
                     <i class="fa-solid fa-handshake" style="margin-right: 0.25rem;"></i>Meetings
                 </button>
+                <button class="tab-btn active" data-tab="checklist">Checklist</button>
                 <button class="tab-btn" data-tab="ncr">NCRs</button>
                 <button class="tab-btn" data-tab="capa">CAPA</button>
                 <button class="tab-btn" data-tab="observations">Observations</button>
@@ -1239,7 +1239,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             `;
             break;
 
-        case 'finalization': {
+        case 'review': {
             // UNIFIED DASHBOARD: MERGES REVIEW & SUMMARY
             // Auditor's Findings Review & Final Submission Screen
             const allFindings = [];
