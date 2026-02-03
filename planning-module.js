@@ -2034,6 +2034,10 @@ async function generateAIAgenda() {
         const team = Array.from(document.getElementById('plan-team').selectedOptions).map(o => o.value);
         const fullTeam = [leadAuditor, ...team].filter(Boolean);
 
+        // Fetch Client Departments for Context
+        const clientObj = window.state.clients.find(c => c.name === clientName);
+        const departments = clientObj ? (clientObj.departments || []) : [];
+
         const context = {
             client: clientName,
             standard: standard,
@@ -2041,7 +2045,8 @@ async function generateAIAgenda() {
             manDays: manDays,
             onsiteDays: onsiteDays,
             sites: selectedSites,
-            team: fullTeam
+            team: fullTeam,
+            departments: departments // Add departments to context
         };
 
         const agenda = await window.AI_SERVICE.generateAuditAgenda(context);
