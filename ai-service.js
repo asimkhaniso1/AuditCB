@@ -20,6 +20,69 @@ const AI_SERVICE = {
         }
     },
 
+    // ------------------------------------------------------------------
+    // NEW: Smart Analysis Features
+    // ------------------------------------------------------------------
+
+    // 1. Auto-Classify Findings
+    analyzeFindings: async (findings) => {
+        if (!findings || findings.length === 0) return [];
+
+        // Prepare simplified list for AI to save tokens
+        const simplifedFindings = findings.map((f, idx) => ({
+            id: idx,
+            description: f.description,
+            remarks: f.remarks || f.transcript || ''
+        }));
+
+        const prompt = `
+You are a Lead Auditor. Classify the following audit findings based on ISO 19011 and ISO 17021 principles.
+Determines if each finding is: "Major", "Minor", or "Observation".
+
+Findings:
+${JSON.stringify(simplifedFindings, null, 2)}
+
+Return a raw JSON array of objects with 'id' and 'type' only.
+Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
+`;
+        try {
+            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
+            return AI_SERVICE.parseAgendaResponse(apiResponseText);
+        } catch (error) {
+            console.error("AI Analysis Error:", error);
+            throw error;
+        }
+    },
+
+    // 2. Draft Executive Summary
+    draftExecutiveSummary: async (reportData) => {
+        const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc').length;
+        const prompt = `
+Act as a professional ISO Lead Auditor. Write an Executive Summary for an Audit Report.
+
+Client: ${reportData.client}
+Standard: ${reportData.standard || 'ISO Standard'}
+Date: ${reportData.date}
+Total Non-Conformities: ${ncCount}
+
+Instructions:
+1. Write a professional "Executive Summary" paragraph summarizing the overall audit conclusion (positive tone, highlighting cooperation).
+2. Write a bulleted list of "Key Strengths".
+3. Write a bulleted list of "Opportunities for Improvement" (general, not specific NCs).
+4. Return raw JSON: {"executiveSummary": "...", "strengths": ["...", "..."], "ofi": ["...", "..."]}
+`;
+        try {
+            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
+            // Parse logic might need to be slightly different if it's an object, but parseAgendaResponse handles JSON parsing generally.
+            // Let's reuse parseAgendaResponse but handle object return.
+            const json = JSON.parse(apiResponseText.replace(/```json/g, '').replace(/```/g, '').trim());
+            return json;
+        } catch (error) {
+            console.error("AI Summary Error:", error);
+            throw error;
+        }
+    },
+
     // Construct the prompt based on plan details
     buildPrompt: (ctx) => {
         return `

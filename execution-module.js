@@ -1239,8 +1239,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             `;
             break;
 
-        case 'review': {
-            // Auditor's Findings Review Screen
+        case 'finalization': {
+            // UNIFIED DASHBOARD: MERGES REVIEW & SUMMARY
+            // Auditor's Findings Review & Final Submission Screen
             const allFindings = [];
 
             // Destructure for lookup
@@ -1299,74 +1300,101 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             });
 
             const isReadyToSubmit = allFindings.length === 0 || allFindings.every(f => f.type !== 'pending');
+            const currentUserRole = window.state.currentUser?.role || 'Auditor';
+            const canOneClickFinalize = ['Lead Auditor', 'Admin', 'Certification Manager', 'Manager'].includes(currentUserRole);
+
+            let primaryActionBtn = '';
+            if (canOneClickFinalize) {
+                primaryActionBtn = `
+                    <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" onclick="window.finalizeAndPublish('${report.id}')" ${!isReadyToSubmit ? 'disabled' : ''}>
+                        <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Finalize & Publish
+                    </button>
+                `;
+            } else {
+                primaryActionBtn = `
+                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" onclick="window.submitToLeadAuditor('${report.id}')" ${!isReadyToSubmit ? 'disabled' : ''}>
+                        <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit for Review
+                    </button>
+                `;
+            }
+
 
             tabContent.innerHTML = `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div class="card" style="border-top: 4px solid var(--primary-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                         <div>
-                            <h3 style="margin: 0;"><i class="fa-solid fa-clipboard-check" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Review Your Findings</h3>
-                            <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Review all flagged items before submitting to Lead Auditor for classification.</p>
+                            <h3 style="margin: 0; font-size: 1.5rem; background: linear-gradient(90deg, #1e293b, #475569); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                                <i class="fa-solid fa-flag-checkered" style="color: var(--primary-color); -webkit-text-fill-color: initial; margin-right: 0.5rem;"></i> Audit Finalization
+                            </h3>
+                            <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-size: 0.95rem;">Review findings, generate AI summaries, and finalize the report.</p>
                         </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-secondary" onclick="window.saveChecklist('${report.id}')">
-                                <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
+                        <div style="display: flex; gap: 0.75rem;">
+                             <button class="btn btn-outline-secondary" onclick="window.saveChecklist('${report.id}')">
+                                <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Draft
                             </button>
-                            <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;" onclick="window.submitToLeadAuditor('${report.id}')" ${!isReadyToSubmit ? '' : ''}>
-                                <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit to Lead Auditor
-                            </button>
+                            ${primaryActionBtn}
+                        </div>
+                    </div>
+
+                    <!-- 1. High Level Stats -->
+                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                        <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="font-size: 2rem; font-weight: 800; color: #3b82f6; line-height: 1;">${allFindings.length}</div>
+                            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Total Findings</div>
+                        </div>
+                        <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #fee2e2; box-shadow: 0 1px 3px rgba(220, 38, 38, 0.05);">
+                            <div style="font-size: 2rem; font-weight: 800; color: #dc2626; line-height: 1;">${allFindings.filter(f => f.type === 'major').length}</div>
+                            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Major NC</div>
+                        </div>
+                        <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #fef3c7; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.05);">
+                            <div style="font-size: 2rem; font-weight: 800; color: #d97706; line-height: 1;">${allFindings.filter(f => f.type === 'minor').length}</div>
+                            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Minor NC</div>
+                        </div>
+                        <div style="background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #f3e8ff; box-shadow: 0 1px 3px rgba(139, 92, 246, 0.05);">
+                            <div style="font-size: 2rem; font-weight: 800; color: #8b5cf6; line-height: 1;">${allFindings.filter(f => f.type === 'observation').length}</div>
+                            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">Observations</div>
                         </div>
                     </div>
                     
-                    <!-- Summary Stats -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                        <div style="background: #eff6ff; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${allFindings.length}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Total Findings</div>
+                    <!-- 2. Findings Review -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Findings & Classification</h4>
+                            <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" onclick="window.runFollowUpAIAnalysis('${report.id}')">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify
+                            </button>
                         </div>
-                        <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc2626;">${allFindings.filter(f => f.type === 'major').length}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Major</div>
-                        </div>
-                        <div style="background: #fef3c7; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${allFindings.filter(f => f.type === 'minor').length}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Minor</div>
-                        </div>
-                        <div style="background: #f3e8ff; padding: 1rem; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;">${allFindings.filter(f => f.type === 'observation').length}</div>
-                            <div style="font-size: 0.8rem; color: #64748b;">Observations</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Findings List -->
-                    ${allFindings.length > 0 ? `
-                        <div style="max-height: 500px; overflow-y: auto;">
+
+                         ${allFindings.length > 0 ? `
+                        <div style="max-height: 600px; overflow-y: auto; padding-right: 5px;">
                             ${allFindings.map((f, idx) => `
-                                <div class="card" style="margin-bottom: 0.75rem; padding: 1rem; border-left: 4px solid ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'};">
-                                    <div style="display: grid; grid-template-columns: 1fr 150px 200px; gap: 1rem; align-items: start;">
+                                <div class="card" style="margin-bottom: 1rem; padding: 1.25rem; border-left: 5px solid ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'}; transition: transform 0.2s;">
+                                    <div style="display: grid; grid-template-columns: 1fr 180px 250px; gap: 1.5rem; align-items: start;">
                                         <!-- Finding Details Column -->
                                         <div>
-                                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                                <span style="background: ${f.type === 'major' ? '#fef2f2' : f.type === 'minor' ? '#fffbeb' : '#f5f3ff'}; color: ${f.type === 'major' ? '#dc2626' : f.type === 'minor' ? '#d97706' : '#8b5cf6'}; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">${f.source}</span>
-                                                <span style="font-weight: 600; color: #1e293b;">Finding #${idx + 1}</span>
-                                                ${f.hasEvidence ? `<img src="${f.evidenceImage}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0;" title="Evidence attached">` : ''}
+                                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                                                <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${f.source}</span>
+                                                <span style="font-weight: 700; color: #1e293b;">#${idx + 1}</span>
+                                                ${f.hasEvidence ? `<span onclick="window.viewEvidenceImage('${f.id.replace('checklist-', '').replace('ncr-', '')}')" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
                                             </div>
                                             ${f.clause || f.requirement ? `
-                                                <div style="font-size: 0.8rem; color: var(--primary-color); margin-bottom: 0.25rem; font-weight: 600;">
-                                                    ${f.clause ? `${f.clause}: ` : ''}${f.requirement || ''}
+                                                <div style="font-size: 0.85rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 0.75rem;">
+                                                    <strong style="color: var(--primary-color);">${f.clause ? `${f.clause}` : 'Requirement'}:</strong> 
+                                                    <span style="color: #334155;">${f.requirement || ''}</span>
                                                 </div>
                                             ` : ''}
-                                            <div style="font-weight: 500; color: #374151; margin-bottom: 0.5rem;">${f.description}</div>
+                                            <div style="font-weight: 500; color: #334155; line-height: 1.5; margin-bottom: 0.5rem;">${f.description}</div>
                                             ${f.designation || f.department ? `
-                                                <div style="font-size: 0.8rem; color: #64748b;">
-                                                    <i class="fa-solid fa-user" style="width: 14px;"></i> ${f.designation || '-'} | 
-                                                    <i class="fa-solid fa-building" style="width: 14px;"></i> ${f.department || '-'}
+                                                <div style="font-size: 0.8rem; color: #64748b; display: flex; gap: 1rem;">
+                                                    <span><i class="fa-solid fa-user" style="width: 14px;"></i> ${f.designation || '-'}</span> 
+                                                    <span><i class="fa-solid fa-building" style="width: 14px;"></i> ${f.department || '-'}</span>
                                                 </div>
                                             ` : ''}
                                         </div>
                                         <!-- Severity Column -->
                                         <div>
-                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Severity</label>
-                                            <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.85rem;">
+                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Severity Classification</label>
+                                            <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.9rem; padding: 0.4rem;">
                                                 <option value="observation" ${f.type === 'observation' ? 'selected' : ''}>Observation</option>
                                                 <option value="minor" ${f.type === 'minor' ? 'selected' : ''}>Minor NC</option>
                                                 <option value="major" ${f.type === 'major' ? 'selected' : ''}>Major NC</option>
@@ -1374,28 +1402,56 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         </div>
                                         <!-- Remarks Column -->
                                         <div>
-                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Auditor Remarks</label>
-                                            <input type="text" class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Add notes..." value="${f.remarks || ''}" style="font-size: 0.85rem;">
+                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
+                                            <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
                                         </div>
                                     </div>
                                 </div>
                             `).join('')}
                         </div>
                     ` : `
-                        <div style="text-align: center; padding: 3rem; background: #f0fdf4; border-radius: 8px;">
-                            <i class="fa-solid fa-check-circle" style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;"></i>
-                            <h4 style="margin: 0 0 0.5rem 0; color: #16a34a;">No Findings Recorded</h4>
-                            <p style="color: #64748b; margin: 0;">This audit has no non-conformities. Ready to submit!</p>
+                        <div style="text-align: center; padding: 4rem 2rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+                            <div style="width: 64px; height: 64px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; font-size: 2rem;">
+                                <i class="fa-solid fa-check"></i>
+                            </div>
+                            <h4 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.2rem;">Detailed Audit Complete!</h4>
+                            <p style="color: #64748b; margin: 0; max-width: 400px; margin: 0 auto;">No non-conformities were raised during this audit. You can proceed to generate the summary confirming full compliance.</p>
                         </div>
                     `}
+                    </div>
+
+                    <!-- 3. Executive Summary Generation -->
+                    <div style="background: linear-gradient(to right, #f8fafc, #f1f5f9); padding: 2rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
+                                <i class="fa-solid fa-pen-nib" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Executive Summary & Reporting
+                            </h4>
+                             <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none;" onclick="window.runAutoSummary('${report.id}')">
+                                <i class="fa-solid fa-robot" style="margin-right: 0.5rem;"></i> AI Draft Summary
+                            </button>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+                             <!-- Executive Summary -->
+                             <div>
+                                <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Executive Summary</label>
+                                <textarea id="exec-summary-${report.id}" class="form-control" rows="5" placeholder="Overall conclusion on the effectiveness of the management system...">${report.executiveSummary || ''}</textarea>
+                             </div>
+                        </div>
+                    </div>
+
                 </div>
             `;
         }
             break;
 
         case 'summary':
-            // Delegate to Reporting Module
-            window.renderReportSummaryTab(report, tabContent);
+            // LEGACY: Redirect to Finalization or Show Simplified View
+            tabContent.innerHTML = `<div class="alert alert-info">Moved to <strong>Finalization</strong> tab.</div>`;
+            // Auto switch
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="review"]').click();
+            }, 500);
             break;
 
         case 'meetings':
