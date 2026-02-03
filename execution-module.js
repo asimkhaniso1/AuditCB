@@ -845,12 +845,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             const isSelective = Array.isArray(allowedIds);
 
                             // Filter valid items first
-                            const validSubClauses = clause.subClauses.filter((item, subIdx) => {
-                                const itemId = `${clause.mainClause}-${subIdx}`;
-                                return !isSelective || allowedIds.includes(itemId);
-                            });
+                            const itemsToRender = clause.subClauses
+                                .map((item, subIdx) => ({ item, itemId: `${clause.mainClause}-${subIdx}` }))
+                                .filter(obj => !isSelective || allowedIds.includes(obj.itemId));
 
-                            if (validSubClauses.length === 0) return ''; // Skip empty clauses
+                            if (itemsToRender.length === 0) return ''; // Skip empty clauses
 
                             const sectionId = `clause-${checklist.id}-${clause.mainClause}`;
                             const renderedItems = itemsToRender.map(obj => {

@@ -1263,6 +1263,7 @@ window.closeAuditPlan = function (planId) {
 // FULL-FORM CHECKLIST CONFIGURATION (Local Overrides for Audit Plans)
 window.renderConfigureChecklist = function (planId) {
     if (!window.state) return;
+    const state = window.state;
     const plan = state.auditPlans.find(p => String(p.id) === String(planId));
     if (!plan) return;
 
