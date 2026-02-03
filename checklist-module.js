@@ -959,12 +959,12 @@ function attachRemoveRowListeners() {
 }
 
 function openEditChecklistModal(id) {
-    const checklist = state.checklists?.find(c => c.id === id);
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
     if (!checklist) return;
 
-    const userRole = state.currentUser?.role;
-    const isAdmin = state.settings?.isAdmin || false;
-    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const userRole = (state.currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     // Check permission for global checklists
