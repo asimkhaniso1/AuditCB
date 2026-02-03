@@ -2047,7 +2047,8 @@ async function generateAIAgenda() {
             onsiteDays: onsiteDays,
             sites: selectedSites,
             team: fullTeam,
-            departments: departments // Add departments to context
+            departments: departments,
+            designations: clientObj ? (clientObj.designations || []) : []
         };
 
         const agenda = await window.AI_SERVICE.generateAuditAgenda(context);

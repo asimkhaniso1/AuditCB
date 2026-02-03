@@ -673,11 +673,9 @@ function renderExecutionDetail(reportId) {
                 <button class="tab-btn active" data-tab="checklist">Checklist</button>
                 <button class="tab-btn" data-tab="ncr">NCRs</button>
                 <button class="tab-btn" data-tab="capa">CAPA</button>
-                <button class="tab-btn" data-tab="observations">Observations</button>
                 <button class="tab-btn" data-tab="review">
                     <i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i> Review & Submit
                 </button>
-                <button class="tab-btn" data-tab="summary">Summary</button>
             </div>
 
             <div id="tab-content"></div>
@@ -1209,34 +1207,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             break;
 
         case 'observations':
-            tabContent.innerHTML = `
-                <div class="card">
-                    <h3 style="margin-bottom: 1.5rem;">Observations & Recommendations</h3>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Positive Observations</h4>
-                        <textarea id="positive-observations" rows="4" placeholder="Document good practices and positive findings...">${report.positiveObservations || ''}</textarea>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Opportunities for Improvement</h4>
-                        <textarea id="ofi" rows="4" placeholder="Suggestions for improvement (not non-conformities)...">${report.ofi || ''}</textarea>
-                    </div>
-
-                    <div>
-                        <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Evidence Collected</h4>
-                        <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 2px dashed var(--border-color); text-align: center;">
-                            <i class="fa-solid fa-upload" style="font-size: 2rem; color: var(--text-secondary); margin-bottom: 0.5rem;"></i>
-                            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Drag & drop files or click to upload</p>
-                            <button class="btn btn-secondary">Browse Files</button>
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary" style="margin-top: 1.5rem;" onclick="saveObservations('${report.id}')">
-                        <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Observations
-                    </button>
-                </div>
-            `;
+            // Redirect to Unified Review Tab
+            tabContent.innerHTML = `<div class="alert alert-info">Moved to <strong>Finalization</strong> tab for unified reporting.</div>`;
+            setTimeout(() => {
+                document.querySelector('.tab-btn[data-tab="review"]').click();
+            }, 500);
             break;
 
         case 'review': {
@@ -1438,6 +1413,36 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <textarea id="exec-summary-${report.id}" class="form-control" rows="5" placeholder="Overall conclusion on the effectiveness of the management system...">${report.executiveSummary || ''}</textarea>
                              </div>
                         </div>
+
+                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+                            <div>
+                                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Positive Observations</h4>
+                                <textarea id="positive-observations" class="form-control" rows="4" placeholder="Document good practices and positive findings...">${report.positiveObservations || ''}</textarea>
+                            </div>
+                            <div>
+                                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Opportunities for Improvement</h4>
+                                <textarea id="ofi" class="form-control" rows="4" placeholder="Suggestions for improvement (not non-conformities)...">${report.ofi || ''}</textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Audit Conclusion / Recommendation -->
+                             <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
+                                <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Audit Conclusion & Recommendation</label>
+                                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="radio" name="recommendation-${report.id}" value="Recommended" ${report.recommendation === 'Recommended' ? 'checked' : ''} onchange="window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();">
+                                        <span style="margin-left: 0.5rem;">Recommended for Certification</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="radio" name="recommendation-${report.id}" value="Pending" ${report.recommendation === 'Pending' ? 'checked' : ''} onchange="window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();">
+                                        <span style="margin-left: 0.5rem;">Recommended Pending Plan Verification</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="radio" name="recommendation-${report.id}" value="Not Recommended" ${report.recommendation === 'Not Recommended' ? 'checked' : ''} onchange="window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();">
+                                        <span style="margin-left: 0.5rem;">Not Recommended (Major NCs)</span>
+                                    </label>
+                                </div>
+                             </div>
                     </div>
 
                 </div>
@@ -1781,6 +1786,16 @@ window.saveChecklist = function (reportId) {
             }
         });
     }
+
+    // Save Executive Summary & Observations (Unified View)
+    const execSumInput = document.getElementById(`exec-summary-${reportId}`);
+    if (execSumInput) report.executiveSummary = Sanitizer.sanitizeText(execSumInput.value);
+
+    const posObsInput = document.getElementById('positive-observations');
+    if (posObsInput) report.positiveObservations = Sanitizer.sanitizeText(posObsInput.value);
+
+    const ofiInput = document.getElementById('ofi');
+    if (ofiInput) report.ofi = Sanitizer.sanitizeText(ofiInput.value);
 
     // Persist to Database (Async)
     (async () => {

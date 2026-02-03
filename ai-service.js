@@ -82,21 +82,19 @@ Instructions:
             throw error;
         }
     },
-
     // Construct the prompt based on plan details
     buildPrompt: (ctx) => {
         return `
 You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit Agenda/Itinerary (in valid JSON format) for the following audit plan.
 
-**Audit Details:**
+**Context:**
 - Client: ${ctx.client}
-- Standard(s): ${ctx.standard}
+- Standard: ${ctx.standard}
 - Audit Type: ${ctx.type}
-- Sites: ${ctx.sites.map(s => s.name).join(', ') || 'Main Site'}
-- Total Man-Days: ${ctx.manDays}
-- On-Site Days: ${ctx.onsiteDays}
-- Audit Team: ${ctx.team.join(', ')}
-- Departments: ${ctx.departments && ctx.departments.length ? ctx.departments.join(', ') : 'All/General'}
+- Duration: ${ctx.manDays} Man-days (${ctx.onsiteDays} On-site Days)
+- Sites: ${ctx.sites.map(s => s.name).join(', ')}
+- Departments: ${(ctx.departments || []).join(', ')}
+- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}
 
 **Requirements:**
 1. Create a day-by-day schedule covering ${ctx.onsiteDays} days.
@@ -107,6 +105,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 6. Ensure multiple sites are visited if applicable.
 7. In the "Activity / Clause" column, provide ONLY the Clause Number and Title (e.g., "5.1 Leadership"). Do NOT include the full requirement text or summaries. Keep it a single line.
 8. Times should be in "HH:MM - HH:MM" format.
+9. In the "Department / Auditee" column, use the provided Departments AND Designations. Be specific (e.g., "HR / HR Manager").
 
 **Output Format:**
 Return ONLY a raw JSON array of objects. Do not include markdown formatting (like \`\`\`json).
@@ -140,16 +139,21 @@ Example:
                 });
 
                 if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    // Special handling for 404 (Not Found) or 400 (Bad Request) which might indicate model issues
-                    if (response.status === 404 || response.status === 400) {
-                        console.warn(`Model ${model} failed: ${data.error || response.statusText}. Retrying with next model...`);
-                        lastError = new Error(data.error || `Model ${model} unavailable`);
-                        continue; // Try next model
+                    const text = await response.text();
+                    console.error('AI Proxy Error Response:', text);
+
+                    try {
+                        const data = JSON.parse(text);
+                        // Special handling for 404 (Not Found) or 400 (Bad Request) which might indicate model issues
+                        if (response.status === 404 || response.status === 400) {
+                            console.warn(`Model ${model} failed: ${data.error || response.statusText}. Retrying with next model...`);
+                            lastError = new Error(data.error || `Model ${model} unavailable`);
+                            continue; // Try next model
+                        }
+                        lastError = new Error(data.error || `AI Service Error: ${response.status} `);
+                    } catch (e) {
+                        lastError = new Error(`AI Service connection failed: ${response.status} ${response.statusText} `);
                     }
-                    // For other errors (500, etc), might still be worth retrying or throwing immediate?
-                    // Let's retry for robustness
-                    lastError = new Error(data.error || 'AI Service Unavailable');
                     continue;
                 }
 
@@ -170,7 +174,7 @@ Example:
                 return AI_SERVICE.extractTextFromResponse(data);
 
             } catch (error) {
-                console.error(`Error with model ${model}:`, error);
+                console.error(`Error with model ${model}: `, error);
                 lastError = error;
 
                 // Check if this is a network/fetch error indicating the API isn't available
@@ -202,7 +206,7 @@ Example:
             // Try direct API call
             for (const model of models) {
                 try {
-                    console.log(`Attempting direct Gemini API with model: ${model}`);
+                    console.log(`Attempting direct Gemini API with model: ${model} `);
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
                     const response = await fetch(url, {
