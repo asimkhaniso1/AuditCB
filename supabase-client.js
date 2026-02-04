@@ -1259,7 +1259,6 @@ const SupabaseClient = {
                     keyProcesses: client.key_processes || [],
                     contactPerson: client.contact_person,
                     nextAudit: client.next_audit,
-                    lastAudit: client.last_audit,
                     updatedAt: client.updated_at,
                     logoUrl: client.logo_url
                 };
