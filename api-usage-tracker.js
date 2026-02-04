@@ -122,6 +122,31 @@ const APIUsageTracker = {
 
         Logger.info(`[APIUsageTracker] Logged: ${feature} - ${inputTokens + outputTokens} tokens, $${totalCost.toFixed(6)}`);
 
+        // SYNC TO SUPABASE (Fire and Forget)
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            const user = window.state?.currentUser;
+            const logEntry = {
+                timestamp: callRecord.timestamp,
+                feature: feature,
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cost: totalCost,
+                success: success,
+                model: params.model || 'unknown',
+                user_id: user ? user.id : null,
+                metadata: { source: 'web_client' }
+            };
+
+            window.SupabaseClient.client
+                .from('api_usage_logs')
+                .insert(logEntry)
+                .then(({ error }) => {
+                    if (error) console.warn('[APIUsageTracker] Failed to push log to Supabase:', error);
+                    else console.log('[APIUsageTracker] Log pushed to Supabase');
+                })
+                .catch(err => console.error('[APIUsageTracker] Supabase Sync Error:', err));
+        }
+
         return callRecord;
     },
 

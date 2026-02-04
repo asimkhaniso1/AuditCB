@@ -466,6 +466,7 @@ window.downloadAuditReportPDF = async function (reportId) {
     // Save current state first
     window.saveData();
 
+    const report = state.auditReports.find(r => r.id === reportId);
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;
@@ -1260,6 +1261,7 @@ window.generateAuditReport = function (reportId) {
     // Save current state first to ensure all changes are captured
     window.saveData();
 
+    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;
@@ -1418,6 +1420,7 @@ window.renderReportingModule = renderReportingModule;
  * Uses html2pdf.js to generate PDF and uploads to Supabase
  */
 window.uploadReportToCloud = async function (reportId) {
+    const report = state.auditReports.find(r => r.id === reportId);
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;
