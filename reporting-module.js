@@ -466,11 +466,44 @@ window.downloadAuditReportPDF = async function (reportId) {
     // Save current state first
     window.saveData();
 
-    const report = state.auditReports.find(r => r.id === reportId);
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;
     }
+
+    // CRITICAL FIX: Sync data from DOM before generating
+    // This ensures that latest edits are captured even if "Save" wasn't clicked
+    if (document.getElementById('exec-summary')) report.execSummary = document.getElementById('exec-summary').value;
+    if (document.getElementById('conclusion')) report.conclusion = document.getElementById('conclusion').value;
+    if (document.getElementById('strengths')) report.strengths = document.getElementById('strengths').value;
+    if (document.getElementById('improvements')) report.improvements = document.getElementById('improvements').value;
+    if (document.getElementById('recommendation')) report.recommendation = document.getElementById('recommendation').value;
+
+    // Sync Evidence & Agenda
+    if (document.getElementById('audit-agenda')) report.auditAgenda = document.getElementById('audit-agenda').value;
+    if (document.getElementById('interviewees')) report.interviewees = document.getElementById('interviewees').value;
+    if (document.getElementById('documents-reviewed')) report.documentsReviewed = document.getElementById('documents-reviewed').value;
+
+    // Sync Meetings matches existing logic
+    const od = document.getElementById('opening-date');
+    const oa = document.getElementById('opening-attendees');
+    if (od || oa) {
+        report.openingMeeting = {
+            dateTime: od?.value || report.openingMeeting?.dateTime || '',
+            attendees: oa?.value ? oa.value.split(',').map(s => s.trim()).filter(s => s) : (report.openingMeeting?.attendees || [])
+        };
+    }
+    const cd = document.getElementById('closing-date');
+    const ca = document.getElementById('closing-attendees');
+    if (cd || ca) {
+        report.closingMeeting = {
+            dateTime: cd?.value || report.closingMeeting?.dateTime || '',
+            attendees: ca?.value ? ca.value.split(',').map(s => s.trim()).filter(s => s) : (report.closingMeeting?.attendees || [])
+        };
+    }
+
+    // Persist these changes
+    window.saveData();
 
     // Check if html2pdf is available
     if (typeof html2pdf === 'undefined') {
@@ -1227,11 +1260,44 @@ window.generateAuditReport = function (reportId) {
     // Save current state first to ensure all changes are captured
     window.saveData();
 
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;
     }
+
+    // CRITICAL FIX: Sync data from DOM before generating
+    // This ensures that latest edits are captured even if "Save" wasn't clicked
+    if (document.getElementById('exec-summary')) report.execSummary = document.getElementById('exec-summary').value;
+    if (document.getElementById('conclusion')) report.conclusion = document.getElementById('conclusion').value;
+    if (document.getElementById('strengths')) report.strengths = document.getElementById('strengths').value;
+    if (document.getElementById('improvements')) report.improvements = document.getElementById('improvements').value;
+    if (document.getElementById('recommendation')) report.recommendation = document.getElementById('recommendation').value;
+
+    // Sync Evidence & Agenda
+    if (document.getElementById('audit-agenda')) report.auditAgenda = document.getElementById('audit-agenda').value;
+    if (document.getElementById('interviewees')) report.interviewees = document.getElementById('interviewees').value;
+    if (document.getElementById('documents-reviewed')) report.documentsReviewed = document.getElementById('documents-reviewed').value;
+
+    // Sync Meetings matches existing logic
+    const od = document.getElementById('opening-date');
+    const oa = document.getElementById('opening-attendees');
+    if (od || oa) {
+        report.openingMeeting = {
+            dateTime: od?.value || report.openingMeeting?.dateTime || '',
+            attendees: oa?.value ? oa.value.split(',').map(s => s.trim()).filter(s => s) : (report.openingMeeting?.attendees || [])
+        };
+    }
+    const cd = document.getElementById('closing-date');
+    const ca = document.getElementById('closing-attendees');
+    if (cd || ca) {
+        report.closingMeeting = {
+            dateTime: cd?.value || report.closingMeeting?.dateTime || '',
+            attendees: ca?.value ? ca.value.split(',').map(s => s.trim()).filter(s => s) : (report.closingMeeting?.attendees || [])
+        };
+    }
+
+    // Persist these changes
+    window.saveData();
 
     try {
         const plan = state.auditPlans.find(p => p.client === report.client) || {};
@@ -1352,11 +1418,44 @@ window.renderReportingModule = renderReportingModule;
  * Uses html2pdf.js to generate PDF and uploads to Supabase
  */
 window.uploadReportToCloud = async function (reportId) {
-    const report = state.auditReports.find(r => r.id === reportId);
     if (!report) {
         window.showNotification('Report not found', 'error');
         return;
     }
+
+    // CRITICAL FIX: Sync data from DOM before generating
+    // This ensures that latest edits are captured even if "Save" wasn't clicked
+    if (document.getElementById('exec-summary')) report.execSummary = document.getElementById('exec-summary').value;
+    if (document.getElementById('conclusion')) report.conclusion = document.getElementById('conclusion').value;
+    if (document.getElementById('strengths')) report.strengths = document.getElementById('strengths').value;
+    if (document.getElementById('improvements')) report.improvements = document.getElementById('improvements').value;
+    if (document.getElementById('recommendation')) report.recommendation = document.getElementById('recommendation').value;
+
+    // Sync Evidence & Agenda
+    if (document.getElementById('audit-agenda')) report.auditAgenda = document.getElementById('audit-agenda').value;
+    if (document.getElementById('interviewees')) report.interviewees = document.getElementById('interviewees').value;
+    if (document.getElementById('documents-reviewed')) report.documentsReviewed = document.getElementById('documents-reviewed').value;
+
+    // Sync Meetings matches existing logic
+    const od = document.getElementById('opening-date');
+    const oa = document.getElementById('opening-attendees');
+    if (od || oa) {
+        report.openingMeeting = {
+            dateTime: od?.value || report.openingMeeting?.dateTime || '',
+            attendees: oa?.value ? oa.value.split(',').map(s => s.trim()).filter(s => s) : (report.openingMeeting?.attendees || [])
+        };
+    }
+    const cd = document.getElementById('closing-date');
+    const ca = document.getElementById('closing-attendees');
+    if (cd || ca) {
+        report.closingMeeting = {
+            dateTime: cd?.value || report.closingMeeting?.dateTime || '',
+            attendees: ca?.value ? ca.value.split(',').map(s => s.trim()).filter(s => s) : (report.closingMeeting?.attendees || [])
+        };
+    }
+
+    // Persist these changes
+    window.saveData();
 
     // Check if html2pdf is available
     if (typeof html2pdf === 'undefined') {
