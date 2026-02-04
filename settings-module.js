@@ -345,7 +345,6 @@ window.runSupabaseDiagnostics = async function () {
             name: 'Diagnostic Test',
             status: 'Active',
             contact_person: 'Test Person',
-            next_audit: null,
             updated_at: new Date().toISOString()
         };
 
