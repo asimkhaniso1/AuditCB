@@ -1390,10 +1390,8 @@ window.openReportingDetail = function (reportId) {
             <div id="reporting-detail-container"></div>
         </div>
     `;
-    <div id="reporting-detail-container"></div>
-        </div >
-        `;
-    
+
+
     // Fix: Ensure we get the fresh element reference
     const contentArea = document.getElementById('content-area');
     if (!contentArea) {
@@ -1501,7 +1499,7 @@ window.uploadReportToCloud = async function (reportId) {
         const pdfBlob = await html2pdf()
             .set({
                 margin: [15, 10, 15, 10],
-                filename: `Report_${ report.id }.pdf`,
+                filename: `Report_${report.id}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 enableLinks: true,
                 html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -1550,7 +1548,7 @@ window.runContextAnalysis = function (reportId) {
     const report = state.auditReports.find(r => r.id === reportId);
     if (!report) return;
 
-    const resultDiv = document.getElementById(`ai - context - result - ${ reportId } `);
+    const resultDiv = document.getElementById(`ai - context - result - ${reportId} `);
     if (resultDiv) {
         resultDiv.style.display = 'block';
         resultDiv.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Analyzing historical context...';
@@ -1560,7 +1558,7 @@ window.runContextAnalysis = function (reportId) {
             // Mock fetching previous report
             const prevReport = state.auditReports.find(r => r.client === report.client && r.id !== reportId && r.status === 'Finalized');
             const historyText = prevReport
-                ? `Compared to previous report(${ prevReport.date }): Improvement shown in Clause 9. Performance evaluation is consistent.`
+                ? `Compared to previous report(${prevReport.date}): Improvement shown in Clause 9. Performance evaluation is consistent.`
                 : 'No historical data available for direct comparison.';
 
             const findingCount = (report.ncrs || []).length;
@@ -1604,11 +1602,11 @@ window.classifyFinding = function (reportId, source, index, newType) {
         if (btn) btn.click();
     }, 100);
 
-    window.showNotification(`Finding classified as ${ newType.toUpperCase() } `);
+    window.showNotification(`Finding classified as ${newType.toUpperCase()} `);
 };
 
 window.autoClassifyFinding = function (reportId, source, index, description) {
-    const btnId = `ai - btn - ${ source } -${ index } `;
+    const btnId = `ai - btn - ${source} -${index} `;
     const btn = document.getElementById(btnId);
     if (btn) {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AI Analyzing...';
@@ -1626,7 +1624,7 @@ window.autoClassifyFinding = function (reportId, source, index, description) {
             reasoning = "Potential systemic failure or regulatory issue";
         }
 
-        if (confirm(`AI Analysis Result: \nSuggested: ${ suggestedType.toUpperCase() } \nReason: ${ reasoning } \n\nApply this classification ? `)) {
+        if (confirm(`AI Analysis Result: \nSuggested: ${suggestedType.toUpperCase()} \nReason: ${reasoning} \n\nApply this classification ? `)) {
             window.classifyFinding(reportId, source, index, suggestedType);
         } else {
             if (btn) {
@@ -1868,18 +1866,18 @@ window.generateAIConclusion = async function (reportId) {
     // 1. Checklist Findings (status is stored as 'nc' lowercase)
     (report.checklistProgress || []).forEach(item => {
         if (item.status === 'nc') {
-            findings.push(`[${ item.ncrType || 'Minor' }] ${ item.comment || item.ncrDescription || 'Checklist Finding' } `);
+            findings.push(`[${item.ncrType || 'Minor'}] ${item.comment || item.ncrDescription || 'Checklist Finding'} `);
         }
     });
     // 2. Manual NCRs
     (report.ncrs || []).forEach(ncr => {
-        findings.push(`[${ ncr.type || 'Minor' }] ${ ncr.description } (Clause: ${ ncr.clause })`);
+        findings.push(`[${ncr.type || 'Minor'}] ${ncr.description} (Clause: ${ncr.clause})`);
     });
 
     const findingsText = findings.length > 0 ? findings.join('; ') : 'No Non-Conformities found. The audit was seamless.';
 
     // Show Loading
-    const btn = document.getElementById(`btn - ai - draft - ${ reportId } `);
+    const btn = document.getElementById(`btn - ai - draft - ${reportId} `);
     const originalText = btn ? btn.innerHTML : '';
     if (btn) {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
@@ -1891,12 +1889,12 @@ window.generateAIConclusion = async function (reportId) {
     const prompt = `
     You are an expert ISO Lead Auditor.Write a professional Audit Report Summary(JSON format) for:
 
-        Client: ${ report.client }
-    Industry: ${ client ? client.industry : 'N/A' }
-    Standard: ${ report.standard || 'ISO 9001:2015' }
+        Client: ${report.client}
+    Industry: ${client ? client.industry : 'N/A'}
+    Standard: ${report.standard || 'ISO 9001:2015'}
     Audit Type: Stage 2 / Surveillance
 
-    Findings: ${ findingsText }
+    Findings: ${findingsText}
     
     Please generate:
     1. Executive Summary(Professional overview of the audit outcome).
@@ -1915,90 +1913,90 @@ window.generateAIConclusion = async function (reportId) {
         let data;
         let useTemplate = false;
         try {
-            const cleanText = responseText.replace(/```json / g, '').replace(/```/g, '').trim();
-    data = JSON.parse(cleanText);
-} catch (e) {
-    console.error('JSON Parse Error', e);
-    console.log('[AI Draft] Falling back to template-based generation...');
-    useTemplate = true;
-}
+            const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            data = JSON.parse(cleanText);
+        } catch (e) {
+            console.error('JSON Parse Error', e);
+            console.log('[AI Draft] Falling back to template-based generation...');
+            useTemplate = true;
+        }
 
-// Populate Fields helper
-const setVal = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) {
-        el.value = val;
-        // Update report object for persistence
-        report[id === 'exec-summary' ? 'execSummary' : id] = val;
-    }
-};
+        // Populate Fields helper
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = val;
+                // Update report object for persistence
+                report[id === 'exec-summary' ? 'execSummary' : id] = val;
+            }
+        };
 
-if (!useTemplate && data) {
-    // AI response parsed successfully
-    if (data.executiveSummary) setVal('exec-summary', data.executiveSummary);
-    if (data.strengths) setVal('strengths', data.strengths);
-    if (data.improvements) setVal('improvements', data.improvements);
-    if (data.conclusion) setVal('conclusion', data.conclusion);
-    window.showNotification('Audit Report drafted successfully!', 'success');
-} else {
-    // Fallback: Template-based generation
-    const plan = window.state.auditPlans.find(p => p.client === report.client) || {};
-    const ncrCount = findings.length;
-    const majorCount = findings.filter(f => f.toLowerCase().includes('[major]')).length;
-    const minorCount = ncrCount - majorCount;
+        if (!useTemplate && data) {
+            // AI response parsed successfully
+            if (data.executiveSummary) setVal('exec-summary', data.executiveSummary);
+            if (data.strengths) setVal('strengths', data.strengths);
+            if (data.improvements) setVal('improvements', data.improvements);
+            if (data.conclusion) setVal('conclusion', data.conclusion);
+            window.showNotification('Audit Report drafted successfully!', 'success');
+        } else {
+            // Fallback: Template-based generation
+            const plan = window.state.auditPlans.find(p => p.client === report.client) || {};
+            const ncrCount = findings.length;
+            const majorCount = findings.filter(f => f.toLowerCase().includes('[major]')).length;
+            const minorCount = ncrCount - majorCount;
 
-    const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${report.standard || plan.standard || 'the applicable standard'}. The primary objective was to verify compliance and effectiveness of the management system.
+            const execSummary = `The audit of ${report.client} was conducted on ${report.date} against the requirements of ${report.standard || plan.standard || 'the applicable standard'}. The primary objective was to verify compliance and effectiveness of the management system.
 
 During the audit, a total of ${ncrCount} non-conformities were identified (${majorCount} Major, ${minorCount} Minor). The audit team reviewed objective evidence including documentation, records, and interviewed key personnel.
 
 Overall, the management system demonstrates a ${majorCount > 0 ? 'partial' : 'high level of'} compliance.`;
 
-    const strengths = `• Strong commitment from top management towards quality objectives.
+            const strengths = `• Strong commitment from top management towards quality objectives.
 • Documentation structure is comprehensive and easily accessible.
 • Employee awareness regarding policy and objectives is commendable.
 • Infrastructure and resources are well-maintained.`;
 
-    const improvements = `• Need to strengthen the internal audit mechanism to capture process deviations earlier.
+            const improvements = `• Need to strengthen the internal audit mechanism to capture process deviations earlier.
 • Document control for external origin documents needs review.
 • Training records for temporary staff could be better organized.`;
 
-    const conclusion = ncrCount === 0
-        ? `Based on the audit results, the management system is found to be properly maintained and compliant. No non-conformities were raised. It is recommended to continue certification.`
-        : `The management system is generally effective, with the exception of the identified non-conformities. The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days. Subject to the acceptance of the corrective actions, certification is recommended.`;
+            const conclusion = ncrCount === 0
+                ? `Based on the audit results, the management system is found to be properly maintained and compliant. No non-conformities were raised. It is recommended to continue certification.`
+                : `The management system is generally effective, with the exception of the identified non-conformities. The organization is requested to provide a root cause analysis and a corrective action plan for the ${ncrCount} findings within 30 days. Subject to the acceptance of the corrective actions, certification is recommended.`;
 
-    setVal('exec-summary', execSummary);
-    setVal('strengths', strengths);
-    setVal('improvements', improvements);
-    setVal('conclusion', conclusion);
+            setVal('exec-summary', execSummary);
+            setVal('strengths', strengths);
+            setVal('improvements', improvements);
+            setVal('conclusion', conclusion);
 
-    window.showNotification('Audit Report drafted (using template fallback)!', 'success');
-}
+            window.showNotification('Audit Report drafted (using template fallback)!', 'success');
+        }
 
-// Auto-save the draft
-if (window.saveReportDraft) {
-    window.saveReportDraft(reportId, true); // true = silent save
-}
+        // Auto-save the draft
+        if (window.saveReportDraft) {
+            window.saveReportDraft(reportId, true); // true = silent save
+        }
 
     } catch (err) {
-    console.error('AI Draft Error:', err);
-    window.showNotification('AI service error. Using template...', 'warning');
+        console.error('AI Draft Error:', err);
+        window.showNotification('AI service error. Using template...', 'warning');
 
-    // Ultimate fallback - generate basic template even if AI call fails completely
-    const plan = window.state.auditPlans.find(p => p.client === report.client) || {};
-    const setVal = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val;
-    };
+        // Ultimate fallback - generate basic template even if AI call fails completely
+        const plan = window.state.auditPlans.find(p => p.client === report.client) || {};
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        };
 
-    setVal('exec-summary', `The audit of ${report.client} was conducted to assess compliance with ${report.standard || 'the applicable management system standard'}.`);
-    setVal('strengths', '• Management commitment evident\n• Documented procedures in place');
-    setVal('improvements', '• Continuous improvement opportunities identified');
-    setVal('conclusion', 'Further review of findings is recommended before certification decision.');
+        setVal('exec-summary', `The audit of ${report.client} was conducted to assess compliance with ${report.standard || 'the applicable management system standard'}.`);
+        setVal('strengths', '• Management commitment evident\n• Documented procedures in place');
+        setVal('improvements', '• Continuous improvement opportunities identified');
+        setVal('conclusion', 'Further review of findings is recommended before certification decision.');
 
-} finally {
-    if (btn) {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
-}
 };
