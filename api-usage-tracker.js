@@ -73,7 +73,7 @@ const APIUsageTracker = {
      * @param {number} params.outputTokens - Number of output tokens
      * @param {boolean} params.success - Whether the call was successful
      */
-    logUsage({ feature, inputTokens = 0, outputTokens = 0, success = true }) {
+    logUsage({ feature, inputTokens = 0, outputTokens = 0, success = true, model = 'unknown' }) {
         const data = this.getUsageData() || this.resetUsageData();
 
         // Calculate cost for this call
@@ -132,7 +132,7 @@ const APIUsageTracker = {
                 output_tokens: outputTokens,
                 cost: totalCost,
                 success: success,
-                model: params.model || 'unknown',
+                model: model,
                 user_id: user ? user.id : null,
                 metadata: { source: 'web_client' }
             };
