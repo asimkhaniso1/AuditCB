@@ -709,8 +709,9 @@ function generateReportHTML(report, plan, client) {
     // Compliance Score Logic
     const complianceScore = Math.max(0, 100 - (majorCount * 15) - (minorCount * 5));
     const conformHeight = complianceScore;
-    const majorHeight = Math.min(100, majorCount * 15 + 10);
-    const minorHeight = Math.min(100, minorCount * 10 + 10);
+    // Scale bar heights: minimum 15px when count > 0, max 150px, proportional scaling
+    const majorHeight = majorCount > 0 ? Math.min(150, Math.max(30, majorCount * 30)) : 10;
+    const minorHeight = minorCount > 0 ? Math.min(150, Math.max(30, minorCount * 20)) : 10;
 
     // Get audit team
     const leadAuditor = state.auditors.find(a => plan.auditors?.includes(a.id));
