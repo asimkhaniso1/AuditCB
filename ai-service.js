@@ -364,7 +364,7 @@ window.AI_SERVICE = AI_SERVICE;
 
 // 1. Finalize & Publish (One-Click Workflow)
 window.finalizeAndPublish = function (reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     if (!confirm('Are you sure you want to finalize and publish this report? This will lock the audit.')) return;
@@ -400,7 +400,7 @@ window.finalizeAndPublish = function (reportId) {
 
 // 2. AI Auto-Analysis for Findings
 window.runFollowUpAIAnalysis = async function (reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     const btn = document.querySelector(`button[onclick="window.runFollowUpAIAnalysis('${reportId}')"]`);
@@ -458,7 +458,7 @@ window.runFollowUpAIAnalysis = async function (reportId) {
 
 // 3. AI Auto-Summary Generation
 window.runAutoSummary = async function (reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
     const btn = document.querySelector(`button[onclick="window.runAutoSummary('${reportId}')"]`);
@@ -471,7 +471,7 @@ window.runAutoSummary = async function (reportId) {
         // Gather compliant items for Positive Observations
         const compliantItems = [];
         const plan = window.state.auditPlans.find(p => p.id == report.planId) || {};
-        const assignedChecklists = (state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
+        const assignedChecklists = (window.state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
 
         if (report.checklistProgress) {
             report.checklistProgress.filter(p => p.status === 'compliant' || p.status === 'conform').forEach(item => {
