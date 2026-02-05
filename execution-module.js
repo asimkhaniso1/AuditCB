@@ -1279,7 +1279,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const canOneClickFinalize = ['Lead Auditor', 'Admin', 'Certification Manager', 'Manager'].includes(currentUserRole);
 
             let primaryActionBtn = '';
-            if (canOneClickFinalize) {
+
+            if (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED) {
+                primaryActionBtn = `
+                    <button class="btn btn-secondary" onclick="window.downloadAuditReportPDF('${report.id}')">
+                        <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="window.generateAuditReport('${report.id}')">
+                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
+                    </button>
+                `;
+            } else if (canOneClickFinalize) {
                 primaryActionBtn = `
                     <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" onclick="window.finalizeAndPublish('${report.id}')" ${!isReadyToSubmit ? 'disabled' : ''}>
                         <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Finalize & Publish
@@ -1425,6 +1435,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                         </div>
                         
+
+                        <!-- Meeting Records Section -->
+                        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
+                            <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Meeting Records</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                <!-- Opening Meeting -->
+                                <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #2563eb;">Opening Meeting</label>
+                                    <input type="datetime-local" id="opening-date-${report.id}" class="form-control" style="margin-bottom: 0.5rem;" value="${report.openingMeeting?.dateTime || ''}" onchange="window.updateMeetingData('${report.id}', 'opening', 'dateTime', this.value)">
+                                    <textarea id="opening-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'opening', 'attendees', this.value)">${(report.openingMeeting?.attendees || []).join(', ')}</textarea>
+                                </div>
+                                <!-- Closing Meeting -->
+                                <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px dashed #fdba74;">
+                                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #ea580c;">Closing Meeting</label>
+                                    <input type="datetime-local" id="closing-date-${report.id}" class="form-control" style="margin-bottom: 0.5rem;" value="${report.closingMeeting?.dateTime || ''}" onchange="window.updateMeetingData('${report.id}', 'closing', 'dateTime', this.value)">
+                                    <textarea id="closing-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'closing', 'attendees', this.value)">${(report.closingMeeting?.attendees || []).join(', ')}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Audit Conclusion / Recommendation -->
                              <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
                                 <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Audit Conclusion & Recommendation</label>
@@ -2880,3 +2910,23 @@ document.addEventListener('click', function (e) {
         }
     }
 }, true); // true = capture phase
+
+// Helper to update meeting records (Opening/Closing)
+window.updateMeetingData = function (reportId, meetingType, field, value) {
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+    if (!report) return;
+
+    if (!report[meetingType + 'Meeting']) {
+        report[meetingType + 'Meeting'] = {};
+    }
+
+    if (field === 'attendees') {
+        // Split by comma and clean up
+        report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+    } else {
+        report[meetingType + 'Meeting'][field] = value;
+    }
+
+    window.saveData();
+    window.saveChecklist(reportId);
+};

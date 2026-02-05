@@ -231,9 +231,7 @@ function renderClientSidebarMenu(clientId) {
             <li onclick="window.location.hash = 'client/${clientId}/execution'">
                 <i class="fa-solid fa-tasks"></i> Execution
             </li>
-            <li onclick="window.location.hash = 'client/${clientId}/reporting'">
-                <i class="fa-solid fa-file-pen"></i> Reporting
-            </li>
+
         </div>
 
         <!-- Group: Outcomes -->
@@ -354,9 +352,7 @@ window.renderClientModule = function (clientId, moduleName) {
         case 'execution':
             contentArea.innerHTML = renderClientExecution(client);
             break;
-        case 'reporting':
-            contentArea.innerHTML = renderClientReporting(client);
-            break;
+
         case 'findings':
             contentArea.innerHTML = renderClientFindings(client);
             break;
@@ -1217,118 +1213,10 @@ function renderClientExecution(client) {
     `;
 }
 
-// Client reporting - finalized reports
-function renderClientReporting(client) {
-    const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client) && r.status === 'Finalized');
-
-    // Calculate metrics
-    const totalReports = reports.length;
-    const recommendedCount = reports.filter(r => r.recommendation?.includes('Recommend')).length;
-    const conditionalCount = reports.filter(r => r.recommendation?.includes('Conditional')).length;
-    const notRecommendedCount = reports.filter(r => r.recommendation?.includes('Not Recommend')).length;
-    const totalFindings = reports.reduce((sum, r) => sum + (r.ncrs || r.findings || []).length, 0);
-    const majorFindings = reports.reduce((sum, r) => sum + (r.ncrs || r.findings || []).filter(f => f.type === 'Major').length, 0);
-
-    if (reports.length === 0) {
-        return `
-            <div class="card" style="text-align: center; padding: 3rem;">
-                <i class="fa-solid fa-file-alt" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                <p style="color: var(--text-secondary);">No finalized reports for this client yet.</p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">Reports will appear here once audits are completed and finalized.</p>
-            </div>
-        `;
-    }
-
-    return `
-        <!-- Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
-                <i class="fa-solid fa-file-alt" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalReports}</p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Reports</p>
-            </div>
-            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
-                <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${recommendedCount}</p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Recommended</p>
-                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${conditionalCount} conditional</p>
-            </div>
-            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${majorFindings > 0 ? '#f59e0b' : '#10b981'};">
-                <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: ${majorFindings > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
-                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalFindings}</p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Findings</p>
-                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">${majorFindings} major</p>
-            </div>
-            ${notRecommendedCount > 0 ? `
-            <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #dc2626;">
-                <i class="fa-solid fa-times-circle" style="font-size: 1.5rem; color: #dc2626; margin-bottom: 0.5rem;"></i>
-                <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${notRecommendedCount}</p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Not Recommended</p>
-            </div>
-            ` : ''}
-        </div>
-
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0;">Finalized Audit Reports</h3>
-                <span class="badge" style="background: #d1fae5; color: #065f46;">${reports.length} Reports</span>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Auditor</th>
-                            <th>Findings</th>
-                            <th>Recommendation</th>
-                            <th>Finalized</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
-        const findingsCount = (r.ncrs || r.findings || []).length;
-        const finalizedDate = r.finalizedAt ? window.UTILS.formatDate(r.finalizedAt) : '-';
-
-        return `
-                            <tr>
-                                <td>${r.date || '-'}</td>
-                                <td>${r.type || 'Audit'}</td>
-                                <td>${r.auditor || r.lead || '-'}</td>
-                                <td>
-                                    <span class="badge" style="background: ${findingsCount > 0 ? '#fef3c7' : '#d1fae5'}; color: ${findingsCount > 0 ? '#d97706' : '#065f46'};">
-                                        ${findingsCount} ${findingsCount === 1 ? 'finding' : 'findings'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="badge" style="background: ${r.recommendation?.includes('Recommend') ? '#d1fae5' : '#fee2e2'}; color: ${r.recommendation?.includes('Recommend') ? '#065f46' : '#dc2626'};">
-                                        ${r.recommendation || '-'}
-                                    </span>
-                                </td>
-                                <td>${finalizedDate}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-icon" onclick="window.openReportingDetail && window.openReportingDetail(${r.id})" title="View Report">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-icon" onclick="window.downloadReport && window.downloadReport(${r.id})" title="Download PDF">
-                                        <i class="fa-solid fa-download"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `}).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-}
-
 // Client findings/NCs
 function renderClientFindings(client) {
     const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
     const allFindings = reports.flatMap(r => (r.ncrs || r.findings || []).map(f => ({ ...f, reportId: r.id, reportDate: r.date })));
-
     const totalFindings = allFindings.length;
     const majorNCs = allFindings.filter(f => f.type === 'Major').length;
     const minorNCs = allFindings.filter(f => f.type === 'Minor').length;
@@ -1336,16 +1224,16 @@ function renderClientFindings(client) {
 
     if (allFindings.length === 0) {
         return `
-            <div class="card" style="text-align: center; padding: 3rem;">
+        < div class="card" style = "text-align: center; padding: 3rem;" >
                 <i class="fa-solid fa-check-circle" style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No findings recorded for this client.</p>
-            </div>
+            </div >
         `;
     }
 
     return `
-        <div class="fade-in">
-            <!-- Summary Cards -->
+        < div class="fade-in" >
+            < !--Summary Cards-- >
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
                     <i class="fa-solid fa-search" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
@@ -1402,8 +1290,8 @@ function renderClientFindings(client) {
                     </table>
                 </div>
             </div>
-        </div>
-    `;
+        </div >
+        `;
 }
 
 // Client certificates - UNIFIED with Settings → Scopes
@@ -1416,7 +1304,7 @@ function renderClientCertificates(client) {
 
     if (certs.length === 0) {
         return `
-            <div class="card" style="text-align: center; padding: 3rem;">
+        < div class="card" style = "text-align: center; padding: 3rem;" >
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No certificates configured for this client yet.</p>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
@@ -1425,13 +1313,13 @@ function renderClientCertificates(client) {
                 <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);">
                     <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
                 </button>
-            </div>
+            </div >
         `;
     }
 
     return `
-        <div class="fade-in">
-            <!-- Summary Cards -->
+        < div class="fade-in" >
+            < !--Summary Cards-- >
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
                     <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
@@ -1445,7 +1333,7 @@ function renderClientCertificates(client) {
                 </div>
             </div>
 
-            <!-- Client Context: Goods/Services & Processes (from Org Setup) -->
+            <!--Client Context: Goods / Services & Processes(from Org Setup)-- >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0;">
                     <h4 style="margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
@@ -1514,8 +1402,8 @@ function renderClientCertificates(client) {
                     </table>
                 </div>
             </div>
-        </div>
-    `;
+        </div >
+        `;
 }
 
 // Re-populate sidebar when state changes
