@@ -1444,13 +1444,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
                                     <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #2563eb;">Opening Meeting</label>
                                     <input type="datetime-local" id="opening-date-${report.id}" class="form-control" style="margin-bottom: 0.5rem;" value="${report.openingMeeting?.dateTime || ''}" onchange="window.updateMeetingData('${report.id}', 'opening', 'dateTime', this.value)">
-                                    <textarea id="opening-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'opening', 'attendees', this.value)">${(report.openingMeeting?.attendees || []).join(', ')}</textarea>
+                                    <textarea id="opening-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'opening', 'attendees', this.value)">${Array.isArray(report.openingMeeting?.attendees) ? report.openingMeeting.attendees.join(', ') : (report.openingMeeting?.attendees || '')}</textarea>
                                 </div>
                                 <!-- Closing Meeting -->
                                 <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px dashed #fdba74;">
                                     <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #ea580c;">Closing Meeting</label>
                                     <input type="datetime-local" id="closing-date-${report.id}" class="form-control" style="margin-bottom: 0.5rem;" value="${report.closingMeeting?.dateTime || ''}" onchange="window.updateMeetingData('${report.id}', 'closing', 'dateTime', this.value)">
-                                    <textarea id="closing-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'closing', 'attendees', this.value)">${(report.closingMeeting?.attendees || []).join(', ')}</textarea>
+                                    <textarea id="closing-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'closing', 'attendees', this.value)">${Array.isArray(report.closingMeeting?.attendees) ? report.closingMeeting.attendees.join(', ') : (report.closingMeeting?.attendees || '')}</textarea>
                                 </div>
                             </div>
                         </div>
