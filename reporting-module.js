@@ -1207,17 +1207,17 @@ function validateReportData(report, plan, client) {
     const errors = [];
     const warnings = [];
 
-    // Critical validations
+    // Changed from errors to warnings - allow generation with defaults
     if (!report.execSummary || report.execSummary.trim() === '') {
-        errors.push('❌ Executive Summary is missing');
+        warnings.push('⚠️ Executive Summary is empty - a placeholder will be used');
     }
 
     if (!report.conclusion || report.conclusion.trim() === '') {
-        errors.push('❌ Conclusion is missing');
+        warnings.push('⚠️ Conclusion is empty - a placeholder will be used');
     }
 
     if (!report.recommendation) {
-        errors.push('❌ Certification Recommendation is missing');
+        warnings.push('⚠️ Certification Recommendation is missing - defaulting to "Pending"');
     }
 
     // Warning validations
