@@ -252,7 +252,7 @@ Example:
                     return AI_SERVICE.extractTextFromResponse(data);
 
                 } catch (error) {
-                    console.error(`Direct API error with ${model}:`, error);
+                    console.warn(`Direct API fallback: ${model} unavailable, trying next...`);
                     lastError = error;
                 }
             }
@@ -300,7 +300,7 @@ Example:
                     }
                     return AI_SERVICE.extractTextFromResponse(data);
                 } catch (e) {
-                    console.error(`Dynamic model ${model} failed:`, e);
+                    console.warn(`Dynamic model ${model} unavailable, trying next...`);
                 }
             }
 
