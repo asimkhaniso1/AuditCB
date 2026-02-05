@@ -123,18 +123,25 @@ const APIUsageTracker = {
         Logger.info(`[APIUsageTracker] Logged: ${feature} - ${inputTokens + outputTokens} tokens, $${totalCost.toFixed(6)}`);
 
         // SYNC TO SUPABASE (Fire and Forget)
+        // SYNC TO SUPABASE (Fire and Forget)
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
             const user = window.state?.currentUser;
+
+            // Map to 'audit_log' schema which uses 'details' JSONB column
             const logEntry = {
-                timestamp: callRecord.timestamp,
-                feature: feature,
-                input_tokens: inputTokens,
-                output_tokens: outputTokens,
-                cost: totalCost,
-                success: success,
-                model: model,
-                user_id: user ? user.id : null,
-                metadata: { source: 'web_client' }
+                timestamp: callRecord.timestamp, // Some setups use 'created_at' but audit_log often has 'timestamp' or relies on default
+                action: 'AI_GENERATION',
+                entity_type: 'AI_FEATURE',
+                entity_id: feature,
+                user_email: user ? (user.email || user.username || 'unknown') : 'system',
+                details: {
+                    input_tokens: inputTokens,
+                    output_tokens: outputTokens,
+                    cost: totalCost,
+                    success: success,
+                    model: model,
+                    source: 'web_client'
+                }
             };
 
             window.SupabaseClient.client
@@ -142,7 +149,6 @@ const APIUsageTracker = {
                 .insert(logEntry)
                 .then(({ error }) => {
                     if (error) console.warn('[APIUsageTracker] Failed to push log to Supabase:', error);
-                    else console.log('[APIUsageTracker] Log pushed to Supabase');
                 })
                 .catch(err => console.error('[APIUsageTracker] Supabase Sync Error:', err));
         }
