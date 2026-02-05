@@ -540,6 +540,7 @@ window.downloadAuditReportPDF = async function (reportId) {
         }
 
         window.showNotification('Generating PDF report... This may take a moment.', 'info');
+        console.log('[PDF] Starting PDF generation for report:', report.id, 'client:', report.client);
 
         // Create a hidden container for the report HTML
         const container = document.createElement('div');
@@ -547,18 +548,24 @@ window.downloadAuditReportPDF = async function (reportId) {
         document.body.appendChild(container);
 
         // Generate the report HTML (reuse the same HTML generation logic)
-        window.SafeDOM.setHTML(container, generateReportHTML(report, plan, client));
+        const reportHTML = generateReportHTML(report, plan, client);
+        window.SafeDOM.setHTML(container, reportHTML);
+        console.log('[PDF] HTML generated, length:', reportHTML.length);
+
+        // Safe filename generation
+        const safeClientName = (report.client || 'Unknown_Client').replace(/[^a-z0-9]/gi, '_');
+        const safeReportId = report.id || Date.now();
 
         // Configure PDF options
         const opt = {
             margin: [15, 10, 15, 10],
-            filename: `Audit_Report_${report.client.replace(/[^a-z0-9]/gi, '_')}_${report.id}.pdf`,
+            filename: `Audit_Report_${safeClientName}_${safeReportId}.pdf`,
             image: { type: 'jpeg', quality: 0.95 },
-            enableLinks: true, // Enable clickable links for TOC
+            enableLinks: true,
             html2canvas: {
                 scale: 2,
                 useCORS: true,
-                logging: false,
+                logging: true, // Enable logging for debugging
                 letterRendering: true
             },
             jsPDF: {
@@ -570,8 +577,15 @@ window.downloadAuditReportPDF = async function (reportId) {
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
-        // Generate and download PDF
-        await html2pdf().set(opt).from(container).save();
+        console.log('[PDF] Options configured, calling html2pdf...');
+
+        // Generate and download PDF with explicit promise handling
+        await html2pdf().set(opt).from(container).save().then(() => {
+            console.log('[PDF] Generation completed successfully');
+        }).catch(err => {
+            console.error('[PDF] html2pdf internal error:', err);
+            throw err;
+        });
 
         // Cleanup
         document.body.removeChild(container);
