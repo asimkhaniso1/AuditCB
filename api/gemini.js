@@ -41,8 +41,8 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' }
             };
         } else {
-            // Dynamic model selection with fallback default
-            const modelName = req.body.model || 'gemini-1.5-flash';
+            // Use the requested model or fallback to gemini-pro (most stable)
+            const modelName = req.body.model || 'gemini-pro';
             url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
             fetchOptions = {

@@ -138,7 +138,7 @@ const APIUsageTracker = {
             };
 
             window.SupabaseClient.client
-                .from('api_usage_logs')
+                .from('audit_log')
                 .insert(logEntry)
                 .then(({ error }) => {
                     if (error) console.warn('[APIUsageTracker] Failed to push log to Supabase:', error);
