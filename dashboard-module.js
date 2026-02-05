@@ -178,34 +178,29 @@ function renderDashboardEnhanced() {
                 </div>
             </div>
 
-            <!-- Quick Actions -->
+            <!-- Quick Actions (Simplified) -->
             <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); border: none;">
                 <h3 style="margin: 0 0 1rem 0; color: #1e293b;"><i class="fa-solid fa-bolt" style="margin-right: 0.5rem; color: #8b5cf6;"></i>Quick Actions</h3>
-                <div class="quick-actions-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
-                    <!-- 1. Add Client -->
-                    <button class="btn" onclick="window.renderModule('clients')" style="background: white; color: #30cfd0; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="quick-actions-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                    <!-- 1. Manage Clients -->
+                    <button class="btn" onclick="window.renderModule('clients')" style="background: white; color: #30cfd0; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <i class="fa-solid fa-building" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                        <span style="font-size: 0.8rem;">Add Client</span>
+                        <span style="font-size: 0.85rem;">Clients</span>
                     </button>
                     <!-- 2. Plan Audit -->
-                    <button class="btn" onclick="window.renderModule('audit-planning')" style="background: white; color: #667eea; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <button class="btn" onclick="window.renderModule('audit-planning')" style="background: white; color: #667eea; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <i class="fa-solid fa-clipboard-list" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                        <span style="font-size: 0.8rem;">Plan Audit</span>
+                        <span style="font-size: 0.85rem;">Plan Audit</span>
                     </button>
-                    <!-- 3. Execute Audit -->
-                    <button class="btn" onclick="window.renderModule('audit-execution')" style="background: white; color: #f5576c; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                        <i class="fa-solid fa-play" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                        <span style="font-size: 0.8rem;">Execute Audit</span>
+                    <!-- 3. Execute & Report (Unified) -->
+                    <button class="btn" onclick="window.renderModule('audit-execution')" style="background: white; color: #f5576c; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <i class="fa-solid fa-play-circle" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                        <span style="font-size: 0.85rem;">Execute & Report</span>
                     </button>
-                    <!-- 4. Review Report -->
-                    <button class="btn" onclick="window.renderModule('audit-reporting')" style="background: white; color: #fee140; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                        <i class="fa-solid fa-file-signature" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                        <span style="font-size: 0.8rem;">Review Report</span>
-                    </button>
-                    <!-- 5. Certify -->
-                    <button class="btn" onclick="window.renderModule('certification')" style="background: white; color: #8b5cf6; border: none; padding: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <!-- 4. Certify -->
+                    <button class="btn" onclick="window.renderModule('certification')" style="background: white; color: #8b5cf6; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                         <i class="fa-solid fa-award" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                        <span style="font-size: 0.8rem;">Certify</span>
+                        <span style="font-size: 0.85rem;">Certify</span>
                     </button>
                 </div>
             </div>
