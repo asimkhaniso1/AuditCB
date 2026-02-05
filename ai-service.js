@@ -165,6 +165,8 @@ Example:
                         }
                         lastError = new Error(data.error || `AI Service Error: ${response.status} `);
                     } catch (e) {
+                        // Change to warn to avoid scaring users when fallback is available
+                        console.warn(`AI Proxy connection failed: ${response.status} ${response.statusText} - will attempt fallback.`);
                         lastError = new Error(`AI Service connection failed: ${response.status} ${response.statusText} `);
                     }
                     continue;

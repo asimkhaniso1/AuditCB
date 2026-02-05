@@ -2548,21 +2548,36 @@ function compressImage(img, fileType) {
 }
 
 // View evidence image in full size (modal/popup)
+// View evidence image in full size (modal/popup)
 window.viewEvidenceImage = function (uniqueId) {
+    console.log('[viewEvidenceImage] Attempting to view image for:', uniqueId);
     const imgEl = document.getElementById('evidence-img-' + uniqueId);
-    if (!imgEl || !imgEl.src) return;
+
+    if (!imgEl) {
+        console.error('[viewEvidenceImage] Image element not found:', 'evidence-img-' + uniqueId);
+        window.showNotification('Error: Image element not found', 'error');
+        return;
+    }
+
+    if (!imgEl.src || imgEl.src === '') {
+        console.warn('[viewEvidenceImage] Image source is empty');
+        window.showNotification('No image source found', 'warning');
+        return;
+    }
+
+    console.log('[viewEvidenceImage] Opening modal for src:', imgEl.src.substring(0, 50) + '...');
 
     // Create modal overlay
     const overlay = document.createElement('div');
     overlay.id = 'evidence-modal-overlay';
-    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer;';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
     overlay.onclick = function () { overlay.remove(); };
 
     // Create image container
     overlay.innerHTML = `
         <div style="position: relative; max-width: 90%; max-height: 90%;">
-            <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-            <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem;">
+            <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
+            <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
