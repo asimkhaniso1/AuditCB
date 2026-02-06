@@ -2658,7 +2658,8 @@ window.generateAuditReport = function (reportId) {
     const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
     const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
 
-        < !DOCTYPE html >
+    const reportHtml = `
+        <!DOCTYPE html>
         <html>
             <head>
                 <title>Audit Report - ${report.client}</title>
@@ -2990,8 +2991,8 @@ window.generateAuditReport = function (reportId) {
                                 <td>
                                     <span class="badge status-${(item.status || 'pending').toLowerCase()}">
                                         ${item.status === 'nc' ? (item.ncrType === 'Major' ? 'Major NC' : (item.ncrType === 'Minor' ? 'Minor NC' : 'Non-Conformity')) :
-                                            (item.status === 'conform' ? 'Conformity' :
-                                                (item.status === 'na' ? 'N/A' : '-'))}
+            (item.status === 'conform' ? 'Conformity' :
+                (item.status === 'na' ? 'N/A' : '-'))}
                                     </span>
                                 </td>
                                 <td>
@@ -3113,146 +3114,146 @@ window.generateAuditReport = function (reportId) {
                 </html>
                 `;
 
-                printWindow.document.write(reportHtml);
-                printWindow.document.close();
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
 
     // Auto-print after delay to allow styles to load
     setTimeout(() => {
-                    printWindow.print();
+        printWindow.print();
     }, 1000);
 };
 
-                window.openCreateReportModal = openCreateReportModal;
-                window.openEditReportModal = openEditReportModal;
+window.openCreateReportModal = openCreateReportModal;
+window.openEditReportModal = openEditReportModal;
 
-                // Persistent stream for remote audits
-                window.activeAuditScreenStream = null;
+// Persistent stream for remote audits
+window.activeAuditScreenStream = null;
 
-                window.captureScreenEvidence = async function (uniqueId) {
+window.captureScreenEvidence = async function (uniqueId) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                    window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
-                return;
+        window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+        return;
     }
 
-                try {
-                    let stream = window.activeAuditScreenStream;
-                let isNew = false;
+    try {
+        let stream = window.activeAuditScreenStream;
+        let isNew = false;
 
-                // Check active stream
-                if (!stream || !stream.active) {
-                    window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
-                stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {cursor: "always" },
+        // Check active stream
+        if (!stream || !stream.active) {
+            window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" },
                 audio: false
             });
-                window.activeAuditScreenStream = stream;
-                isNew = true;
+            window.activeAuditScreenStream = stream;
+            isNew = true;
 
             // Handle stop sharing
             stream.getVideoTracks()[0].onended = () => {
-                    window.activeAuditScreenStream = null;
+                window.activeAuditScreenStream = null;
                 window.showNotification('Screen sharing session ended.', 'info');
             };
         }
 
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.muted = true;
-                video.play();
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.muted = true;
+        video.play();
 
         // Wait for buffer
         await new Promise(r => setTimeout(r, isNew ? 500 : 200));
 
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
 
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
-                // DO NOT stop tracks here. We reuse them.
+        // DO NOT stop tracks here. We reuse them.
 
-                // Update UI
-                const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-                const imgElem = document.getElementById('evidence-img-' + uniqueId);
-                const dataInput = document.getElementById('evidence-data-' + uniqueId);
-                const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+        // Update UI
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        const imgElem = document.getElementById('evidence-img-' + uniqueId);
+        const dataInput = document.getElementById('evidence-data-' + uniqueId);
+        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
 
-                if (imgElem) imgElem.src = dataUrl;
-                if (previewDiv) previewDiv.style.display = 'block';
-                if (dataInput) dataInput.value = 'attached';
-                if (sizeElem) sizeElem.textContent = 'Screen Capture';
+        if (imgElem) imgElem.src = dataUrl;
+        if (previewDiv) previewDiv.style.display = 'block';
+        if (dataInput) dataInput.value = 'attached';
+        if (sizeElem) sizeElem.textContent = 'Screen Capture';
 
-                window.showNotification('Captured!', 'success');
+        window.showNotification('Captured!', 'success');
 
-                // Cleanup element
-                video.pause();
-                video.srcObject = null;
-                video.remove();
+        // Cleanup element
+        video.pause();
+        video.srcObject = null;
+        video.remove();
 
     } catch (err) {
         if (err.name !== 'NotAllowedError') {
-                    console.error(err);
-                window.showNotification('Capture failed: ' + err.message, 'error');
+            console.error(err);
+            window.showNotification('Capture failed: ' + err.message, 'error');
         }
     }
 };
-                window.renderExecutionDetail = renderExecutionDetail;
+window.renderExecutionDetail = renderExecutionDetail;
 
-                // Toggle selection of all items in a section
-                window.toggleSectionSelection = function (sectionId) {
+// Toggle selection of all items in a section
+window.toggleSectionSelection = function (sectionId) {
     const checkbox = document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
-                const sectionContent = document.getElementById(sectionId);
+    const sectionContent = document.getElementById(sectionId);
 
-                if (!sectionContent) return;
+    if (!sectionContent) return;
 
-                const items = sectionContent.querySelectorAll('.checklist-item');
+    const items = sectionContent.querySelectorAll('.checklist-item');
     items.forEach(item => {
         if (checkbox.checked) {
-                    item.classList.add('selected-item');
-                item.style.background = '#eff6ff';
-                item.style.borderLeft = '4px solid var(--primary-color)';
+            item.classList.add('selected-item');
+            item.style.background = '#eff6ff';
+            item.style.borderLeft = '4px solid var(--primary-color)';
         } else {
-                    item.classList.remove('selected-item');
-                item.style.background = '';
-                item.style.borderLeft = '';
+            item.classList.remove('selected-item');
+            item.style.background = '';
+            item.style.borderLeft = '';
         }
     });
 };
 
-                // ============================================
-                // Webcam Handling for Desktop 'Camera' Button
-                // ============================================
-                window.activeWebcamStream = null;
+// ============================================
+// Webcam Handling for Desktop 'Camera' Button
+// ============================================
+window.activeWebcamStream = null;
 
-                window.handleCameraButton = function (uniqueId) {
+window.handleCameraButton = function (uniqueId) {
     // Check if mobile device (simple check)
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-                if (isMobile) {
+    if (isMobile) {
         // Use the native input for mobile (file picker / camera app)
         const inp = document.getElementById('cam-' + uniqueId);
-                if (inp) inp.click();
+        if (inp) inp.click();
     } else {
-                    // Use Webcam Modal for desktop
-                    window.openWebcamModal(uniqueId);
+        // Use Webcam Modal for desktop
+        window.openWebcamModal(uniqueId);
     }
 };
 
-                window.openWebcamModal = async function (uniqueId) {
+window.openWebcamModal = async function (uniqueId) {
     const modalTitle = document.getElementById('modal-title');
-                const modalBody = document.getElementById('modal-body');
-                const modalSave = document.getElementById('modal-save');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
 
-                // Cleanup any existing stream first
-                if (window.activeWebcamStream) {
-                    window.activeWebcamStream.getTracks().forEach(track => track.stop());
-                window.activeWebcamStream = null;
+    // Cleanup any existing stream first
+    if (window.activeWebcamStream) {
+        window.activeWebcamStream.getTracks().forEach(track => track.stop());
+        window.activeWebcamStream = null;
     }
 
-                modalTitle.textContent = 'Capture from Webcam';
+    modalTitle.textContent = 'Capture from Webcam';
 
-                modalBody.innerHTML = `
+    modalBody.innerHTML = `
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
                     <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                         <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
@@ -3263,133 +3264,133 @@ window.generateAuditReport = function (reportId) {
                 </div>
                 `;
 
-                // Configure "Capture" button
-                modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+    // Configure "Capture" button
+    modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
     modalSave.onclick = () => window.captureWebcam(uniqueId);
 
-                // Show modal BEFORE requesting media
-                if (window.openModal) window.openModal();
+    // Show modal BEFORE requesting media
+    if (window.openModal) window.openModal();
 
-                try {
-        const stream = await navigator.mediaDevices.getUserMedia({video: true });
-                window.activeWebcamStream = stream;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        window.activeWebcamStream = stream;
 
-                const video = document.getElementById('webcam-video');
-                const loading = document.getElementById('webcam-loading');
+        const video = document.getElementById('webcam-video');
+        const loading = document.getElementById('webcam-loading');
 
-                if (video) {
-                    video.srcObject = stream;
+        if (video) {
+            video.srcObject = stream;
             video.onloadedmetadata = () => {
                 if (loading) loading.style.display = 'none';
             };
         }
     } catch (err) {
         const errDiv = document.getElementById('webcam-error');
-                const loading = document.getElementById('webcam-loading');
-                if (loading) loading.style.display = 'none';
+        const loading = document.getElementById('webcam-loading');
+        if (loading) loading.style.display = 'none';
 
-                if (errDiv) {
-                    errDiv.style.display = 'block';
-                errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+        if (errDiv) {
+            errDiv.style.display = 'block';
+            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
         }
-                console.error("Webcam error:", err);
+        console.error("Webcam error:", err);
     }
 };
 
-                window.captureWebcam = function (uniqueId) {
+window.captureWebcam = function (uniqueId) {
     const video = document.getElementById('webcam-video');
-                if (!video || !window.activeWebcamStream) return;
+    if (!video || !window.activeWebcamStream) return;
 
-                try {
+    try {
         const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-                const ctx = canvas.getContext('2d');
-                // Mirror the capture if the video was mirrored
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0);
+        const ctx = canvas.getContext('2d');
+        // Mirror the capture if the video was mirrored
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0);
 
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
         // Stop stream
         window.activeWebcamStream.getTracks().forEach(track => track.stop());
-                window.activeWebcamStream = null;
+        window.activeWebcamStream = null;
 
-                // Update UI
-                const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-                const imgElem = document.getElementById('evidence-img-' + uniqueId);
-                const dataInput = document.getElementById('evidence-data-' + uniqueId);
-                const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+        // Update UI
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        const imgElem = document.getElementById('evidence-img-' + uniqueId);
+        const dataInput = document.getElementById('evidence-data-' + uniqueId);
+        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
 
-                if (imgElem) imgElem.src = dataUrl;
-                if (previewDiv) previewDiv.style.display = 'block';
-                if (dataInput) dataInput.value = 'attached';
-                if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+        if (imgElem) imgElem.src = dataUrl;
+        if (previewDiv) previewDiv.style.display = 'block';
+        if (dataInput) dataInput.value = 'attached';
+        if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
 
-                // Close modal
-                if (window.closeModal) window.closeModal();
+        // Close modal
+        if (window.closeModal) window.closeModal();
     } catch (e) {
-                    console.error("Capture failed:", e);
-                window.showNotification("Failed to capture image", "error");
+        console.error("Capture failed:", e);
+        window.showNotification("Failed to capture image", "error");
     }
 };
 
-                // Global event delegation for section checkboxes (works with dynamically rendered content)
-                document.addEventListener('click', function (e) {
+// Global event delegation for section checkboxes (works with dynamically rendered content)
+document.addEventListener('click', function (e) {
     if (e.target.classList.contains('section-checkbox')) {
-                    e.stopPropagation();
-                const sectionId = e.target.getAttribute('data-section-id');
-                const isChecked = e.target.checked;
-                console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
+        e.stopPropagation();
+        const sectionId = e.target.getAttribute('data-section-id');
+        const isChecked = e.target.checked;
+        console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
 
-                // Find all items in this section and toggle selection
-                const section = document.getElementById(sectionId);
-                if (!section) {
-                    console.error('Section not found:', sectionId);
-                return;
+        // Find all items in this section and toggle selection
+        const section = document.getElementById(sectionId);
+        if (!section) {
+            console.error('Section not found:', sectionId);
+            return;
         }
 
-                const items = section.querySelectorAll('.checklist-item');
-                console.log('Found', items.length, 'items in section');
+        const items = section.querySelectorAll('.checklist-item');
+        console.log('Found', items.length, 'items in section');
 
         items.forEach((item, idx) => {
             // Toggle the individual checkbox too
             const itemCheckbox = item.querySelector('.item-checkbox');
-                if (itemCheckbox) {
-                    itemCheckbox.checked = isChecked;
+            if (itemCheckbox) {
+                itemCheckbox.checked = isChecked;
             }
 
-                if (isChecked) {
-                    item.classList.add('selected-item');
+            if (isChecked) {
+                item.classList.add('selected-item');
                 item.style.background = '#eff6ff';
                 item.style.borderLeft = '4px solid var(--primary-color)';
             } else {
-                    item.classList.remove('selected-item');
+                item.classList.remove('selected-item');
                 item.style.background = '';
                 item.style.borderLeft = '4px solid #e2e8f0';
             }
         });
 
-                console.log('Selection complete for', items.length, 'items');
+        console.log('Selection complete for', items.length, 'items');
     }
 });
 
-                // Global event delegation for individual item checkboxes
-                document.addEventListener('click', function (e) {
+// Global event delegation for individual item checkboxes
+document.addEventListener('click', function (e) {
     if (e.target.classList.contains('item-checkbox')) {
         const checkbox = e.target;
-                const uniqueId = checkbox.getAttribute('data-unique-id');
-                const row = document.getElementById('row-' + uniqueId);
+        const uniqueId = checkbox.getAttribute('data-unique-id');
+        const row = document.getElementById('row-' + uniqueId);
 
-                if (row) {
+        if (row) {
             if (checkbox.checked) {
-                    row.classList.add('selected-item');
+                row.classList.add('selected-item');
                 row.style.background = '#eff6ff';
                 row.style.borderLeft = '4px solid var(--primary-color)';
             } else {
-                    row.classList.remove('selected-item');
+                row.classList.remove('selected-item');
                 row.style.background = '';
                 row.style.borderLeft = '4px solid #e2e8f0';
             }
@@ -3397,72 +3398,72 @@ window.generateAuditReport = function (reportId) {
     }
 });
 
-                // Global event delegation for bulk action buttons
-                document.addEventListener('click', function (e) {
+// Global event delegation for bulk action buttons
+document.addEventListener('click', function (e) {
     const btn = e.target.closest('.bulk-action-btn');
-                if (btn) {
+    if (btn) {
         const action = btn.getAttribute('data-action');
-                const reportId = btn.getAttribute('data-report-id');
-                console.log('Bulk action button clicked:', action, 'for report:', reportId);
+        const reportId = btn.getAttribute('data-report-id');
+        console.log('Bulk action button clicked:', action, 'for report:', reportId);
 
-                if (action && reportId) {
-                    window.bulkUpdateStatus(parseInt(reportId), action);
+        if (action && reportId) {
+            window.bulkUpdateStatus(parseInt(reportId), action);
 
-                // Close menu
-                const menu = document.getElementById('bulk-menu-' + reportId);
-                if (menu) menu.classList.add('hidden');
+            // Close menu
+            const menu = document.getElementById('bulk-menu-' + reportId);
+            if (menu) menu.classList.add('hidden');
         }
     }
 });
 
-                // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
-                document.addEventListener('click', function (e) {
-                    // Check if clicked element or any parent has status-btn class
-                    let btn = e.target;
+// Global event delegation for status buttons (OK, NC, N/A) - using capture phase
+document.addEventListener('click', function (e) {
+    // Check if clicked element or any parent has status-btn class
+    let btn = e.target;
 
-                // Log all clicks for debugging
-                if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-                    console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
+    // Log all clicks for debugging
+    if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+        console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
     }
 
-                while (btn && btn.classList && !btn.classList.contains('status-btn')) {
-                    btn = btn.parentElement;
-                if (!btn || btn === document.body) {
-                    btn = null;
-                break;
+    while (btn && btn.classList && !btn.classList.contains('status-btn')) {
+        btn = btn.parentElement;
+        if (!btn || btn === document.body) {
+            btn = null;
+            break;
         }
     }
 
-                if (btn && btn.classList && btn.classList.contains('status-btn')) {
-                    e.preventDefault();
-                e.stopPropagation();
+    if (btn && btn.classList && btn.classList.contains('status-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
 
-                const uniqueId = btn.getAttribute('data-unique-id');
-                const status = btn.getAttribute('data-status');
-                console.log('Status button clicked:', status, 'for item:', uniqueId);
+        const uniqueId = btn.getAttribute('data-unique-id');
+        const status = btn.getAttribute('data-status');
+        console.log('Status button clicked:', status, 'for item:', uniqueId);
 
-                if (uniqueId && status) {
-                    window.setChecklistStatus(uniqueId, status);
+        if (uniqueId && status) {
+            window.setChecklistStatus(uniqueId, status);
         }
     }
 }, true); // true = capture phase
 
-                // Helper to update meeting records (Opening/Closing)
-                window.updateMeetingData = function (reportId, meetingType, field, value) {
+// Helper to update meeting records (Opening/Closing)
+window.updateMeetingData = function (reportId, meetingType, field, value) {
     const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-                if (!report) return;
+    if (!report) return;
 
-                if (!report[meetingType + 'Meeting']) {
-                    report[meetingType + 'Meeting'] = {};
+    if (!report[meetingType + 'Meeting']) {
+        report[meetingType + 'Meeting'] = {};
     }
 
-                if (field === 'attendees') {
-                    // Split by comma and clean up
-                    report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+    if (field === 'attendees') {
+        // Split by comma and clean up
+        report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
     } else {
-                    report[meetingType + 'Meeting'][field] = value;
+        report[meetingType + 'Meeting'][field] = value;
     }
 
-                window.saveData();
-                window.saveChecklist(reportId);
+    window.saveData();
+    window.saveChecklist(reportId);
 };
