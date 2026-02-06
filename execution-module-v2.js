@@ -2943,7 +2943,7 @@ window.generateAuditReport = function (reportId) {
                         </tr>
                     </thead>
                     <tbody>
-                        ${hydratedProgress.map((item, idx) => `
+                        ${hydratedProgress.filter(item => item.status === 'nc').map((item, idx) => `
                         <tr style="background: ${idx % 2 === 0 ? 'white' : '#f8fafc'};">
                             <td><strong>${item.clause}</strong></td>
                             <td style="color: #475569;">${item.requirement}</td>
@@ -3391,3 +3391,4 @@ window.openCreateReportModal = openCreateReportModal;
         window.saveData();
         window.saveChecklist(reportId);
 };
+
