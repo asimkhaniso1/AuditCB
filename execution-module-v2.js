@@ -3031,7 +3031,8 @@ window.generateAuditReport = function (reportId) {
 
             <!--3. NCRs-- >
     ${report.ncrs && report.ncrs.length > 0 ? `
-            <div id="section-ncrs" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. NCR Details</div>
+            <div id="section-ncrs" class="page-break table-container">
+                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. NCR Details</div>
                 ${report.ncrs.map(ncr => `
                 <div class="card" style="margin-top: 20px; border-left: 5px solid ${ncr.type === 'Major' ? 'var(--danger)' : 'var(--warning)'};">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -3046,7 +3047,8 @@ window.generateAuditReport = function (reportId) {
 }
 
     < !--4. Meetings-- >
-            <div id="section-meetings" class="page-break table-container">`r`n                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">5. Meeting Records</div>
+            <div id="section-meetings" class="page-break table-container">
+                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">5. Meeting Records</div>
                  <div class="dashboard-grid" style="padding: 0; margin-top: 20px;">
                     <div class="card">
                         <strong>Opening Meeting</strong>
