@@ -2956,7 +2956,8 @@ window.generateAuditReport = function (reportId) {
             </div>
 
             <!-- 2. Audit Details & Geolocation -->
-            <div id="section-overview" class="page-break table-container">`r`n                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">2. Audit Details & Location</div>
+            <div id="section-overview" class="page-break table-container">
+                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">2. Audit Details & Location</div>
                 <div class="card" style="margin-top: 20px;">
                     <table style="width: 100%;">
                         <tr>
