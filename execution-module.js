@@ -2640,6 +2640,9 @@ window.generateAuditReport = function (reportId) {
         return;
     }
 
+    // Attempt to get client details for address/logo if available
+    const client = window.state.clients.find(c => c.name === report.client) || {};
+
     // Create a new window for printing
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -2647,71 +2650,277 @@ window.generateAuditReport = function (reportId) {
         return;
     }
 
+    const today = new Date().toLocaleDateString();
+
+    // Calculate stats
+    const totalItems = (report.checklistProgress || []).length;
+    const ncItems = (report.checklistProgress || []).filter(i => i.status === 'nc');
+    const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
+    const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
+
     const reportHtml = `
         <!DOCTYPE html>
         <html>
         <head>
             <title>Audit Report - ${report.client}</title>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; }
-                h1, h2, h3 { color: #1e40af; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f3f4f6; }
-                .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
-                .conform { background: #d1fae5; color: #065f46; }
-                .nc { background: #fee2e2; color: #991b1b; }
-                .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+                
+                body { 
+                    font-family: 'Inter', sans-serif; 
+                    line-height: 1.5; 
+                    color: #1e293b; 
+                    max-width: 1000px; 
+                    margin: 0 auto; 
+                    padding: 40px; 
+                    background: white;
+                }
+                
+                /* Header / Branding */
+                .report-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 2px solid #e2e8f0;
+                    padding-bottom: 20px;
+                    margin-bottom: 30px;
+                }
+                .brand-logo {
+                    font-size: 24px;
+                    font-weight: 800;
+                    color: #1e40af;
+                    text-transform: uppercase;
+                    letter-spacing: -0.5px;
+                }
+                .report-meta {
+                    text-align: right;
+                    font-size: 0.9rem;
+                    color: #64748b;
+                }
+
+                /* Title Section */
+                .title-section {
+                    text-align: center;
+                    margin-bottom: 40px;
+                    background: #f8fafc;
+                    padding: 30px;
+                    border-radius: 8px;
+                    border: 1px solid #e2e8f0;
+                }
+                h1 { margin: 0; color: #0f172a; font-size: 2rem; }
+                h2 { margin: 10px 0 0; color: #64748b; font-weight: 500; font-size: 1.25rem; }
+                
+                /* Sections */
+                .section { margin-bottom: 40px; }
+                .section-title {
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                    color: #1e40af;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    border-bottom: 1px solid #cbd5e1;
+                    padding-bottom: 8px;
+                    margin-bottom: 20px;
+                }
+                
+                /* Stats Grid */
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 15px;
+                    margin-bottom: 30px;
+                }
+                .stat-box {
+                    background: #f1f5f9;
+                    padding: 15px;
+                    border-radius: 6px;
+                    text-align: center;
+                }
+                .stat-val { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+                .stat-label { font-size: 0.75rem; text-transform: uppercase; color: #64748b; margin-top: 5px; }
+
+                /* Tables */
+                table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+                th { 
+                    background: #e2e8f0; 
+                    color: #475569; 
+                    padding: 12px; 
+                    text-align: left; 
+                    font-weight: 600;
+                    border-bottom: 2px solid #cbd5e1;
+                }
+                td { 
+                    padding: 12px; 
+                    border-bottom: 1px solid #e2e8f0; 
+                    vertical-align: top; 
+                }
+                tr:last-child td { border-bottom: none; }
+                
+                /* Badges */
+                .badge { 
+                    display: inline-block;
+                    padding: 4px 10px; 
+                    border-radius: 99px; 
+                    font-size: 0.75rem; 
+                    font-weight: 600; 
+                    text-transform: uppercase;
+                }
+                .status-conform { background: #dcfce7; color: #166534; }
+                .status-nc { background: #fee2e2; color: #991b1b; }
+                .status-na { background: #f1f5f9; color: #64748b; }
+                
+                /* Signatures */
+                .signatures {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 80px;
+                    page-break-inside: avoid;
+                }
+                .sig-block {
+                    width: 45%;
+                    border-top: 1px solid #cbd5e1;
+                    padding-top: 10px;
+                }
+                .sig-title { font-weight: 700; margin-bottom: 40px; }
+                
+                /* Print Optimizations */
                 @media print {
-                    body { -webkit-print-color-adjust: exact; }
+                    body { padding: 0; max-width: none; }
+                    .no-print { display: none; }
+                    .page-break { page-break-before: always; }
+                    a { text-decoration: none; color: inherit; }
+                    .card { break-inside: avoid; }
                 }
             </style>
         </head>
         <body>
-            <div class="header">
+            <!-- Print Controls -->
+            <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: #1e293b; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; gap: 10px; z-index: 9999;">
+                <button onclick="window.print()" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                    <i class="fa fa-print"></i> Print / Save PDF
+                </button>
+                <button onclick="window.close()" style="background: #475569; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    Close
+                </button>
+            </div>
+
+            <header class="report-header">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-check-double"></i> AuditCB
+                </div>
+                <div class="report-meta">
+                    <strong>Report ID:</strong> #${report.id.substring(0, 8)}<br>
+                    <strong>Generated:</strong> ${today}<br>
+                    <strong>Status:</strong> ${report.status}
+                </div>
+            </header>
+
+            <div class="title-section">
                 <h1>Audit Report</h1>
                 <h2>${report.client}</h2>
-                <p>Date: ${report.date} | Status: ${report.status}</p>
+                <div style="margin-top: 15px; font-size: 0.9rem; color: #64748b;">
+                    <span style="margin: 0 10px;"><i class="fa fa-calendar"></i> ${report.date}</span>
+                    <span style="margin: 0 10px;"><i class="fa fa-user-tie"></i> Lead Auditor: ${report.leadAuditor || 'Assigned Auditor'}</span>
+                </div>
             </div>
 
-            <h3>Executive Summary</h3>
-            <p>${report.executiveSummary || 'No summary provided.'}</p>
+            <div class="section">
+                <div class="section-title">Audit Overview</div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-val">${totalItems}</div>
+                        <div class="stat-label">Total Checks</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" style="color: ${ncItems.length > 0 ? '#dc2626' : '#16a34a'}">${ncItems.length}</div>
+                        <div class="stat-label">Non-Conformities</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val">${majorNC}</div>
+                        <div class="stat-label">Major NCs</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val">${minorNC}</div>
+                        <div class="stat-label">Minor NCs</div>
+                    </div>
+                </div>
+            </div>
 
-            <h3>Audit Findings</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Clause</th>
-                        <th>Requirement</th>
-                        <th>Status</th>
-                        <th>Remarks</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${(report.checklistProgress || []).map(item => `
+            <div class="section">
+                <div class="section-title">Executive Summary</div>
+                <p style="text-align: justify; color: #334155; line-height: 1.8;">
+                    ${report.executiveSummary ? report.executiveSummary.replace(/\n/g, '<br>') : '<em>No executive summary provided. This section typically contains a high-level overview of the audit findings, effectiveness of the management system, and key recommendations.</em>'}
+                </p>
+            </div>
+
+            <div class="section page-break">
+                <div class="section-title">Detailed Findings</div>
+                <table>
+                    <thead>
                         <tr>
-                            <td>${item.clause || '-'}</td>
-                            <td>${item.requirement || item.text || '-'}</td>
-                            <td><span class="badge ${item.status === 'conform' ? 'conform' : (item.status === 'nc' ? 'nc' : '')}">${item.status ? item.status.toUpperCase() : 'PENDING'}</span></td>
-                            <td>${item.comment || ''}</td>
+                            <th style="width: 15%">Clause</th>
+                            <th style="width: 35%">Requirement</th>
+                            <th style="width: 15%">Status</th>
+                            <th style="width: 35%">Audit Evidence & Remarks</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-
-            <div style="margin-top: 30px; font-size: 0.9em; color: #666; text-align: center;">
-                Generated by AuditCB • ${new Date().toLocaleDateString()}
+                    </thead>
+                    <tbody>
+                        ${(report.checklistProgress || []).map(item => `
+                            <tr>
+                                <td><strong>${item.clause || ''}</strong></td>
+                                <td style="font-size: 0.85rem; color: #475569;">${item.requirement || item.text || 'Requirement text'}</td>
+                                <td>
+                                    <span class="badge status-${(item.status || 'pending').toLowerCase()}">
+                                        ${item.status === 'nc' ? (item.ncrType === 'Major' ? 'Major NC' : (item.ncrType === 'Minor' ? 'Minor NC' : 'Non-Conformity')) : (item.status === 'conform' ? 'Conformity' : (item.status === 'na' ? 'N/A' : 'Pending'))}
+                                    </span>
+                                </td>
+                                <td>
+                                    ${item.comment || '<span style="color: #cbd5e1; font-style: italic;">No specific remarks recorded.</span>'}
+                                    ${item.evidenceImages && item.evidenceImages.length > 0 ? `<div style="margin-top: 5px; font-size: 0.75rem; color: #64748b;"><i class="fa fa-paperclip"></i> ${item.evidenceImages.length} image(s) attached</div>` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
-            
-            <script>
-                window.onload = function() { window.print(); }
-            </script>
+
+            <div class="section">
+                <div class="section-title">Signatures</div>
+                <p style="margin-bottom: 20px; font-size: 0.9rem; color: #64748b;">
+                    By signing below, the Lead Auditor confirms the accuracy of these findings, and the Client Representative acknowledges receipt of this report.
+                </p>
+                <div class="signatures">
+                    <div class="sig-block">
+                        <div class="sig-title">Lead Auditor</div>
+                        <div style="height: 50px;"></div>
+                        <div>Name: ______________________</div>
+                        <div style="margin-top: 10px;">Date: ______________________</div>
+                    </div>
+                    <div class="sig-block">
+                        <div class="sig-title">Client Representative</div>
+                        <div style="height: 50px;"></div>
+                        <div>Name: ______________________</div>
+                        <div style="margin-top: 10px;">Date: ______________________</div>
+                    </div>
+                </div>
+            </div>
+
+            <footer style="margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.8rem; color: #94a3b8;">
+                &copy; ${new Date().getFullYear()} AuditCB Certification Body. All rights reserved.<br>
+                This document is confidential and intended solely for the use of the individual or entity to whom it is addressed.
+            </footer>
         </body>
         </html>
     `;
 
     printWindow.document.write(reportHtml);
     printWindow.document.close();
+
+    // Auto-print after delay to allow styles to load
+    setTimeout(() => {
+        printWindow.print();
+    }, 1000);
 };
 
 window.openCreateReportModal = openCreateReportModal;
