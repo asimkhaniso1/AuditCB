@@ -2658,539 +2658,700 @@ window.generateAuditReport = function (reportId) {
     const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
     const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
 
-    const reportHtml = `
-        <!DOCTYPE html>
+        < !DOCTYPE html >
         <html>
-        <head>
-            <title>Audit Report - ${report.client}</title>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-                
-                body { 
-                    font-family: 'Inter', sans-serif; 
-                    line-height: 1.5; 
-                    color: #1e293b; 
-                    max-width: 1000px; 
-                    margin: 0 auto; 
-                    padding: 40px; 
-                    background: white;
-                }
-                
-                /* Header / Branding */
-                .report-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    border-bottom: 2px solid #e2e8f0;
-                    padding-bottom: 20px;
-                    margin-bottom: 30px;
-                }
-                .brand-logo {
-                    font-size: 24px;
-                    font-weight: 800;
-                    color: #1e40af;
-                    text-transform: uppercase;
-                    letter-spacing: -0.5px;
-                }
-                .report-meta {
-                    text-align: right;
-                    font-size: 0.9rem;
-                    color: #64748b;
+            <head>
+                <title>Audit Report - ${report.client}</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+                        body {
+                            font - family: 'Inter', sans-serif;
+                        line-height: 1.6;
+                        color: #334155;
+                        max-width: 1000px;
+                        margin: 0 auto;
+                        padding: 40px;
+                        background: white;
                 }
 
-                /* Title Section */
-                .title-section {
-                    text-align: center;
-                    margin-bottom: 40px;
-                    background: #f8fafc;
-                    padding: 30px;
-                    border-radius: 8px;
-                    border: 1px solid #e2e8f0;
+                        /* Header / Branding */
+                        .report-header {
+                            display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px solid #e2e8f0;
+                        padding-bottom: 20px;
+                        margin-bottom: 40px;
                 }
-                h1 { margin: 0; color: #0f172a; font-size: 2rem; }
-                h2 { margin: 10px 0 0; color: #64748b; font-weight: 500; font-size: 1.25rem; }
-                
-                /* Sections */
-                .section { margin-bottom: 40px; }
-                .section-title {
-                    font-size: 1.1rem;
-                    font-weight: 700;
-                    color: #1e40af;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    border-bottom: 1px solid #cbd5e1;
-                    padding-bottom: 8px;
-                    margin-bottom: 20px;
+                        .brand-logo {
+                            font - size: 24px;
+                        font-weight: 800;
+                        color: #1e40af;
+                        text-transform: uppercase;
+                        letter-spacing: -0.5px;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
                 }
-                
-                /* Stats Grid */
-                .stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 15px;
-                    margin-bottom: 30px;
+                        .report-meta {
+                            text - align: right;
+                        font-size: 0.9rem;
+                        color: #64748b;
                 }
-                .stat-box {
-                    background: #f1f5f9;
-                    padding: 15px;
-                    border-radius: 6px;
-                    text-align: center;
-                }
-                .stat-val { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
-                .stat-label { font-size: 0.75rem; text-transform: uppercase; color: #64748b; margin-top: 5px; }
 
-                /* Tables */
-                table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-                th { 
-                    background: #e2e8f0; 
-                    color: #475569; 
-                    padding: 12px; 
-                    text-align: left; 
-                    font-weight: 600;
-                    border-bottom: 2px solid #cbd5e1;
+                        /* Title Section */
+                        .title-section {
+                            text - align: center;
+                        margin-bottom: 50px;
+                        background: #f8fafc;
+                        padding: 30px;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
                 }
-                td { 
-                    padding: 12px; 
-                    border-bottom: 1px solid #e2e8f0; 
-                    vertical-align: top; 
-                }
-                tr:last-child td { border-bottom: none; }
-                
-                /* Badges */
-                .badge { 
-                    display: inline-block;
-                    padding: 4px 10px; 
-                    border-radius: 99px; 
-                    font-size: 0.75rem; 
-                    font-weight: 600; 
-                    text-transform: uppercase;
-                }
-                .status-conform { background: #dcfce7; color: #166534; }
-                .status-nc { background: #fee2e2; color: #991b1b; }
-                .status-na { background: #f1f5f9; color: #64748b; }
-                
-                /* Signatures */
-                .signatures {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-top: 80px;
-                    page-break-inside: avoid;
-                }
-                .sig-block {
-                    width: 45%;
-                    border-top: 1px solid #cbd5e1;
-                    padding-top: 10px;
-                }
-                .sig-title { font-weight: 700; margin-bottom: 40px; }
-                
-                /* Print Optimizations */
-                @media print {
-                    body { padding: 0; max-width: none; }
-                    .no-print { display: none; }
-                    .page-break { page-break-before: always; }
-                    a { text-decoration: none; color: inherit; }
-                    .card { break-inside: avoid; }
-                }
-            </style>
-        </head>
-        <body>
-            <!-- Print Controls -->
-            <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: #1e293b; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; gap: 10px; z-index: 9999;">
-                <button onclick="window.print()" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600;">
-                    <i class="fa fa-print"></i> Print / Save PDF
-                </button>
-                <button onclick="window.close()" style="background: #475569; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
-                    Close
-                </button>
-            </div>
+                        h1 {margin: 0; color: #0f172a; font-size: 2.2rem; font-weight: 800; }
+                        h2 {margin: 10px 0 5px; color: #475569; font-weight: 600; font-size: 1.4rem; }
 
-            <header class="report-header">
-                <div class="brand-logo">
-                    <i class="fa-solid fa-check-double"></i> AuditCB
+                        /* Headings */
+                        .section-title {
+                            font - size: 1.25rem;
+                        font-weight: 700;
+                        color: #1e3a8a;
+                        border-bottom: 2px solid #e2e8f0;
+                        padding-bottom: 10px;
+                        margin-top: 40px;
+                        margin-bottom: 20px;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                }
+
+                        /* Stats Grid */
+                        .stats-grid {
+                            display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 20px;
+                        margin-bottom: 40px;
+                }
+                        .stat-box {
+                            background: white;
+                        padding: 20px;
+                        border-radius: 8px;
+                        text-align: center;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+                        .stat-val {font - size: 2rem; font-weight: 800; color: #0f172a; line-height: 1; margin-bottom: 5px; }
+                        .stat-label {font - size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 600; }
+
+                        /* Tables */
+                        table {width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+                        th {
+                            background: #f1f5f9;
+                        color: #475569;
+                        padding: 12px 16px;
+                        text-align: left;
+                        font-weight: 600;
+                        border-bottom: 2px solid #cbd5e1;
+                        font-size: 0.85rem;
+                        text-transform: uppercase;
+                }
+                        td {
+                            padding: 14px 16px;
+                        border-bottom: 1px solid #e2e8f0;
+                        vertical-align: top; 
+                }
+                        tr:last-child td {border - bottom: none; }
+                        tr:nth-child(even) {background - color: #fcfcfc; }
+
+                        /* Badges */
+                        .badge {
+                            display: inline-flex;
+                        align-items: center;
+                        padding: 4px 10px;
+                        border-radius: 99px;
+                        font-size: 0.75rem;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        line-height: 1;
+                }
+                        .status-conform {background: #dcfce7; color: #166534; }
+                        .status-nc {background: #fee2e2; color: #991b1b; }
+                        .status-na {background: #f1f5f9; color: #64748b; }
+
+                        /* Content Boxes */
+                        .content-box {
+                            background: #f8fafc;
+                        border-left: 4px solid #3b82f6;
+                        padding: 15px 20px;
+                        margin-bottom: 20px;
+                        border-radius: 0 4px 4px 0;
+                }
+                        .box-title {font - weight: 700; color: #1e40af; margin-bottom: 8px; font-size: 0.9rem; }
+                        .box-content {font - size: 0.95rem; color: #334155; }
+
+                        /* Grid for Meeting Info */
+                        .info-grid {
+                            display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 20px;
+                        margin-bottom: 20px;
+                }
+                        .info-item label {display: block; font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+                        .info-item div {font - weight: 500; color: #0f172a; }
+
+                        /* Image Thumbnails */
+                        .evidence-thumbnail {
+                            display: inline-block;
+                        width: 80px;
+                        height: 80px;
+                        object-fit: cover;
+                        border-radius: 4px;
+                        border: 1px solid #e2e8f0;
+                        margin-right: 8px;
+                        margin-top: 8px;
+                }
+
+                        /* Signatures */
+                        .signatures {
+                            display: flex;
+                        justify-content: space-between;
+                        margin-top: 80px;
+                        page-break-inside: avoid;
+                }
+                        .sig-block {
+                            width: 45%;
+                }
+                        .sig-line {
+                            border - top: 1px solid #cbd5e1;
+                        margin-top: 50px;
+                        padding-top: 10px;
+                        display: flex;
+                        justify-content: space-between;
+                }
+                        .sig-title {font - weight: 700; text-transform: uppercase; font-size: 0.85rem; color: #64748b; margin-bottom: 10px; }
+
+                        /* Print Optimizations */
+                        @media print {
+                            body {padding: 0; max-width: none; background: white; -webkit-print-color-adjust: exact; }
+                        .no-print {display: none !important; }
+                        .page-break {page -break-before: always; }
+                        a {text - decoration: none; color: inherit; }
+                        .card, .content-box, tr { break-inside: avoid; }
+                        .section-title {margin - top: 20px; }
+                }
+                    </style>
+            </head>
+            <body>
+                <!-- Print Controls -->
+                <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: #1e293b; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; gap: 10px; z-index: 9999;">
+                    <button onclick="window.print()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa fa-print"></i> Print / Save PDF
+                    </button>
+                    <button onclick="window.close()" style="background: #475569; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        Close
+                    </button>
                 </div>
-                <div class="report-meta">
-                    <strong>Report ID:</strong> #${report.id.substring(0, 8)}<br>
-                    <strong>Generated:</strong> ${today}<br>
-                    <strong>Status:</strong> ${report.status}
-                </div>
-            </header>
 
-            <div class="title-section">
-                <h1>Audit Report</h1>
-                <h2>${report.client}</h2>
-                <div style="margin-top: 15px; font-size: 0.9rem; color: #64748b;">
-                    <span style="margin: 0 10px;"><i class="fa fa-calendar"></i> ${report.date}</span>
-                    <span style="margin: 0 10px;"><i class="fa fa-user-tie"></i> Lead Auditor: ${report.leadAuditor || 'Assigned Auditor'}</span>
-                </div>
+                <header class="report-header">
+                    <div class="brand-logo">
+                        <i class="fa-solid fa-check-double"></i> AuditCB
+                    </div>
+                    <div class="report-meta">
+                        <strong>Report ID:</strong> #${report.id.substring(0, 8)}<br>
+                            <strong>Generated:</strong> ${today}<br>
+                                <strong>Status:</strong> <span style="text-transform: capitalize;">${report.status}</span>
+                            </div>
+                        </header>
+
+                        <div class="title-section">
+                            <h1>Audit Findings Report</h1>
+                            <h2>${report.client}</h2>
+                            <div style="margin-top: 20px; display: flex; justify-content: center; gap: 30px; color: #64748b;">
+                                <span><i class="fa fa-calendar-alt"></i> ${report.date}</span>
+                                <span><i class="fa fa-user-tie"></i> Lead Auditor: ${report.leadAuditor || 'Assigned Auditor'}</span>
+                                <span><i class="fa fa-map-marker-alt"></i> ${client.city || 'Remote Audit'}</span>
+                            </div>
+                        </div>
+
+                        <!-- 1. Audit Statistics -->
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-val">${totalItems}</div>
+                                <div class="stat-label">Total Checks</div>
+                            </div>
+                            <div class="stat-box" style="border-color: ${ncItems.length > 0 ? '#fecaca' : '#e2e8f0'}; background: ${ncItems.length > 0 ? '#fef2f2' : 'white'};">
+                                <div class="stat-val" style="color: ${ncItems.length > 0 ? '#dc2626' : '#16a34a'}">${ncItems.length}</div>
+                                <div class="stat-label">Non-Conformities</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-val">${majorNC}</div>
+                                <div class="stat-label">Major NCs</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-val">${minorNC}</div>
+                                <div class="stat-label">Minor NCs</div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Executive Summary -->
+                        <div>
+                            <div class="section-title"><i class="fa-solid fa-file-alt"></i> Executive Summary</div>
+                            <div class="content-box">
+                                <p style="margin: 0;">
+                                    ${report.executiveSummary ? report.executiveSummary.replace(/\n/g, '<br>') : '<em>No executive summary recorded.</em>'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 3. Observations & OFIs -->
+                        ${report.positiveObservations || report.ofi ? `
+            <div class="info-grid" style="margin-top: 30px;">
+                ${report.positiveObservations ? `
+                <div>
+                    <div class="box-title" style="color: #166534;"><i class="fa-solid fa-plus-circle"></i> Positive Observations</div>
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 6px; color: #166534; font-size: 0.95rem;">
+                        ${report.positiveObservations.replace(/\n/g, '<br>')}
+                    </div>
+                </div>` : ''}
+                
+                ${report.ofi ? `
+                <div>
+                    <div class="box-title" style="color: #854d0e;"><i class="fa-solid fa-lightbulb"></i> Opportunities for Improvement</div>
+                    <div style="background: #fefce8; border: 1px solid #fde047; padding: 15px; border-radius: 6px; color: #854d0e; font-size: 0.95rem;">
+                        ${report.ofi.replace(/\n/g, '<br>')}
+                    </div>
+                </div>` : ''}
             </div>
+            ` : ''}
 
-            <div class="section">
-                <div class="section-title">Audit Overview</div>
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="stat-val">${totalItems}</div>
-                        <div class="stat-label">Total Checks</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-val" style="color: ${ncItems.length > 0 ? '#dc2626' : '#16a34a'}">${ncItems.length}</div>
-                        <div class="stat-label">Non-Conformities</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-val">${majorNC}</div>
-                        <div class="stat-label">Major NCs</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-val">${minorNC}</div>
-                        <div class="stat-label">Minor NCs</div>
-                    </div>
-                </div>
-            </div>
+                        <!-- 4. Meeting Records -->
+                        <div class="page-break">
+                            <div class="section-title"><i class="fa-solid fa-users"></i> Meeting Records</div>
 
-            <div class="section">
-                <div class="section-title">Executive Summary</div>
-                <p style="text-align: justify; color: #334155; line-height: 1.8;">
-                    ${report.executiveSummary ? report.executiveSummary.replace(/\n/g, '<br>') : '<em>No executive summary provided. This section typically contains a high-level overview of the audit findings, effectiveness of the management system, and key recommendations.</em>'}
-                </p>
-            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <!-- Opening Meeting -->
+                                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+                                    <h3 style="margin-top: 0; font-size: 1.1rem; color: #0f172a; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Opening Meeting</h3>
+                                    <div class="info-grid" style="margin-bottom: 10px; gap: 10px;">
+                                        <div class="info-item"><label>Date</label><div>${report.openingMeeting?.date || '-'}</div></div>
+                                        <div class="info-item"><label>Time</label><div>${report.openingMeeting?.time || '-'}</div></div>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Attendees</label>
+                                        <div style="font-size: 0.9rem; line-height: 1.5;">${report.openingMeeting?.attendees ? report.openingMeeting.attendees.replace(/\n/g, '<br>') : '-'}</div>
+                                    </div>
+                                    ${report.openingMeeting?.notes ? `
+                        <div class="info-item" style="margin-top: 15px;">
+                            <label>Notes</label>
+                            <div style="font-size: 0.9rem;">${report.openingMeeting.notes}</div>
+                        </div>` : ''}
+                                </div>
 
-            <div class="section page-break">
-                <div class="section-title">Detailed Findings</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 15%">Clause</th>
-                            <th style="width: 35%">Requirement</th>
-                            <th style="width: 15%">Status</th>
-                            <th style="width: 35%">Audit Evidence & Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${(report.checklistProgress || []).map(item => `
+                                <!-- Closing Meeting -->
+                                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+                                    <h3 style="margin-top: 0; font-size: 1.1rem; color: #0f172a; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Closing Meeting</h3>
+                                    <div class="info-grid" style="margin-bottom: 10px; gap: 10px;">
+                                        <div class="info-item"><label>Date</label><div>${report.closingMeeting?.date || '-'}</div></div>
+                                        <div class="info-item"><label>Time</label><div>${report.closingMeeting?.time || '-'}</div></div>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Attendees</label>
+                                        <div style="font-size: 0.9rem; line-height: 1.5;">${report.closingMeeting?.attendees ? report.closingMeeting.attendees.replace(/\n/g, '<br>') : '-'}</div>
+                                    </div>
+                                    ${report.closingMeeting?.summary ? `
+                        <div class="info-item" style="margin-top: 15px;">
+                            <label>Summary Presented</label>
+                            <div style="font-size: 0.9rem;">${report.closingMeeting.summary}</div>
+                        </div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5. detailed Findings -->
+                        <div class="page-break">
+                            <div class="section-title"><i class="fa-solid fa-list-check"></i> Detailed Findings</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 12%">Clause</th>
+                                        <th style="width: 30%">Requirement</th>
+                                        <th style="width: 15%">Status</th>
+                                        <th style="width: 43%">Audit Evidence & Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(report.checklistProgress || []).map(item => `
                             <tr>
                                 <td><strong>${item.clause || ''}</strong></td>
                                 <td style="font-size: 0.85rem; color: #475569;">${item.requirement || item.text || 'Requirement text'}</td>
                                 <td>
                                     <span class="badge status-${(item.status || 'pending').toLowerCase()}">
-                                        ${item.status === 'nc' ? (item.ncrType === 'Major' ? 'Major NC' : (item.ncrType === 'Minor' ? 'Minor NC' : 'Non-Conformity')) : (item.status === 'conform' ? 'Conformity' : (item.status === 'na' ? 'N/A' : 'Pending'))}
+                                        ${item.status === 'nc' ? (item.ncrType === 'Major' ? 'Major NC' : (item.ncrType === 'Minor' ? 'Minor NC' : 'Non-Conformity')) :
+                                            (item.status === 'conform' ? 'Conformity' :
+                                                (item.status === 'na' ? 'N/A' : '-'))}
                                     </span>
                                 </td>
                                 <td>
-                                    ${item.comment || '<span style="color: #cbd5e1; font-style: italic;">No specific remarks recorded.</span>'}
-                                    ${item.evidenceImages && item.evidenceImages.length > 0 ? `<div style="margin-top: 5px; font-size: 0.75rem; color: #64748b;"><i class="fa fa-paperclip"></i> ${item.evidenceImages.length} image(s) attached</div>` : ''}
+                                    <!-- Comment -->
+                                    <div style="margin-bottom: 8px;">
+                                        ${item.comment || (item.status === 'nc' ? '<em style="color:#ef4444">No description recorded.</em>' : '<em style="color:#cbd5e1">No remarks.</em>')}
+                                    </div>
+                                    
+                                    <!-- NC Transcripts if applicable -->
+                                    ${item.transcript ? `
+                                    <div style="background: #fef2f2; padding: 8px; border-radius: 4px; font-size: 0.8rem; border-left: 2px solid #ef4444; margin-bottom: 8px;">
+                                        <strong>Finding Note:</strong> ${item.transcript}
+                                    </div>` : ''}
+
+                                    <!-- Evidence Images -->
+                                    ${item.evidenceImage ? `
+                                    <div>
+                                        <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Evidence</div>
+                                        <img src="${item.evidenceImage}" class="evidence-thumbnail" alt="Evidence">
+                                    </div>` : ''}
                                 </td>
                             </tr>
+                        `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 6. CAPA Section (if any) -->
+                        ${report.capas && report.capas.length > 0 ? `
+            <div class="page-break">
+                <div class="section-title"><i class="fa-solid fa-tools"></i> Corrective Action Plan (CAPA)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ref</th>
+                            <th>Root Cause</th>
+                            <th>Action Plan</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${report.capas.map((capa, i) => `
+                        <tr>
+                            <td><strong>${capa.linkedNCR || '#'}</strong></td>
+                            <td>${capa.rootCause}</td>
+                            <td>${capa.actionPlan}</td>
+                            <td>${capa.dueDate || '-'}</td>
+                            <td><span class="badge" style="background:#f1f5f9; color:#475569">${capa.status || 'Open'}</span></td>
+                        </tr>
                         `).join('')}
                     </tbody>
                 </table>
             </div>
+            ` : ''}
 
-            <div class="section">
-                <div class="section-title">Signatures</div>
-                <p style="margin-bottom: 20px; font-size: 0.9rem; color: #64748b;">
-                    By signing below, the Lead Auditor confirms the accuracy of these findings, and the Client Representative acknowledges receipt of this report.
-                </p>
-                <div class="signatures">
-                    <div class="sig-block">
-                        <div class="sig-title">Lead Auditor</div>
-                        <div style="height: 50px;"></div>
-                        <div>Name: ______________________</div>
-                        <div style="margin-top: 10px;">Date: ______________________</div>
-                    </div>
-                    <div class="sig-block">
-                        <div class="sig-title">Client Representative</div>
-                        <div style="height: 50px;"></div>
-                        <div>Name: ______________________</div>
-                        <div style="margin-top: 10px;">Date: ______________________</div>
-                    </div>
-                </div>
-            </div>
+                        <!-- 7. Signatures -->
+                        <div style="margin-top: 80px; page-break-inside: avoid;">
+                            <div class="signatures">
+                                <div class="sig-block">
+                                    <div class="sig-title">Lead Auditor</div>
+                                    <div class="sig-line">
+                                        <span>Name: ${report.leadAuditor || '__________________'}</span>
+                                        <span>Date: ${today}</span>
+                                    </div>
+                                </div>
+                                <div class="sig-block">
+                                    <div class="sig-title">Client Representative</div>
+                                    <div class="sig-line">
+                                        <span>Name: __________________</span>
+                                        <span>Date: ${today}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-            <footer style="margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.8rem; color: #94a3b8;">
-                &copy; ${new Date().getFullYear()} AuditCB Certification Body. All rights reserved.<br>
-                This document is confidential and intended solely for the use of the individual or entity to whom it is addressed.
-            </footer>
-        </body>
-        </html>
-    `;
+                        <footer style="margin-top: 50px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.8rem; color: #94a3b8;">
+                            &copy; ${new Date().getFullYear()} AuditCB Certification Body. All rights reserved.<br>
+                                This document is confidential and intended solely for the use of the individual or entity to whom it is addressed.
+                        </footer>
+                    </body>
+                </html>
+                `;
 
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
+                printWindow.document.write(reportHtml);
+                printWindow.document.close();
 
     // Auto-print after delay to allow styles to load
     setTimeout(() => {
-        printWindow.print();
+                    printWindow.print();
     }, 1000);
 };
 
-window.openCreateReportModal = openCreateReportModal;
-window.openEditReportModal = openEditReportModal;
+                window.openCreateReportModal = openCreateReportModal;
+                window.openEditReportModal = openEditReportModal;
 
-// Persistent stream for remote audits
-window.activeAuditScreenStream = null;
+                // Persistent stream for remote audits
+                window.activeAuditScreenStream = null;
 
-window.captureScreenEvidence = async function (uniqueId) {
+                window.captureScreenEvidence = async function (uniqueId) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
-        return;
+                    window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+                return;
     }
 
-    try {
-        let stream = window.activeAuditScreenStream;
-        let isNew = false;
+                try {
+                    let stream = window.activeAuditScreenStream;
+                let isNew = false;
 
-        // Check active stream
-        if (!stream || !stream.active) {
-            window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
-            stream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always" },
+                // Check active stream
+                if (!stream || !stream.active) {
+                    window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {cursor: "always" },
                 audio: false
             });
-            window.activeAuditScreenStream = stream;
-            isNew = true;
+                window.activeAuditScreenStream = stream;
+                isNew = true;
 
             // Handle stop sharing
             stream.getVideoTracks()[0].onended = () => {
-                window.activeAuditScreenStream = null;
+                    window.activeAuditScreenStream = null;
                 window.showNotification('Screen sharing session ended.', 'info');
             };
         }
 
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.muted = true;
-        video.play();
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.muted = true;
+                video.play();
 
         // Wait for buffer
         await new Promise(r => setTimeout(r, isNew ? 500 : 200));
 
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
-        // DO NOT stop tracks here. We reuse them.
+                // DO NOT stop tracks here. We reuse them.
 
-        // Update UI
-        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-        const imgElem = document.getElementById('evidence-img-' + uniqueId);
-        const dataInput = document.getElementById('evidence-data-' + uniqueId);
-        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+                // Update UI
+                const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+                const imgElem = document.getElementById('evidence-img-' + uniqueId);
+                const dataInput = document.getElementById('evidence-data-' + uniqueId);
+                const sizeElem = document.getElementById('evidence-size-' + uniqueId);
 
-        if (imgElem) imgElem.src = dataUrl;
-        if (previewDiv) previewDiv.style.display = 'block';
-        if (dataInput) dataInput.value = 'attached';
-        if (sizeElem) sizeElem.textContent = 'Screen Capture';
+                if (imgElem) imgElem.src = dataUrl;
+                if (previewDiv) previewDiv.style.display = 'block';
+                if (dataInput) dataInput.value = 'attached';
+                if (sizeElem) sizeElem.textContent = 'Screen Capture';
 
-        window.showNotification('Captured!', 'success');
+                window.showNotification('Captured!', 'success');
 
-        // Cleanup element
-        video.pause();
-        video.srcObject = null;
-        video.remove();
+                // Cleanup element
+                video.pause();
+                video.srcObject = null;
+                video.remove();
 
     } catch (err) {
         if (err.name !== 'NotAllowedError') {
-            console.error(err);
-            window.showNotification('Capture failed: ' + err.message, 'error');
+                    console.error(err);
+                window.showNotification('Capture failed: ' + err.message, 'error');
         }
     }
 };
-window.renderExecutionDetail = renderExecutionDetail;
+                window.renderExecutionDetail = renderExecutionDetail;
 
-// Toggle selection of all items in a section
-window.toggleSectionSelection = function (sectionId) {
+                // Toggle selection of all items in a section
+                window.toggleSectionSelection = function (sectionId) {
     const checkbox = document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
-    const sectionContent = document.getElementById(sectionId);
+                const sectionContent = document.getElementById(sectionId);
 
-    if (!sectionContent) return;
+                if (!sectionContent) return;
 
-    const items = sectionContent.querySelectorAll('.checklist-item');
+                const items = sectionContent.querySelectorAll('.checklist-item');
     items.forEach(item => {
         if (checkbox.checked) {
-            item.classList.add('selected-item');
-            item.style.background = '#eff6ff';
-            item.style.borderLeft = '4px solid var(--primary-color)';
+                    item.classList.add('selected-item');
+                item.style.background = '#eff6ff';
+                item.style.borderLeft = '4px solid var(--primary-color)';
         } else {
-            item.classList.remove('selected-item');
-            item.style.background = '';
-            item.style.borderLeft = '';
+                    item.classList.remove('selected-item');
+                item.style.background = '';
+                item.style.borderLeft = '';
         }
     });
 };
 
-// ============================================
-// Webcam Handling for Desktop 'Camera' Button
-// ============================================
-window.activeWebcamStream = null;
+                // ============================================
+                // Webcam Handling for Desktop 'Camera' Button
+                // ============================================
+                window.activeWebcamStream = null;
 
-window.handleCameraButton = function (uniqueId) {
+                window.handleCameraButton = function (uniqueId) {
     // Check if mobile device (simple check)
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    if (isMobile) {
+                if (isMobile) {
         // Use the native input for mobile (file picker / camera app)
         const inp = document.getElementById('cam-' + uniqueId);
-        if (inp) inp.click();
+                if (inp) inp.click();
     } else {
-        // Use Webcam Modal for desktop
-        window.openWebcamModal(uniqueId);
+                    // Use Webcam Modal for desktop
+                    window.openWebcamModal(uniqueId);
     }
 };
 
-window.openWebcamModal = async function (uniqueId) {
+                window.openWebcamModal = async function (uniqueId) {
     const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+                const modalBody = document.getElementById('modal-body');
+                const modalSave = document.getElementById('modal-save');
 
-    // Cleanup any existing stream first
-    if (window.activeWebcamStream) {
-        window.activeWebcamStream.getTracks().forEach(track => track.stop());
-        window.activeWebcamStream = null;
+                // Cleanup any existing stream first
+                if (window.activeWebcamStream) {
+                    window.activeWebcamStream.getTracks().forEach(track => track.stop());
+                window.activeWebcamStream = null;
     }
 
-    modalTitle.textContent = 'Capture from Webcam';
+                modalTitle.textContent = 'Capture from Webcam';
 
-    modalBody.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-            <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
-                <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
-            </div>
-            <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
-        </div>
-    `;
+                modalBody.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                    <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                        <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                        <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
+                    </div>
+                    <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
+                </div>
+                `;
 
-    // Configure "Capture" button
-    modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+                // Configure "Capture" button
+                modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
     modalSave.onclick = () => window.captureWebcam(uniqueId);
 
-    // Show modal BEFORE requesting media
-    if (window.openModal) window.openModal();
+                // Show modal BEFORE requesting media
+                if (window.openModal) window.openModal();
 
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        window.activeWebcamStream = stream;
+                try {
+        const stream = await navigator.mediaDevices.getUserMedia({video: true });
+                window.activeWebcamStream = stream;
 
-        const video = document.getElementById('webcam-video');
-        const loading = document.getElementById('webcam-loading');
+                const video = document.getElementById('webcam-video');
+                const loading = document.getElementById('webcam-loading');
 
-        if (video) {
-            video.srcObject = stream;
+                if (video) {
+                    video.srcObject = stream;
             video.onloadedmetadata = () => {
                 if (loading) loading.style.display = 'none';
             };
         }
     } catch (err) {
         const errDiv = document.getElementById('webcam-error');
-        const loading = document.getElementById('webcam-loading');
-        if (loading) loading.style.display = 'none';
+                const loading = document.getElementById('webcam-loading');
+                if (loading) loading.style.display = 'none';
 
-        if (errDiv) {
-            errDiv.style.display = 'block';
-            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+                if (errDiv) {
+                    errDiv.style.display = 'block';
+                errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
         }
-        console.error("Webcam error:", err);
+                console.error("Webcam error:", err);
     }
 };
 
-window.captureWebcam = function (uniqueId) {
+                window.captureWebcam = function (uniqueId) {
     const video = document.getElementById('webcam-video');
-    if (!video || !window.activeWebcamStream) return;
+                if (!video || !window.activeWebcamStream) return;
 
-    try {
+                try {
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
 
-        const ctx = canvas.getContext('2d');
-        // Mirror the capture if the video was mirrored
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0);
+                const ctx = canvas.getContext('2d');
+                // Mirror the capture if the video was mirrored
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
         // Stop stream
         window.activeWebcamStream.getTracks().forEach(track => track.stop());
-        window.activeWebcamStream = null;
+                window.activeWebcamStream = null;
 
-        // Update UI
-        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-        const imgElem = document.getElementById('evidence-img-' + uniqueId);
-        const dataInput = document.getElementById('evidence-data-' + uniqueId);
-        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+                // Update UI
+                const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+                const imgElem = document.getElementById('evidence-img-' + uniqueId);
+                const dataInput = document.getElementById('evidence-data-' + uniqueId);
+                const sizeElem = document.getElementById('evidence-size-' + uniqueId);
 
-        if (imgElem) imgElem.src = dataUrl;
-        if (previewDiv) previewDiv.style.display = 'block';
-        if (dataInput) dataInput.value = 'attached';
-        if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+                if (imgElem) imgElem.src = dataUrl;
+                if (previewDiv) previewDiv.style.display = 'block';
+                if (dataInput) dataInput.value = 'attached';
+                if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
 
-        // Close modal
-        if (window.closeModal) window.closeModal();
+                // Close modal
+                if (window.closeModal) window.closeModal();
     } catch (e) {
-        console.error("Capture failed:", e);
-        window.showNotification("Failed to capture image", "error");
+                    console.error("Capture failed:", e);
+                window.showNotification("Failed to capture image", "error");
     }
 };
 
-// Global event delegation for section checkboxes (works with dynamically rendered content)
-document.addEventListener('click', function (e) {
+                // Global event delegation for section checkboxes (works with dynamically rendered content)
+                document.addEventListener('click', function (e) {
     if (e.target.classList.contains('section-checkbox')) {
-        e.stopPropagation();
-        const sectionId = e.target.getAttribute('data-section-id');
-        const isChecked = e.target.checked;
-        console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
+                    e.stopPropagation();
+                const sectionId = e.target.getAttribute('data-section-id');
+                const isChecked = e.target.checked;
+                console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
 
-        // Find all items in this section and toggle selection
-        const section = document.getElementById(sectionId);
-        if (!section) {
-            console.error('Section not found:', sectionId);
-            return;
+                // Find all items in this section and toggle selection
+                const section = document.getElementById(sectionId);
+                if (!section) {
+                    console.error('Section not found:', sectionId);
+                return;
         }
 
-        const items = section.querySelectorAll('.checklist-item');
-        console.log('Found', items.length, 'items in section');
+                const items = section.querySelectorAll('.checklist-item');
+                console.log('Found', items.length, 'items in section');
 
         items.forEach((item, idx) => {
             // Toggle the individual checkbox too
             const itemCheckbox = item.querySelector('.item-checkbox');
-            if (itemCheckbox) {
-                itemCheckbox.checked = isChecked;
+                if (itemCheckbox) {
+                    itemCheckbox.checked = isChecked;
             }
 
-            if (isChecked) {
-                item.classList.add('selected-item');
+                if (isChecked) {
+                    item.classList.add('selected-item');
                 item.style.background = '#eff6ff';
                 item.style.borderLeft = '4px solid var(--primary-color)';
             } else {
-                item.classList.remove('selected-item');
+                    item.classList.remove('selected-item');
                 item.style.background = '';
                 item.style.borderLeft = '4px solid #e2e8f0';
             }
         });
 
-        console.log('Selection complete for', items.length, 'items');
+                console.log('Selection complete for', items.length, 'items');
     }
 });
 
-// Global event delegation for individual item checkboxes
-document.addEventListener('click', function (e) {
+                // Global event delegation for individual item checkboxes
+                document.addEventListener('click', function (e) {
     if (e.target.classList.contains('item-checkbox')) {
         const checkbox = e.target;
-        const uniqueId = checkbox.getAttribute('data-unique-id');
-        const row = document.getElementById('row-' + uniqueId);
+                const uniqueId = checkbox.getAttribute('data-unique-id');
+                const row = document.getElementById('row-' + uniqueId);
 
-        if (row) {
+                if (row) {
             if (checkbox.checked) {
-                row.classList.add('selected-item');
+                    row.classList.add('selected-item');
                 row.style.background = '#eff6ff';
                 row.style.borderLeft = '4px solid var(--primary-color)';
             } else {
-                row.classList.remove('selected-item');
+                    row.classList.remove('selected-item');
                 row.style.background = '';
                 row.style.borderLeft = '4px solid #e2e8f0';
             }
@@ -3198,72 +3359,72 @@ document.addEventListener('click', function (e) {
     }
 });
 
-// Global event delegation for bulk action buttons
-document.addEventListener('click', function (e) {
+                // Global event delegation for bulk action buttons
+                document.addEventListener('click', function (e) {
     const btn = e.target.closest('.bulk-action-btn');
-    if (btn) {
+                if (btn) {
         const action = btn.getAttribute('data-action');
-        const reportId = btn.getAttribute('data-report-id');
-        console.log('Bulk action button clicked:', action, 'for report:', reportId);
+                const reportId = btn.getAttribute('data-report-id');
+                console.log('Bulk action button clicked:', action, 'for report:', reportId);
 
-        if (action && reportId) {
-            window.bulkUpdateStatus(parseInt(reportId), action);
+                if (action && reportId) {
+                    window.bulkUpdateStatus(parseInt(reportId), action);
 
-            // Close menu
-            const menu = document.getElementById('bulk-menu-' + reportId);
-            if (menu) menu.classList.add('hidden');
+                // Close menu
+                const menu = document.getElementById('bulk-menu-' + reportId);
+                if (menu) menu.classList.add('hidden');
         }
     }
 });
 
-// Global event delegation for status buttons (OK, NC, N/A) - using capture phase
-document.addEventListener('click', function (e) {
-    // Check if clicked element or any parent has status-btn class
-    let btn = e.target;
+                // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
+                document.addEventListener('click', function (e) {
+                    // Check if clicked element or any parent has status-btn class
+                    let btn = e.target;
 
-    // Log all clicks for debugging
-    if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-        console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
+                // Log all clicks for debugging
+                if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+                    console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
     }
 
-    while (btn && btn.classList && !btn.classList.contains('status-btn')) {
-        btn = btn.parentElement;
-        if (!btn || btn === document.body) {
-            btn = null;
-            break;
+                while (btn && btn.classList && !btn.classList.contains('status-btn')) {
+                    btn = btn.parentElement;
+                if (!btn || btn === document.body) {
+                    btn = null;
+                break;
         }
     }
 
-    if (btn && btn.classList && btn.classList.contains('status-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
+                if (btn && btn.classList && btn.classList.contains('status-btn')) {
+                    e.preventDefault();
+                e.stopPropagation();
 
-        const uniqueId = btn.getAttribute('data-unique-id');
-        const status = btn.getAttribute('data-status');
-        console.log('Status button clicked:', status, 'for item:', uniqueId);
+                const uniqueId = btn.getAttribute('data-unique-id');
+                const status = btn.getAttribute('data-status');
+                console.log('Status button clicked:', status, 'for item:', uniqueId);
 
-        if (uniqueId && status) {
-            window.setChecklistStatus(uniqueId, status);
+                if (uniqueId && status) {
+                    window.setChecklistStatus(uniqueId, status);
         }
     }
 }, true); // true = capture phase
 
-// Helper to update meeting records (Opening/Closing)
-window.updateMeetingData = function (reportId, meetingType, field, value) {
+                // Helper to update meeting records (Opening/Closing)
+                window.updateMeetingData = function (reportId, meetingType, field, value) {
     const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
+                if (!report) return;
 
-    if (!report[meetingType + 'Meeting']) {
-        report[meetingType + 'Meeting'] = {};
+                if (!report[meetingType + 'Meeting']) {
+                    report[meetingType + 'Meeting'] = {};
     }
 
-    if (field === 'attendees') {
-        // Split by comma and clean up
-        report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+                if (field === 'attendees') {
+                    // Split by comma and clean up
+                    report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
     } else {
-        report[meetingType + 'Meeting'][field] = value;
+                    report[meetingType + 'Meeting'][field] = value;
     }
 
-    window.saveData();
-    window.saveChecklist(reportId);
+                window.saveData();
+                window.saveChecklist(reportId);
 };
