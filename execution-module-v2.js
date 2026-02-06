@@ -2684,7 +2684,6 @@ window.generateAuditReport = function (reportId) {
     const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
     
     // QR Code for Report Verification (using report ID)
-    const qrCodeUrl || 'https://via.placeholder.com/150?text=Logo'; // Fallback
     // QR Code for Report Verification (using report ID)
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
 
