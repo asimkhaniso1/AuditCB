@@ -2970,6 +2970,7 @@ window.generateAuditReport = function (reportId) {
                         </div>
 
                         <!-- 5. detailed Findings -->
+                        <!-- 5. detailed Findings -->
                         <div class="page-break">
                             <div class="section-title"><i class="fa-solid fa-list-check"></i> Detailed Findings</div>
                             <table>
@@ -3007,9 +3008,9 @@ window.generateAuditReport = function (reportId) {
 
                                     <!-- Evidence Images -->
                                     ${item.evidenceImage ? `
-                                    <div>
+                                    <div style="margin-top: 10px;">
                                         <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Evidence</div>
-                                        <img src="${item.evidenceImage}" class="evidence-thumbnail" alt="Evidence">
+                                        <a href="${item.evidenceImage}" target="_blank"><img src="${item.evidenceImage}" class="evidence-thumbnail" alt="Evidence"></a>
                                     </div>` : ''}
                                 </td>
                             </tr>
@@ -3017,6 +3018,43 @@ window.generateAuditReport = function (reportId) {
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- 5b. Non-Conformity Reports (NCRs) - Standalone -->
+                        ${report.ncrs && report.ncrs.length > 0 ? `
+            <div class="page-break">
+                <div class="section-title"><i class="fa-solid fa-exclamation-triangle"></i> Non-Conformity Reports (NCRs)</div>
+                ${report.ncrs.map((ncr, idx) => `
+                <div class="content-box" style="border-left-color: ${ncr.type === 'Major' ? '#dc2626' : (ncr.type === 'Minor' ? '#f59e0b' : '#3b82f6')}; background: white; border: 1px solid #e2e8f0; border-left-width: 4px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <div>
+                            <span class="badge" style="background: ${ncr.type === 'Major' ? '#fee2e2' : (ncr.type === 'Minor' ? '#fef3c7' : '#e0f2fe')}; color: ${ncr.type === 'Major' ? '#991b1b' : (ncr.type === 'Minor' ? '#92400e' : '#075985')};">
+                                ${ncr.type || 'Observation'}
+                            </span>
+                            <span style="margin-left: 10px; font-weight: 700; color: #334155;">Clause: ${ncr.clause || 'N/A'}</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b;">${new Date(ncr.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Description</div>
+                        <div style="color: #334155;">${ncr.description || 'No description provided.'}</div>
+                    </div>
+
+                    ${ncr.evidence ? `
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Evidence Details</div>
+                        <div style="color: #475569; font-size: 0.9rem;">${ncr.evidence}</div>
+                    </div>` : ''}
+
+                    ${ncr.evidenceImage ? `
+                    <div style="margin-top: 10px;">
+                        <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Attached Evidence</div>
+                        <a href="${ncr.evidenceImage}" target="_blank"><img src="${ncr.evidenceImage}" class="evidence-thumbnail" alt="Evidence" style="width: 100px; height: 100px;"></a>
+                    </div>` : ''}
+                </div>
+                `).join('')}
+            </div>
+            ` : ''}
 
                         <!-- 6. CAPA Section (if any) -->
                         ${report.capas && report.capas.length > 0 ? `
