@@ -2974,27 +2974,27 @@ window.generateAuditReport = function (reportId) {
                         </tr>
                         <tr>
                             <td><strong>Audit Plan Reference:</strong></td>
-                            <td>${auditPlan ? #${ auditPlan.id.substring(0, 8) } - ${ auditPlan.auditType || 'N/A' } : 'Not Linked'
-}</td >
-                        </tr >
+                            <td>${auditPlan ? `#${auditPlan.id.substring(0, 8)} - ${auditPlan.auditType || 'N/A'}` : 'Not Linked'}</td>
+                        </tr>
                         <tr>
                             <td><strong>Audit Standard:</strong></td>
                             <td>${report.standard || auditPlan?.standard || 'ISO 9001:2015'}</td>
                         </tr>
                         <tr>
                             <td><strong>Audit Dates:</strong></td>
-                            <td>${report.date || 'N/A'} ${report.endDate ?  to ${report.endDate} : ''}</td>
+                            <td>${report.date || 'N/A'} ${report.endDate ? `to ${report.endDate}` : ''}</td>
                         </tr>
                         <tr>
                             <td><strong>Lead Auditor:</strong></td>
                             <td>${report.leadAuditor || 'Assigned Auditor'}</td>
                         </tr>
-                    </table >
-                </div >
-            </div >
+                    </table>
+                </div>
+            </div>
 
-            < !--2. Detailed Findings-- >
-            <div id="section-findings" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">3. Non-Conformities Found</div>
+            <!-- 3. Detailed Findings -->
+            <div id="section-findings" class="page-break table-container">
+                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">3. Non-Conformities Found</div>
                 <table style="margin-top: 20px;">
                     <thead>
                         <tr>
@@ -3030,8 +3030,7 @@ window.generateAuditReport = function (reportId) {
             </div>
 
             <!--3. NCRs-- >
-    ${
-        report.ncrs && report.ncrs.length > 0 ? `
+    ${report.ncrs && report.ncrs.length > 0 ? `
             <div id="section-ncrs" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. NCR Details</div>
                 ${report.ncrs.map(ncr => `
                 <div class="card" style="margin-top: 20px; border-left: 5px solid ${ncr.type === 'Major' ? 'var(--danger)' : 'var(--warning)'};">
@@ -3046,7 +3045,7 @@ window.generateAuditReport = function (reportId) {
             </div>` : ''
 }
 
-            < !--4. Meetings-- >
+    < !--4. Meetings-- >
             <div id="section-meetings" class="page-break table-container">`r`n                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">5. Meeting Records</div>
                  <div class="dashboard-grid" style="padding: 0; margin-top: 20px;">
                     <div class="card">
