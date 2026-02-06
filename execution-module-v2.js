@@ -2679,10 +2679,10 @@ window.generateAuditReport = function (reportId) {
     // Attempt to get client details for address/logo if available
     const client = window.state.clients.find(c => c.name === report.client) || {};
     const clientLogo = client.logo || 'https://via.placeholder.com/150?text=Logo';
-    
+
     // Get audit plan reference
     const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
-    
+
     // QR Code for Report Verification (using report ID)
     // QR Code for Report Verification (using report ID)
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
@@ -2929,29 +2929,29 @@ window.generateAuditReport = function (reportId) {
                         </tr>
                     </table>
                     
-                    ${client.goodsServices && client.goodsServices.length > 0 ? 
+                    ${client.goodsServices && client.goodsServices.length > 0 ? `
                     <div style="margin-top: 20px;">
                         <strong style="display: block; margin-bottom: 10px; color: #334155;">Goods & Services:</strong>
                         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                            ${client.goodsServices.map(g => <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde047;">${g.name} ${g.category ? () : ''}</span>).join('')}
+                            ${client.goodsServices.map(g => `<span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde047;">${g.name} ${g.category ? `(${g.category})` : ''}</span>`).join('')}
                         </div>
-                    </div> : ''}
+                    </div>` : ''}
                     
-                    ${client.keyProcesses && client.keyProcesses.length > 0 ? 
+                    ${client.keyProcesses && client.keyProcesses.length > 0 ? `
                     <div style="margin-top: 20px;">
                         <strong style="display: block; margin-bottom: 10px; color: #334155;">Key Processes:</strong>
                         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                            ${client.keyProcesses.map(p => <span class="badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;">${p.name || p}</span>).join('')}
+                            ${client.keyProcesses.map(p => `<span class="badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;">${p.name || p}</span>`).join('')}
                         </div>
-                    </div> : ''}
+                    </div>` : ''}
                     
-                    ${client.sites && client.sites.length > 0 ? 
+                    ${client.sites && client.sites.length > 0 ? `
                     <div style="margin-top: 20px;">
                         <strong style="display: block; margin-bottom: 10px; color: #334155;">Sites/Locations:</strong>
                         <ul style="margin: 0; padding-left: 20px;">
-                            ${client.sites.map(site => <li>${site.name || site.address} - ${site.city || ''}, ${site.country || ''}</li>).join('')}
+                            ${client.sites.map(site => `<li>${site.name || site.address} - ${site.city || ''}, ${site.country || ''}</li>`).join('')}
                         </ul>
-                    </div> : ''}
+                    </div>` : ''}
                 </div>
             </div>
 
@@ -2973,8 +2973,9 @@ window.generateAuditReport = function (reportId) {
                         </tr>
                         <tr>
                             <td><strong>Audit Plan Reference:</strong></td>
-                            <td>${auditPlan ? #${auditPlan.id.substring(0,8)} - ${auditPlan.auditType || 'N/A'} : 'Not Linked'}</td>
-                        </tr>
+                            <td>${auditPlan ? #${ auditPlan.id.substring(0, 8) } - ${ auditPlan.auditType || 'N/A' } : 'Not Linked'
+}</td >
+                        </tr >
                         <tr>
                             <td><strong>Audit Standard:</strong></td>
                             <td>${report.standard || auditPlan?.standard || 'ISO 9001:2015'}</td>
@@ -2987,11 +2988,11 @@ window.generateAuditReport = function (reportId) {
                             <td><strong>Lead Auditor:</strong></td>
                             <td>${report.leadAuditor || 'Assigned Auditor'}</td>
                         </tr>
-                    </table>
-                </div>
-            </div>
+                    </table >
+                </div >
+            </div >
 
-            <!-- 2. Detailed Findings -->
+            < !--2. Detailed Findings-- >
             <div id="section-findings" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">3. Non-Conformities Found</div>
                 <table style="margin-top: 20px;">
                     <thead>
@@ -3027,8 +3028,9 @@ window.generateAuditReport = function (reportId) {
                 </table>
             </div>
 
-            <!-- 3. NCRs -->
-            ${report.ncrs && report.ncrs.length > 0 ? `
+            <!--3. NCRs-- >
+    ${
+        report.ncrs && report.ncrs.length > 0 ? `
             <div id="section-ncrs" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. NCR Details</div>
                 ${report.ncrs.map(ncr => `
                 <div class="card" style="margin-top: 20px; border-left: 5px solid ${ncr.type === 'Major' ? 'var(--danger)' : 'var(--warning)'};">
@@ -3040,9 +3042,10 @@ window.generateAuditReport = function (reportId) {
                     ${ncr.evidenceImage ? `<img src="${ncr.evidenceImage}" style="max-height: 150px; border-radius: 6px; margin-top: 10px;">` : ''}
                 </div>
                 `).join('')}
-            </div>` : ''}
+            </div>` : ''
+}
 
-            <!-- 4. Meetings -->
+            < !--4. Meetings-- >
             <div id="section-meetings" class="page-break table-container">`r`n                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">5. Meeting Records</div>
                  <div class="dashboard-grid" style="padding: 0; margin-top: 20px;">
                     <div class="card">
@@ -3092,8 +3095,8 @@ window.generateAuditReport = function (reportId) {
                     });
                 }
             </script>
-        </body>
-        </html>
+        </body >
+        </html >
     `;
 
     printWindow.document.write(reportHtml);
@@ -3184,7 +3187,7 @@ window.openCreateReportModal = openCreateReportModal;
 
         // Toggle selection of all items in a section
         window.toggleSectionSelection = function (sectionId) {
-    const checkbox = document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
+    const checkbox = document.querySelector(`.section - checkbox[data - section - id="${sectionId}"]`);
         const sectionContent = document.getElementById(sectionId);
 
         if (!sectionContent) return;
@@ -3236,15 +3239,15 @@ window.openCreateReportModal = openCreateReportModal;
         modalTitle.textContent = 'Capture from Webcam';
 
         modalBody.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+    < div style = "display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
             <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                 <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
                 <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
             </div>
             <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
             <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
-        </div>
-        `;
+        </div >
+    `;
 
         // Configure "Capture" button
         modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
