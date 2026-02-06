@@ -1282,7 +1282,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             if (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED) {
                 primaryActionBtn = `
-                    <button class="btn btn-secondary" onclick="window.downloadAuditReportPDF('${report.id}')">
+                    <button class="btn btn-secondary" onclick="window.generateAuditReport('${report.id}')">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
                     </button>
                     <button class="btn btn-outline-primary" onclick="window.generateAuditReport('${report.id}')">
@@ -3044,7 +3044,7 @@ window.generateAuditReport = function (reportId) {
                 </div>
                 `).join('')}
             </div>` : ''
-}
+        }
 
     < !--4. Meetings-- >
             <div id="section-meetings" class="page-break table-container">
@@ -3111,35 +3111,35 @@ window.generateAuditReport = function (reportId) {
 };
 
 window.openCreateReportModal = openCreateReportModal;
-        window.openEditReportModal = openEditReportModal;
+window.openEditReportModal = openEditReportModal;
 
-        // Persistent stream for remote audits
-        window.activeAuditScreenStream = null;
+// Persistent stream for remote audits
+window.activeAuditScreenStream = null;
 
-        window.captureScreenEvidence = async function (uniqueId) {
+window.captureScreenEvidence = async function (uniqueId) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+        window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
         return;
     }
 
-        try {
-            let stream = window.activeAuditScreenStream;
+    try {
+        let stream = window.activeAuditScreenStream;
         let isNew = false;
 
         // Check active stream
         if (!stream || !stream.active) {
             window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
-        stream = await navigator.mediaDevices.getDisplayMedia({
-            video: {cursor: "always" },
-        audio: false
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" },
+                audio: false
             });
-        window.activeAuditScreenStream = stream;
-        isNew = true;
+            window.activeAuditScreenStream = stream;
+            isNew = true;
 
             // Handle stop sharing
             stream.getVideoTracks()[0].onended = () => {
-            window.activeAuditScreenStream = null;
-        window.showNotification('Screen sharing session ended.', 'info');
+                window.activeAuditScreenStream = null;
+                window.showNotification('Screen sharing session ended.', 'info');
             };
         }
 
@@ -3181,66 +3181,66 @@ window.openCreateReportModal = openCreateReportModal;
     } catch (err) {
         if (err.name !== 'NotAllowedError') {
             console.error(err);
-        window.showNotification('Capture failed: ' + err.message, 'error');
+            window.showNotification('Capture failed: ' + err.message, 'error');
         }
     }
 };
-        window.renderExecutionDetail = renderExecutionDetail;
+window.renderExecutionDetail = renderExecutionDetail;
 
-        // Toggle selection of all items in a section
-        window.toggleSectionSelection = function (sectionId) {
+// Toggle selection of all items in a section
+window.toggleSectionSelection = function (sectionId) {
     const checkbox = document.querySelector(`.section - checkbox[data - section - id="${sectionId}"]`);
-        const sectionContent = document.getElementById(sectionId);
+    const sectionContent = document.getElementById(sectionId);
 
-        if (!sectionContent) return;
+    if (!sectionContent) return;
 
-        const items = sectionContent.querySelectorAll('.checklist-item');
+    const items = sectionContent.querySelectorAll('.checklist-item');
     items.forEach(item => {
         if (checkbox.checked) {
             item.classList.add('selected-item');
-        item.style.background = '#eff6ff';
-        item.style.borderLeft = '4px solid var(--primary-color)';
+            item.style.background = '#eff6ff';
+            item.style.borderLeft = '4px solid var(--primary-color)';
         } else {
             item.classList.remove('selected-item');
-        item.style.background = '';
-        item.style.borderLeft = '';
+            item.style.background = '';
+            item.style.borderLeft = '';
         }
     });
 };
 
-        // ============================================
-        // Webcam Handling for Desktop 'Camera' Button
-        // ============================================
-        window.activeWebcamStream = null;
+// ============================================
+// Webcam Handling for Desktop 'Camera' Button
+// ============================================
+window.activeWebcamStream = null;
 
-        window.handleCameraButton = function (uniqueId) {
+window.handleCameraButton = function (uniqueId) {
     // Check if mobile device (simple check)
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        if (isMobile) {
+    if (isMobile) {
         // Use the native input for mobile (file picker / camera app)
         const inp = document.getElementById('cam-' + uniqueId);
         if (inp) inp.click();
     } else {
-            // Use Webcam Modal for desktop
-            window.openWebcamModal(uniqueId);
+        // Use Webcam Modal for desktop
+        window.openWebcamModal(uniqueId);
     }
 };
 
-        window.openWebcamModal = async function (uniqueId) {
+window.openWebcamModal = async function (uniqueId) {
     const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
 
-        // Cleanup any existing stream first
-        if (window.activeWebcamStream) {
-            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+    // Cleanup any existing stream first
+    if (window.activeWebcamStream) {
+        window.activeWebcamStream.getTracks().forEach(track => track.stop());
         window.activeWebcamStream = null;
     }
 
-        modalTitle.textContent = 'Capture from Webcam';
+    modalTitle.textContent = 'Capture from Webcam';
 
-        modalBody.innerHTML = `
+    modalBody.innerHTML = `
     < div style = "display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
             <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                 <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
@@ -3251,15 +3251,15 @@ window.openCreateReportModal = openCreateReportModal;
         </div >
     `;
 
-        // Configure "Capture" button
-        modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+    // Configure "Capture" button
+    modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
     modalSave.onclick = () => window.captureWebcam(uniqueId);
 
-        // Show modal BEFORE requesting media
-        if (window.openModal) window.openModal();
+    // Show modal BEFORE requesting media
+    if (window.openModal) window.openModal();
 
-        try {
-        const stream = await navigator.mediaDevices.getUserMedia({video: true });
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         window.activeWebcamStream = stream;
 
         const video = document.getElementById('webcam-video');
@@ -3278,17 +3278,17 @@ window.openCreateReportModal = openCreateReportModal;
 
         if (errDiv) {
             errDiv.style.display = 'block';
-        errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
         }
         console.error("Webcam error:", err);
     }
 };
 
-        window.captureWebcam = function (uniqueId) {
+window.captureWebcam = function (uniqueId) {
     const video = document.getElementById('webcam-video');
-        if (!video || !window.activeWebcamStream) return;
+    if (!video || !window.activeWebcamStream) return;
 
-        try {
+    try {
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -3319,15 +3319,15 @@ window.openCreateReportModal = openCreateReportModal;
         // Close modal
         if (window.closeModal) window.closeModal();
     } catch (e) {
-            console.error("Capture failed:", e);
+        console.error("Capture failed:", e);
         window.showNotification("Failed to capture image", "error");
     }
 };
 
-        // Global event delegation for section checkboxes (works with dynamically rendered content)
-        document.addEventListener('click', function (e) {
+// Global event delegation for section checkboxes (works with dynamically rendered content)
+document.addEventListener('click', function (e) {
     if (e.target.classList.contains('section-checkbox')) {
-            e.stopPropagation();
+        e.stopPropagation();
         const sectionId = e.target.getAttribute('data-section-id');
         const isChecked = e.target.checked;
         console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
@@ -3336,7 +3336,7 @@ window.openCreateReportModal = openCreateReportModal;
         const section = document.getElementById(sectionId);
         if (!section) {
             console.error('Section not found:', sectionId);
-        return;
+            return;
         }
 
         const items = section.querySelectorAll('.checklist-item');
@@ -3345,18 +3345,18 @@ window.openCreateReportModal = openCreateReportModal;
         items.forEach((item, idx) => {
             // Toggle the individual checkbox too
             const itemCheckbox = item.querySelector('.item-checkbox');
-        if (itemCheckbox) {
-            itemCheckbox.checked = isChecked;
+            if (itemCheckbox) {
+                itemCheckbox.checked = isChecked;
             }
 
-        if (isChecked) {
-            item.classList.add('selected-item');
-        item.style.background = '#eff6ff';
-        item.style.borderLeft = '4px solid var(--primary-color)';
+            if (isChecked) {
+                item.classList.add('selected-item');
+                item.style.background = '#eff6ff';
+                item.style.borderLeft = '4px solid var(--primary-color)';
             } else {
-            item.classList.remove('selected-item');
-        item.style.background = '';
-        item.style.borderLeft = '4px solid #e2e8f0';
+                item.classList.remove('selected-item');
+                item.style.background = '';
+                item.style.borderLeft = '4px solid #e2e8f0';
             }
         });
 
@@ -3364,8 +3364,8 @@ window.openCreateReportModal = openCreateReportModal;
     }
 });
 
-        // Global event delegation for individual item checkboxes
-        document.addEventListener('click', function (e) {
+// Global event delegation for individual item checkboxes
+document.addEventListener('click', function (e) {
     if (e.target.classList.contains('item-checkbox')) {
         const checkbox = e.target;
         const uniqueId = checkbox.getAttribute('data-unique-id');
@@ -3373,22 +3373,22 @@ window.openCreateReportModal = openCreateReportModal;
 
         if (row) {
             if (checkbox.checked) {
-            row.classList.add('selected-item');
-        row.style.background = '#eff6ff';
-        row.style.borderLeft = '4px solid var(--primary-color)';
+                row.classList.add('selected-item');
+                row.style.background = '#eff6ff';
+                row.style.borderLeft = '4px solid var(--primary-color)';
             } else {
-            row.classList.remove('selected-item');
-        row.style.background = '';
-        row.style.borderLeft = '4px solid #e2e8f0';
+                row.classList.remove('selected-item');
+                row.style.background = '';
+                row.style.borderLeft = '4px solid #e2e8f0';
             }
         }
     }
 });
 
-        // Global event delegation for bulk action buttons
-        document.addEventListener('click', function (e) {
+// Global event delegation for bulk action buttons
+document.addEventListener('click', function (e) {
     const btn = e.target.closest('.bulk-action-btn');
-        if (btn) {
+    if (btn) {
         const action = btn.getAttribute('data-action');
         const reportId = btn.getAttribute('data-report-id');
         console.log('Bulk action button clicked:', action, 'for report:', reportId);
@@ -3396,33 +3396,33 @@ window.openCreateReportModal = openCreateReportModal;
         if (action && reportId) {
             window.bulkUpdateStatus(parseInt(reportId), action);
 
-        // Close menu
-        const menu = document.getElementById('bulk-menu-' + reportId);
-        if (menu) menu.classList.add('hidden');
+            // Close menu
+            const menu = document.getElementById('bulk-menu-' + reportId);
+            if (menu) menu.classList.add('hidden');
         }
     }
 });
 
-        // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
-        document.addEventListener('click', function (e) {
-            // Check if clicked element or any parent has status-btn class
-            let btn = e.target;
+// Global event delegation for status buttons (OK, NC, N/A) - using capture phase
+document.addEventListener('click', function (e) {
+    // Check if clicked element or any parent has status-btn class
+    let btn = e.target;
 
-        // Log all clicks for debugging
-        if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-            console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
+    // Log all clicks for debugging
+    if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+        console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
     }
 
-        while (btn && btn.classList && !btn.classList.contains('status-btn')) {
-            btn = btn.parentElement;
+    while (btn && btn.classList && !btn.classList.contains('status-btn')) {
+        btn = btn.parentElement;
         if (!btn || btn === document.body) {
             btn = null;
-        break;
+            break;
         }
     }
 
-        if (btn && btn.classList && btn.classList.contains('status-btn')) {
-            e.preventDefault();
+    if (btn && btn.classList && btn.classList.contains('status-btn')) {
+        e.preventDefault();
         e.stopPropagation();
 
         const uniqueId = btn.getAttribute('data-unique-id');
@@ -3435,23 +3435,23 @@ window.openCreateReportModal = openCreateReportModal;
     }
 }, true); // true = capture phase
 
-        // Helper to update meeting records (Opening/Closing)
-        window.updateMeetingData = function (reportId, meetingType, field, value) {
+// Helper to update meeting records (Opening/Closing)
+window.updateMeetingData = function (reportId, meetingType, field, value) {
     const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-        if (!report) return;
+    if (!report) return;
 
-        if (!report[meetingType + 'Meeting']) {
-            report[meetingType + 'Meeting'] = {};
+    if (!report[meetingType + 'Meeting']) {
+        report[meetingType + 'Meeting'] = {};
     }
 
-        if (field === 'attendees') {
-            // Split by comma and clean up
-            report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+    if (field === 'attendees') {
+        // Split by comma and clean up
+        report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
     } else {
-            report[meetingType + 'Meeting'][field] = value;
+        report[meetingType + 'Meeting'][field] = value;
     }
 
-        window.saveData();
-        window.saveChecklist(reportId);
+    window.saveData();
+    window.saveChecklist(reportId);
 };
 
