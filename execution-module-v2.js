@@ -2907,9 +2907,57 @@ window.generateAuditReport = function (reportId) {
                 </div>
             </div>
 
-            <!-- 1. Overview & Geolocation -->
-            <div id="section-overview" class="page-break table-container">
-                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">1. Audit Overview & Geolocation</div>
+            <!-- 1. Organization Context -->
+            <div id="section-org-context" class="page-break table-container">
+                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">1. Organization Context</div>
+                <div class="card" style="margin-top: 20px;">
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="width: 30%;"><strong>Client Name:</strong></td>
+                            <td>${report.client}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Industry:</strong></td>
+                            <td>${client.industry || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Certification Scope:</strong></td>
+                            <td>${client.certificationScope || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Number of Employees:</strong></td>
+                            <td>${client.numberOfEmployees || 'N/A'}</td>
+                        </tr>
+                    </table>
+                    
+                    ${client.goodsServices && client.goodsServices.length > 0 ? 
+                    <div style="margin-top: 20px;">
+                        <strong style="display: block; margin-bottom: 10px; color: #334155;">Goods & Services:</strong>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${client.goodsServices.map(g => <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde047;">${g.name} ${g.category ? () : ''}</span>).join('')}
+                        </div>
+                    </div> : ''}
+                    
+                    ${client.keyProcesses && client.keyProcesses.length > 0 ? 
+                    <div style="margin-top: 20px;">
+                        <strong style="display: block; margin-bottom: 10px; color: #334155;">Key Processes:</strong>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${client.keyProcesses.map(p => <span class="badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;">${p.name || p}</span>).join('')}
+                        </div>
+                    </div> : ''}
+                    
+                    ${client.sites && client.sites.length > 0 ? 
+                    <div style="margin-top: 20px;">
+                        <strong style="display: block; margin-bottom: 10px; color: #334155;">Sites/Locations:</strong>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            ${client.sites.map(site => <li>${site.name || site.address} - ${site.city || ''}, ${site.country || ''}</li>).join('')}
+                        </ul>
+                    </div> : ''}
+                </div>
+            </div>
+
+            <!-- 2. Audit Details & Geolocation -->
+            <div id="section-overview" class="page-break table-container">`r`n                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">2. Audit Details & Location</div>
                 <div class="card" style="margin-top: 20px;">
                     <table style="width: 100%;">
                         <tr>
@@ -2945,8 +2993,7 @@ window.generateAuditReport = function (reportId) {
             </div>
 
             <!-- 2. Detailed Findings -->
-            <div id="section-findings" class="page-break table-container">
-                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">2. Detailed Findings</div>
+            <div id="section-findings" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">3. Non-Conformities Found</div>
                 <table style="margin-top: 20px;">
                     <thead>
                         <tr>
@@ -2983,8 +3030,7 @@ window.generateAuditReport = function (reportId) {
 
             <!-- 3. NCRs -->
             ${report.ncrs && report.ncrs.length > 0 ? `
-            <div id="section-ncrs" class="page-break table-container">
-                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">3. Non-Conformity Reports</div>
+            <div id="section-ncrs" class="page-break table-container">`r`n                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. NCR Details</div>
                 ${report.ncrs.map(ncr => `
                 <div class="card" style="margin-top: 20px; border-left: 5px solid ${ncr.type === 'Major' ? 'var(--danger)' : 'var(--warning)'};">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -2998,8 +3044,7 @@ window.generateAuditReport = function (reportId) {
             </div>` : ''}
 
             <!-- 4. Meetings -->
-            <div id="section-meetings" class="page-break table-container">
-                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. Meeting Records</div>
+            <div id="section-meetings" class="page-break table-container">`r`n                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">5. Meeting Records</div>
                  <div class="dashboard-grid" style="padding: 0; margin-top: 20px;">
                     <div class="card">
                         <strong>Opening Meeting</strong>
