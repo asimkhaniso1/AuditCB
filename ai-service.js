@@ -153,7 +153,7 @@ Example:
 
                 if (!response.ok) {
                     const text = await response.text();
-                    console.error('AI Proxy Error Response:', text);
+                    console.warn('AI Proxy Error Response:', text);
 
                     try {
                         const data = JSON.parse(text);
@@ -189,7 +189,7 @@ Example:
                 return AI_SERVICE.extractTextFromResponse(data);
 
             } catch (error) {
-                console.error(`Error with model ${model}: `, error);
+                console.warn(`Error with model ${model}: `, error);
                 lastError = error;
 
                 // Check if this is a network/fetch error indicating the API isn't available

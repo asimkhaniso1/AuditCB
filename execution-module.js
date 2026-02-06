@@ -2549,18 +2549,51 @@ function compressImage(img, fileType) {
 
 // View evidence image in full size (modal/popup)
 // View evidence image in full size (modal/popup)
+// View evidence image in full size (modal/popup)
 window.viewEvidenceImage = function (uniqueId) {
     console.log('[viewEvidenceImage] Attempting to view image for:', uniqueId);
-    const imgEl = document.getElementById('evidence-img-' + uniqueId);
+
+    // Strategy 1: Standard ID
+    let imgEl = document.getElementById('evidence-img-' + uniqueId);
+
+    // Strategy 2: If uniqueId looks like "0" (index-only), try to find it via the row container
+    if (!imgEl) {
+        console.warn(`[viewEvidenceImage] Element 'evidence-img-${uniqueId}' not found. Searching by context...`);
+
+        // Try to find the file input which usually has the same ID suffix
+        const fileInput = document.getElementById('img-' + uniqueId);
+        if (fileInput) {
+            // Look for sibling/cousin image in the same container
+            const container = fileInput.closest('.ncr-panel') || fileInput.parentElement.parentElement;
+            if (container) {
+                const nearbyImg = container.querySelector('img[id^="evidence-img-"]');
+                if (nearbyImg) {
+                    console.log('[viewEvidenceImage] Found image via context:', nearbyImg.id);
+                    imgEl = nearbyImg;
+                }
+            }
+        }
+    }
 
     if (!imgEl) {
-        console.error('[viewEvidenceImage] Image element not found:', 'evidence-img-' + uniqueId);
-        window.showNotification('Error: Image element not found', 'error');
+        // Strategy 3: Try to find ANY evidence image if we are desperate and uniqueId is just '0'
+        if (uniqueId === 0 || uniqueId === '0') {
+            const firstImg = document.querySelector('img[id^="evidence-img-"]');
+            if (firstImg) {
+                console.log('[viewEvidenceImage] Fallback: Using first found evidence image:', firstImg.id);
+                imgEl = firstImg;
+            }
+        }
+    }
+
+    if (!imgEl) {
+        console.error('[viewEvidenceImage] Image element DEFINITELY not found for:', uniqueId);
+        window.showNotification('Error: Image element not found. Please refresh and try again.', 'error');
         return;
     }
 
-    if (!imgEl.src || imgEl.src === '') {
-        console.warn('[viewEvidenceImage] Image source is empty');
+    if (!imgEl.src || imgEl.src === '' || imgEl.src.includes('placeholder')) {
+        console.warn('[viewEvidenceImage] Image source is empty or invalid');
         window.showNotification('No image source found', 'warning');
         return;
     }
@@ -2599,7 +2632,87 @@ window.removeEvidence = function (uniqueId) {
     window.showNotification('Evidence image removed', 'info');
 };
 // Generate Printable Report - Enhanced Version
-// generateAuditReport moved to reporting-module.js
+// Generate Printable Report - Enhanced Version
+window.generateAuditReport = function (reportId) {
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+    if (!report) {
+        window.showNotification('Report not found', 'error');
+        return;
+    }
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        window.showNotification('Pop-up blocked. Please allow pop-ups to print.', 'warning');
+        return;
+    }
+
+    const reportHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Audit Report - ${report.client}</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; }
+                h1, h2, h3 { color: #1e40af; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f3f4f6; }
+                .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+                .conform { background: #d1fae5; color: #065f46; }
+                .nc { background: #fee2e2; color: #991b1b; }
+                .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+                @media print {
+                    body { -webkit-print-color-adjust: exact; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Audit Report</h1>
+                <h2>${report.client}</h2>
+                <p>Date: ${report.date} | Status: ${report.status}</p>
+            </div>
+
+            <h3>Executive Summary</h3>
+            <p>${report.executiveSummary || 'No summary provided.'}</p>
+
+            <h3>Audit Findings</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Clause</th>
+                        <th>Requirement</th>
+                        <th>Status</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(report.checklistProgress || []).map(item => `
+                        <tr>
+                            <td>${item.clause || '-'}</td>
+                            <td>${item.requirement || item.text || '-'}</td>
+                            <td><span class="badge ${item.status === 'conform' ? 'conform' : (item.status === 'nc' ? 'nc' : '')}">${item.status ? item.status.toUpperCase() : 'PENDING'}</span></td>
+                            <td>${item.comment || ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; font-size: 0.9em; color: #666; text-align: center;">
+                Generated by AuditCB • ${new Date().toLocaleDateString()}
+            </div>
+            
+            <script>
+                window.onload = function() { window.print(); }
+            </script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+};
 
 window.openCreateReportModal = openCreateReportModal;
 window.openEditReportModal = openEditReportModal;
