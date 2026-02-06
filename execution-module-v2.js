@@ -2678,7 +2678,13 @@ window.generateAuditReport = function (reportId) {
 
     // Attempt to get client details for address/logo if available
     const client = window.state.clients.find(c => c.name === report.client) || {};
-    const clientLogo = client.logo || 'https://via.placeholder.com/150?text=Logo'; // Fallback
+    const clientLogo = client.logo || 'https://via.placeholder.com/150?text=Logo';
+    
+    // Get audit plan reference
+    const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
+    
+    // QR Code for Report Verification (using report ID)
+    const qrCodeUrl || 'https://via.placeholder.com/150?text=Logo'; // Fallback
     // QR Code for Report Verification (using report ID)
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
 
@@ -2919,8 +2925,16 @@ window.generateAuditReport = function (reportId) {
                             <td>${client.latitude ? `${client.latitude}, ${client.longitude}` : 'Not Recorded (On-site verified)'}</td>
                         </tr>
                         <tr>
+                            <td><strong>Audit Plan Reference:</strong></td>
+                            <td>${auditPlan ? #${auditPlan.id.substring(0,8)} - ${auditPlan.auditType || 'N/A'} : 'Not Linked'}</td>
+                        </tr>
+                        <tr>
                             <td><strong>Audit Standard:</strong></td>
-                            <td>ISO 9001:2015</td>
+                            <td>${report.standard || auditPlan?.standard || 'ISO 9001:2015'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Audit Dates:</strong></td>
+                            <td>${report.date || 'N/A'} ${report.endDate ?  to ${report.endDate} : ''}</td>
                         </tr>
                         <tr>
                             <td><strong>Lead Auditor:</strong></td>
