@@ -173,8 +173,8 @@ Example:
 
     // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt) => {
-        // Updated model list - use only stable models that exist in Gemini API
-        const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
+        // Updated model list - gemini-2.0-flash is the current stable model
+        const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
         let lastError;
         let proxyFailed = false;
 
@@ -198,8 +198,8 @@ Example:
 
                     try {
                         const data = JSON.parse(text);
-                        // Special handling for 404 (Not Found) or 400 (Bad Request) which might indicate model issues
-                        if (response.status === 404 || response.status === 400) {
+                        // Special handling for model-related errors (404, 400, 500)
+                        if (response.status === 404 || response.status === 400 || response.status === 500) {
                             console.warn(`Model ${model} failed: ${data.error || response.statusText}. Retrying with next model...`);
                             lastError = new Error(data.error || `Model ${model} unavailable`);
                             continue; // Try next model

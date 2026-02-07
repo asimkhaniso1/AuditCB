@@ -3628,40 +3628,25 @@ async function extractStandardClauses(doc, standardName) {
         
         Return ONLY valid JSON. No markdown formatting.`;
 
-        console.log(`[KB Analysis] Calling AI API...`);
+        console.log(`[KB Analysis] Calling AI API via callProxyAPI...`);
 
-        // Direct fetch to proxy
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
+        // Use AI_SERVICE.callProxyAPI which has model fallback logic
+        const text = await window.AI_SERVICE.callProxyAPI(prompt);
 
-        console.log(`[KB Analysis] API Response Status: ${response.status}`);
+        console.log(`[KB Analysis] AI Response received, length: ${text.length} chars`);
 
-        if (response.ok) {
-            const data = await response.json();
-            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            console.log(`[KB Analysis] AI Response received, length: ${text.length} chars`);
-
-            // Parse JSON from response
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                const newClauses = JSON.parse(jsonMatch[0]);
-                doc.clauses = newClauses;
-                doc.status = 'ready';
-                doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-                window.saveData();
-                console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
-                return;
-            } else {
-                console.warn(`[KB Analysis] No JSON array found in AI response`);
-            }
+        // Parse JSON from response
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            const newClauses = JSON.parse(jsonMatch[0]);
+            doc.clauses = newClauses;
+            doc.status = 'ready';
+            doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+            window.saveData();
+            console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
+            return;
         } else {
-            const errorText = await response.text();
-            console.error(`[KB Analysis] API Error: ${response.status} - ${errorText}`);
-            window.showNotification(`AI Extraction Failed: ${response.status} - ${errorText.substring(0, 50)}`, 'error');
+            console.warn(`[KB Analysis] No JSON array found in AI response`);
         }
     } catch (error) {
         console.error('[KB Analysis] Exception during AI extraction:', error);
@@ -4012,15 +3997,22 @@ window.extractTextFromFile = async function (file) {
         return null; // Graceful degradation
     }
 
+    // Disable PDF.js worker globally to bypass CSP blob: restrictions
+    if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
+
     const extractionPromise = async () => {
         try {
             if (file.type === 'application/pdf') {
                 const arrayBuffer = await file.arrayBuffer();
-                // Disable worker to avoid CSP issues with blob: URLs
-                const pdf = await pdfjsLib.getDocument({
+                // Use isEvalSupported:false + disableWorker for max CSP compatibility
+                const loadingTask = pdfjsLib.getDocument({
                     data: arrayBuffer,
-                    disableWorker: true  // Run in main thread to bypass CSP
-                }).promise;
+                    disableWorker: true,
+                    isEvalSupported: false
+                });
+                const pdf = await loadingTask.promise;
                 let fullText = '';
                 const maxPages = pdf.numPages; // Extract ALL pages for complete analysis
                 console.log(`[PDF Extraction] Extracting ${maxPages} pages from ${file.name}`);

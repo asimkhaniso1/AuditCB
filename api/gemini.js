@@ -41,8 +41,18 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' }
             };
         } else {
-            // Use the requested model or fallback to gemini-pro (most stable)
-            const modelName = req.body.model || 'gemini-pro';
+            // Use the requested model or fallback to current stable model
+            const requestedModel = req.body.model || 'gemini-2.0-flash';
+            // Map old model names to current ones
+            const modelMap = {
+                'gemini-pro': 'gemini-2.0-flash',
+                'gemini-1.5-flash': 'gemini-1.5-flash-latest',
+                'gemini-1.5-pro': 'gemini-1.5-pro-latest',
+                'gemini-1.5-flash-latest': 'gemini-1.5-flash-latest',
+                'gemini-1.5-pro-latest': 'gemini-1.5-pro-latest',
+                'gemini-2.0-flash': 'gemini-2.0-flash'
+            };
+            const modelName = modelMap[requestedModel] || requestedModel;
             url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
             fetchOptions = {
