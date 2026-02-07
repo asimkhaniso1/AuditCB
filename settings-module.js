@@ -4018,7 +4018,8 @@ window.extractTextFromFile = async function (file) {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 let fullText = '';
-                const maxPages = Math.min(pdf.numPages, 10);
+                const maxPages = pdf.numPages; // Extract ALL pages for complete analysis
+                console.log(`[PDF Extraction] Extracting ${maxPages} pages from ${file.name}`);
                 for (let i = 1; i <= maxPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
@@ -4036,11 +4037,11 @@ window.extractTextFromFile = async function (file) {
         return null;
     };
 
-    // Race against 4-second timeout to prevent UI freeze
+    // Race against 30-second timeout to prevent UI freeze on very large files
     const timeoutPromise = new Promise((resolve) => setTimeout(() => {
-        console.warn('Text extraction timed out - skipping');
+        console.warn('Text extraction timed out after 30s - file may be too large');
         resolve(null);
-    }, 4000));
+    }, 30000));
 
     try {
         return await Promise.race([extractionPromise(), timeoutPromise]);
@@ -4344,10 +4345,34 @@ window.reanalyzeStandard = async function (docId) {
         return;
     }
 
-    const isEMS = doc.name.toLowerCase().includes('14001');
-    const isOHS = doc.name.toLowerCase().includes('45001');
-    const systemTerm = isEMS ? 'Environmental Management System (EMS)' : isOHS ? 'OH&S Management System' : 'Quality Management System (QMS)';
-    const abbr = isEMS ? 'EMS' : isOHS ? 'OH&S MS' : 'QMS';
+    const docNameLower = doc.name.toLowerCase();
+    let systemTerm, abbr;
+
+    if (docNameLower.includes('9001')) {
+        systemTerm = 'Quality Management System (QMS)';
+        abbr = 'QMS';
+    } else if (docNameLower.includes('14001')) {
+        systemTerm = 'Environmental Management System (EMS)';
+        abbr = 'EMS';
+    } else if (docNameLower.includes('45001')) {
+        systemTerm = 'Occupational Health and Safety Management System';
+        abbr = 'OH&S MS';
+    } else if (docNameLower.includes('27001')) {
+        systemTerm = 'Information Security Management System (ISMS)';
+        abbr = 'ISMS';
+    } else if (docNameLower.includes('22000')) {
+        systemTerm = 'Food Safety Management System (FSMS)';
+        abbr = 'FSMS';
+    } else if (docNameLower.includes('50001')) {
+        systemTerm = 'Energy Management System (EnMS)';
+        abbr = 'EnMS';
+    } else if (docNameLower.includes('13485')) {
+        systemTerm = 'Medical Devices Quality Management System';
+        abbr = 'MD-QMS';
+    } else {
+        systemTerm = 'Management System';
+        abbr = 'MS';
+    }
 
     // Close the current modal
     window.closeModal();
@@ -4363,15 +4388,25 @@ window.reanalyzeStandard = async function (docId) {
     }
 
     try {
+        // Use stored extracted text if available
+        const docContext = doc.extractedText ? doc.extractedText.substring(0, 30000) : '';
+
+        if (!docContext) {
+            console.warn('[Re-analyze] No extracted text found. AI will use general knowledge only.');
+        }
+
         // Enhanced prompt with context-aware examples
-        const prompt = `You are an ISO standards expert. For the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
+        const prompt = `You are an ISO standards expert. ${docContext ? 'Based on the source text below,' : ''} for the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
         
         This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS".
 
-For each clause, include:
+${docContext ? `Source Text (first 30,000 characters):
+${docContext}
+
+` : ''}For each clause, include:
 - "clause": The clause number (e.g., "4.4.1", "5.1.1")
 - "title": The official clause title
-- "requirement": The main requirement statement
+- "requirement": The main requirement statement  
 - "subRequirements": An array of the specific bullet points (a, b, c, d, etc.)
 
 Example format:
