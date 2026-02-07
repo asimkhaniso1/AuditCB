@@ -2867,8 +2867,23 @@ window.generateAuditReport = function (reportId) {
                 </div>
             </div>
 
+            <!-- Table of Contents -->
+            <div class="table-container">
+                <div class="card">
+                    <div class="card-title">Table of Contents</div>
+                    <ul style="list-style: none; padding: 0; margin: 0; columns: 2;">
+                        <li style="margin-bottom: 10px;"><a href="#section-org-context" style="text-decoration: none; color: var(--primary); font-weight: 500;">1. Organization Context</a></li>
+                        <li style="margin-bottom: 10px;"><a href="#section-overview" style="text-decoration: none; color: var(--primary); font-weight: 500;">2. Audit Details & Location</a></li>
+                        <li style="margin-bottom: 10px;"><a href="#section-exec-summary" style="text-decoration: none; color: var(---primary); font-weight: 500;">3. Executive Summary</a></li>
+                        <li style="margin-bottom: 10px;"><a href="#section-findings" style="text-decoration: none; color: var(--primary); font-weight: 500;">4. Non-Conformities Found</a></li>
+                        <li style="margin-bottom: 10px;"><a href="#section-ncrs" style="text-decoration: none; color: var(--primary); font-weight: 500;">5. NCR Details</a></li>
+                        <li style="margin-bottom: 10px;"><a href="#section-meetings" style="text-decoration: none; color: var(--primary); font-weight: 500;">6. Meeting Records</a></li>
+                    </ul>
+                </div>
+            </div>
+
             <!-- Charts & Exec Summary -->
-            <div class="dashboard-grid">
+            <div id="section-exec-summary" class="dashboard-grid">
                 <div class="card">
                     <div class="card-title">Executive Summary</div>
                     <div style="color: var(--secondary); font-size: 1rem; line-height: 1.7;">
@@ -2893,18 +2908,7 @@ window.generateAuditReport = function (reportId) {
                 </div>
             </div>
 
-            <!-- Table of Contents -->
-            <div class="table-container">
-                <div class="card">
-                    <div class="card-title">Table of Contents</div>
-                    <ul style="list-style: none; padding: 0; margin: 0; columns: 2;">
-                        <li style="margin-bottom: 10px;"><a href="#section-overview" style="text-decoration: none; color: var(--primary); font-weight: 500;">1. Audit Overview & Geo-Location</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-findings" style="text-decoration: none; color: var(--primary); font-weight: 500;">2. Detailed Findings</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-ncrs" style="text-decoration: none; color: var(--primary); font-weight: 500;">3. Non-Conformity Reports</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-meetings" style="text-decoration: none; color: var(--primary); font-weight: 500;">4. Meeting Records</a></li>
-                    </ul>
-                </div>
-            </div>
+
 
             <!-- 1. Organization Context -->
             <div id="section-org-context" class="page-break table-container">
@@ -2970,7 +2974,7 @@ window.generateAuditReport = function (reportId) {
                         </tr>
                         <tr>
                             <td><strong>Geo-Coordinates:</strong></td>
-                            <td>${client.latitude ? `${client.latitude}, ${client.longitude}` : 'Not Recorded (On-site verified)'}</td>
+                            <td>${client.latitude ? `<a href="https://www.openstreetmap.org/?mlat=${client.latitude}&mlon=${client.longitude}#map=15/${client.latitude}/${client.longitude}" target="_blank" style="color: var(--primary); text-decoration: none;">${client.latitude}, ${client.longitude} <i class="fa-solid fa-external-link" style="font-size: 0.75rem;"></i></a>` : 'Not Recorded (On-site verified)'}</td>
                         </tr>
                         <tr>
                             <td><strong>Audit Plan Reference:</strong></td>
