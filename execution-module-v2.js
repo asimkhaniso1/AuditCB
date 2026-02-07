@@ -2678,7 +2678,7 @@ window.generateAuditReport = function (reportId) {
 
     // Attempt to get client details for address/logo if available
     const client = window.state.clients.find(c => c.name === report.client) || {};
-    const clientLogo = client.logo || 'https://via.placeholder.com/150?text=Logo';
+    const clientLogo = client.logoUrl || 'https://via.placeholder.com/150?text=Client+Logo';
 
     // Get audit plan reference
     const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
