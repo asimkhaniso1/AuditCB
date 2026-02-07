@@ -24,8 +24,37 @@ const AI_SERVICE = {
     // NEW: Smart Analysis Features
     // ------------------------------------------------------------------
 
-    // 1. Auto-Classify Findings
-    analyzeFindings: async (findings) => {
+    // Helper: Get KB clauses for token-efficient context
+    getRelevantKBClauses: (standardName) => {
+        const kb = window.state.knowledgeBase;
+        if (!kb?.standards?.length) return '';
+
+        // Match standard by name (normalize by removing "ISO " prefix)
+        const normalizedName = standardName ? standardName.toLowerCase().replace('iso ', '').trim() : '';
+        const stdDoc = kb.standards.find(s =>
+            s.status === 'ready' && s.clauses?.length > 0 &&
+            normalizedName && s.name.toLowerCase().replace('iso ', '').includes(normalizedName)
+        );
+
+        if (!stdDoc) {
+            console.log('[KB] No matching standard found in KB for:', standardName);
+            return '';
+        }
+
+        console.log(`[KB] Found ${stdDoc.clauses.length} clauses for ${stdDoc.name}`);
+
+        // Return concise clause reference (saves tokens vs full text)
+        // Limit to ~2000 chars to avoid overwhelming the prompt
+        const clauseText = stdDoc.clauses
+            .map(c => `${c.clause}: ${c.title} — ${c.requirement}`)
+            .join('\n')
+            .substring(0, 2000);
+
+        return clauseText;
+    },
+
+    // 1. Auto-Classify Findings (with KB context)
+    analyzeFindings: async (findings, standardName = null) => {
         if (!findings || findings.length === 0) return [];
 
         // Prepare simplified list for AI to save tokens
@@ -35,11 +64,17 @@ const AI_SERVICE = {
             remarks: f.remarks || f.transcript || ''
         }));
 
+        // Get KB context if standard name provided
+        const kbContext = standardName ? AI_SERVICE.getRelevantKBClauses(standardName) : '';
+
         const prompt = `
 You are a Lead Auditor. Classify the following audit findings based on ISO 19011 and ISO 17021 principles.
 Determines if each finding is: "Major", "Minor", or "Observation".
 
-Findings:
+${kbContext ? `Standard Requirements (from Knowledge Base):
+${kbContext}
+
+` : ''}Findings:
 ${JSON.stringify(simplifedFindings, null, 2)}
 
 Return a raw JSON array of objects with 'id' and 'type' only.
@@ -424,8 +459,8 @@ window.runFollowUpAIAnalysis = async function (reportId) {
             });
         });
 
-        // Call AI Service
-        const suggestions = await window.AI_SERVICE.analyzeFindings(findings);
+        // Call AI Service with standard name for KB lookup
+        const suggestions = await window.AI_SERVICE.analyzeFindings(findings, report.standard);
 
         // Apply suggestions
         let updateCount = 0;
