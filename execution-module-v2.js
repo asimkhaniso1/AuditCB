@@ -2901,19 +2901,19 @@ window.generateAuditReport = function (reportId) {
                 <div class="card">
                     <div class="card-title">Executive Summary</div>
                     <div style="color: var(--secondary); font-size: 1rem; line-height: 1.7;">
-                        ${report.executiveSummary ? report.executiveSummary.replace(/\n/g, '<br>') : '<em>No executive summary recorded.</em>'}
+                        ${formatText(report.executiveSummary) || '<em>No executive summary recorded.</em>'}
                     </div>
                     
                     ${report.positiveObservations ? `
                     <div style="margin-top: 20px; padding: 15px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid var(--success);">
                         <strong style="color: #166534; display: block; margin-bottom: 5px;">Positive Observations</strong>
-                        <span style="color: #15803d;">${report.positiveObservations.replace(/\n/g, '<br>')}</span>
+                        <div style="color: #15803d; line-height: 1.8;">${formatText(report.positiveObservations)}</div>
                     </div>` : ''}
 
                     ${report.ofi ? `
                     <div style="margin-top: 20px; padding: 15px; background: #fefce8; border-radius: 8px; border-left: 4px solid var(--warning);">
                         <strong style="color: #854d0e; display: block; margin-bottom: 5px;">Opportunities for Improvement</strong>
-                        <span style="color: #a16207;">${report.ofi.replace(/\n/g, '<br>')}</span>
+                        <div style="color: #a16207; line-height: 1.8;">${formatText(report.ofi)}</div>
                     </div>` : ''}
                 </div>
                 <div class="card" style="text-align: center;">
