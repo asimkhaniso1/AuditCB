@@ -2697,7 +2697,18 @@ window.generateAuditReport = function (reportId) {
 
     const today = new Date().toLocaleDateString();
 
-    // Calculate stats form Hydrated Data
+    // Helper function to format text (markdown + newlines)
+    const formatText = (text) => {
+        if (!text) return '';
+        return text
+            .replace(/\\n/g, '<br>')  // Handle escaped newlines
+            .replace(/\n/g, '<br>')   // Handle actual newlines
+            .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>')  // ***bold***
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')      // **bold**
+            .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size: 0.9em; color: #059669;">(Clause $1)</em>');
+    };
+
+    // Calculate stats from Hydrated Data
     const totalItems = hydratedProgress.length;
     const ncItems = hydratedProgress.filter(i => i.status === 'nc');
     const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
