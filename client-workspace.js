@@ -7,6 +7,10 @@
 
 // Initialize client sidebar on page load
 document.addEventListener('DOMContentLoaded', function () {
+    // Skip if on login page (no sidebar needed)
+    if (window.location.pathname.includes('login') || document.getElementById('login-container')) {
+        return;
+    }
     // Use retry mechanism to wait for auth and client data
     initClientSidebarWithRetry();
 });
