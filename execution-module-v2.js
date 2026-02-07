@@ -1773,6 +1773,25 @@ window.saveChecklist = function (reportId) {
             const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
             const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
 
+            // Extract clause and requirement text from the DOM for report display
+            const itemContainer = input.closest('.checklist-item-card') || input.closest('.checklist-item');
+            let clauseText = '';
+            let requirementText = '';
+
+            if (itemContainer) {
+                // Try to find the clause/section title (usually in a heading or strong tag above the input)
+                const sectionHeader = itemContainer.querySelector('.section-title, .clause-title, strong, h5, h6');
+                if (sectionHeader) {
+                    clauseText = sectionHeader.textContent?.trim() || '';
+                }
+
+                // Try to find the requirement text (usually the question text)
+                const questionText = itemContainer.querySelector('.item-text, .question-text, p, label');
+                if (questionText) {
+                    requirementText = questionText.textContent?.trim() || '';
+                }
+            }
+
             // Save ALL items (not just ones with status/comment)
             // This ensures Conform/NC/NA selections persist even without comments
             checklistData.push({
@@ -1787,7 +1806,10 @@ window.saveChecklist = function (reportId) {
                 evidenceImage: evidenceImage,
                 evidenceSize: evidenceSize,
                 designation: designation,
-                department: department
+                department: department,
+                // Include clause and requirement for report display
+                clause: clauseText || input.dataset.clause || '',
+                requirement: requirementText || input.dataset.requirement || ''
             });
         });
         report.checklistProgress = checklistData;
