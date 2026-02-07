@@ -4016,7 +4016,11 @@ window.extractTextFromFile = async function (file) {
         try {
             if (file.type === 'application/pdf') {
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                // Disable worker to avoid CSP issues with blob: URLs
+                const pdf = await pdfjsLib.getDocument({
+                    data: arrayBuffer,
+                    disableWorker: true  // Run in main thread to bypass CSP
+                }).promise;
                 let fullText = '';
                 const maxPages = pdf.numPages; // Extract ALL pages for complete analysis
                 console.log(`[PDF Extraction] Extracting ${maxPages} pages from ${file.name}`);
