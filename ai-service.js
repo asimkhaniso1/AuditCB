@@ -173,8 +173,8 @@ Example:
 
     // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt) => {
-        // Updated model list - use stable versions first
-        const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+        // Updated model list - use only stable models that exist in Gemini API
+        const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
         let lastError;
         let proxyFailed = false;
 
