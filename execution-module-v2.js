@@ -2640,7 +2640,7 @@ window.generateAuditReport = function (reportId) {
         return;
     }
 
-    // 1. Hydrate Checklist Data (Clause & Requirements)
+    // 1. Hydrate Checklist Data (Clause & Requirements) - ENHANCED
     const hydratedProgress = (report.checklistProgress || []).map(item => {
         let clause = item.clause;
         let requirement = item.requirement;
@@ -2650,16 +2650,17 @@ window.generateAuditReport = function (reportId) {
         if ((!requirement || !clause) && item.checklistId) {
             const checklist = window.state.checklists.find(c => String(c.id) === String(item.checklistId));
             if (checklist && checklist.sections) {
-                // Try to map itemIdx to the actual item text
-                // Check if itemIdx is a simple number or string index
                 let cumulativeIdx = 0;
                 let found = false;
                 for (const section of checklist.sections) {
                     if (found) break;
                     for (const q of section.items) {
                         if (String(cumulativeIdx) === String(item.itemIdx)) {
-                            clause = section.title;
-                            requirement = q.text;
+                            // Use clauseNumber if available, otherwise title
+                            clause = section.clauseNumber
+                                ? `${section.clauseNumber} ${section.title || ''}`.trim()
+                                : (section.title || section.clause || `Section ${section.id || ''}`);
+                            requirement = q.text || q.requirement || q.description || '';
                             found = true;
                             break;
                         }
@@ -2671,8 +2672,8 @@ window.generateAuditReport = function (reportId) {
 
         return {
             ...item,
-            clause: clause || item.clause || 'General',
-            requirement: requirement || item.text || item.requirement || 'Requirement text unavailable'
+            clause: clause || item.clause || item.sectionName || 'General Requirement',
+            requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available'
         };
     });
 
@@ -2795,6 +2796,8 @@ window.generateAuditReport = function (reportId) {
                 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
                 th { background: #f1f5f9; color: #475569; font-weight: 700; text-align: left; padding: 12px 15px; border-bottom: 2px solid #e2e8f0; }
                 td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+                tbody tr:nth-child(even) { background: #f8fafc; }
+                tbody tr:hover { background: #f1f5f9; }
                 tr:last-child td { border-bottom: none; }
 
                 .badge {
@@ -3010,7 +3013,7 @@ window.generateAuditReport = function (reportId) {
                     </thead>
                     <tbody>
                         ${hydratedProgress.filter(item => item.status === 'nc').map((item, idx) => `
-                        <tr style="background: ${idx % 2 === 0 ? 'white' : '#f8fafc'};">
+                        <tr>
                             <td><strong>${item.clause}</strong></td>
                             <td style="color: #475569;">${item.requirement}</td>
                             <td>
@@ -3079,10 +3082,10 @@ window.generateAuditReport = function (reportId) {
             </footer>
 
             <script>
-                // Render Chart
+                // Render Chart and convert to static image for PDF
                 const ctx = document.getElementById('complianceChart');
                 if (ctx) {
-                    new Chart(ctx, {
+                    const chart = new Chart(ctx, {
                         type: 'doughnut',
                         data: {
                             labels: ['Conformity', 'Minor NC', 'Major NC', 'Observations'],
@@ -3094,6 +3097,20 @@ window.generateAuditReport = function (reportId) {
                         },
                         options: {
                             responsive: true,
+                            animation: {
+                                onComplete: function() {
+                                    // Convert canvas to static image for PDF
+                                    const canvas = document.getElementById('complianceChart');
+                                    const imgData = canvas.toDataURL('image/png');
+                                    const img = document.createElement('img');
+                                    img.src = imgData;
+                                    img.style.maxWidth = '100%';
+                                    img.style.height = 'auto';
+                                    
+                                    // Replace canvas with image
+                                    canvas.parentNode.replaceChild(img, canvas);
+                                }
+                            },
                             plugins: {
                                 legend: { position: 'bottom' }
                             }
