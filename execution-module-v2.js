@@ -3022,7 +3022,8 @@ window.generateAuditReport = function (reportId) {
                                 </span>
                             </td>
                             <td>
-                                <div>${item.comment || '-'}</div>
+                                <div><strong>Comment:</strong> ${item.comment || '-'}</div>
+                                ${item.auditorRemarks || item.notes || item.justification ? `<div style="margin-top: 5px;"><strong>Auditor Remarks:</strong> ${item.auditorRemarks || item.notes || item.justification}</div>` : ''}
                                 ${item.evidenceImage ? `
                                 <div style="margin-top: 10px;">
                                     <a href="${item.evidenceImage}" target="_blank">
