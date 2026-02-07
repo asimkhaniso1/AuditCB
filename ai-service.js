@@ -89,7 +89,7 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
         }
     },
 
-    // 2. Draft Executive Summary
+    // 2. Draft Executive Summary (with KB context)
     draftExecutiveSummary: async (reportData, compliantAreas = []) => {
         const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc').length;
 
@@ -97,6 +97,9 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
         if (compliantAreas.length > 0) {
             areaText = compliantAreas.join(', ');
         }
+
+        // Get KB context for more accurate positive observations
+        const kbContext = reportData.standard ? AI_SERVICE.getRelevantKBClauses(reportData.standard) : '';
 
         const prompt = `
 Act as a professional ISO Lead Auditor. Write an Executive Summary, Positive Observations, and Opportunities for Improvement for an Audit Report.
@@ -107,10 +110,13 @@ Context:
 - Date: ${reportData.date}
 - Total Non-Conformities: ${ncCount}
 - Compliant Clauses/Areas: ${areaText}
-
+${kbContext ? `
+Standard Requirements (from Knowledge Base):
+${kbContext}
+` : ''}
 Instructions:
 1. Executive Summary: Write a professional paragraph summarizing the audit conclusion.
-2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above, generate 3-5 specific positive observations. Reference the specific clauses/headings provided (e.g. "Effective implementation of [Clause Name] was observed..."). Use professional reporting language.
+2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "*** Effective implementation of Clause 5.1 Leadership was observed..."). Use professional reporting language with *** for emphasis.
 3. OFI: Write a list of general opportunities for improvement (not specific NCs).
 
 Return raw JSON:
