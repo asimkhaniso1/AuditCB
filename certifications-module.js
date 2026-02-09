@@ -5,28 +5,7 @@
 
 // Initialize Certifications State if missing
 if (!window.state.certifications) {
-    window.state.certifications = [
-        {
-            id: 'CERT-2024-001',
-            client: 'Tech Solutions Ltd',
-            standard: 'ISO 9001:2015',
-            issueDate: '2024-01-15',
-            expiryDate: '2027-01-14',
-            status: 'Valid',
-            scope: 'Software Development and IT Services including Cloud Infrastructure Management.',
-            history: [{ date: '2024-01-15', action: 'Initial Certification', user: 'Admin' }]
-        },
-        {
-            id: 'CERT-2024-002',
-            client: 'Global Manufacturing',
-            standard: 'ISO 14001:2015',
-            issueDate: '2024-02-10',
-            expiryDate: '2027-02-09',
-            status: 'Valid',
-            scope: 'Manufacturing of Automotive Parts and Assembly Operations.',
-            history: [{ date: '2024-02-10', action: 'Initial Certification', user: 'Admin' }]
-        }
-    ];
+    window.state.certifications = [];
 }
 
 function renderCertificationModule() {

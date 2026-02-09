@@ -22,17 +22,19 @@ function renderChecklistLibrary() {
     let filtered = checklists.filter(c => {
         const matchStandard = checklistFilterStandard === 'all' || c.standard === checklistFilterStandard;
         const matchType = checklistFilterType === 'all' || c.type === checklistFilterType;
-        // Audit Type filter removed
         const matchScope = checklistFilterScope === 'all' || c.auditScope === checklistFilterScope;
         const matchSearch = checklistSearchTerm === '' ||
             c.name.toLowerCase().includes(checklistSearchTerm.toLowerCase()) ||
             c.standard.toLowerCase().includes(checklistSearchTerm.toLowerCase());
-        return matchStandard && matchType && matchScope && matchSearch;
+        // Hide archived unless explicitly filtered
+        const matchArchived = checklistFilterType === 'archived' ? c.archived === true : !c.archived;
+        return matchStandard && (checklistFilterType === 'archived' || matchType) && matchScope && matchSearch && matchArchived;
     });
 
-    // Separate global and custom
-    const globalChecklists = filtered.filter(c => c.type === 'global');
-    const customChecklists = filtered.filter(c => c.type === 'custom');
+    // Separate global, custom, and archived
+    const globalChecklists = filtered.filter(c => c.type === 'global' && !c.archived);
+    const customChecklists = filtered.filter(c => c.type === 'custom' && !c.archived);
+    const archivedChecklists = filtered.filter(c => c.archived);
 
     const standards = window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
@@ -52,6 +54,7 @@ function renderChecklistLibrary() {
                         <option value="all" ${checklistFilterType === 'all' ? 'selected' : ''}>All Types</option>
                         <option value="global" ${checklistFilterType === 'global' ? 'selected' : ''}>Global</option>
                         <option value="custom" ${checklistFilterType === 'custom' ? 'selected' : ''}>Custom</option>
+                        <option value="archived" ${checklistFilterType === 'archived' ? 'selected' : ''}>Archived</option>
                     </select>
                     <!-- Audit Type filter removed -->
                     <select id="checklist-filter-scope" style="max-width: 140px; margin-bottom: 0;">
@@ -92,7 +95,7 @@ function renderChecklistLibrary() {
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Custom</p>
                 </div>
                 <div class="card" style="text-align: center; padding: 1rem;">
-                    <p style="font-size: 2rem; font-weight: 700; color: #d97706; margin: 0;">${checklists.reduce((sum, c) => sum + (c.clauses ? c.clauses.reduce((s, cl) => s + (cl.subClauses?.length || 0), 0) : (c.items?.length || 0)), 0)}</p>
+                    <p style="font-size: 2rem; font-weight: 700; color: #d97706; margin: 0;">${checklists.filter(c => !c.archived).reduce((sum, c) => sum + (c.clauses ? c.clauses.reduce((s, cl) => s + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)), 0)}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Items</p>
                 </div>
             </div>
@@ -124,7 +127,7 @@ function renderChecklistLibrary() {
                                     <tr>
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
-                                        <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses?.length || 0), 0) : (c.items?.length || 0)}</td>
+                                        <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
                                         <td>${window.UTILS.escapeHtml(c.updatedAt || c.createdAt)}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
@@ -178,7 +181,7 @@ function renderChecklistLibrary() {
                                     <tr>
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
-                                        <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses?.length || 0), 0) : (c.items?.length || 0)}</td>
+                                        <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
                                         <td>${window.UTILS.escapeHtml(c.createdBy || 'Unknown')}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
@@ -1022,7 +1025,7 @@ function viewChecklistDetail(id) {
             <div class="card">
                 <h3 style="margin-bottom: 1rem;">
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                    Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses?.length || 0), 0) : (checklist.items?.length || 0)})
+                    Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (checklist.items?.length || 0)})
                 </h3>
                 
                 ${checklist.clauses ? checklist.clauses.map((mainClause, idx) => `
@@ -1031,22 +1034,48 @@ function viewChecklistDetail(id) {
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${mainClause.mainClause}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${mainClause.title}</span>
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">(${mainClause.subClauses?.length || 0} items)</span>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">(${mainClause.subClauses?.length || 0} sub-clauses)</span>
                             </div>
                             <i class="fa-solid fa-chevron-down accordion-icon" style="transition: transform 0.3s; transform: ${idx === 0 ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
                         </div>
                         <div class="accordion-content" style="display: ${idx === 0 ? 'block' : 'none'}; padding: 0; background: white;">
-                            <table style="width: 100%; margin: 0;">
-                                <tbody>
-                                    ${mainClause.subClauses.map((sub, subIdx) => `
-                                        <tr style="border-bottom: 1px solid #f1f5f9;">
-                                            <td style="width: 60px; padding: 0.75rem 1rem; font-weight: 500; color: var(--text-secondary);">${subIdx + 1}</td>
-                                            <td style="width: 100px; padding: 0.75rem;"><span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${sub.clause}</span></td>
-                                            <td style="padding: 0.75rem;">${sub.requirement}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                            ${(mainClause.subClauses || []).map(sub => {
+        // Check if sub-clause has nested items (new structure)
+        const hasItems = sub.items && sub.items.length > 0;
+        const isSingleFlat = !hasItems && sub.requirement;
+
+        if (hasItems) {
+            return `
+                                    <div style="border-bottom: 1px solid #f1f5f9;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f0f9ff; cursor: pointer; user-select: none;" onclick="const c=this.nextElementSibling; c.style.display=c.style.display==='none'?'block':'none'; this.querySelector('.sub-icon').style.transform=c.style.display==='none'?'rotate(0deg)':'rotate(90deg)';">
+                                            <i class="fa-solid fa-caret-right sub-icon" style="transition: transform 0.2s; transform: rotate(90deg); color: #0369a1; font-size: 0.8rem;"></i>
+                                            <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${sub.clause}</span>
+                                            <span style="font-weight: 500; color: #334155;">${sub.title || ''}</span>
+                                            <span style="color: var(--text-secondary); font-size: 0.8rem;">(${sub.items.length} items)</span>
+                                        </div>
+                                        <div style="display: block;">
+                                            <table style="width: 100%; margin: 0;">
+                                                <tbody>
+                                                    ${sub.items.map((item, itemIdx) => `
+                                                        <tr style="border-bottom: 1px solid #f8fafc;">
+                                                            <td style="width: 40px; padding: 0.5rem 0.5rem 0.5rem 2.5rem; font-weight: 400; color: var(--text-secondary); font-size: 0.85rem;">${itemIdx + 1}</td>
+                                                            <td style="width: 90px; padding: 0.5rem;"><span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 500; font-size: 0.8rem;">${item.clause}</span></td>
+                                                            <td style="padding: 0.5rem; font-size: 0.9rem;">${item.requirement}</td>
+                                                        </tr>
+                                                    `).join('')}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>`;
+        } else {
+            // Legacy flat structure or single-item sub-clause
+            return `
+                                    <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9;">
+                                        <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; white-space: nowrap;">${sub.clause}</span>
+                                        <span style="font-size: 0.9rem;">${sub.requirement || ''}</span>
+                                    </div>`;
+        }
+    }).join('')}
                         </div>
                     </div>
                 `).join('') : `
@@ -1078,6 +1107,65 @@ function viewChecklistDetail(id) {
     window.contentArea.innerHTML = html;
 }
 
+// Check if a checklist is used in any audit report
+function isChecklistUsedInAudits(checklistId) {
+    const reports = window.state.auditReports || [];
+    const executions = window.state.auditExecutions || [];
+    const strId = String(checklistId);
+
+    // Check audit reports
+    for (const r of reports) {
+        if (String(r.checklistId) === strId) return { used: true, where: `Audit Report: ${r.clientName || r.id}` };
+        if (r.checklistProgress?.some(p => String(p.checklistId) === strId)) return { used: true, where: `Audit Report: ${r.clientName || r.id}` };
+    }
+    // Check audit executions
+    for (const e of executions) {
+        if (String(e.checklistId) === strId) return { used: true, where: `Audit Execution: ${e.clientName || e.id}` };
+    }
+    return { used: false };
+}
+
+// Archive a checklist (soft delete)
+function archiveChecklist(id) {
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
+    if (!checklist) return;
+
+    checklist.archived = true;
+    checklist.archivedAt = new Date().toISOString();
+    checklist.archivedBy = state.currentUser?.name || 'Unknown';
+    window.saveData();
+
+    // Sync to DB
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        window.SupabaseClient.syncSettingsToSupabase(window.state.settings).catch(e => {
+            console.warn('Archive sync failed:', e);
+        });
+    }
+
+    window.showNotification(`"${checklist.name}" has been archived. You can find it under the Archived filter.`, 'success');
+    renderChecklistLibrary();
+}
+
+// Restore an archived checklist
+function restoreChecklist(id) {
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
+    if (!checklist) return;
+
+    delete checklist.archived;
+    delete checklist.archivedAt;
+    delete checklist.archivedBy;
+    window.saveData();
+
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        window.SupabaseClient.syncSettingsToSupabase(window.state.settings).catch(e => {
+            console.warn('Restore sync failed:', e);
+        });
+    }
+
+    window.showNotification(`"${checklist.name}" has been restored.`, 'success');
+    renderChecklistLibrary();
+}
+
 function deleteChecklist(id) {
     const checklist = state.checklists?.find(c => String(c.id) === String(id));
     if (!checklist) {
@@ -1090,46 +1178,40 @@ function deleteChecklist(id) {
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
-    // Log attempt for debugging
-    console.log('Delete attempt:', {
-        checklistName: checklist.name,
-        checklistType: checklist.type,
-        userRole: userRole,
-        isAdmin: isAdmin,
-        isCertManager: isCertManager,
-        canEditGlobal: canEditGlobal
-    });
-
-    // CRITICAL: Block deletion of global checklists by unauthorized users
     if (checklist.type === 'global' && !canEditGlobal) {
-        console.error('Unauthorized delete attempt blocked');
         window.showNotification('Only Certification Managers or Admins can delete global checklists', 'error');
         return;
     }
 
-    // Additional safety check - prevent deletion if no user is logged in
     if (!state.currentUser) {
         window.showNotification('You must be logged in to delete checklists', 'error');
         return;
     }
 
-    if (confirm(`Are you sure you want to delete "${checklist.name}"?`)) {
-        state.checklists = state.checklists.filter(c => c.id !== id);
+    // Check if checklist is used in audits
+    const usage = isChecklistUsedInAudits(id);
+    if (usage.used) {
+        window.showNotification(`This checklist is used in "${usage.where}". It will be archived instead of deleted to preserve audit records.`, 'warning');
+        archiveChecklist(id);
+        return;
+    }
 
-        // Persist Delete to DB
-        (async () => {
-            try {
-                if (window.SupabaseClient) {
-                    await window.SupabaseClient.db.delete('checklists', id);
-                    window.showNotification('Checklist deleted from Database', 'success');
-                }
-            } catch (dbError) {
-                console.error('Checklist DB Delete Error:', dbError);
-                window.showNotification('Deleted locally, but DB delete failed: ' + dbError.message, 'warning');
-            }
-        })();
-
+    if (confirm(`Are you sure you want to permanently delete "${checklist.name}"?`)) {
+        state.checklists = state.checklists.filter(c => String(c.id) !== String(id));
         window.saveData();
+
+        // Persist to DB
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+            window.SupabaseClient.syncSettingsToSupabase(window.state.settings).then(() => {
+                window.showNotification('Checklist deleted and synced', 'success');
+            }).catch(dbError => {
+                console.error('Checklist DB sync error:', dbError);
+                window.showNotification('Deleted locally, DB sync failed', 'warning');
+            });
+        } else {
+            window.showNotification('Checklist deleted', 'success');
+        }
+
         renderChecklistLibrary();
     }
 }
@@ -1137,6 +1219,30 @@ function deleteChecklist(id) {
 function printChecklist(id) {
     const checklist = state.checklists.find(c => String(c.id) === String(id));
     if (!checklist) return;
+
+    // Build items from both old (items) and new (clauses) structures
+    let printItems = [];
+    if (checklist.clauses && checklist.clauses.length > 0) {
+        checklist.clauses.forEach(main => {
+            // Add main clause as a header row (Level 1)
+            printItems.push({ clause: main.mainClause || main.clause, requirement: main.title || main.requirement, isHeader: true, level: 1 });
+            (main.subClauses || []).forEach(sub => {
+                if (sub.items && sub.items.length > 0) {
+                    // Sub-clause header (Level 2)
+                    printItems.push({ clause: sub.clause, requirement: sub.title || '', isHeader: true, level: 2 });
+                    // Individual items (Level 3+)
+                    sub.items.forEach(item => {
+                        printItems.push({ clause: item.clause, requirement: item.requirement });
+                    });
+                } else {
+                    // Legacy flat sub-clause
+                    printItems.push({ clause: sub.clause, requirement: sub.requirement });
+                }
+            });
+        });
+    } else if (checklist.items && checklist.items.length > 0) {
+        printItems = checklist.items;
+    }
 
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`CHECKLIST-${checklist.id}|${checklist.name}|${checklist.standard}`)}`;
 
@@ -1147,30 +1253,34 @@ function printChecklist(id) {
             <style>
                 body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; max-width: 900px; margin: 0 auto; }
                 .header { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; position: relative; }
-                h1 { color: #0f172a; margin: 0 0 10px 0; }
-                p { margin: 5px 0; color: #64748b; }
+                h1 { color: #0f172a; margin: 0 0 10px 0; font-size: 1.4rem; }
+                p { margin: 5px 0; color: #64748b; font-size: 0.9rem; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { padding: 12px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+                th, td { padding: 10px 12px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; font-size: 0.85rem; }
                 th { background: #f8fafc; font-weight: 600; color: #475569; }
                 td.clause { font-weight: 600; background: #f1f5f9; width: 80px; }
+                tr.section-header td { background: #e0f2fe; font-weight: 700; color: #0369a1; border-bottom: 2px solid #0369a1; }
+                tr.sub-header td { background: #f0f9ff; font-weight: 600; color: #0c4a6e; border-bottom: 1px solid #7dd3fc; font-size: 0.83rem; }
+                .status-box { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 4px; display: inline-block; }
                 @media print {
-                    button { display: none; }
-                    body { padding: 0; }
+                    button { display: none !important; }
+                    body { padding: 20px; }
                 }
             </style>
         </head>
         <body>
-            <div class="no-print" style="text-align: right;">
-                <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #0056b3; color: white; border: none; border-radius: 4px;">Print Checklist</button>
+            <div class="no-print" style="text-align: right; margin-bottom: 1rem;">
+                <button onclick="window.print()" style="padding: 10px 24px; cursor: pointer; background: #0056b3; color: white; border: none; border-radius: 6px; font-weight: 600;">🖨️ Print Checklist</button>
             </div>
             <div class="header">
-                 <div style="position: absolute; top: 0; right: 0;">
+                <div style="position: absolute; top: 0; right: 0;">
                     <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
                 </div>
-                <h1>${checklist.name}</h1>
-                <p><strong>Standard:</strong> ${checklist.standard}</p>
-                <p><strong>Type:</strong> ${checklist.type === 'global' ? 'Global (Standard)' : 'Custom'}</p>
-                <p><strong>Items:</strong> ${checklist.items?.length || 0}</p>
+                <h1>${window.UTILS.escapeHtml(checklist.name)}</h1>
+                <p><strong>Standard:</strong> ${window.UTILS.escapeHtml(checklist.standard)}</p>
+                <p><strong>Type:</strong> ${checklist.type === 'global' ? 'Global (Organization-wide)' : 'Custom'}</p>
+                <p><strong>Items:</strong> ${printItems.length}${checklist.auditScope ? ` &bull; <strong>Scope:</strong> ${window.UTILS.escapeHtml(checklist.auditScope)}` : ''}</p>
+                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
             </div>
 
             <table>
@@ -1178,24 +1288,34 @@ function printChecklist(id) {
                     <tr>
                         <th>Clause</th>
                         <th>Requirement / Check Item</th>
-                        <th style="width: 150px;">Status</th> <!-- Space for writing -->
-                        <th style="width: 200px;">Remarks</th> <!-- Space for writing -->
+                        <th style="width: 60px; text-align:center;">C</th>
+                        <th style="width: 60px; text-align:center;">NC</th>
+                        <th style="width: 60px; text-align:center;">N/A</th>
+                        <th style="width: 180px;">Remarks</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${(checklist.items || []).map(item => `
+                    ${printItems.map(item => item.isHeader ? `
+                        <tr class="${item.level === 2 ? 'sub-header' : 'section-header'}">
+                            <td>${window.UTILS.escapeHtml(item.clause)}</td>
+                            <td colspan="5">${window.UTILS.escapeHtml(item.requirement)}</td>
+                        </tr>
+                    ` : `
                         <tr>
-                            <td class="clause">${item.clause || ''}</td>
-                            <td>${item.requirement}</td>
-                            <td></td>
+                            <td class="clause">${window.UTILS.escapeHtml(item.clause || '')}</td>
+                            <td>${window.UTILS.escapeHtml(item.requirement || '')}</td>
+                            <td style="text-align:center;"><span class="status-box"></span></td>
+                            <td style="text-align:center;"><span class="status-box"></span></td>
+                            <td style="text-align:center;"><span class="status-box"></span></td>
                             <td></td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
 
-            <div style="margin-top: 40px; font-size: 0.8rem; color: #94a3b8; text-align: center;">
-                Generated by AuditCB360 Platform
+            <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8;">
+                <span>Generated by AuditCB360 Platform</span>
+                <span>Auditor Signature: ____________________</span>
             </div>
         </body>
         </html>
@@ -1212,4 +1332,6 @@ window.openAddChecklistModal = openAddChecklistModal;
 window.openEditChecklistModal = openEditChecklistModal;
 window.viewChecklistDetail = viewChecklistDetail;
 window.deleteChecklist = deleteChecklist;
+window.archiveChecklist = archiveChecklist;
+window.restoreChecklist = restoreChecklist;
 window.printChecklist = printChecklist;

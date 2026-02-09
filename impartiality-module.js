@@ -167,59 +167,9 @@ async function persistImpartialityMeeting(meeting) {
 // Initialize state
 if (!window.state.impartialityCommittee) {
     window.state.impartialityCommittee = {
-        members: [
-            {
-                id: 'demo-1',
-                name: 'Dr. Sarah Mitchell',
-                organization: 'Independent Quality Consultant',
-                role: 'Chairperson',
-                expertise: 'Quality Management Systems',
-                appointedDate: '2023-01-15',
-                termEnd: '2026-01-14',
-                status: 'Active'
-            },
-            {
-                id: 'demo-2',
-                name: 'John Anderson',
-                organization: 'Industry Association Representative',
-                role: 'Member',
-                expertise: 'Manufacturing Standards',
-                appointedDate: '2023-01-15',
-                termEnd: '2026-01-14',
-                status: 'Active'
-            }
-        ],
-        meetings: [
-            {
-                id: 'demo-1',
-                date: '2024-03-15',
-                attendees: ['demo-1', 'demo-2'],
-                threatsReviewed: [
-                    {
-                        threat: 'Auditor previously worked for client',
-                        client: 'Tech Solutions Ltd',
-                        safeguard: 'Assigned different auditor',
-                        decision: 'Approved'
-                    }
-                ],
-                decisions: ['Approved new auditor competence criteria'],
-                nextMeetingDate: '2024-06-15'
-            }
-        ],
-        threats: [
-            {
-                id: 'demo-1',
-                date: '2024-02-10',
-                type: 'Self-Interest',
-                description: 'Auditor has financial interest in client company',
-                client: 'Global Manufacturing',
-                identifiedBy: 'Quality Manager',
-                safeguard: 'Auditor recused from assignment',
-                status: 'Resolved',
-                reviewedByCommittee: true,
-                committeeDecision: 'Safeguard adequate'
-            }
-        ]
+        members: [],
+        meetings: [],
+        threats: []
     };
 }
 

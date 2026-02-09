@@ -4345,26 +4345,65 @@ window.createChecklistFromKB = function (docId) {
         return;
     }
 
-    // Build hierarchical checklist structure grouped by main clause
+    // Build hierarchical checklist structure: mainClause -> subClause -> items
+    // Supports 2-4 level hierarchy (e.g., 4 -> 4.1 -> 4.1.1 -> items)
+    const mainClauseTitles = {
+        '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning',
+        '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement',
+        'A': 'Annex A Controls', 'General': 'General Requirements'
+    };
+
     const clauseGroups = {};
     doc.generatedChecklist.forEach(item => {
-        const mainClause = item.clause.split('.')[0] || 'General';
-        if (!clauseGroups[mainClause]) {
-            const titles = {
-                '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning',
-                '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement',
-                'A': 'Annex A Controls', 'General': 'General Requirements'
-            };
-            clauseGroups[mainClause] = {
-                mainClause: mainClause,
-                title: titles[mainClause] || `Clause ${mainClause}`,
-                subClauses: []
+        const parts = item.clause.split('.');
+        const mainNum = parts[0] || 'General';
+        // Sub-clause is first two parts (e.g., "4.1")
+        const subNum = parts.length >= 2 ? parts.slice(0, 2).join('.') : mainNum;
+
+        if (!clauseGroups[mainNum]) {
+            clauseGroups[mainNum] = {
+                mainClause: mainNum,
+                title: mainClauseTitles[mainNum] || `Clause ${mainNum}`,
+                subClauses: {}
             };
         }
-        clauseGroups[mainClause].subClauses.push({
+
+        if (!clauseGroups[mainNum].subClauses[subNum]) {
+            clauseGroups[mainNum].subClauses[subNum] = {
+                clause: subNum,
+                title: '',
+                items: []
+            };
+        }
+
+        clauseGroups[mainNum].subClauses[subNum].items.push({
             clause: item.clause,
             requirement: item.requirement
         });
+    });
+
+    // Convert subClauses from object to sorted array, preserve items as nested
+    const clauseArray = Object.values(clauseGroups).map(group => ({
+        mainClause: group.mainClause,
+        title: group.title,
+        subClauses: Object.values(group.subClauses).sort((a, b) => {
+            const aParts = a.clause.split('.').map(Number);
+            const bParts = b.clause.split('.').map(Number);
+            for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+                if ((aParts[i] || 0) !== (bParts[i] || 0)) return (aParts[i] || 0) - (bParts[i] || 0);
+            }
+            return 0;
+        }).map(sub => ({
+            clause: sub.clause,
+            title: sub.title,
+            items: sub.items,
+            // Keep backward compat: if only 1 item and clause matches subClause, flatten
+            requirement: sub.items.length === 1 && sub.items[0].clause === sub.clause ? sub.items[0].requirement : undefined
+        }))
+    })).sort((a, b) => {
+        const aNum = parseInt(a.mainClause) || 999;
+        const bNum = parseInt(b.mainClause) || 999;
+        return aNum - bNum;
     });
 
     const newChecklist = {
@@ -4372,7 +4411,7 @@ window.createChecklistFromKB = function (docId) {
         name: `${doc.name} - Audit Checklist`,
         standard: doc.name,
         type: 'global',
-        clauses: Object.values(clauseGroups),
+        clauses: clauseArray,
         createdBy: window.state.currentUser?.name || 'Admin',
         createdAt: new Date().toISOString().split('T')[0],
         updatedAt: new Date().toISOString().split('T')[0],
