@@ -2671,22 +2671,66 @@ window.generateAuditReport = function (reportId) {
         // Try to lookup from source checklist if text is missing
         if ((!requirement || !clause) && item.checklistId) {
             const checklist = window.state.checklists.find(c => String(c.id) === String(item.checklistId));
-            if (checklist && checklist.sections) {
-                let cumulativeIdx = 0;
-                let found = false;
-                for (const section of checklist.sections) {
-                    if (found) break;
-                    for (const q of section.items) {
-                        if (String(cumulativeIdx) === String(item.itemIdx)) {
-                            // Use clauseNumber if available, otherwise title
-                            clause = section.clauseNumber
-                                ? `${section.clauseNumber} ${section.title || ''}`.trim()
-                                : (section.title || section.clause || `Section ${section.id || ''}`);
-                            requirement = q.text || q.requirement || q.description || '';
-                            found = true;
-                            break;
+            if (checklist) {
+                // Support both data structures: sections[] and clauses[]
+                const sections = checklist.sections || [];
+                const clauseGroups = checklist.clauses || [];
+
+                if (sections.length > 0) {
+                    // Old structure: sections with items
+                    let cumulativeIdx = 0;
+                    let found = false;
+                    for (const section of sections) {
+                        if (found) break;
+                        for (const q of (section.items || [])) {
+                            if (String(cumulativeIdx) === String(item.itemIdx)) {
+                                clause = section.clauseNumber
+                                    ? `${section.clauseNumber} ${section.title || ''}`.trim()
+                                    : (section.title || section.clause || `Section ${section.id || ''}`);
+                                requirement = q.text || q.requirement || q.description || '';
+                                found = true;
+                                break;
+                            }
+                            cumulativeIdx++;
                         }
-                        cumulativeIdx++;
+                    }
+                } else if (clauseGroups.length > 0) {
+                    // New structure: clauses with subClauses
+                    let cumulativeIdx = 0;
+                    let found = false;
+                    for (const group of clauseGroups) {
+                        if (found) break;
+                        for (const sub of (group.subClauses || [])) {
+                            if (String(cumulativeIdx) === String(item.itemIdx)) {
+                                clause = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
+                                requirement = sub.requirement || sub.text || '';
+                                found = true;
+                                break;
+                            }
+                            cumulativeIdx++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: Try KB clause lookup if still missing
+        if ((!requirement || requirement === 'Requirement details not available') && clause && report.standard) {
+            const kb = window.state.knowledgeBase;
+            if (kb?.standards?.length > 0) {
+                const stdDoc = kb.standards.find(s =>
+                    s.status === 'ready' && s.clauses?.length > 0 &&
+                    s.name.toLowerCase().includes(report.standard.toLowerCase().replace('iso ', ''))
+                );
+                if (stdDoc) {
+                    // Try to match clause number
+                    const clauseNum = clause.split(' ')[0]; // e.g. "5.1" from "5.1 Leadership"
+                    const kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+                    if (kbClause) {
+                        requirement = kbClause.requirement || requirement;
+                        if (!clause || clause === 'General Requirement') {
+                            clause = `${kbClause.clause} ${kbClause.title}`;
+                        }
                     }
                 }
             }
@@ -2695,7 +2739,8 @@ window.generateAuditReport = function (reportId) {
         return {
             ...item,
             clause: clause || item.clause || item.sectionName || 'General Requirement',
-            requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available'
+            requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available',
+            comment: item.comment || ''
         };
     });
 
@@ -3242,25 +3287,7 @@ window.captureScreenEvidence = async function (uniqueId) {
 window.renderExecutionDetail = renderExecutionDetail;
 
 // Toggle selection of all items in a section
-window.toggleSectionSelection = function (sectionId) {
-    const checkbox = document.querySelector(`.section - checkbox[data - section - id="${sectionId}"]`);
-    const sectionContent = document.getElementById(sectionId);
-
-    if (!sectionContent) return;
-
-    const items = sectionContent.querySelectorAll('.checklist-item');
-    items.forEach(item => {
-        if (checkbox.checked) {
-            item.classList.add('selected-item');
-            item.style.background = '#eff6ff';
-            item.style.borderLeft = '4px solid var(--primary-color)';
-        } else {
-            item.classList.remove('selected-item');
-            item.style.background = '';
-            item.style.borderLeft = '';
-        }
-    });
-};
+// toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
 
 // ============================================
 // Webcam Handling for Desktop 'Camera' Button
