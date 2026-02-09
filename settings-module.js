@@ -3604,29 +3604,69 @@ async function extractStandardClauses(doc, standardName) {
     }
 
     try {
+        // Limit source text to ~25K chars to leave room for output tokens
+        const sourceText = docContent.substring(0, 25000);
+
         // Build comprehensive extraction prompt
-        const prompt = `You are an expert Lead Auditor for ISO standards. Your task is to extract every single audit requirement from the provided text for the standard "${standardName}".
-        
-        CRITICAL INSTRUCTIONS:
-        1. This is a ${systemTerm}. TERMINOLOGY: Use "${abbr}" (e.g., "${abbr} policy", "effectiveness of the ${abbr}").
-        2. SCOPE: Extract ALL requirements from Clause 4 through Clause 10. Do NOT skip any sub-clauses.
-        3. COMPLETENESS: I need the FULL list. Do not summarize. Do not truncate. If there are 150 requirements, list all 150.
-        4. FORMAT: Return a valid JSON array of objects.
-        
-        Source Text:
-        ${docContent}
-        
-        Required JSON Structure:
-        [
-          {
-            "clause": "4.1",
-            "title": "Understanding the organization and its context",
-            "requirement": "The organization shall determine external and internal issues...",
-            "subRequirements": ["a) issue one", "b) issue two"]
-          }
-        ]
-        
-        Return ONLY valid JSON. No markdown formatting.`;
+        const prompt = `You are an expert ISO Lead Auditor extracting audit requirements from "${standardName}".
+This is a ${systemTerm}. Use "${abbr}" terminology throughout (e.g., "${abbr} policy", "effectiveness of the ${abbr}").
+
+TASK: Extract EVERY auditable requirement from Clauses 4 through 10 of the source text below.
+For EACH clause, also generate 1-3 practical audit checklist questions.
+
+RULES:
+1. Include ALL sub-clauses (e.g., 4.1, 4.2, 4.3, 4.4, 4.4.1, 4.4.2, 5.1, 5.1.1, 5.1.2, 5.2.1, 5.2.2, etc.)
+2. The "requirement" field must contain the FULL requirement text as written in the standard — do NOT summarize or paraphrase.
+3. The "subRequirements" array must contain ALL lettered items (a, b, c, d, e, f, g, h...) exactly as stated in the standard.
+4. The "checklistQuestions" array must have 1-3 practical audit questions an auditor would ask to verify conformity.
+5. Do NOT skip any clause or sub-clause. A typical ISO standard has 70-120+ clauses.
+6. If a clause has a "NOTE" that contains an auditable requirement, include it.
+
+SOURCE TEXT:
+${sourceText}
+
+OUTPUT FORMAT — Return ONLY a valid JSON array:
+[
+  {
+    "clause": "4.1",
+    "title": "Understanding the organization and its context",
+    "requirement": "The organization shall determine external and internal issues that are relevant to its purpose and its strategic direction and that affect its ability to achieve the intended result(s) of its ${abbr}.",
+    "subRequirements": [],
+    "checklistQuestions": [
+      "Has the organization identified external and internal issues relevant to the ${abbr}?",
+      "How does the organization monitor and review these issues?"
+    ]
+  },
+  {
+    "clause": "4.2",
+    "title": "Understanding the needs and expectations of interested parties",
+    "requirement": "The organization shall determine:",
+    "subRequirements": [
+      "a) the interested parties that are relevant to the ${abbr}",
+      "b) the relevant requirements of these interested parties",
+      "c) which of these requirements will be addressed through the ${abbr}"
+    ],
+    "checklistQuestions": [
+      "Has the organization identified interested parties relevant to the ${abbr}?",
+      "Are their requirements documented and periodically reviewed?"
+    ]
+  },
+  {
+    "clause": "5.1.1",
+    "title": "Leadership and commitment — General",
+    "requirement": "Top management shall demonstrate leadership and commitment with respect to the ${abbr} by:",
+    "subRequirements": [
+      "a) taking accountability for the effectiveness of the ${abbr}",
+      "b) ensuring that the ${abbr} policy and objectives are established and are compatible with the strategic direction"
+    ],
+    "checklistQuestions": [
+      "Can top management demonstrate accountability for the effectiveness of the ${abbr}?",
+      "Is the ${abbr} policy aligned with strategic direction?"
+    ]
+  }
+]
+
+Return ONLY the JSON array. No markdown, no explanations, no truncation.`;
 
         console.log(`[KB Analysis] Calling AI API via callProxyAPI...`);
 
@@ -3640,10 +3680,23 @@ async function extractStandardClauses(doc, standardName) {
         if (jsonMatch) {
             const newClauses = JSON.parse(jsonMatch[0]);
             doc.clauses = newClauses;
+
+            // Also extract checklist questions from the AI output
+            const checklistItems = [];
+            newClauses.forEach(c => {
+                if (c.checklistQuestions && c.checklistQuestions.length > 0) {
+                    c.checklistQuestions.forEach(q => {
+                        checklistItems.push({ clause: c.clause, requirement: q });
+                    });
+                }
+            });
+            doc.generatedChecklist = checklistItems;
+            doc.checklistCount = checklistItems.length;
+
             doc.status = 'ready';
             doc.lastAnalyzed = new Date().toISOString().split('T')[0];
             window.saveData();
-            console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses from ${standardName} via AI`);
+            console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses + ${checklistItems.length} checklist questions from ${standardName} via AI`);
             return;
         } else {
             console.warn(`[KB Analysis] No JSON array found in AI response`);
@@ -4095,6 +4148,57 @@ window.handleReanalyze = function (docId, docType) {
     }
 };
 
+// Create a checklist from KB extracted questions
+window.createChecklistFromKB = function (docId) {
+    const kb = window.state.knowledgeBase;
+    const doc = kb.standards.find(d => d.id == docId);
+    if (!doc || !doc.generatedChecklist || doc.generatedChecklist.length === 0) {
+        window.showNotification('No checklist questions found. Re-analyze the standard first.', 'error');
+        return;
+    }
+
+    // Build hierarchical checklist structure grouped by main clause
+    const clauseGroups = {};
+    doc.generatedChecklist.forEach(item => {
+        const mainClause = item.clause.split('.')[0] || 'General';
+        if (!clauseGroups[mainClause]) {
+            const titles = {
+                '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning',
+                '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement',
+                'A': 'Annex A Controls', 'General': 'General Requirements'
+            };
+            clauseGroups[mainClause] = {
+                mainClause: mainClause,
+                title: titles[mainClause] || `Clause ${mainClause}`,
+                subClauses: []
+            };
+        }
+        clauseGroups[mainClause].subClauses.push({
+            clause: item.clause,
+            requirement: item.requirement
+        });
+    });
+
+    const newChecklist = {
+        id: Date.now(),
+        name: `${doc.name} - Audit Checklist`,
+        standard: doc.name,
+        type: 'global',
+        clauses: Object.values(clauseGroups),
+        createdBy: window.state.currentUser?.name || 'Admin',
+        createdAt: new Date().toISOString().split('T')[0],
+        updatedAt: new Date().toISOString().split('T')[0],
+        source: 'kb-generated'
+    };
+
+    if (!window.state.checklists) window.state.checklists = [];
+    window.state.checklists.push(newChecklist);
+    window.saveData();
+
+    window.closeModal();
+    window.showNotification(`Created checklist "${newChecklist.name}" with ${doc.generatedChecklist.length} questions!`, 'success');
+};
+
 // Delete Knowledge Document
 window.deleteKnowledgeDoc = async function (type, id) {
     if (!confirm('Are you sure you want to delete this document from the Knowledge Base?')) return;
@@ -4217,10 +4321,15 @@ window.viewKBAnalysis = function (docId) {
                 <div>
                     <strong style="color: #166534;"><i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i>Analysis Complete</strong>
                     <div style="font-size: 0.85rem; color: #166534; margin-top: 0.25rem;">
-                        ${clauses.length} ${docType === 'standard' ? 'clauses' : 'sections'} extracted • Uploaded ${doc.uploadDate}
+                        ${clauses.length} ${docType === 'standard' ? 'clauses' : 'sections'} extracted${doc.checklistCount ? ` • ${doc.checklistCount} checklist questions` : ''} • Uploaded ${doc.uploadDate}
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    ${docType === 'standard' && doc.generatedChecklist && doc.generatedChecklist.length > 0 ? `
+                        <button class="btn btn-sm btn-primary" onclick="window.createChecklistFromKB('${doc.id}')" title="Create audit checklist from extracted questions">
+                            <i class="fa-solid fa-list-check" style="margin-right: 0.25rem;"></i>Create Checklist
+                        </button>
+                    ` : ''}
                     <button class="btn btn-sm btn-secondary" onclick="window.handleReanalyze('${doc.id}', '${docType}')" title="${docType === 'standard' ? 'Re-analyze with AI' : 'Reset Analysis Template'}">
                         <i class="fa-solid fa-rotate" style="margin-right: 0.25rem;"></i>${docType === 'standard' ? 'Re-analyze' : 'Reset'}
                     </button>
