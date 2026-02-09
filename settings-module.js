@@ -4068,7 +4068,100 @@ window.updateKBSection = function (docId, clauseId, newContent) {
     }
 };
 
-// Helper: Extract text from file (PDF/Text)
+// Helper: Extract text from DOCX (ZIP containing XML) without external library
+async function extractDocxText(uint8Array) {
+    try {
+        // DOCX is a ZIP file. We need to find "word/document.xml" entry
+        // ZIP format: local file headers start with PK\x03\x04
+        const data = uint8Array;
+        const files = [];
+        let offset = 0;
+
+        // Parse ZIP local file headers
+        while (offset < data.length - 4) {
+            // Look for local file header signature PK\x03\x04
+            if (data[offset] === 0x50 && data[offset + 1] === 0x4B &&
+                data[offset + 2] === 0x03 && data[offset + 3] === 0x04) {
+
+                const fnameLen = data[offset + 26] | (data[offset + 27] << 8);
+                const extraLen = data[offset + 28] | (data[offset + 29] << 8);
+                const compMethod = data[offset + 8] | (data[offset + 9] << 8);
+                const compSize = data[offset + 18] | (data[offset + 19] << 8) | (data[offset + 20] << 16) | (data[offset + 21] << 24);
+                const uncompSize = data[offset + 22] | (data[offset + 23] << 8) | (data[offset + 24] << 16) | (data[offset + 25] << 24);
+
+                const fnameStart = offset + 30;
+                const fname = new TextDecoder().decode(data.slice(fnameStart, fnameStart + fnameLen));
+                const dataStart = fnameStart + fnameLen + extraLen;
+                const fileData = data.slice(dataStart, dataStart + compSize);
+
+                files.push({ name: fname, data: fileData, compressed: compMethod !== 0, uncompSize });
+                offset = dataStart + compSize;
+            } else {
+                offset++;
+            }
+        }
+
+        // Find word/document.xml
+        const docEntry = files.find(f => f.name === 'word/document.xml');
+        if (!docEntry) {
+            console.warn('[DOCX] word/document.xml not found in ZIP');
+            return null;
+        }
+
+        let xmlText;
+        if (docEntry.compressed) {
+            // Deflate compressed - use DecompressionStream API (modern browsers)
+            if (typeof DecompressionStream !== 'undefined') {
+                const ds = new DecompressionStream('raw');
+                const writer = ds.writable.getWriter();
+                const reader = ds.readable.getReader();
+                writer.write(docEntry.data);
+                writer.close();
+
+                const chunks = [];
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                }
+                const totalLen = chunks.reduce((a, c) => a + c.length, 0);
+                const combined = new Uint8Array(totalLen);
+                let pos = 0;
+                for (const chunk of chunks) {
+                    combined.set(chunk, pos);
+                    pos += chunk.length;
+                }
+                xmlText = new TextDecoder().decode(combined);
+            } else {
+                console.warn('[DOCX] DecompressionStream not available');
+                return null;
+            }
+        } else {
+            xmlText = new TextDecoder().decode(docEntry.data);
+        }
+
+        // Parse XML to extract text (strip tags, keep paragraph breaks)
+        const text = xmlText
+            .replace(/<w:p[^>]*>/g, '\n')  // Paragraph breaks
+            .replace(/<w:tab\/>/g, '\t')    // Tabs
+            .replace(/<w:br[^>]*\/>/g, '\n') // Line breaks
+            .replace(/<[^>]+>/g, '')         // Strip all XML tags
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'")
+            .replace(/\n{3,}/g, '\n\n')     // Collapse multiple blank lines
+            .trim();
+
+        return text;
+    } catch (err) {
+        console.error('[DOCX] Extraction error:', err);
+        return null;
+    }
+}
+
+// Helper: Extract text from file (PDF/DOCX/Text)
 window.extractTextFromFile = async function (file) {
     // Check if PDF.js is loaded
     if (file.type === 'application/pdf' && (typeof pdfjsLib === 'undefined')) {
@@ -4102,11 +4195,41 @@ window.extractTextFromFile = async function (file) {
                     fullText += pageText + '\n';
                 }
                 return fullText;
+            } else if (file.name.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                // DOCX extraction: DOCX is a ZIP containing word/document.xml
+                console.log(`[DOCX Extraction] Extracting text from ${file.name}`);
+
+                // Use mammoth.js if available (better formatting)
+                if (typeof mammoth !== 'undefined') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const result = await mammoth.extractRawText({ arrayBuffer });
+                    console.log(`[DOCX Extraction] mammoth.js extracted ${result.value.length} chars`);
+                    return result.value;
+                }
+
+                // Fallback: Manual ZIP parsing (no library needed)
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8 = new Uint8Array(arrayBuffer);
+
+                // Find word/document.xml in the ZIP
+                const docXml = await extractDocxText(uint8);
+                if (docXml) {
+                    console.log(`[DOCX Extraction] Extracted ${docXml.length} chars from ${file.name}`);
+                    return docXml;
+                }
+
+                console.warn('[DOCX Extraction] Could not extract text from DOCX');
+                return null;
+            } else if (file.name.endsWith('.doc')) {
+                // .doc (legacy binary format) - cannot parse in browser
+                console.warn('[DOC Extraction] Legacy .doc format not supported. Please convert to .docx or .pdf');
+                window.showNotification('Legacy .doc format not supported. Please save as .docx or .pdf', 'warning');
+                return null;
             } else if (file.type.startsWith('text/')) {
                 return await file.text();
             }
         } catch (e) {
-            console.error('Text extraction extraction error:', e);
+            console.error('Text extraction error:', e);
             throw e;
         }
         return null;
