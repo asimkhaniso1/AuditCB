@@ -3627,131 +3627,89 @@ async function extractStandardClauses(doc, standardName) {
     }
 
     try {
-        // Limit source text to ~25K chars to leave room for output tokens
         const sourceText = docContent.length > 100 ? docContent.substring(0, 25000) : '';
-
-        // Build comprehensive extraction prompt
         const sourceSection = sourceText
-            ? `\nSOURCE TEXT (extract requirements from this text):\n${sourceText}\n`
-            : `\nNo source text available. Use your expert knowledge of ${standardName} to provide ALL auditable requirements from Clauses 4 through 10.\n`;
+            ? `\nSOURCE TEXT:\n${sourceText}\n`
+            : `\nNo source text available. Use your expert knowledge of ${standardName}.\n`;
 
-        const prompt = `You are an expert ISO Lead Auditor extracting audit requirements from "${standardName}".
-This is a ${systemTerm}. Use "${abbr}" terminology throughout (e.g., "${abbr} policy", "effectiveness of the ${abbr}").
+        // Split into two batches to avoid AI output token truncation
+        const batches = [
+            { label: 'Clauses 4-7', range: '4, 5, 6, and 7 (Context, Leadership, Planning, Support)' },
+            { label: 'Clauses 8-10', range: '8, 9, and 10 (Operation, Performance Evaluation, Improvement)' }
+        ];
 
-TASK: Extract EVERY auditable requirement from Clauses 4 through 10${sourceText ? ' of the source text below' : ' based on your knowledge of this standard'}.
-For EACH clause, also generate 1-3 practical audit checklist questions.
+        let allClauses = [];
+        let allChecklist = [];
+
+        for (const batch of batches) {
+            console.log(`[KB Analysis] Extracting ${batch.label}...`);
+            window.showNotification(`Extracting ${batch.label}...`, 'info');
+
+            const prompt = `You are an expert ISO Lead Auditor. Extract audit requirements from "${standardName}" (${systemTerm}).
+Use "${abbr}" terminology throughout.
+
+TASK: Extract EVERY auditable requirement from Clauses ${batch.range}${sourceText ? ' of the source text' : ''}.
+Generate 1-3 practical audit checklist questions per clause.
 
 RULES:
-1. Include ALL sub-clauses (e.g., 4.1, 4.2, 4.3, 4.4, 4.4.1, 4.4.2, 5.1, 5.1.1, 5.1.2, 5.2.1, 5.2.2, etc.)
-2. The "requirement" field must contain the FULL requirement text as written in the standard — do NOT summarize or paraphrase.
-3. The "subRequirements" array must contain ALL lettered items (a, b, c, d, e, f, g, h...) exactly as stated in the standard.
-4. The "checklistQuestions" array must have 1-3 practical audit questions an auditor would ask to verify conformity.
-5. Do NOT skip any clause or sub-clause. A typical ISO standard has 70-120+ clauses.
-6. If a clause has a "NOTE" that contains an auditable requirement, include it.
-
+1. Include ALL sub-clauses (e.g., 4.1, 4.2, 4.4.1, 5.1.1, 5.2.1, etc.)
+2. "requirement" = FULL text, not a summary
+3. "subRequirements" = ALL lettered items (a, b, c...) exactly as stated
+4. "checklistQuestions" = 1-3 practical questions
+5. Do NOT skip any clause
 ${sourceSection}
+Return ONLY a valid JSON array:
+[{"clause":"4.1","title":"...","requirement":"...","subRequirements":["a)..."],"checklistQuestions":["...?"]}]
 
-OUTPUT FORMAT — Return ONLY a valid JSON array:
-[
-  {
-    "clause": "4.1",
-    "title": "Understanding the organization and its context",
-    "requirement": "The organization shall determine external and internal issues that are relevant to its purpose and its strategic direction and that affect its ability to achieve the intended result(s) of its ${abbr}.",
-    "subRequirements": [],
-    "checklistQuestions": [
-      "Has the organization identified external and internal issues relevant to the ${abbr}?",
-      "How does the organization monitor and review these issues?"
-    ]
-  },
-  {
-    "clause": "4.2",
-    "title": "Understanding the needs and expectations of interested parties",
-    "requirement": "The organization shall determine:",
-    "subRequirements": [
-      "a) the interested parties that are relevant to the ${abbr}",
-      "b) the relevant requirements of these interested parties",
-      "c) which of these requirements will be addressed through the ${abbr}"
-    ],
-    "checklistQuestions": [
-      "Has the organization identified interested parties relevant to the ${abbr}?",
-      "Are their requirements documented and periodically reviewed?"
-    ]
-  },
-  {
-    "clause": "5.1.1",
-    "title": "Leadership and commitment — General",
-    "requirement": "Top management shall demonstrate leadership and commitment with respect to the ${abbr} by:",
-    "subRequirements": [
-      "a) taking accountability for the effectiveness of the ${abbr}",
-      "b) ensuring that the ${abbr} policy and objectives are established and are compatible with the strategic direction"
-    ],
-    "checklistQuestions": [
-      "Can top management demonstrate accountability for the effectiveness of the ${abbr}?",
-      "Is the ${abbr} policy aligned with strategic direction?"
-    ]
-  }
-]
+ONLY JSON. No markdown. No explanations.`;
 
-Return ONLY the JSON array. No markdown, no explanations, no truncation.`;
+            const text = await window.AI_SERVICE.callProxyAPI(prompt);
+            console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars`);
 
-        console.log(`[KB Analysis] Calling AI API via callProxyAPI...`);
+            let jsonMatch = text.match(/\[[\s\S]*\]/);
+            let batchClauses = null;
 
-        // Use AI_SERVICE.callProxyAPI which has model fallback logic
-        const text = await window.AI_SERVICE.callProxyAPI(prompt);
-
-        console.log(`[KB Analysis] AI Response received, length: ${text.length} chars`);
-
-        // Parse JSON from response (with repair for truncated output)
-        let jsonMatch = text.match(/\[[\s\S]*\]/);
-        let newClauses = null;
-
-        if (jsonMatch) {
-            try {
-                newClauses = JSON.parse(jsonMatch[0]);
-            } catch (parseErr) {
-                // AI output was likely truncated — try to repair by finding last complete object
-                console.warn('[KB Analysis] JSON parse failed, attempting repair...', parseErr.message);
-                let jsonStr = jsonMatch[0];
-
-                // Find the last complete object (ends with })
-                const lastCompleteObj = jsonStr.lastIndexOf('}');
-                if (lastCompleteObj > 0) {
-                    jsonStr = jsonStr.substring(0, lastCompleteObj + 1) + ']';
-                    try {
-                        newClauses = JSON.parse(jsonStr);
-                        console.log(`[KB Analysis] JSON repaired! Recovered ${newClauses.length} clauses from truncated output`);
-                    } catch (e2) {
-                        console.error('[KB Analysis] JSON repair also failed:', e2.message);
+            if (jsonMatch) {
+                try {
+                    batchClauses = JSON.parse(jsonMatch[0]);
+                } catch (parseErr) {
+                    console.warn(`[KB Analysis] ${batch.label} JSON repair needed...`);
+                    let jsonStr = jsonMatch[0];
+                    const lastObj = jsonStr.lastIndexOf('}');
+                    if (lastObj > 0) {
+                        jsonStr = jsonStr.substring(0, lastObj + 1) + ']';
+                        try { batchClauses = JSON.parse(jsonStr); } catch (e2) { /* skip */ }
                     }
                 }
             }
+
+            if (batchClauses && batchClauses.length > 0) {
+                allClauses = allClauses.concat(batchClauses);
+                batchClauses.forEach(c => {
+                    (c.checklistQuestions || []).forEach(q => {
+                        allChecklist.push({ clause: c.clause, requirement: q });
+                    });
+                });
+                console.log(`[KB Analysis] ${batch.label}: ${batchClauses.length} clauses`);
+            } else {
+                console.warn(`[KB Analysis] ${batch.label}: extraction failed`);
+            }
         }
 
-        if (newClauses && newClauses.length > 0) {
-            doc.clauses = newClauses;
-
-            // Also extract checklist questions from the AI output
-            const checklistItems = [];
-            newClauses.forEach(c => {
-                if (c.checklistQuestions && c.checklistQuestions.length > 0) {
-                    c.checklistQuestions.forEach(q => {
-                        checklistItems.push({ clause: c.clause, requirement: q });
-                    });
-                }
-            });
-            doc.generatedChecklist = checklistItems;
-            doc.checklistCount = checklistItems.length;
-
+        if (allClauses.length > 0) {
+            doc.clauses = allClauses;
+            doc.generatedChecklist = allChecklist;
+            doc.checklistCount = allChecklist.length;
             doc.status = 'ready';
             doc.lastAnalyzed = new Date().toISOString().split('T')[0];
             window.saveData();
-            console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses + ${checklistItems.length} checklist questions from ${standardName} via AI`);
+            console.log(`✅ [KB Analysis] SUCCESS! ${allClauses.length} clauses + ${allChecklist.length} checklist Qs from ${standardName}`);
             return;
         } else {
-            console.warn(`[KB Analysis] No valid JSON array found in AI response`);
+            console.warn(`[KB Analysis] Both batches failed`);
         }
     } catch (error) {
-        console.error('[KB Analysis] Exception during AI extraction:', error);
+        console.error('[KB Analysis] Exception:', error);
         window.showNotification(`AI Error: ${error.message}`, 'error');
     }
 
@@ -4258,11 +4216,11 @@ window.extractTextFromFile = async function (file) {
         return null;
     };
 
-    // Race against 60-second timeout to prevent UI freeze on very large files
+    // Race against 120-second timeout to prevent UI freeze on very large files
     const timeoutPromise = new Promise((resolve) => setTimeout(() => {
-        console.warn('Text extraction timed out after 60s - file may be too large');
+        console.warn('Text extraction timed out after 120s - file may be too large');
         resolve(null);
-    }, 60000));
+    }, 120000));
 
     try {
         return await Promise.race([extractionPromise(), timeoutPromise]);
