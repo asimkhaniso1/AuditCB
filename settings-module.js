@@ -3701,10 +3701,33 @@ Return ONLY the JSON array. No markdown, no explanations, no truncation.`;
 
         console.log(`[KB Analysis] AI Response received, length: ${text.length} chars`);
 
-        // Parse JSON from response
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        // Parse JSON from response (with repair for truncated output)
+        let jsonMatch = text.match(/\[[\s\S]*\]/);
+        let newClauses = null;
+
         if (jsonMatch) {
-            const newClauses = JSON.parse(jsonMatch[0]);
+            try {
+                newClauses = JSON.parse(jsonMatch[0]);
+            } catch (parseErr) {
+                // AI output was likely truncated — try to repair by finding last complete object
+                console.warn('[KB Analysis] JSON parse failed, attempting repair...', parseErr.message);
+                let jsonStr = jsonMatch[0];
+
+                // Find the last complete object (ends with })
+                const lastCompleteObj = jsonStr.lastIndexOf('}');
+                if (lastCompleteObj > 0) {
+                    jsonStr = jsonStr.substring(0, lastCompleteObj + 1) + ']';
+                    try {
+                        newClauses = JSON.parse(jsonStr);
+                        console.log(`[KB Analysis] JSON repaired! Recovered ${newClauses.length} clauses from truncated output`);
+                    } catch (e2) {
+                        console.error('[KB Analysis] JSON repair also failed:', e2.message);
+                    }
+                }
+            }
+        }
+
+        if (newClauses && newClauses.length > 0) {
             doc.clauses = newClauses;
 
             // Also extract checklist questions from the AI output
@@ -3725,7 +3748,7 @@ Return ONLY the JSON array. No markdown, no explanations, no truncation.`;
             console.log(`✅ [KB Analysis] SUCCESS! Extracted ${doc.clauses.length} clauses + ${checklistItems.length} checklist questions from ${standardName} via AI`);
             return;
         } else {
-            console.warn(`[KB Analysis] No JSON array found in AI response`);
+            console.warn(`[KB Analysis] No valid JSON array found in AI response`);
         }
     } catch (error) {
         console.error('[KB Analysis] Exception during AI extraction:', error);
@@ -4235,11 +4258,11 @@ window.extractTextFromFile = async function (file) {
         return null;
     };
 
-    // Race against 30-second timeout to prevent UI freeze on very large files
+    // Race against 60-second timeout to prevent UI freeze on very large files
     const timeoutPromise = new Promise((resolve) => setTimeout(() => {
-        console.warn('Text extraction timed out after 30s - file may be too large');
+        console.warn('Text extraction timed out after 60s - file may be too large');
         resolve(null);
-    }, 30000));
+    }, 60000));
 
     try {
         return await Promise.race([extractionPromise(), timeoutPromise]);
