@@ -686,6 +686,7 @@ function renderChecklistEditor(checklistId) {
                                 <option value="custom" ${checklist?.type === 'custom' || !checklist ? 'selected' : ''}>Custom (Personal)</option>
                                 ${canEditGlobal ? `<option value="global" ${checklist?.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                             </select>
+                            ${isAdmin ? '<small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;"><i class="fa-solid fa-shield-halved" style="margin-right: 0.25rem;"></i>Admin: can change type</small>' : ''}
                         </div>
                         <!-- Audit Type field removed -->
                         <div class="form-group">
@@ -805,9 +806,9 @@ function saveChecklistFromEditor(checklistId) {
     }
 
     // Permission check for global
-    const userRole = state.currentUser?.role;
-    const isAdmin = state.settings?.isAdmin || false;
-    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const userRole = (state.currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
 
     if (type === 'global' && !canEditGlobal) {
