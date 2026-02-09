@@ -3596,22 +3596,49 @@ async function extractStandardClauses(doc, standardName) {
     console.log(`[KB Analysis] Starting AI extraction for: ${standardName} (${abbr})`);
 
     // Fix: Define docContent from the document object
-    const docContent = doc.extractedText || '';
+    let docContent = doc.extractedText || '';
+
+    // If no extracted text, try to re-extract from cloud URL
+    if ((!docContent || docContent.length < 100) && doc.cloudUrl) {
+        console.log('[KB Analysis] No extracted text found. Attempting to re-extract from cloud URL:', doc.cloudUrl);
+        try {
+            const response = await fetch(doc.cloudUrl);
+            if (response.ok) {
+                const blob = await response.blob();
+                const file = new File([blob], doc.fileName || 'document.pdf', { type: blob.type });
+                const reExtracted = await window.extractTextFromFile(file);
+                if (reExtracted && reExtracted.length > 100) {
+                    docContent = reExtracted;
+                    doc.extractedText = reExtracted; // Cache it for next time
+                    window.saveData();
+                    console.log(`[KB Analysis] Re-extracted ${reExtracted.length} chars from cloud PDF`);
+                }
+            }
+        } catch (reExtractErr) {
+            console.warn('[KB Analysis] Re-extraction from cloud failed:', reExtractErr);
+        }
+    }
 
     if (!docContent || docContent.length < 100) {
-        console.warn('[KB Analysis] Document text appears empty or too short. PDF text extraction might have failed.');
-        window.showNotification('Warning: PDF text extraction returned little or no text. AI might fail.', 'warning');
+        console.warn(`[KB Analysis] Document text is empty or too short (${docContent.length} chars). Will proceed with AI general knowledge.`);
+        window.showNotification('PDF text extraction returned little text. AI will use general knowledge for this standard.', 'warning');
+    } else {
+        console.log(`[KB Analysis] Source text available: ${docContent.length} chars`);
     }
 
     try {
         // Limit source text to ~25K chars to leave room for output tokens
-        const sourceText = docContent.substring(0, 25000);
+        const sourceText = docContent.length > 100 ? docContent.substring(0, 25000) : '';
 
         // Build comprehensive extraction prompt
+        const sourceSection = sourceText
+            ? `\nSOURCE TEXT (extract requirements from this text):\n${sourceText}\n`
+            : `\nNo source text available. Use your expert knowledge of ${standardName} to provide ALL auditable requirements from Clauses 4 through 10.\n`;
+
         const prompt = `You are an expert ISO Lead Auditor extracting audit requirements from "${standardName}".
 This is a ${systemTerm}. Use "${abbr}" terminology throughout (e.g., "${abbr} policy", "effectiveness of the ${abbr}").
 
-TASK: Extract EVERY auditable requirement from Clauses 4 through 10 of the source text below.
+TASK: Extract EVERY auditable requirement from Clauses 4 through 10${sourceText ? ' of the source text below' : ' based on your knowledge of this standard'}.
 For EACH clause, also generate 1-3 practical audit checklist questions.
 
 RULES:
@@ -3622,8 +3649,7 @@ RULES:
 5. Do NOT skip any clause or sub-clause. A typical ISO standard has 70-120+ clauses.
 6. If a clause has a "NOTE" that contains an auditable requirement, include it.
 
-SOURCE TEXT:
-${sourceText}
+${sourceSection}
 
 OUTPUT FORMAT — Return ONLY a valid JSON array:
 [
