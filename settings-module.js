@@ -4523,45 +4523,81 @@ window.viewKBAnalysis = function (docId) {
             `) : ''}
             
             <!-- Extracted Sections -->
-            <h4 style="margin: 0 0 0.75rem 0; color: #0369a1;">
-                <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>${docType === 'standard' ? 'Extracted Clauses' : 'Document Sections'} (${clauses.length})
-            </h4>
-            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
-                <table style="width: 100%; font-size: 0.85rem;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
-                        <tr>
-                            <th style="padding: 0.5rem; width: 70px;">${docType === 'standard' ? 'Clause' : 'Section'}</th>
-                            <th style="padding: 0.5rem; width: 25%;">Title</th>
-                            <th style="padding: 0.5rem;">Description / Content</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${clauses.map(c => `
-                            <tr style="vertical-align: top;">
-                                <td style="padding: 0.5rem;"><span class="badge bg-blue">${window.UTILS.escapeHtml(c.clause)}</span></td>
-                                <td style="padding: 0.5rem; font-weight: 500;">${window.UTILS.escapeHtml(c.title)}</td>
-                                <td style="padding: 0.5rem; color: var(--text-secondary);">
-                                    <div contenteditable="true" 
-                                         onblur="window.updateKBSection('${doc.id}', '${c.clause}', this.innerText)" 
-                                         title="Click to edit content"
-                                         style="padding: 4px; border: 1px dashed transparent; border-radius: 4px; transition: all 0.2s; cursor: text;" 
-                                         onfocus="this.style.borderColor='#3b82f6'; this.style.backgroundColor='#eff6ff'; this.style.color='#1e293b';"
-                                         onmouseover="this.style.borderColor='#cbd5e1';" 
-                                         onmouseout="if(document.activeElement !== this) this.style.borderColor='transparent';">
-                                        ${window.UTILS.escapeHtml(c.requirement)}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <h4 style="margin: 0; color: #0369a1;">
+                    <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>${docType === 'standard' ? 'Extracted Clauses' : 'Document Sections'} (${clauses.length})
+                </h4>
+                <div style="display: flex; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+                    ${docType === 'standard' ? `
+                        <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 10px;">
+                            ${clauses.filter(c => c.subRequirements && c.subRequirements.length > 0).length} with sub-items
+                        </span>
+                        <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px;">
+                            ${clauses.reduce((a, c) => a + (c.checklistQuestions?.length || 0), 0)} checklist Qs
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+
+            <!-- Group clauses by main section -->
+            <div style="max-height: 450px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                ${(() => {
+            // Group by main clause number (4, 5, 6...)
+            const sectionTitles = { '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning', '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement' };
+            const groups = {};
+            clauses.forEach(c => {
+                const main = c.clause.split('.')[0];
+                if (!groups[main]) groups[main] = [];
+                groups[main].push(c);
+            });
+
+            return Object.keys(groups).sort((a, b) => parseInt(a) - parseInt(b)).map(mainNum => {
+                const items = groups[mainNum];
+                const sTitle = sectionTitles[mainNum] || 'Other';
+                return `
+                            <div style="border-bottom: 1px solid var(--border-color);">
+                                <div style="background: linear-gradient(135deg, #0369a1, #0284c7); color: white; padding: 0.6rem 1rem; font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>Clause ${mainNum} — ${sTitle}</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">${items.length} items</span>
+                                </div>
+                                ${items.map(c => `
+                                    <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9;">
+                                        <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.4rem;">
+                                            <span style="background: #dbeafe; color: #1e40af; padding: 1px 8px; border-radius: 10px; font-size: 0.78rem; font-weight: 600; white-space: nowrap;">${window.UTILS.escapeHtml(c.clause)}</span>
+                                            <strong style="font-size: 0.85rem; color: #1e293b;">${window.UTILS.escapeHtml(c.title)}</strong>
+                                        </div>
+                                        <div style="color: #475569; font-size: 0.82rem; line-height: 1.5; padding-left: 0.5rem; border-left: 3px solid #e2e8f0; margin-left: 0.25rem;"
+                                             contenteditable="true" 
+                                             onblur="window.updateKBSection('${doc.id}', '${c.clause}', this.innerText)" 
+                                             title="Click to edit"
+                                             style="cursor: text;">
+                                            ${window.UTILS.escapeHtml(c.requirement)}
+                                        </div>
+                                        ${c.subRequirements && c.subRequirements.length > 0 ? `
+                                            <ul style="margin: 0.4rem 0 0 1.5rem; padding: 0; font-size: 0.8rem; color: #374151; line-height: 1.6;">
+                                                ${c.subRequirements.map(sub => `
+                                                    <li style="margin-bottom: 0.15rem;">${window.UTILS.escapeHtml(sub)}</li>
+                                                `).join('')}
+                                            </ul>
+                                        ` : ''}
+                                        ${c.checklistQuestions && c.checklistQuestions.length > 0 ? `
+                                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fffbeb; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                                                <div style="font-size: 0.72rem; font-weight: 600; color: #92400e; margin-bottom: 0.3rem;">
+                                                    <i class="fa-solid fa-clipboard-question" style="margin-right: 0.3rem;"></i>CHECKLIST QUESTIONS
+                                                </div>
+                                                ${c.checklistQuestions.map(q => `
+                                                    <div style="font-size: 0.78rem; color: #78350f; padding: 0.15rem 0; padding-left: 0.75rem; position: relative;">
+                                                        <span style="position: absolute; left: 0; color: #d97706;">▸</span>${window.UTILS.escapeHtml(q)}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        ` : ''}
                                     </div>
-                                    ${c.subRequirements && c.subRequirements.length > 0 ? `
-                                        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; color: #374151;">
-                                            ${c.subRequirements.map(sub => `
-                                                <li style="margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(sub)}</li>
-                                            `).join('')}
-                                        </ul>
-                                    ` : ''}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                                `).join('')}
+                            </div>
+                        `;
+            }).join('');
+        })()}
             </div>
             
             <!-- How it's used -->
@@ -4571,6 +4607,7 @@ window.viewKBAnalysis = function (docId) {
                     ${docType === 'standard' ? `
                         <li>When creating NCRs, AI references these clauses to suggest findings</li>
                         <li>Clause requirements are included in NCR descriptions</li>
+                        <li>Checklist questions can be exported as an audit checklist</li>
                         <li>Helps ensure audit findings align with standard requirements</li>
                     ` : docType === 'marketing' ? `
                         <li>Provides organizational context for Audit Planning</li>
