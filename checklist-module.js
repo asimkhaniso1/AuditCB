@@ -633,9 +633,9 @@ function renderChecklistEditor(checklistId) {
     const checklist = isEdit ? state.checklists?.find(c => String(c.id) === String(checklistId)) : null;
 
     const standards = window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
-    const userRole = state.currentUser?.role;
-    const isAdmin = state.settings?.isAdmin || false;
-    const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
+    const userRole = (state.currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
+    const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
     const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];

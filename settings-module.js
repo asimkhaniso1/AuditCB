@@ -3416,6 +3416,50 @@ window.uploadKnowledgeDoc = function (type) {
 };
 
 // Analyze standard function (triggered by "Analyze Now" button)
+// --- KB Analysis Progress Overlay ---
+window._kbProgress = {
+    el: null,
+    startTime: null,
+    timer: null,
+    show(label, pct) {
+        if (!this.el) {
+            this.el = document.createElement('div');
+            this.el.id = 'kb-analysis-progress';
+            this.el.innerHTML = `
+                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:9998;display:flex;align-items:center;justify-content:center;">
+                    <div style="background:white;border-radius:12px;padding:2rem 2.5rem;min-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+                        <div style="font-size:1.5rem;margin-bottom:0.5rem;">🔍</div>
+                        <div id="kb-prog-title" style="font-weight:600;font-size:1.05rem;color:#1e293b;margin-bottom:0.25rem;">Analyzing Standard...</div>
+                        <div id="kb-prog-step" style="font-size:0.85rem;color:#64748b;margin-bottom:1rem;">Initializing...</div>
+                        <div style="background:#e2e8f0;border-radius:8px;height:10px;overflow:hidden;margin-bottom:0.75rem;">
+                            <div id="kb-prog-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:8px;transition:width 0.5s ease;"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#94a3b8;">
+                            <span id="kb-prog-pct">0%</span>
+                            <span id="kb-prog-time">Elapsed: 0s</span>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.appendChild(this.el);
+            this.startTime = Date.now();
+            this.timer = setInterval(() => {
+                const el = document.getElementById('kb-prog-time');
+                if (el) el.textContent = `Elapsed: ${Math.round((Date.now() - this.startTime) / 1000)}s`;
+            }, 1000);
+        }
+        const bar = document.getElementById('kb-prog-bar');
+        const pctEl = document.getElementById('kb-prog-pct');
+        const stepEl = document.getElementById('kb-prog-step');
+        if (bar) bar.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (stepEl) stepEl.textContent = label;
+    },
+    hide() {
+        if (this.timer) { clearInterval(this.timer); this.timer = null; }
+        if (this.el) { this.el.remove(); this.el = null; }
+    }
+};
+
 window.analyzeStandard = async function (docId) {
     const kb = window.state.knowledgeBase;
     const doc = kb.standards.find(d => d.id == docId);
@@ -3433,10 +3477,15 @@ window.analyzeStandard = async function (docId) {
         renderSettings();
     }
 
-    window.showNotification(`Analyzing ${doc.name}...`, 'info');
+    // Show progress overlay
+    window._kbProgress.show('Preparing analysis...', 5);
 
     // Extract clauses
     await extractStandardClauses(doc, doc.name);
+
+    // Complete
+    window._kbProgress.show('✅ Analysis complete!', 100);
+    setTimeout(() => window._kbProgress.hide(), 1500);
 
     // Re-render
     if (typeof switchSettingsSubTab === 'function') {
@@ -3621,9 +3670,10 @@ async function extractStandardClauses(doc, standardName) {
 
     if (!docContent || docContent.length < 100) {
         console.warn(`[KB Analysis] Document text is empty or too short (${docContent.length} chars). Will proceed with AI general knowledge.`);
-        window.showNotification('PDF text extraction returned little text. AI will use general knowledge for this standard.', 'warning');
+        window._kbProgress?.show('No PDF text found — using AI knowledge...', 15);
     } else {
         console.log(`[KB Analysis] Source text available: ${docContent.length} chars`);
+        window._kbProgress?.show(`Text extracted: ${Math.round(docContent.length / 1000)}K chars`, 15);
     }
 
     try {
@@ -3641,9 +3691,13 @@ async function extractStandardClauses(doc, standardName) {
         let allClauses = [];
         let allChecklist = [];
 
-        for (const batch of batches) {
+        for (let bi = 0; bi < batches.length; bi++) {
+            const batch = batches[bi];
+            const batchStartPct = bi === 0 ? 20 : 55;
+            const batchEndPct = bi === 0 ? 50 : 90;
+
             console.log(`[KB Analysis] Extracting ${batch.label}...`);
-            window.showNotification(`Extracting ${batch.label}...`, 'info');
+            window._kbProgress?.show(`AI extracting ${batch.label}...`, batchStartPct);
 
             const prompt = `You are an expert ISO Lead Auditor. Extract audit requirements from "${standardName}" (${systemTerm}).
 Use "${abbr}" terminology throughout.
@@ -3665,6 +3719,7 @@ ONLY JSON. No markdown. No explanations.`;
 
             const text = await window.AI_SERVICE.callProxyAPI(prompt);
             console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars`);
+            window._kbProgress?.show(`Parsing ${batch.label} response...`, batchEndPct - 5);
 
             let jsonMatch = text.match(/\[[\s\S]*\]/);
             let batchClauses = null;
@@ -3690,13 +3745,16 @@ ONLY JSON. No markdown. No explanations.`;
                         allChecklist.push({ clause: c.clause, requirement: q });
                     });
                 });
+                window._kbProgress?.show(`${batch.label}: ${batchClauses.length} clauses extracted ✓`, batchEndPct);
                 console.log(`[KB Analysis] ${batch.label}: ${batchClauses.length} clauses`);
             } else {
+                window._kbProgress?.show(`${batch.label}: extraction failed ✗`, batchEndPct);
                 console.warn(`[KB Analysis] ${batch.label}: extraction failed`);
             }
         }
 
         if (allClauses.length > 0) {
+            window._kbProgress?.show(`Saving ${allClauses.length} clauses + ${allChecklist.length} questions...`, 95);
             doc.clauses = allClauses;
             doc.generatedChecklist = allChecklist;
             doc.checklistCount = allChecklist.length;
