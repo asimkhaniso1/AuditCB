@@ -317,6 +317,11 @@ window.switchSettingsSubTab = function (mainTab, subTab) {
 
     // Update content
     document.getElementById('settings-content').innerHTML = getSettingsContent(mainTab, subTab);
+
+    // Load async data for specific tabs
+    if (subTab === 'usage' && typeof window.loadSupabaseStats === 'function') {
+        setTimeout(() => window.loadSupabaseStats(), 100);
+    }
 };
 
 
@@ -5227,9 +5232,9 @@ function getUsageAnalyticsHTML() {
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <i class="fa-solid fa-circle-info" style="font-size: 1.5rem;"></i>
                     <div>
-                        <strong>Gemini 1.5 Flash Pricing</strong>
+                        <strong>Gemini 2.0 Flash Pricing</strong>
                         <div style="font-size: 0.85rem; opacity: 0.9;">
-                            Input: $0.075/1M tokens • Output: $0.30/1M tokens
+                            Input: $0.10/1M tokens • Output: $0.40/1M tokens
                         </div>
                     </div>
                 </div>
@@ -5346,8 +5351,8 @@ function getUsageAnalyticsHTML() {
         // Estimate ~3.5 API calls per audit, ~3000 tokens per call
         const estimatedCalls = audits * 3.5;
         const estimatedTokens = estimatedCalls * 3000;
-        const inputCost = (estimatedTokens * 0.6 / 1000000) * 0.075;
-        const outputCost = (estimatedTokens * 0.4 / 1000000) * 0.30;
+        const inputCost = (estimatedTokens * 0.6 / 1000000) * 0.10;
+        const outputCost = (estimatedTokens * 0.4 / 1000000) * 0.40;
         const totalCost = inputCost + outputCost;
         return `
                             <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center;">
@@ -5361,11 +5366,94 @@ function getUsageAnalyticsHTML() {
     }).join('')}
                 </div>
                 <p style="margin: 1rem 0 0 0; font-size: 0.8rem; color: #6b7280; text-align: center;">
-                    * Projections based on average of 3.5 AI calls per audit with ~3,000 tokens each
+                    * Projections based on Gemini 2.0 Flash pricing, avg 3.5 AI calls per audit with ~3,000 tokens each
                 </p>
+            </div>
+
+            <!-- Supabase Database & Storage -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-top: 1.5rem;">
+                <h4 style="margin: 0 0 1rem 0; color: #374151;">
+                    <i class="fa-solid fa-database" style="margin-right: 0.5rem; color: #10b981;"></i>
+                    Supabase Database & Storage
+                </h4>
+                <div id="supabase-stats-container">
+                    <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                        <i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i>
+                        Loading Supabase statistics...
+                    </div>
+                </div>
             </div>
         </div>
             `;
+}
+
+// Load Supabase stats asynchronously after render
+window.loadSupabaseStats = async function () {
+    const container = document.getElementById('supabase-stats-container');
+    if (!container) return;
+
+    const tracker = window.APIUsageTracker;
+    if (!tracker || typeof tracker.getSupabaseStats !== 'function') {
+        container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Supabase stats not available.</p>';
+        return;
+    }
+
+    try {
+        const stats = await tracker.getSupabaseStats();
+
+        if (!stats.connected) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                    <i class="fa-solid fa-unlink" style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #f59e0b;"></i>
+                    <p style="margin: 0;">Supabase not connected. Configure in Settings > Supabase tab.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const tableEntries = Object.entries(stats.tables);
+        const tableRows = tableEntries.map(([name, count]) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
+                <span style="font-size: 0.85rem; color: #475569;"><i class="fa-solid fa-table" style="width: 16px; color: var(--primary-color); margin-right: 6px;"></i>${name}</span>
+                <span style="font-weight: 600; color: #1e293b;">${count} rows</span>
+            </div>
+        `).join('');
+
+        const bucketRows = stats.storage.buckets.length > 0 ? stats.storage.buckets.map(b => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
+                <span style="font-size: 0.85rem; color: #475569;"><i class="fa-solid fa-hard-drive" style="width: 16px; color: #8b5cf6; margin-right: 6px;"></i>${b.name}</span>
+                <span style="font-size: 0.85rem;">${b.files} files • <strong>${b.sizeMB} MB</strong></span>
+            </div>
+        `).join('') : '<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 0.5rem;">No storage buckets found</p>';
+
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div>
+                    <h5 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #64748b;">Database Tables</h5>
+                    ${tableRows || '<p style="color: var(--text-secondary);">No tables found</p>'}
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-weight: 600; color: var(--primary-color); border-top: 2px solid #e2e8f0; margin-top: 4px;">
+                        <span>Total Rows</span>
+                        <span>${tableEntries.reduce((s, [, c]) => s + c, 0)}</span>
+                    </div>
+                </div>
+                <div>
+                    <h5 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #64748b;">Storage Buckets</h5>
+                    ${bucketRows}
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-weight: 600; color: #8b5cf6; border-top: 2px solid #e2e8f0; margin-top: 4px;">
+                        <span>Total Storage</span>
+                        <span>${stats.storage.totalFiles} files • ${stats.storage.totalSizeMB} MB</span>
+                    </div>
+                    <div style="margin-top: 0.75rem; padding: 0.5rem; background: #f0fdf4; border-radius: 6px; font-size: 0.75rem; color: #166534;">
+                        <i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i>
+                        Supabase Free Tier: 500 MB database • 1 GB storage • 2 GB bandwidth/month
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        console.error('Failed to load Supabase stats:', err);
+        container.innerHTML = '<p style="color: var(--danger-color); text-align: center;">Failed to load Supabase statistics.</p>';
+    }
 }
 
 // Reset usage data with confirmation

@@ -7,10 +7,10 @@ const APIUsageTracker = {
     // Storage key
     STORAGE_KEY: 'auditcb_api_usage',
 
-    // Gemini 1.5 Flash pricing (per 1M tokens)
+    // Gemini 2.0 Flash pricing (per 1M tokens) - current model used
     PRICING: {
-        input: 0.075,   // $0.075 per 1M input tokens
-        output: 0.30    // $0.30 per 1M output tokens
+        input: 0.10,    // $0.10 per 1M input tokens (Gemini 2.0 Flash)
+        output: 0.40    // $0.40 per 1M output tokens (Gemini 2.0 Flash)
     },
 
     /**
@@ -292,14 +292,84 @@ const APIUsageTracker = {
      */
     getFeatureDisplayName(feature) {
         const names = {
+            'ai-generation': 'AI Generation (Proxy)',
+            'ai-generation-direct': 'AI Generation (Direct)',
+            'ai-generation-dynamic': 'AI Generation (Dynamic)',
             'agenda-generation': 'Audit Agenda AI',
             'ncr-analysis': 'NCR AI Analysis',
             'capa-suggestions': 'CAPA Suggestions',
             'knowledge-base': 'Knowledge Base AI',
+            'kb-extraction': 'KB Clause Extraction',
             'report-generation': 'Report Generation',
+            'executive-summary': 'Executive Summary AI',
+            'findings-analysis': 'Findings Classification',
             'other': 'Other'
         };
-        return names[feature] || feature;
+        return names[feature] || feature.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    },
+
+    /**
+     * Get Supabase database and storage statistics
+     * @returns {Promise<Object>} Stats object with table counts and storage info
+     */
+    async getSupabaseStats() {
+        const stats = {
+            tables: {},
+            storage: { totalFiles: 0, totalSizeMB: 0, buckets: [] },
+            connected: false
+        };
+
+        if (!window.SupabaseClient?.client || !window.SupabaseClient.isInitialized) {
+            return stats;
+        }
+
+        stats.connected = true;
+        const client = window.SupabaseClient.client;
+
+        try {
+            // Query row counts for main tables
+            const tables = ['clients', 'audit_plans', 'audit_reports', 'checklists', 'auditors', 'settings', 'documents', 'audit_log'];
+            for (const table of tables) {
+                try {
+                    const { count, error } = await client.from(table).select('*', { count: 'exact', head: true });
+                    if (!error) {
+                        stats.tables[table] = count || 0;
+                    }
+                } catch (e) {
+                    // Table might not exist, skip
+                }
+            }
+
+            // Query storage buckets
+            try {
+                const { data: buckets, error } = await client.storage.listBuckets();
+                if (!error && buckets) {
+                    for (const bucket of buckets) {
+                        try {
+                            const { data: files } = await client.storage.from(bucket.name).list('', { limit: 1000 });
+                            const fileCount = files?.length || 0;
+                            const totalSize = files?.reduce((sum, f) => sum + (f.metadata?.size || 0), 0) || 0;
+                            stats.storage.buckets.push({
+                                name: bucket.name,
+                                files: fileCount,
+                                sizeMB: (totalSize / (1024 * 1024)).toFixed(2)
+                            });
+                            stats.storage.totalFiles += fileCount;
+                            stats.storage.totalSizeMB += totalSize / (1024 * 1024);
+                        } catch (e) {
+                            stats.storage.buckets.push({ name: bucket.name, files: 0, sizeMB: '0' });
+                        }
+                    }
+                    stats.storage.totalSizeMB = stats.storage.totalSizeMB.toFixed(2);
+                }
+            } catch (e) {
+                console.warn('[APIUsageTracker] Could not list storage buckets:', e);
+            }
+        } catch (e) {
+            console.warn('[APIUsageTracker] Error getting Supabase stats:', e);
+        }
+
+        return stats;
     }
 };
 

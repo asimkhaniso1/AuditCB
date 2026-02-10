@@ -283,10 +283,11 @@ Example:
                     const data = await response.json();
 
                     if (window.APIUsageTracker) {
+                        const usage = data.usageMetadata || {};
                         window.APIUsageTracker.logUsage({
                             feature: 'ai-generation-direct',
-                            inputTokens: window.APIUsageTracker.estimateTokens(prompt),
-                            outputTokens: 0,
+                            inputTokens: usage.promptTokenCount || window.APIUsageTracker.estimateTokens(prompt),
+                            outputTokens: usage.candidatesTokenCount || 0,
                             success: true,
                             model: model
                         });
@@ -308,7 +309,7 @@ Example:
             console.log('Standard models failed. Fetching available models from API...');
             const availableModels = await AI_SERVICE.getAvailableModels();
 
-            // Filter for content generation models and sort by preference (Gemini 1.5 > 1.0 > Pro)
+            // Filter for content generation models and sort by preference (Gemini 2.0 > 1.5 > Pro)
             const viableModels = availableModels
                 .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
                 .map(m => m.name.replace('models/', '')) // Remove prefix if present
