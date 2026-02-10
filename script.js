@@ -17,8 +17,7 @@ const state = {
     // Current User Context (Populated after authentication)
     currentUser: null,
     currentModule: 'dashboard',
-    // DEMO DATA REMOVED - Data now loads from Supabase database
-    // Demo users can use "admin/admin123" login to get demo data via restoreDemoData()
+    // Data loads from Supabase database after authentication
     clients: [],
     auditors: [],
     auditPrograms: [],

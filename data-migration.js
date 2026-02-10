@@ -291,7 +291,7 @@ const DataMigration = {
                         <h4 style="font-size: 0.9rem; color: #64748b; margin-bottom: 0.5rem;">Reset Data</h4>
                         <div style="background: #fff1f2; padding: 1rem; border-radius: 6px; border: 1px solid #fecdd3;">
                             <p style="font-size: 0.85rem; margin-bottom: 1rem; color: #881337;">
-                                Clear local mock data to start fresh.
+                                Clear local data and reload from Supabase.
                             </p>
                             
                             <div style="margin-bottom: 1rem;">
@@ -309,8 +309,8 @@ const DataMigration = {
                                 <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i> Clear Local Data
                             </button>
                             
-                            <button class="btn btn-secondary" onclick="window.DataMigration.restoreDemoData()" style="margin-left: 0.5rem;">
-                                <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Restore Demo Data
+                            <button class="btn btn-secondary" onclick="window.DataMigration.reloadFromCloud()" style="margin-left: 0.5rem;">
+                                <i class="fa-solid fa-cloud-arrow-down" style="margin-right: 0.5rem;"></i> Reload from Cloud
                             </button>
                         </div>
                     </div>
@@ -329,22 +329,18 @@ const DataMigration = {
     },
 
     /**
-     * Restore demo/mock data for testing and demos
-     * @param {object} options - Options { keepCBSettings: boolean }
+     * Reload data from Supabase cloud database
+     * Clears local cache and fetches fresh data from the server
      */
-    restoreDemoData: function (options = { keepCBSettings: true }) {
-        if (!confirm('This will restore demo data. All current data will be RESET to factory defaults. Continue?')) {
+    reloadFromCloud: function () {
+        if (!confirm('This will clear your local cache and reload all data from Supabase. Continue?')) {
             return;
         }
 
         try {
-            // Note: Preserving settings is temporarily disabled to prevent state corruption
-            // as script.js requires full state initialization.
-            // Future improvement: Use sessionStorage to pass settings across reload.
+            window.showNotification('Clearing local cache and reloading from cloud...', 'info');
 
-            window.showNotification('Restoring demo data...', 'info');
-
-            // Clear localStorage to force script.js to load defaults
+            // Clear localStorage to force fresh load from Supabase
             localStorage.removeItem('auditCB360State');
 
             // Force reload
@@ -353,8 +349,8 @@ const DataMigration = {
             }, 500);
 
         } catch (error) {
-            console.error('Restore demo data failed:', error);
-            window.showNotification('Failed to restore demo data.', 'error');
+            console.error('Reload from cloud failed:', error);
+            window.showNotification('Failed to reload from cloud.', 'error');
         }
     },
 
