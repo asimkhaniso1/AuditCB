@@ -356,7 +356,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                     </div>
 
                     <!-- Sidebar Column -->
-                    <div style="display: grid; gap: 1.5rem; position: sticky; top: 1.5rem;">
+                    <div style="display: grid; gap: 1.5rem; align-self: start;">
                         
                         <!-- Card: Duration Calculation -->
                         <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid var(--primary-color);">
@@ -444,7 +444,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                         </div>
 
                         <!-- Main Actions -->
-                        <div style="display: grid; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--border-color); position: sticky; bottom: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.05);">
+                        <div style="display: grid; gap: 0.75rem; padding: 1rem; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);">
                             <button type="button" id="btn-plan-save" class="btn btn-primary" style="height: 48px; font-weight: 600;">
                                 <i class="fa-solid fa-floppy-disk" style="margin-right: 0.5rem;"></i> Save Audit Plan
                             </button>
