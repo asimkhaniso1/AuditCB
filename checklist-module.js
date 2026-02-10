@@ -988,10 +988,20 @@ function viewChecklistDetail(id) {
 
     const html = `
         <div class="fade-in">
-            <div style="margin-bottom: 1.5rem;">
+            <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
                 <button class="btn btn-secondary" onclick="renderChecklistLibrary()">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Library
                 </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    ${typeof window.exportChecklistPDF === 'function' ? `
+                        <button class="btn btn-secondary" onclick="window.exportChecklistPDF('${id}')" title="Export as PDF">
+                            <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem; color: #ef4444;"></i> Export PDF
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-secondary" onclick="window.printChecklist('${id}')" title="Print Checklist">
+                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
+                    </button>
+                </div>
             </div>
 
             <div class="card" style="margin-bottom: 1.5rem;">

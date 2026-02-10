@@ -1792,3 +1792,83 @@ textarea:focus:invalid {
         grid-template-columns: repeat(2, 1fr) !important;
     }
 }
+
+/* ============================================
+   ENHANCED TABLET / MOBILE RESPONSIVE (v2.0)
+   ============================================ */
+
+/* Tablet Landscape (769px-1024px) - Improve two-column layouts */
+@media (max-width: 1024px) {
+    /* Audit Plan form: 2fr 1fr grid compresses well, but charts need help */
+    [style*="grid-template-columns: 2fr 1fr"] {
+        grid-template-columns: 1.5fr 1fr !important;
+        gap: 1rem !important;
+    }
+
+    /* Chart rows: single column on smaller tablets */
+    [style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Keep 2fr 1fr chart layout */
+    [style*="grid-template-columns: 2fr 1fr"]:not(form *) {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Tablet Portrait (481px-768px) */
+@media (max-width: 768px) {
+    /* Audit Plan form: fully single column */
+    [style*="grid-template-columns: 2fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Card hover effect: remove on touch */
+    .card:hover {
+        transform: none;
+    }
+
+    /* Better tap targets */
+    .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .btn-sm {
+        min-height: 36px;
+    }
+
+    /* Shortcut hint: hide on small screens */
+    #shortcut-hint {
+        display: none !important;
+    }
+
+    /* Checklist accordion headers: larger tap target */
+    [style*="cursor: pointer"] {
+        min-height: 44px;
+    }
+
+    /* Better spacing for form controls */
+    .form-group {
+        margin-bottom: 0.75rem;
+    }
+
+    input, select, textarea {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}
+
+/* Touch device specific */
+.touch-device .card:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.touch-device .main-nav li:hover {
+    transform: none;
+}
+
+/* Smooth sidebar transition for all sizes */
+.sidebar {
+    will-change: transform;
+}

@@ -262,6 +262,9 @@ function renderDashboardEnhanced() {
                 </div>
             </div>
 
+            <!-- Clause Compliance Analytics -->
+            ${typeof window.renderClauseAnalyticsCard === 'function' ? window.renderClauseAnalyticsCard() : ''}
+
             <!-- Alerts and Recent Activity -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                 <!-- Alerts & Notifications -->
