@@ -1537,6 +1537,10 @@ window.handleLoginSubmit = async function (form) {
                 window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
                         console.log(`Synced checklists from Supabase: ${result.added} added, ${result.updated} updated`);
+                        // Re-render if user is currently viewing checklists or planning
+                        const hash = window.location.hash;
+                        if (hash === '#checklists' && window.renderChecklistModule) window.renderChecklistModule();
+                        if (hash === '#planning' && window.renderPlanningModule) window.renderPlanningModule();
                     }
                 }).catch(err => console.warn('Supabase checklist sync failed:', err));
 

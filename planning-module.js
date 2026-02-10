@@ -1261,8 +1261,18 @@ window.closeAuditPlan = function (planId) {
 
 // Checklist Selection Modal for Audit Plan
 // FULL-FORM CHECKLIST CONFIGURATION (Local Overrides for Audit Plans)
-window.renderConfigureChecklist = function (planId) {
+window.renderConfigureChecklist = async function (planId) {
     if (!window.state) return;
+
+    // Refresh checklists from Supabase before rendering to ensure latest data
+    if (window.SupabaseClient?.isInitialized) {
+        try {
+            await window.SupabaseClient.syncChecklistsFromSupabase();
+        } catch (e) {
+            console.warn('Could not refresh checklists from Supabase:', e);
+        }
+    }
+
     const state = window.state;
     const plan = state.auditPlans.find(p => String(p.id) === String(planId));
     if (!plan) return;
