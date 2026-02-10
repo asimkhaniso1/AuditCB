@@ -4510,8 +4510,13 @@ window.viewKBAnalysis = function (docId) {
     auditReports.forEach(report => {
         const ncrs = report.ncrs || [];
         ncrs.forEach(ncr => {
-            // Check if NCR references this standard
-            if (ncr.standard && doc.name.toLowerCase().includes(ncr.standard.toLowerCase().replace('iso ', ''))) {
+            // Normalize standard names for reliable matching
+            // Extract core number: "ISO 9001:2015" → "9001", "ISO/IEC 27001" → "27001"
+            const extractStdNum = (s) => s ? (s.match(/\b(\d{4,5})\b/) || [])[1] || '' : '';
+            const docStdNum = extractStdNum(doc.name);
+            const ncrStdNum = extractStdNum(ncr.standard || ncr.clause || '');
+
+            if (docStdNum && ncrStdNum && docStdNum === ncrStdNum) {
                 referencedNCRs.push({
                     reportId: report.id,
                     clientName: report.clientName,

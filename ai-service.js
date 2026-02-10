@@ -465,8 +465,19 @@ window.runFollowUpAIAnalysis = async function (reportId) {
             });
         });
 
+        // Resolve standard name — try report directly, then fall back to linked plan/client
+        let standardName = report.standard;
+        if (!standardName && report.planId) {
+            const plan = window.state.auditPlans?.find(p => String(p.id) === String(report.planId));
+            standardName = plan?.standard;
+        }
+        if (!standardName && report.client) {
+            const client = window.state.clients?.find(c => c.name === report.client);
+            standardName = client?.standard;
+        }
+
         // Call AI Service with standard name for KB lookup
-        const suggestions = await window.AI_SERVICE.analyzeFindings(findings, report.standard);
+        const suggestions = await window.AI_SERVICE.analyzeFindings(findings, standardName);
 
         // Apply suggestions
         let updateCount = 0;
@@ -537,6 +548,16 @@ window.runAutoSummary = async function (reportId) {
         }
 
         const uniqueCompliantAreas = [...new Set(compliantItems)];
+
+        // Ensure report.standard is resolved for KB context
+        if (!report.standard) {
+            report.standard = plan?.standard;
+        }
+        if (!report.standard && report.client) {
+            const client = window.state.clients?.find(c => c.name === report.client);
+            report.standard = client?.standard;
+        }
+
         const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas);
 
         if (result.executiveSummary) {
