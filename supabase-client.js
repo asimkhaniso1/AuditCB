@@ -1931,6 +1931,12 @@ const SupabaseClient = {
 
                 window.saveState();
                 Logger.info('Synced settings from Supabase (Singleton)');
+
+                // Refresh CB logo in sidebar with real name from cloud settings
+                if (typeof window.updateCBLogoDisplay === 'function') {
+                    window.updateCBLogoDisplay();
+                }
+
                 return { updated: true };
             }
 
