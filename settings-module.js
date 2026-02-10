@@ -3511,24 +3511,8 @@ window.analyzeStandard = async function (docId) {
 };
 
 // Re-analyze a standard (for deeper extraction)
-window.reanalyzeStandard = async function (docId) {
-    const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id == docId);
-    if (!doc) {
-        window.showNotification('Standard not found', 'error');
-        return;
-    }
+// reanalyzeStandard is defined later in the file (line ~4709) with full implementation
 
-    // Clear existing clauses and re-analyze
-    doc.clauses = [];
-    doc.status = 'pending';
-    window.saveData();
-    window.closeModal();
-
-    // Trigger re-analysis
-    await window.analyzeStandard(docId);
-};
-// Analyze SOP or Policy document - uses instant template (AI optional)
 window.analyzeDocument = async function (type, docId) {
     const kb = window.state.knowledgeBase;
     const collection = type === 'sop' ? kb.sops : type === 'policy' ? kb.policies : kb.marketing;
@@ -4805,6 +4789,21 @@ Return ONLY the JSON array.`;
             if (jsonMatch) {
                 const newClauses = JSON.parse(jsonMatch[0]);
                 doc.clauses = newClauses;
+
+                // Also generate checklist questions from clauses
+                const checklist = [];
+                newClauses.forEach(c => {
+                    if (c.checklistQuestions) {
+                        c.checklistQuestions.forEach(q => checklist.push({ clause: c.clause, requirement: q }));
+                    } else if (c.subRequirements && c.subRequirements.length > 0) {
+                        c.subRequirements.forEach(sub => checklist.push({ clause: c.clause, requirement: sub }));
+                    } else if (c.requirement) {
+                        checklist.push({ clause: c.clause, requirement: c.requirement });
+                    }
+                });
+                doc.generatedChecklist = checklist;
+                doc.checklistCount = checklist.length;
+
                 doc.status = 'ready';
                 doc.lastAnalyzed = new Date().toISOString().split('T')[0];
                 window.saveData();

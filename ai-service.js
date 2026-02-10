@@ -44,11 +44,11 @@ const AI_SERVICE = {
         console.log(`[KB] Found ${stdDoc.clauses.length} clauses for ${stdDoc.name}`);
 
         // Return concise clause reference (saves tokens vs full text)
-        // Limit to ~2000 chars to avoid overwhelming the prompt
+        // Limit to ~8000 chars for balanced context without overwhelming prompt
         const clauseText = stdDoc.clauses
             .map(c => `${c.clause}: ${c.title} — ${c.requirement}`)
             .join('\n')
-            .substring(0, 2000);
+            .substring(0, 8000);
 
         return clauseText;
     },
