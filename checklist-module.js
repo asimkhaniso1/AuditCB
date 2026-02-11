@@ -12,19 +12,6 @@ let checklistSearchTerm = '';
 
 function renderChecklistLibrary() {
     const contentArea = document.getElementById('content-area');
-
-    // Sync from Supabase first (cloud is source of truth) — but don't block rendering
-    if (window.SupabaseClient && window.SupabaseClient.isInitialized && !renderChecklistLibrary._syncing) {
-        renderChecklistLibrary._syncing = true;
-        window.SupabaseClient.syncChecklistsFromSupabase().then(() => {
-            renderChecklistLibrary._syncing = false;
-            // Re-render with fresh data (only if we're still on checklists page)
-            if (window.location.hash === '#checklists') {
-                renderChecklistLibrary(); // Will skip sync this time due to _syncing flag
-            }
-        }).catch(() => { renderChecklistLibrary._syncing = false; });
-    }
-
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());

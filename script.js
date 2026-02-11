@@ -1533,13 +1533,13 @@ window.handleLoginSubmit = async function (form) {
                     }
                 }).catch(err => console.warn('Supabase audit report sync failed:', err));
 
-                // Sync checklists from Supabase
+                // Sync checklists from Supabase — clear local stale data first
+                window.state.checklists = [];
                 window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
-                    console.log(`Synced checklists from Supabase: ${result?.added || 0} added, ${result?.updated || 0} updated`);
+                    console.log(`Synced checklists from Supabase: ${result?.added || 0} added, ${result?.updated || 0} updated, total: ${window.state.checklists.length}`);
                     // Always re-render after sync since cloud replaces local data
-                    const hash = window.location.hash;
-                    if (hash === '#checklists' && window.renderChecklistModule) window.renderChecklistModule();
-                    if (hash === '#planning' && window.renderPlanningModule) window.renderPlanningModule();
+                    if (window.renderChecklistLibrary) window.renderChecklistLibrary();
+                    if (window.location.hash === '#planning' && window.renderPlanningModule) window.renderPlanningModule();
                 }).catch(err => console.warn('Supabase checklist sync failed:', err));
 
                 // Sync settings from Supabase
