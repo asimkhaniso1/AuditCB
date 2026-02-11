@@ -4807,91 +4807,17 @@ window.reanalyzeStandard = async function (docId) {
     }
 
     try {
-        // Use stored extracted text if available
-        const docContext = doc.extractedText ? doc.extractedText.substring(0, 30000) : '';
+        // Reuse the main KB analysis function (which has batching, maxTokens, Annex A support)
+        await extractStandardClauses(doc, doc.name);
 
-        if (!docContext) {
-            console.warn('[Re-analyze] No extracted text found. AI will use general knowledge only.');
-        }
-
-        // Enhanced prompt with context-aware examples
-        const prompt = `You are an ISO standards expert. ${docContext ? 'Based on the source text below,' : ''} for the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL auditable clauses and sub-clauses with their requirement text.
-        
-        This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS".
-
-        IMPORTANT: Only include Clauses 4 through 10. Skip Clauses 1 (Scope), 2 (Normative References), and 3 (Terms and Definitions) — these are informative, NOT auditable requirements.
-
-${docContext ? `Source Text (first 30,000 characters):
-${docContext}
-
-` : ''}For each clause, include:
-- "clause": The clause number (e.g., "4.4.1", "5.1.1")
-- "title": The official clause title
-- "requirement": The main requirement statement  
-- "subRequirements": An array of the specific bullet points (a, b, c, d, etc.)
-- "checklistQuestions": 1-3 practical audit checklist questions
-
-Example format:
-[
-  {
-    "clause": "5.1.1",
-    "title": "Leadership and commitment - General",
-    "requirement": "Top management shall demonstrate leadership and commitment...",
-    "subRequirements": ["a) ...", "b) ..."],
-    "checklistQuestions": ["Has top management demonstrated commitment to...?"]
-  }
-]
-
-Return ONLY the JSON array.`;
-
-        const response = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const text = data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            // Parse JSON from response
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                // Filter out clauses 1-3 (non-requirement sections)
-                const newClauses = JSON.parse(jsonMatch[0]).filter(c => {
-                    const clauseNum = parseFloat(c.clause);
-                    return isNaN(clauseNum) || clauseNum >= 4;
-                });
-                doc.clauses = newClauses;
-
-                // Generate checklist questions from clauses
-                const checklist = [];
-                newClauses.forEach(c => {
-                    if (c.checklistQuestions) {
-                        c.checklistQuestions.forEach(q => checklist.push({ clause: c.clause, requirement: q }));
-                    } else {
-                        // Fallback: create a question from the requirement
-                        if (c.requirement) {
-                            checklist.push({ clause: c.clause, requirement: `Verify: ${c.requirement}` });
-                        }
-                    }
-                });
-                doc.generatedChecklist = checklist;
-                doc.checklistCount = checklist.length;
-
-                doc.status = 'ready';
-                doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-                window.saveData();
-
-                window.showNotification(`Re-analysis complete! ${newClauses.length} clauses extracted.`, 'success');
-
-                // Re-render and open the analysis view
-                if (typeof switchSettingsSubTab === 'function') {
-                    switchSettingsSubTab('knowledge', 'kb');
-                }
-                setTimeout(() => window.viewKBAnalysis(docId), 500);
-                return;
+        // After analysis, show result
+        if (doc.status === 'ready') {
+            window.showNotification(`Re-analysis complete! ${doc.clauses?.length || 0} clauses, ${doc.checklistCount || 0} questions extracted.`, 'success');
+            if (typeof switchSettingsSubTab === 'function') {
+                switchSettingsSubTab('knowledge', 'kb');
             }
+            setTimeout(() => window.viewKBAnalysis(docId), 500);
+            return;
         }
     } catch (error) {
         console.error('Re-analysis error:', error);
