@@ -4807,8 +4807,15 @@ window.reanalyzeStandard = async function (docId) {
     }
 
     try {
+        // Show progress overlay
+        window._kbProgress?.show('Starting re-analysis...', 5);
+
         // Reuse the main KB analysis function (which has batching, maxTokens, Annex A support)
         await extractStandardClauses(doc, doc.name);
+
+        // Complete progress
+        window._kbProgress?.show('✅ Re-analysis complete!', 100);
+        setTimeout(() => window._kbProgress?.hide(), 1500);
 
         // After analysis, show result
         if (doc.status === 'ready') {
@@ -4821,6 +4828,7 @@ window.reanalyzeStandard = async function (docId) {
         }
     } catch (error) {
         console.error('Re-analysis error:', error);
+        window._kbProgress?.hide();
     }
 
     // Fallback if AI fails - use built-in detailed clauses
