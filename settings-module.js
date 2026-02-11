@@ -3698,8 +3698,8 @@ RULES:
 1. Include ALL sub-clauses (e.g., 4.1, 4.2, 4.4.1, 5.1.1, 5.2.1, etc.)
 2. "requirement" = FULL text, not a summary
 3. "subRequirements" = ALL lettered items (a, b, c...) exactly as stated
-4. "checklistQuestions" = 1-3 practical questions
-5. Do NOT skip any clause
+4. "checklistQuestions" = 1-3 practical audit questions per clause
+5. IMPORTANT: Only include Clauses 4 through 10. Skip Clauses 1 (Scope), 2 (Normative References), and 3 (Terms and Definitions) — these are NOT auditable requirements.
 ${sourceSection}
 Return ONLY a valid JSON array:
 [{"clause":"4.1","title":"...","requirement":"...","subRequirements":["a)..."],"checklistQuestions":["...?"]}]
@@ -3728,6 +3728,11 @@ ONLY JSON. No markdown. No explanations.`;
             }
 
             if (batchClauses && batchClauses.length > 0) {
+                // Filter out clauses 1-3 (non-requirement sections in ISO standards)
+                batchClauses = batchClauses.filter(c => {
+                    const clauseNum = parseFloat(c.clause);
+                    return isNaN(clauseNum) || clauseNum >= 4;
+                });
                 allClauses = allClauses.concat(batchClauses);
                 batchClauses.forEach(c => {
                     (c.checklistQuestions || []).forEach(q => {
@@ -4343,7 +4348,12 @@ window.createChecklistFromKB = async function (docId) {
     };
 
     const clauseGroups = {};
-    doc.generatedChecklist.forEach(item => {
+    // Filter out clauses 1-3 (non-requirement sections in ISO standards)
+    const auditableItems = doc.generatedChecklist.filter(item => {
+        const clauseNum = parseFloat(item.clause);
+        return isNaN(clauseNum) || clauseNum >= 4;
+    });
+    auditableItems.forEach(item => {
         const parts = item.clause.split('.');
         const mainNum = parts[0] || 'General';
         // Sub-clause is first two parts (e.g., "4.1")
@@ -4433,7 +4443,7 @@ window.createChecklistFromKB = async function (docId) {
     }
 
     window.closeModal();
-    window.showNotification(`Created checklist "${newChecklist.name}" with ${doc.generatedChecklist.length} questions!`, 'success');
+    window.showNotification(`Created checklist "${newChecklist.name}" with ${auditableItems.length} questions (clauses 4-10)!`, 'success');
 };
 
 // Delete Knowledge Document
@@ -4780,9 +4790,11 @@ window.reanalyzeStandard = async function (docId) {
         }
 
         // Enhanced prompt with context-aware examples
-        const prompt = `You are an ISO standards expert. ${docContext ? 'Based on the source text below,' : ''} for the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL clauses and sub-clauses with their requirement text.
+        const prompt = `You are an ISO standards expert. ${docContext ? 'Based on the source text below,' : ''} for the standard "${doc.name}", provide a COMPREHENSIVE JSON array of ALL auditable clauses and sub-clauses with their requirement text.
         
         This is an ${systemTerm} standard. Ensure requirements refer to "${abbr}" and not "QMS".
+
+        IMPORTANT: Only include Clauses 4 through 10. Skip Clauses 1 (Scope), 2 (Normative References), and 3 (Terms and Definitions) — these are informative, NOT auditable requirements.
 
 ${docContext ? `Source Text (first 30,000 characters):
 ${docContext}
@@ -4792,6 +4804,7 @@ ${docContext}
 - "title": The official clause title
 - "requirement": The main requirement statement  
 - "subRequirements": An array of the specific bullet points (a, b, c, d, etc.)
+- "checklistQuestions": 1-3 practical audit checklist questions
 
 Example format:
 [
@@ -4799,7 +4812,8 @@ Example format:
     "clause": "5.1.1",
     "title": "Leadership and commitment - General",
     "requirement": "Top management shall demonstrate leadership and commitment...",
-    "subRequirements": ["a) ...", "b) ..."]
+    "subRequirements": ["a) ...", "b) ..."],
+    "checklistQuestions": ["Has top management demonstrated commitment to...?"]
   }
 ]
 
@@ -4818,18 +4832,23 @@ Return ONLY the JSON array.`;
             // Parse JSON from response
             const jsonMatch = text.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
-                const newClauses = JSON.parse(jsonMatch[0]);
+                // Filter out clauses 1-3 (non-requirement sections)
+                const newClauses = JSON.parse(jsonMatch[0]).filter(c => {
+                    const clauseNum = parseFloat(c.clause);
+                    return isNaN(clauseNum) || clauseNum >= 4;
+                });
                 doc.clauses = newClauses;
 
-                // Also generate checklist questions from clauses
+                // Generate checklist questions from clauses
                 const checklist = [];
                 newClauses.forEach(c => {
                     if (c.checklistQuestions) {
                         c.checklistQuestions.forEach(q => checklist.push({ clause: c.clause, requirement: q }));
-                    } else if (c.subRequirements && c.subRequirements.length > 0) {
-                        c.subRequirements.forEach(sub => checklist.push({ clause: c.clause, requirement: sub }));
-                    } else if (c.requirement) {
-                        checklist.push({ clause: c.clause, requirement: c.requirement });
+                    } else {
+                        // Fallback: create a question from the requirement
+                        if (c.requirement) {
+                            checklist.push({ clause: c.clause, requirement: `Verify: ${c.requirement}` });
+                        }
                     }
                 });
                 doc.generatedChecklist = checklist;
