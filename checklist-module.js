@@ -721,7 +721,7 @@ function renderChecklistEditor(checklistId) {
 
                     <div id="checklist-items-container" style="max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
                         <table style="width: 100%; margin: 0;">
-                            <thead style="position: sticky; top: 0; background: #f1f5f9;">
+                            <thead style="position: sticky; top: 0; background: #f1f5f9; color: #1e293b;">
                                 <tr>
                                     <th style="width: 120px; padding: 0.75rem;">Clause #</th>
                                     <th style="padding: 0.75rem;">Requirement</th>
@@ -1040,7 +1040,7 @@ function viewChecklistDetail(id) {
                 
                 ${checklist.clauses ? checklist.clauses.map((mainClause, idx) => `
                     <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-                        <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); cursor: pointer; user-select: none;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.querySelector('.accordion-icon').style.transform = this.nextElementSibling.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';">
+                        <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); color: #1e293b; cursor: pointer; user-select: none;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.querySelector('.accordion-icon').style.transform = this.nextElementSibling.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';">
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${mainClause.mainClause}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${mainClause.title}</span>
@@ -1048,7 +1048,7 @@ function viewChecklistDetail(id) {
                             </div>
                             <i class="fa-solid fa-chevron-down accordion-icon" style="transition: transform 0.3s; transform: ${idx === 0 ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
                         </div>
-                        <div class="accordion-content" style="display: ${idx === 0 ? 'block' : 'none'}; padding: 0; background: white;">
+                        <div class="accordion-content" style="display: ${idx === 0 ? 'block' : 'none'}; padding: 0; background: white; color: #334155;">
                             ${(mainClause.subClauses || []).map(sub => {
         // Check if sub-clause has nested items (new structure)
         const hasItems = sub.items && sub.items.length > 0;
@@ -1057,7 +1057,7 @@ function viewChecklistDetail(id) {
         if (hasItems) {
             return `
                                     <div style="border-bottom: 1px solid #f1f5f9;">
-                                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f0f9ff; cursor: pointer; user-select: none;" onclick="const c=this.nextElementSibling; c.style.display=c.style.display==='none'?'block':'none'; this.querySelector('.sub-icon').style.transform=c.style.display==='none'?'rotate(0deg)':'rotate(90deg)';">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f0f9ff; color: #1e293b; cursor: pointer; user-select: none;" onclick="const c=this.nextElementSibling; c.style.display=c.style.display==='none'?'block':'none'; this.querySelector('.sub-icon').style.transform=c.style.display==='none'?'rotate(0deg)':'rotate(90deg)';">
                                             <i class="fa-solid fa-caret-right sub-icon" style="transition: transform 0.2s; transform: rotate(90deg); color: #0369a1; font-size: 0.8rem;"></i>
                                             <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${sub.clause}</span>
                                             <span style="font-weight: 500; color: #334155;">${sub.title || ''}</span>
@@ -1070,7 +1070,7 @@ function viewChecklistDetail(id) {
                                                         <tr style="border-bottom: 1px solid #f8fafc;">
                                                             <td style="width: 40px; padding: 0.5rem 0.5rem 0.5rem 2.5rem; font-weight: 400; color: var(--text-secondary); font-size: 0.85rem;">${itemIdx + 1}</td>
                                                             <td style="width: 90px; padding: 0.5rem;"><span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 500; font-size: 0.8rem;">${item.clause}</span></td>
-                                                            <td style="padding: 0.5rem; font-size: 0.9rem;">${item.requirement}</td>
+                                                            <td style="padding: 0.5rem; font-size: 0.9rem; color: #334155;">${item.requirement}</td>
                                                         </tr>
                                                     `).join('')}
                                                 </tbody>
@@ -1082,7 +1082,7 @@ function viewChecklistDetail(id) {
             return `
                                     <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9;">
                                         <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; white-space: nowrap;">${sub.clause}</span>
-                                        <span style="font-size: 0.9rem;">${sub.requirement || ''}</span>
+                                        <span style="font-size: 0.9rem; color: #334155;">${sub.requirement || ''}</span>
                                     </div>`;
         }
     }).join('')}
