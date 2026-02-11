@@ -3671,35 +3671,48 @@ async function extractStandardClauses(doc, standardName) {
             ? `\nSOURCE TEXT:\n${sourceText}\n`
             : `\nNo source text available. Use your expert knowledge of ${standardName}.\n`;
 
-        // Split into two batches to avoid AI output token truncation
+        // Build batches based on standard type
         const batches = [
-            { label: 'Clauses 4-7', range: '4, 5, 6, and 7 (Context, Leadership, Planning, Support)' },
+            { label: 'Clauses 4-5', range: '4 and 5 (Context of the Organization, Leadership)' },
+            { label: 'Clauses 6-7', range: '6 and 7 (Planning, Support)' },
             { label: 'Clauses 8-10', range: '8, 9, and 10 (Operation, Performance Evaluation, Improvement)' }
         ];
+
+        // ISO 27001 has Annex A controls which are a major audit area
+        if (abbr === 'ISMS') {
+            batches.push(
+                { label: 'Annex A.5-A.6', range: 'Annex A.5 (Organizational Controls) and A.6 (People Controls)', isAnnex: true },
+                { label: 'Annex A.7-A.8', range: 'Annex A.7 (Physical Controls) and A.8 (Technological Controls)', isAnnex: true }
+            );
+        }
 
         let allClauses = [];
         let allChecklist = [];
 
         for (let bi = 0; bi < batches.length; bi++) {
             const batch = batches[bi];
-            const batchStartPct = bi === 0 ? 20 : 55;
-            const batchEndPct = bi === 0 ? 50 : 90;
+            const batchStartPct = Math.round(20 + (bi / batches.length) * 70);
+            const batchEndPct = Math.round(20 + ((bi + 1) / batches.length) * 70);
 
-            console.log(`[KB Analysis] Extracting ${batch.label}...`);
-            window._kbProgress?.show(`AI extracting ${batch.label}...`, batchStartPct);
+            console.log(`[KB Analysis] Extracting ${batch.label} (batch ${bi + 1}/${batches.length})...`);
+            window._kbProgress?.show(`AI extracting ${batch.label}... (${bi + 1}/${batches.length})`, batchStartPct);
 
-            const prompt = `You are an expert ISO Lead Auditor. Extract audit requirements from "${standardName}" (${systemTerm}).
+            const prompt = `You are an expert ISO Lead Auditor with 20+ years experience. Extract DETAILED audit requirements from "${standardName}" (${systemTerm}).
 Use "${abbr}" terminology throughout.
 
-TASK: Extract EVERY auditable requirement from Clauses ${batch.range}${sourceText ? ' of the source text' : ''}.
-Generate 1-3 practical audit checklist questions per clause.
+TASK: Extract EVERY auditable requirement from ${batch.range}${sourceText ? ' of the source text' : ''}.
+Generate 3-5 practical audit checklist questions per clause that a lead auditor would use during a certification audit.
 
 RULES:
-1. Include ALL sub-clauses (e.g., 4.1, 4.2, 4.4.1, 5.1.1, 5.2.1, etc.)
-2. "requirement" = FULL text, not a summary
-3. "subRequirements" = ALL lettered items (a, b, c...) exactly as stated
-4. "checklistQuestions" = 1-3 practical audit questions per clause
-5. IMPORTANT: Only include Clauses 4 through 10. Skip Clauses 1 (Scope), 2 (Normative References), and 3 (Terms and Definitions) — these are NOT auditable requirements.
+1. Include ALL sub-clauses down to the deepest level (e.g., 4.1, 4.2, 4.3, 4.4, 5.1, 5.1.1, 5.1.2, 5.2.1, 5.2.2, 5.3, 6.1.1, 6.1.2, 6.1.3, etc.)
+2. "requirement" = FULL requirement text verbatim, not a summary
+3. "subRequirements" = ALL lettered/numbered items (a, b, c...) exactly as stated in the standard
+4. "checklistQuestions" = 3-5 specific, actionable audit questions per clause. Questions should cover:
+   - Evidence review (documented information, records, procedures)
+   - Implementation verification (processes, controls, practices)
+   - Effectiveness evaluation (results, monitoring, improvement)
+5. IMPORTANT: Only include auditable requirement clauses. Skip any introductory/informative text.
+6. Be THOROUGH — do not skip any sub-clause or requirement.
 ${sourceSection}
 Return ONLY a valid JSON array:
 [{"clause":"4.1","title":"...","requirement":"...","subRequirements":["a)..."],"checklistQuestions":["...?"]}]
@@ -4344,6 +4357,8 @@ window.createChecklistFromKB = async function (docId) {
     const mainClauseTitles = {
         '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning',
         '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement',
+        'A.5': 'Organizational Controls', 'A.6': 'People Controls',
+        'A.7': 'Physical Controls', 'A.8': 'Technological Controls',
         'A': 'Annex A Controls', 'General': 'General Requirements'
     };
 
@@ -4355,9 +4370,16 @@ window.createChecklistFromKB = async function (docId) {
     });
     auditableItems.forEach(item => {
         const parts = item.clause.split('.');
-        const mainNum = parts[0] || 'General';
-        // Sub-clause is first two parts (e.g., "4.1")
-        const subNum = parts.length >= 2 ? parts.slice(0, 2).join('.') : mainNum;
+        let mainNum, subNum;
+
+        if (parts[0] === 'A' && parts.length >= 2) {
+            // Annex A: group by A.5, A.6, A.7, A.8
+            mainNum = `A.${parts[1]}`;
+            subNum = parts.length >= 3 ? `A.${parts[1]}.${parts[2]}` : mainNum;
+        } else {
+            mainNum = parts[0] || 'General';
+            subNum = parts.length >= 2 ? parts.slice(0, 2).join('.') : mainNum;
+        }
 
         if (!clauseGroups[mainNum]) {
             clauseGroups[mainNum] = {
