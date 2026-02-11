@@ -172,11 +172,12 @@ Example:
     },
 
     // Call Vercel Serverless Function with Fallback Logic
-    callProxyAPI: async (prompt) => {
+    callProxyAPI: async (prompt, options = {}) => {
         // Updated model list - gemini-2.0-flash is the current stable model
         const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
         let lastError;
         let proxyFailed = false;
+        const maxTokens = options.maxTokens || 65536;
 
         if (!window.navigator.onLine) {
             throw new Error('You appear to be offline. Please check your internet connection.');
@@ -185,11 +186,11 @@ Example:
         // First, try the serverless proxy (for Vercel deployment)
         for (const model of models) {
             try {
-                console.log(`Attempting AI generation with model: ${model} via proxy`);
+                console.log(`Attempting AI generation with model: ${model} via proxy (maxTokens: ${maxTokens})`);
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, model })
+                    body: JSON.stringify({ prompt, model, maxTokens })
                 });
 
                 if (!response.ok) {

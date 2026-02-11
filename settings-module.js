@@ -3721,8 +3721,8 @@ ${batchSource}
 Return ONLY a valid JSON array. No markdown. No explanation:
 [{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?","Q3?"]}]`;
 
-            const text = await window.AI_SERVICE.callProxyAPI(prompt);
-            console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars`);
+            const text = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: 65536 });
+            console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars (first 200: ${text.substring(0, 200)}...)`);
             window._kbProgress?.show(`Parsing ${batch.label} response...`, batchEndPct - 5);
 
             let jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -3755,7 +3755,8 @@ Return ONLY a valid JSON array. No markdown. No explanation:
                     });
                 });
                 window._kbProgress?.show(`${batch.label}: ${batchClauses.length} clauses extracted ✓`, batchEndPct);
-                console.log(`[KB Analysis] ${batch.label}: ${batchClauses.length} clauses`);
+                const batchQs = batchClauses.reduce((sum, c) => sum + (c.checklistQuestions?.length || 0), 0);
+                console.log(`[KB Analysis] ${batch.label}: ${batchClauses.length} clauses, ${batchQs} questions (running total: ${allChecklist.length} Qs)`);
             } else {
                 window._kbProgress?.show(`${batch.label}: extraction failed ✗`, batchEndPct);
                 console.warn(`[KB Analysis] ${batch.label}: extraction failed`);
