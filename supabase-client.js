@@ -1774,46 +1774,29 @@ const SupabaseClient = {
 
             if (error) throw error;
 
-            if (!data || !data.length) {
-                return { added: 0, updated: 0 };
-            }
+            // Supabase is the source of truth — replace local checklists entirely
+            const cloudChecklists = (data || []).map(checklist => ({
+                id: checklist.id,
+                name: checklist.name,
+                standard: checklist.standard,
+                type: checklist.type,
+                auditType: checklist.audit_type,
+                auditScope: checklist.audit_scope,
+                createdBy: checklist.created_by,
+                clauses: checklist.clauses,
+                createdAt: checklist.created_at,
+                updatedAt: checklist.updated_at
+            }));
 
-            const localChecklists = window.state.checklists || [];
-            let added = 0, updated = 0;
+            const localCount = (window.state.checklists || []).length;
+            const cloudCount = cloudChecklists.length;
 
-            data.forEach(checklist => {
-                const existing = localChecklists.find(c => c.id === checklist.id);
-                if (existing) {
-                    // Update existing - map Supabase fields back to app fields
-                    existing.name = checklist.name;
-                    existing.standard = checklist.standard;
-                    existing.type = checklist.type;
-                    existing.auditType = checklist.audit_type;
-                    existing.auditScope = checklist.audit_scope;
-                    existing.createdBy = checklist.created_by;
-                    existing.clauses = checklist.clauses;
-                    updated++;
-                } else {
-                    // Add new - map Supabase fields to app fields
-                    localChecklists.push({
-                        id: checklist.id,
-                        name: checklist.name,
-                        standard: checklist.standard,
-                        type: checklist.type,
-                        auditType: checklist.audit_type,
-                        auditScope: checklist.audit_scope,
-                        createdBy: checklist.created_by,
-                        clauses: checklist.clauses,
-                        createdAt: checklist.created_at,
-                        updatedAt: checklist.updated_at
-                    });
-                    added++;
-                }
-            });
-
-            window.state.checklists = localChecklists;
+            window.state.checklists = cloudChecklists;
             window.saveState();
-            Logger.info(`Synced checklists from Supabase: ${added} added, ${updated} updated`);
+
+            const added = Math.max(0, cloudCount - localCount);
+            const updated = Math.min(localCount, cloudCount);
+            Logger.info(`Synced checklists from Supabase: ${cloudCount} cloud, replaced ${localCount} local`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch checklists from Supabase:', error);

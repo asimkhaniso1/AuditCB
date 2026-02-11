@@ -164,7 +164,46 @@ window.generateCertificatesFromStandards = function (clientId) {
 window.updateCertField = function (clientId, certIndex, field, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) client.certificates[certIndex][field] = value; };
 window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
 window.saveCertificateDetails = function (clientId) { if (window.saveData) window.saveData(); if (window.showNotification) window.showNotification('Saved', 'success'); };
-// getClientSettingsHTML is defined in clients-module.js with full Archive/Delete/ID UI — do not override here
+window.getClientSettingsHTML = function (client) {
+    return `
+    <div class="fade-in">
+        <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
+            <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i> Client Settings
+        </h3>
+        <div class="card" style="border-left: 4px solid var(--danger-color);">
+            <h4 class="text-danger" style="margin-top: 0;">Danger Zone</h4>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #fff1f2; border-radius: 8px;">
+                    <div>
+                        <strong style="color: #991b1b;">Archive Client</strong>
+                        <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Move to archives. Data is preserved but hidden from active lists.</p>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.archiveClient('${client.id}')">
+                        <i class="fa-solid fa-box-archive"></i> Archive
+                    </button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #fee2e2; border-radius: 8px;">
+                    <div>
+                        <strong style="color: #dc2626;">Delete Client</strong>
+                        <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Permanently remove this client and ALL data. Cannot be undone.</p>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="window.deleteClient('${client.id}')">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 1.5rem;">
+            <h4>Information</h4>
+            <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
+                <p style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong>Client ID:</strong> <code>${client.id}</code></p>
+                <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${client.id}').then(() => window.showNotification('ID Copied', 'success'))">
+                    <i class="fa-solid fa-copy"></i> Copy ID
+                </button>
+            </div>
+        </div>
+    </div>`;
+};
 
 // ============================================
 // 2. HTML GENERATORS (EXTRACTED)

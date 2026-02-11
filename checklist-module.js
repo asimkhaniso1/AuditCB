@@ -649,7 +649,15 @@ function renderChecklistEditor(checklistId) {
         if (checklist.clauses) {
             checklist.clauses.forEach(main => {
                 (main.subClauses || []).forEach(sub => {
-                    existingItems.push({ clause: sub.clause, requirement: sub.requirement });
+                    if (sub.items && sub.items.length > 0) {
+                        // Nested items structure (KB-generated)
+                        sub.items.forEach(item => {
+                            existingItems.push({ clause: item.clause || sub.clause, requirement: item.requirement || '' });
+                        });
+                    } else {
+                        // Flat structure
+                        existingItems.push({ clause: sub.clause, requirement: sub.requirement || '' });
+                    }
                 });
             });
         } else if (checklist.items) {
