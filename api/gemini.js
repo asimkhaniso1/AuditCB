@@ -65,7 +65,7 @@ export default async function handler(req, res) {
                         parts: [{ text: prompt }]
                     }],
                     generationConfig: {
-                        maxOutputTokens: req.body.maxTokens || 8192,
+                        maxOutputTokens: req.body.maxTokens || 65536,
                         temperature: req.body.temperature ?? 0.4
                     }
                 })
