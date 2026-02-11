@@ -3695,6 +3695,12 @@ async function extractStandardClauses(doc, standardName) {
             const batchStartPct = Math.round(15 + (bi / batches.length) * 80);
             const batchEndPct = Math.round(15 + ((bi + 1) / batches.length) * 80);
 
+            // Delay between batches to avoid API rate limiting (429)
+            if (bi > 0) {
+                window._kbProgress?.show(`Waiting before next batch... (avoiding rate limits)`, batchStartPct - 2);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+
             console.log(`[KB Analysis] Extracting ${batch.label} (batch ${bi + 1}/${batches.length})...`);
             window._kbProgress?.show(`AI extracting ${batch.label}... (${bi + 1}/${batches.length})`, batchStartPct);
 

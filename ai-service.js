@@ -173,11 +173,11 @@ Example:
 
     // Call Vercel Serverless Function with Fallback Logic
     callProxyAPI: async (prompt, options = {}) => {
-        // Updated model list - gemini-2.0-flash is the current stable model
-        const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
+        // Model fallback list — use current, supported models only
+        const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
         let lastError;
         let proxyFailed = false;
-        const maxTokens = options.maxTokens || 65536;
+        const maxTokens = options.maxTokens || 32768;
 
         if (!window.navigator.onLine) {
             throw new Error('You appear to be offline. Please check your internet connection.');
