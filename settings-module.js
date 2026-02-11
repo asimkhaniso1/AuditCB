@@ -3666,38 +3666,24 @@ async function extractStandardClauses(doc, standardName) {
     }
 
     try {
-        const fullSourceText = docContent.length > 100 ? docContent : '';
+        // Send generous source text to each batch
+        const sourceText = docContent.length > 100 ? docContent.substring(0, 50000) : '';
+        const sourceSection = sourceText
+            ? `\nSOURCE TEXT:\n${sourceText}\n`
+            : `\nNo source text available. Use your comprehensive expert knowledge of ${standardName}.\n`;
 
-        // Helper: extract relevant section of source text for a batch
-        function getSourceSlice(text, keywords, maxLen = 15000) {
-            if (!text || text.length < 200) return '';
-            // Try to find the section by keyword
-            let bestStart = 0;
-            for (const kw of keywords) {
-                const idx = text.toLowerCase().indexOf(kw.toLowerCase());
-                if (idx > 0) { bestStart = Math.max(0, idx - 200); break; }
-            }
-            return text.substring(bestStart, bestStart + maxLen);
-        }
-
-        // Each clause gets its own batch for maximum extraction depth
+        // Broader batches = more complete output per batch
         const batches = [
-            { label: 'Clause 4', range: 'Clause 4 - Context of the Organization (all sub-clauses: 4.1, 4.2, 4.3, 4.4)', keywords: ['clause 4', '4 context', '4.1 understanding'] },
-            { label: 'Clause 5', range: 'Clause 5 - Leadership (all sub-clauses: 5.1, 5.1.1, 5.1.2, 5.2, 5.2.1, 5.2.2, 5.3)', keywords: ['clause 5', '5 leadership', '5.1 leadership'] },
-            { label: 'Clause 6', range: 'Clause 6 - Planning (all sub-clauses: 6.1, 6.1.1, 6.1.2, 6.1.3, 6.2, 6.3)', keywords: ['clause 6', '6 planning', '6.1 actions'] },
-            { label: 'Clause 7', range: 'Clause 7 - Support (all sub-clauses: 7.1, 7.2, 7.3, 7.4, 7.5, 7.5.1, 7.5.2, 7.5.3)', keywords: ['clause 7', '7 support', '7.1 resources'] },
-            { label: 'Clause 8', range: 'Clause 8 - Operation (all sub-clauses: 8.1, 8.2, 8.3)', keywords: ['clause 8', '8 operation', '8.1 operational'] },
-            { label: 'Clause 9', range: 'Clause 9 - Performance Evaluation (all sub-clauses: 9.1, 9.1.1, 9.1.2, 9.2, 9.2.1, 9.2.2, 9.3, 9.3.1, 9.3.2, 9.3.3)', keywords: ['clause 9', '9 performance', '9.1 monitoring'] },
-            { label: 'Clause 10', range: 'Clause 10 - Improvement (all sub-clauses: 10.1, 10.2)', keywords: ['clause 10', '10 improvement', '10.1 continual'] }
+            { label: 'Clauses 4-6', range: 'Clauses 4 (Context), 5 (Leadership), and 6 (Planning) — include ALL sub-clauses: 4.1, 4.2, 4.3, 4.4, 5.1, 5.1.1, 5.1.2, 5.2, 5.2.1, 5.2.2, 5.3, 6.1, 6.1.1, 6.1.2, 6.1.3, 6.2, 6.3', useSource: true },
+            { label: 'Clauses 7-8', range: 'Clauses 7 (Support) and 8 (Operation) — include ALL sub-clauses: 7.1, 7.2, 7.3, 7.4, 7.5, 7.5.1, 7.5.2, 7.5.3, 8.1, 8.2, 8.3', useSource: true },
+            { label: 'Clauses 9-10', range: 'Clauses 9 (Performance Evaluation) and 10 (Improvement) — include ALL sub-clauses: 9.1, 9.1.1, 9.1.2, 9.2, 9.2.1, 9.2.2, 9.3, 9.3.1, 9.3.2, 9.3.3, 10.1, 10.2', useSource: true }
         ];
 
-        // ISO 27001 Annex A — each section gets its own batch
+        // ISO 27001 Annex A — comprehensive controls extraction
         if (abbr === 'ISMS') {
             batches.push(
-                { label: 'Annex A.5', range: 'Annex A.5 - Organizational Controls (A.5.1 through A.5.37, all 37 controls)', keywords: ['annex a', 'a.5', 'organizational controls'], isAnnex: true },
-                { label: 'Annex A.6', range: 'Annex A.6 - People Controls (A.6.1 through A.6.8, all 8 controls)', keywords: ['a.6', 'people controls'], isAnnex: true },
-                { label: 'Annex A.7', range: 'Annex A.7 - Physical Controls (A.7.1 through A.7.14, all 14 controls)', keywords: ['a.7', 'physical controls'], isAnnex: true },
-                { label: 'Annex A.8', range: 'Annex A.8 - Technological Controls (A.8.1 through A.8.34, all 34 controls)', keywords: ['a.8', 'technological controls'], isAnnex: true }
+                { label: 'Annex A.5-A.6', range: 'ISO 27001:2022 Annex A controls: A.5 Organizational Controls (ALL 37 controls: A.5.1 Policies for information security, A.5.2 Information security roles, A.5.3 Segregation of duties, A.5.4 Management responsibilities, A.5.5 Contact with authorities, A.5.6 Contact with special interest groups, A.5.7 Threat intelligence, A.5.8 Information security in project management, A.5.9-A.5.37 and all remaining) AND A.6 People Controls (ALL 8 controls: A.6.1-A.6.8)', useSource: false },
+                { label: 'Annex A.7-A.8', range: 'ISO 27001:2022 Annex A controls: A.7 Physical Controls (ALL 14 controls: A.7.1-A.7.14) AND A.8 Technological Controls (ALL 34 controls: A.8.1-A.8.34 including A.8.1 User endpoint devices, A.8.2 Privileged access rights, A.8.3 Information access restriction, A.8.4 Access to source code, A.8.5-A.8.34)', useSource: false }
             );
         }
 
@@ -3712,32 +3698,28 @@ async function extractStandardClauses(doc, standardName) {
             console.log(`[KB Analysis] Extracting ${batch.label} (batch ${bi + 1}/${batches.length})...`);
             window._kbProgress?.show(`AI extracting ${batch.label}... (${bi + 1}/${batches.length})`, batchStartPct);
 
-            // Get relevant source text for this batch
-            const batchSourceText = getSourceSlice(fullSourceText, batch.keywords);
-            const sourceSection = batchSourceText
-                ? `\nSOURCE TEXT (relevant section):\n${batchSourceText}\n`
-                : `\nNo source text available. Use your comprehensive expert knowledge of ${standardName}.\n`;
+            const batchSource = batch.useSource ? sourceSection : `\nUse your expert knowledge of ${standardName}. Be comprehensive — list EVERY control.\n`;
 
             const prompt = `You are an expert ISO Lead Auditor with 20+ years experience in ${systemTerm} certification audits.
 
 TASK: Extract EVERY auditable requirement from ${batch.range} of "${standardName}".
-For EACH sub-clause, generate 3-5 specific audit checklist questions.
 
-CRITICAL RULES:
-1. Extract ALL sub-clauses — do NOT skip any. Go to the deepest level (e.g., 4.1, 4.2, 4.3, 4.4, 5.1.1, 5.1.2, 5.2.1, 5.2.2, etc.)
-2. "requirement" = FULL requirement text from the standard, verbatim — not a summary
-3. "subRequirements" = ALL lettered items (a, b, c...) exactly as written
-4. "checklistQuestions" = MINIMUM 3 questions per sub-clause. Questions must be specific and actionable:
-   - "Can you show evidence of...?" (documented information, records)
-   - "How does the organization ensure...?" (implementation)
-   - "How is effectiveness of ... measured/monitored?" (performance)
-   - "What process exists for...?" (procedures)
-   - "Can you demonstrate that...?" (verification)
-5. Use "${abbr}" terminology, NOT "QMS"
-6. Skip Clauses 1, 2, 3 (non-auditable)
-${sourceSection}
-Return ONLY a valid JSON array. No markdown fences, no explanation:
-[{"clause":"X.Y","title":"...","requirement":"Full requirement text...","subRequirements":["a) ..."],"checklistQuestions":["Question 1?","Question 2?","Question 3?"]}]`;
+REQUIREMENTS — generate a LARGE, COMPREHENSIVE output:
+1. Include EVERY sub-clause at the deepest level. Do NOT summarize or skip any.
+2. "requirement" = FULL requirement text verbatim from the standard
+3. "subRequirements" = ALL lettered items (a, b, c...) exactly as stated
+4. "checklistQuestions" = Generate 3-5 specific audit questions per sub-clause:
+   - Evidence: "Can you show documented evidence of...?"
+   - Implementation: "How does the organization implement...?"
+   - Effectiveness: "How is the effectiveness of ... evaluated?"
+   - Compliance: "Does the organization conform to...?"
+   - Records: "What records are maintained for...?"
+5. Use "${abbr}" terminology throughout
+6. IMPORTANT: Skip clauses 1, 2, 3 (non-auditable informative sections)
+7. Your output should contain MANY entries — typically 8-15 sub-clauses per main clause
+${batchSource}
+Return ONLY a valid JSON array. No markdown. No explanation:
+[{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?","Q3?"]}]`;
 
             const text = await window.AI_SERVICE.callProxyAPI(prompt);
             console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars`);
