@@ -4326,7 +4326,7 @@ window.handleReanalyze = function (docId, docType) {
 };
 
 // Create a checklist from KB extracted questions
-window.createChecklistFromKB = function (docId) {
+window.createChecklistFromKB = async function (docId) {
     const kb = window.state.knowledgeBase;
     const doc = kb.standards.find(d => d.id == docId);
     if (!doc || !doc.generatedChecklist || doc.generatedChecklist.length === 0) {
@@ -4410,6 +4410,27 @@ window.createChecklistFromKB = function (docId) {
     if (!window.state.checklists) window.state.checklists = [];
     window.state.checklists.push(newChecklist);
     window.saveData();
+
+    // Sync to Supabase checklists table
+    if (window.SupabaseClient?.isInitialized) {
+        try {
+            await window.SupabaseClient.client
+                .from('checklists')
+                .upsert({
+                    id: String(newChecklist.id),
+                    name: newChecklist.name,
+                    standard: newChecklist.standard,
+                    type: newChecklist.type,
+                    clauses: newChecklist.clauses,
+                    created_by: newChecklist.createdBy,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
+            console.log('[KB] Checklist synced to Supabase:', newChecklist.name);
+        } catch (dbErr) {
+            console.error('[KB] Failed to sync checklist to Supabase:', dbErr);
+        }
+    }
 
     window.closeModal();
     window.showNotification(`Created checklist "${newChecklist.name}" with ${doc.generatedChecklist.length} questions!`, 'success');
