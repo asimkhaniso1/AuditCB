@@ -4861,33 +4861,70 @@ window.viewKBAnalysis = function (docId) {
         </div>
     `;
 
-    // After analysis, show result
-    if (doc.status === 'ready') {
-        window.showNotification(`Re-analysis complete! ${doc.clauses?.length || 0} clauses, ${doc.checklistCount || 0} questions extracted.`, 'success');
-        if (typeof switchSettingsSubTab === 'function') {
-            switchSettingsSubTab('knowledge', 'kb');
-        }
-        setTimeout(() => window.viewKBAnalysis(docId), 500);
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
+
+// Re-analyze standard with AI for more detailed extraction
+window.reanalyzeStandard = async function (docId, mode = 'standard') {
+    const kb = window.state.knowledgeBase;
+    const doc = kb.standards.find(d => d.id == docId);
+    if (!doc) {
+        console.warn('Document not found for re-analysis:', docId);
         return;
     }
-} catch (error) {
-    console.error('Re-analysis error:', error);
-    window._kbProgress?.hide();
-}
 
-// Fallback if AI fails - use built-in detailed clauses
-doc.clauses = getBuiltInClauses(doc.name);
-doc.status = 'ready';
-doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-window.saveData();
+    // Close the current modal
+    window.closeModal();
 
-window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
-if (typeof switchSettingsSubTab === 'function') {
-    switchSettingsSubTab('knowledge', 'kb');
-} else {
-    renderSettings();
-}
-setTimeout(() => window.viewKBAnalysis(docId), 500);
+    // Show processing notification
+    window.showNotification(`Re-analyzing ${doc.name} (${mode} mode)...`, 'info');
+
+    // Update status to processing
+    doc.status = 'processing';
+    window.saveData();
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    }
+
+    try {
+        // Show progress overlay
+        window._kbProgress?.show(`Starting ${mode} re-analysis...`, 5);
+
+        // Reuse the main KB analysis function with selected mode
+        await extractStandardClauses(doc, doc.name, mode);
+
+        // Complete progress
+        window._kbProgress?.show('✅ Re-analysis complete!', 100);
+        setTimeout(() => window._kbProgress?.hide(), 1500);
+
+        // After analysis, show result
+        if (doc.status === 'ready') {
+            window.showNotification(`Re-analysis complete! ${doc.clauses?.length || 0} clauses, ${doc.checklistCount || 0} questions extracted.`, 'success');
+            if (typeof switchSettingsSubTab === 'function') {
+                switchSettingsSubTab('knowledge', 'kb');
+            }
+            setTimeout(() => window.viewKBAnalysis(docId), 500);
+            return;
+        }
+    } catch (error) {
+        console.error('Re-analysis error:', error);
+        window._kbProgress?.hide();
+    }
+
+    // Fallback if AI fails - use built-in detailed clauses
+    doc.clauses = getBuiltInClauses(doc.name);
+    doc.status = 'ready';
+    doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+    window.saveData();
+
+    window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
+    if (typeof switchSettingsSubTab === 'function') {
+        switchSettingsSubTab('knowledge', 'kb');
+    } else {
+        renderSettings();
+    }
+    setTimeout(() => window.viewKBAnalysis(docId), 500);
 };
 
 // ============================================
