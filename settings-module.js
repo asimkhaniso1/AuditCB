@@ -3743,7 +3743,7 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
     // ---- MODE-DEPENDENT CONFIGURATION ----
     const modeConfig = {
         short: {
-            sourceLimit: 10000,
+            sourceLimit: 100000, // Increased from 10k to ensure full doc context
             maxTokens: 8192,
             questionsPerClause: '1',
             questionsInstruction: '1 practical audit checklist question',
@@ -3753,7 +3753,7 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
             ]
         },
         standard: {
-            sourceLimit: 25000,
+            sourceLimit: 200000, // Increased from 25k to cover full ISO standard
             maxTokens: 16384,
             questionsPerClause: '1-2',
             questionsInstruction: '1-2 practical audit checklist questions',
@@ -3764,7 +3764,7 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
             ]
         },
         comprehensive: {
-            sourceLimit: 50000,
+            sourceLimit: 500000, // Increased from 50k to cover largest documents
             maxTokens: 32768,
             questionsPerClause: '3-5',
             questionsInstruction: '3-5 specific audit questions per sub-clause covering evidence, implementation, effectiveness, compliance, and records',
@@ -3830,7 +3830,7 @@ REQUIREMENTS:
 5. Use "${abbr}" terminology throughout
 6. IMPORTANT: Skip clauses 1, 2, 3 (non-auditable informative sections)
 ${batchSource}
-Return ONLY a valid JSON array. No markdown. No explanation:
+Return valid JSON only. No markdown formatting. No code blocks. No introductory text.
 [{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?"]}]`;
 
             const text = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: config.maxTokens });
