@@ -3419,6 +3419,73 @@ window.uploadKnowledgeDoc = function (type) {
 
     window.openModal();
 };
+// --- KB Analysis Mode Picker ---
+window.showAnalysisModeModal = function (docId, isReanalyze = false) {
+    const modalContent = document.getElementById('modal-body-content');
+    if (!modalContent) return;
+
+    modalContent.innerHTML = `
+        <div style="text-align:center;margin-bottom:1.5rem;">
+            <div style="font-size:1.5rem;margin-bottom:0.25rem;">🔍</div>
+            <h3 style="margin:0;font-size:1.2rem;color:#1e293b;">Choose Analysis Depth</h3>
+            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:#64748b;">Select how thorough the AI extraction should be</p>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+            <div onclick="window._startAnalysis('${docId}', 'short', ${isReanalyze})" 
+                 style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;"
+                 onmouseover="this.style.borderColor='#f59e0b';this.style.background='#fffbeb';this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff';this.style.transform='none'">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem;">⚡</div>
+                <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Short</div>
+                <div style="font-size:0.75rem;color:#64748b;line-height:1.5;">
+                    <div>~30 questions</div>
+                    <div>1 API call</div>
+                    <div style="color:#f59e0b;font-weight:600;">~10 seconds</div>
+                </div>
+            </div>
+            <div onclick="window._startAnalysis('${docId}', 'standard', ${isReanalyze})" 
+                 style="cursor:pointer;border:2px solid #3b82f6;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#eff6ff;position:relative;"
+                 onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(59,130,246,0.3)'"
+                 onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;font-size:0.65rem;padding:2px 8px;border-radius:4px;font-weight:600;">RECOMMENDED</div>
+                <div style="font-size:1.5rem;margin-bottom:0.5rem;">📋</div>
+                <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Standard</div>
+                <div style="font-size:0.75rem;color:#64748b;line-height:1.5;">
+                    <div>~80 questions</div>
+                    <div>2 API calls</div>
+                    <div style="color:#3b82f6;font-weight:600;">~25 seconds</div>
+                </div>
+            </div>
+            <div onclick="window._startAnalysis('${docId}', 'comprehensive', ${isReanalyze})" 
+                 style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;"
+                 onmouseover="this.style.borderColor='#8b5cf6';this.style.background='#f5f3ff';this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff';this.style.transform='none'">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem;">🔬</div>
+                <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Comprehensive</div>
+                <div style="font-size:0.75rem;color:#64748b;line-height:1.5;">
+                    <div>200+ questions</div>
+                    <div>3-5 API calls</div>
+                    <div style="color:#8b5cf6;font-weight:600;">~60 seconds</div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <button class="btn btn-secondary btn-sm" onclick="window.closeModal()">Cancel</button>
+        </div>
+    `;
+    document.getElementById('modal-title').textContent = isReanalyze ? 'Re-analyze Standard' : 'Analyze Standard';
+    window.openModal();
+};
+
+// Internal: Start analysis with selected mode
+window._startAnalysis = async function (docId, mode, isReanalyze) {
+    window.closeModal();
+    if (isReanalyze) {
+        window.reanalyzeStandard(docId, mode);
+    } else {
+        window.analyzeStandard(docId, mode);
+    }
+};
 
 // Analyze standard function (triggered by "Analyze Now" button)
 // --- KB Analysis Progress Overlay ---
@@ -3465,11 +3532,17 @@ window._kbProgress = {
     }
 };
 
-window.analyzeStandard = async function (docId) {
+window.analyzeStandard = async function (docId, mode) {
     const kb = window.state.knowledgeBase;
     const doc = kb.standards.find(d => d.id == docId);
     if (!doc) {
         window.showNotification('Standard not found', 'error');
+        return;
+    }
+
+    // If no mode specified, show the mode picker
+    if (!mode) {
+        window.showAnalysisModeModal(docId, false);
         return;
     }
 
@@ -3483,10 +3556,10 @@ window.analyzeStandard = async function (docId) {
     }
 
     // Show progress overlay
-    window._kbProgress.show('Preparing analysis...', 5);
+    window._kbProgress.show(`Preparing ${mode} analysis...`, 5);
 
-    // Extract clauses
-    await extractStandardClauses(doc, doc.name);
+    // Extract clauses with selected mode
+    await extractStandardClauses(doc, doc.name, mode);
 
     // Complete
     window._kbProgress.show('✅ Analysis complete!', 100);
@@ -3500,7 +3573,7 @@ window.analyzeStandard = async function (docId) {
     }
 
     if (doc.status === 'ready') {
-        window.showNotification(`${doc.name} analysis complete! ${doc.clauses ? doc.clauses.length : 0} clauses indexed.`, 'success');
+        window.showNotification(`${doc.name} analysis complete! ${doc.clauses ? doc.clauses.length : 0} clauses, ${doc.checklistCount || 0} questions.`, 'success');
     } else {
         window.showNotification(`Analysis complete. Using fallback clause data.`, 'info');
     }
@@ -3600,7 +3673,7 @@ window.analyzeDocument = async function (type, docId) {
 
 
 // One-time clause extraction from standard
-async function extractStandardClauses(doc, standardName) {
+async function extractStandardClauses(doc, standardName, mode = 'standard') {
     // Detect standard type based on the name
     const stdLower = standardName.toLowerCase();
     let systemTerm, abbr;
@@ -3631,7 +3704,7 @@ async function extractStandardClauses(doc, standardName) {
         abbr = 'MS';
     }
 
-    console.log(`[KB Analysis] Starting AI extraction for: ${standardName} (${abbr})`);
+    console.log(`[KB Analysis] Starting ${mode.toUpperCase()} AI extraction for: ${standardName} (${abbr})`);
 
     // Fix: Define docContent from the document object
     let docContent = doc.extractedText || '';
@@ -3665,27 +3738,64 @@ async function extractStandardClauses(doc, standardName) {
         window._kbProgress?.show(`Text extracted: ${Math.round(docContent.length / 1000)}K chars`, 15);
     }
 
+    // ---- MODE-DEPENDENT CONFIGURATION ----
+    const modeConfig = {
+        short: {
+            sourceLimit: 10000,
+            maxTokens: 8192,
+            questionsPerClause: '1',
+            questionsInstruction: '1 practical audit checklist question',
+            batchDelay: 0,
+            batches: [
+                { label: 'Clauses 4-10', range: 'ALL auditable clauses 4 through 10 — include main sub-clauses only (e.g., 4.1, 4.2, 5.1, 5.2, 6.1, 7.1, 8.1, 9.1, 10.1)', useSource: true }
+            ]
+        },
+        standard: {
+            sourceLimit: 25000,
+            maxTokens: 16384,
+            questionsPerClause: '1-2',
+            questionsInstruction: '1-2 practical audit checklist questions',
+            batchDelay: 2000,
+            batches: [
+                { label: 'Clauses 4-7', range: 'Clauses 4 (Context), 5 (Leadership), 6 (Planning), and 7 (Support) — include ALL sub-clauses down to the deepest level', useSource: true },
+                { label: 'Clauses 8-10', range: 'Clauses 8 (Operation), 9 (Performance Evaluation), and 10 (Improvement) — include ALL sub-clauses down to the deepest level', useSource: true }
+            ]
+        },
+        comprehensive: {
+            sourceLimit: 50000,
+            maxTokens: 32768,
+            questionsPerClause: '3-5',
+            questionsInstruction: '3-5 specific audit questions per sub-clause covering evidence, implementation, effectiveness, compliance, and records',
+            batchDelay: 3000,
+            batches: [
+                { label: 'Clauses 4-6', range: 'Clauses 4 (Context), 5 (Leadership), and 6 (Planning) — include ALL sub-clauses: 4.1, 4.2, 4.3, 4.4, 5.1, 5.1.1, 5.1.2, 5.2, 5.2.1, 5.2.2, 5.3, 6.1, 6.1.1, 6.1.2, 6.1.3, 6.2, 6.3', useSource: true },
+                { label: 'Clauses 7-8', range: 'Clauses 7 (Support) and 8 (Operation) — include ALL sub-clauses: 7.1, 7.2, 7.3, 7.4, 7.5, 7.5.1, 7.5.2, 7.5.3, 8.1, 8.2, 8.3', useSource: true },
+                { label: 'Clauses 9-10', range: 'Clauses 9 (Performance Evaluation) and 10 (Improvement) — include ALL sub-clauses: 9.1, 9.1.1, 9.1.2, 9.2, 9.2.1, 9.2.2, 9.3, 9.3.1, 9.3.2, 9.3.3, 10.1, 10.2', useSource: true }
+            ]
+        }
+    };
+
+    const config = modeConfig[mode] || modeConfig.standard;
+
     try {
-        // Send generous source text to each batch
-        const sourceText = docContent.length > 100 ? docContent.substring(0, 50000) : '';
+        // Source text limited by mode
+        const sourceText = docContent.length > 100 ? docContent.substring(0, config.sourceLimit) : '';
         const sourceSection = sourceText
             ? `\nSOURCE TEXT:\n${sourceText}\n`
             : `\nNo source text available. Use your comprehensive expert knowledge of ${standardName}.\n`;
 
-        // Broader batches = more complete output per batch
-        const batches = [
-            { label: 'Clauses 4-6', range: 'Clauses 4 (Context), 5 (Leadership), and 6 (Planning) — include ALL sub-clauses: 4.1, 4.2, 4.3, 4.4, 5.1, 5.1.1, 5.1.2, 5.2, 5.2.1, 5.2.2, 5.3, 6.1, 6.1.1, 6.1.2, 6.1.3, 6.2, 6.3', useSource: true },
-            { label: 'Clauses 7-8', range: 'Clauses 7 (Support) and 8 (Operation) — include ALL sub-clauses: 7.1, 7.2, 7.3, 7.4, 7.5, 7.5.1, 7.5.2, 7.5.3, 8.1, 8.2, 8.3', useSource: true },
-            { label: 'Clauses 9-10', range: 'Clauses 9 (Performance Evaluation) and 10 (Improvement) — include ALL sub-clauses: 9.1, 9.1.1, 9.1.2, 9.2, 9.2.1, 9.2.2, 9.3, 9.3.1, 9.3.2, 9.3.3, 10.1, 10.2', useSource: true }
-        ];
+        // Build batch list from mode config
+        const batches = [...config.batches];
 
-        // ISO 27001 Annex A — comprehensive controls extraction
-        if (abbr === 'ISMS') {
+        // ISO 27001 Annex A — only in comprehensive mode
+        if (abbr === 'ISMS' && mode === 'comprehensive') {
             batches.push(
                 { label: 'Annex A.5-A.6', range: 'ISO 27001:2022 Annex A controls: A.5 Organizational Controls (ALL 37 controls: A.5.1 Policies for information security, A.5.2 Information security roles, A.5.3 Segregation of duties, A.5.4 Management responsibilities, A.5.5 Contact with authorities, A.5.6 Contact with special interest groups, A.5.7 Threat intelligence, A.5.8 Information security in project management, A.5.9-A.5.37 and all remaining) AND A.6 People Controls (ALL 8 controls: A.6.1-A.6.8)', useSource: false },
                 { label: 'Annex A.7-A.8', range: 'ISO 27001:2022 Annex A controls: A.7 Physical Controls (ALL 14 controls: A.7.1-A.7.14) AND A.8 Technological Controls (ALL 34 controls: A.8.1-A.8.34 including A.8.1 User endpoint devices, A.8.2 Privileged access rights, A.8.3 Information access restriction, A.8.4 Access to source code, A.8.5-A.8.34)', useSource: false }
             );
         }
+
+        console.log(`[KB Analysis] Mode: ${mode} | Batches: ${batches.length} | maxTokens: ${config.maxTokens} | Source: ${config.sourceLimit} chars`);
 
         let allClauses = [];
         let allChecklist = [];
@@ -3696,9 +3806,9 @@ async function extractStandardClauses(doc, standardName) {
             const batchEndPct = Math.round(15 + ((bi + 1) / batches.length) * 80);
 
             // Delay between batches to avoid API rate limiting (429)
-            if (bi > 0) {
-                window._kbProgress?.show(`Waiting before next batch... (avoiding rate limits)`, batchStartPct - 2);
-                await new Promise(resolve => setTimeout(resolve, 3000));
+            if (bi > 0 && config.batchDelay > 0) {
+                window._kbProgress?.show(`Waiting before next batch...`, batchStartPct - 2);
+                await new Promise(resolve => setTimeout(resolve, config.batchDelay));
             }
 
             console.log(`[KB Analysis] Extracting ${batch.label} (batch ${bi + 1}/${batches.length})...`);
@@ -3710,24 +3820,18 @@ async function extractStandardClauses(doc, standardName) {
 
 TASK: Extract EVERY auditable requirement from ${batch.range} of "${standardName}".
 
-REQUIREMENTS — generate a LARGE, COMPREHENSIVE output:
+REQUIREMENTS:
 1. Include EVERY sub-clause at the deepest level. Do NOT summarize or skip any.
 2. "requirement" = FULL requirement text verbatim from the standard
 3. "subRequirements" = ALL lettered items (a, b, c...) exactly as stated
-4. "checklistQuestions" = Generate 3-5 specific audit questions per sub-clause:
-   - Evidence: "Can you show documented evidence of...?"
-   - Implementation: "How does the organization implement...?"
-   - Effectiveness: "How is the effectiveness of ... evaluated?"
-   - Compliance: "Does the organization conform to...?"
-   - Records: "What records are maintained for...?"
+4. "checklistQuestions" = Generate ${config.questionsInstruction}
 5. Use "${abbr}" terminology throughout
 6. IMPORTANT: Skip clauses 1, 2, 3 (non-auditable informative sections)
-7. Your output should contain MANY entries — typically 8-15 sub-clauses per main clause
 ${batchSource}
 Return ONLY a valid JSON array. No markdown. No explanation:
-[{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?","Q3?"]}]`;
+[{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?"]}]`;
 
-            const text = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: 65536 });
+            const text = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: config.maxTokens });
             console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars (first 200: ${text.substring(0, 200)}...)`);
             window._kbProgress?.show(`Parsing ${batch.label} response...`, batchEndPct - 5);
 
@@ -4344,7 +4448,7 @@ window.analyzeCustomDocWithAI = async function (doc, type) {
 // Handle Re-analyze / Reset Action
 window.handleReanalyze = function (docId, docType) {
     if (docType === 'standard') {
-        window.reanalyzeStandard(docId);
+        window.showAnalysisModeModal(docId, true);
     } else {
         // Reset analysis (uses template)
         window.analyzeDocument(docType, docId);
@@ -4757,99 +4861,33 @@ window.viewKBAnalysis = function (docId) {
         </div>
     `;
 
-    document.getElementById('modal-save').style.display = 'none';
-    window.openModal();
-};
-
-// Re-analyze standard with AI for more detailed extraction
-window.reanalyzeStandard = async function (docId) {
-    const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id == docId);
-    if (!doc) {
-        console.warn('Document not found for re-analysis:', docId);
+    // After analysis, show result
+    if (doc.status === 'ready') {
+        window.showNotification(`Re-analysis complete! ${doc.clauses?.length || 0} clauses, ${doc.checklistCount || 0} questions extracted.`, 'success');
+        if (typeof switchSettingsSubTab === 'function') {
+            switchSettingsSubTab('knowledge', 'kb');
+        }
+        setTimeout(() => window.viewKBAnalysis(docId), 500);
         return;
     }
+} catch (error) {
+    console.error('Re-analysis error:', error);
+    window._kbProgress?.hide();
+}
 
-    const docNameLower = doc.name.toLowerCase();
-    let systemTerm, abbr;
+// Fallback if AI fails - use built-in detailed clauses
+doc.clauses = getBuiltInClauses(doc.name);
+doc.status = 'ready';
+doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+window.saveData();
 
-    if (docNameLower.includes('9001')) {
-        systemTerm = 'Quality Management System (QMS)';
-        abbr = 'QMS';
-    } else if (docNameLower.includes('14001')) {
-        systemTerm = 'Environmental Management System (EMS)';
-        abbr = 'EMS';
-    } else if (docNameLower.includes('45001')) {
-        systemTerm = 'Occupational Health and Safety Management System';
-        abbr = 'OH&S MS';
-    } else if (docNameLower.includes('27001')) {
-        systemTerm = 'Information Security Management System (ISMS)';
-        abbr = 'ISMS';
-    } else if (docNameLower.includes('22000')) {
-        systemTerm = 'Food Safety Management System (FSMS)';
-        abbr = 'FSMS';
-    } else if (docNameLower.includes('50001')) {
-        systemTerm = 'Energy Management System (EnMS)';
-        abbr = 'EnMS';
-    } else if (docNameLower.includes('13485')) {
-        systemTerm = 'Medical Devices Quality Management System';
-        abbr = 'MD-QMS';
-    } else {
-        systemTerm = 'Management System';
-        abbr = 'MS';
-    }
-
-    // Close the current modal
-    window.closeModal();
-
-    // Show processing notification
-    window.showNotification(`Re-analyzing ${doc.name} for detailed clauses...`, 'info');
-
-    // Update status to processing
-    doc.status = 'processing';
-    window.saveData();
-    if (typeof switchSettingsSubTab === 'function') {
-        switchSettingsSubTab('knowledge', 'kb');
-    }
-
-    try {
-        // Show progress overlay
-        window._kbProgress?.show('Starting re-analysis...', 5);
-
-        // Reuse the main KB analysis function (which has batching, maxTokens, Annex A support)
-        await extractStandardClauses(doc, doc.name);
-
-        // Complete progress
-        window._kbProgress?.show('✅ Re-analysis complete!', 100);
-        setTimeout(() => window._kbProgress?.hide(), 1500);
-
-        // After analysis, show result
-        if (doc.status === 'ready') {
-            window.showNotification(`Re-analysis complete! ${doc.clauses?.length || 0} clauses, ${doc.checklistCount || 0} questions extracted.`, 'success');
-            if (typeof switchSettingsSubTab === 'function') {
-                switchSettingsSubTab('knowledge', 'kb');
-            }
-            setTimeout(() => window.viewKBAnalysis(docId), 500);
-            return;
-        }
-    } catch (error) {
-        console.error('Re-analysis error:', error);
-        window._kbProgress?.hide();
-    }
-
-    // Fallback if AI fails - use built-in detailed clauses
-    doc.clauses = getBuiltInClauses(doc.name);
-    doc.status = 'ready';
-    doc.lastAnalyzed = new Date().toISOString().split('T')[0];
-    window.saveData();
-
-    window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
-    if (typeof switchSettingsSubTab === 'function') {
-        switchSettingsSubTab('knowledge', 'kb');
-    } else {
-        renderSettings();
-    }
-    setTimeout(() => window.viewKBAnalysis(docId), 500);
+window.showNotification(`Re-analysis complete using built-in clause database (${doc.clauses.length} clauses).`, 'info');
+if (typeof switchSettingsSubTab === 'function') {
+    switchSettingsSubTab('knowledge', 'kb');
+} else {
+    renderSettings();
+}
+setTimeout(() => window.viewKBAnalysis(docId), 500);
 };
 
 // ============================================
