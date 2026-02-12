@@ -3421,7 +3421,7 @@ window.uploadKnowledgeDoc = function (type) {
 };
 // --- KB Analysis Mode Picker ---
 window.showAnalysisModeModal = function (docId, isReanalyze = false) {
-    const modalContent = document.getElementById('modal-body-content');
+    const modalContent = document.getElementById('modal-body');
     if (!modalContent) return;
 
     modalContent.innerHTML = `
@@ -3469,11 +3469,13 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                 </div>
             </div>
         </div>
-        <div style="text-align:center;">
-            <button class="btn btn-secondary btn-sm" onclick="window.closeModal()">Cancel</button>
-        </div>
     `;
     document.getElementById('modal-title').textContent = isReanalyze ? 'Re-analyze Standard' : 'Analyze Standard';
+
+    // Hide default footer buttons since we have custom actions
+    const saveBtn = document.getElementById('modal-save');
+    if (saveBtn) saveBtn.style.display = 'none';
+
     window.openModal();
 };
 
