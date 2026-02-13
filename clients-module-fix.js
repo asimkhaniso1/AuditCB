@@ -242,7 +242,7 @@ window.getClientSitesHTML = function (client) {
                                     <td>${window.UTILS.escapeHtml(s.city || '-')}</td>
                                     <td>${s.employees || '-'}</td>
                                     <td>
-                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
                                             <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
                                                 <i class="fa-solid fa-pen"></i>

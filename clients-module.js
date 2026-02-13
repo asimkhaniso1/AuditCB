@@ -242,16 +242,16 @@ function renderClientsEnhanced() {
 }
 
 window.changeClientPage = function (page) {
-    if (window.window.state.clientPagination) {
-        window.window.state.clientPagination.currentPage = page;
+    if (window.state.clientPagination) {
+        window.state.clientPagination.currentPage = page;
         renderClientsEnhanced();
     }
 };
 
 window.changeClientItemsPerPage = function (val) {
-    if (window.window.state.clientPagination) {
-        window.window.state.clientPagination.itemsPerPage = parseInt(val, 10);
-        window.window.state.clientPagination.currentPage = 1; // Reset to first page
+    if (window.state.clientPagination) {
+        window.state.clientPagination.itemsPerPage = parseInt(val, 10);
+        window.state.clientPagination.currentPage = 1; // Reset to first page
         renderClientsEnhanced();
     }
 };
@@ -547,7 +547,7 @@ function getClientSitesHTML(client) {
                                         ${s.geotag ? `<a href="https://maps.google.com/?q=${window.UTILS.escapeHtml(s.geotag)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(s.geotag)}</a>` : '-'}
                                     </td>
                                     <td>
-                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
                                             <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
                                                 <i class="fa-solid fa-pen"></i>
@@ -567,7 +567,7 @@ function getClientSitesHTML(client) {
                 <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;">
                     <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">No sites or branch locations added yet.</p>
-                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" onclick="addSite(${client.id})">
                         <i class="fa-solid fa-plus"></i> Add First Site
                     </button>
@@ -593,7 +593,7 @@ function getClientProfileHTML(client) {
                 </p>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                         <label class="btn btn-sm btn-outline-primary" style="cursor: pointer; margin: 0;">
                             <i class="fa-solid fa-file-pdf" style="margin-right: 0.25rem;"></i> Upload PDF
                             <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc(${client.id}, this.files[0])">
@@ -618,7 +618,7 @@ function getClientProfileHTML(client) {
                     <span style="font-size: 0.9rem; color: #166534;"><strong>Source Document:</strong> ${window.UTILS.escapeHtml(client.profileDocument.name)}</span>
                     <span style="font-size: 0.8rem; color: #22c55e; margin-left: 0.5rem;">(Uploaded ${new Date(client.profileDocument.uploadedAt).toLocaleDateString()})</span>
                 </div>
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" onclick="window.removeProfileDocument(${client.id})" title="Remove document">
                     <i class="fa-solid fa-times"></i>
                 </button>
@@ -639,7 +639,7 @@ function getClientProfileHTML(client) {
                         Upload a company profile PDF/manual, use AI generation from website, or write manually.
                     </p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                             <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
                                 <i class="fa-solid fa-upload"></i> Upload Document
                                 <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc(${client.id}, this.files[0])">
@@ -1185,7 +1185,7 @@ function getClientDocumentsHTML(client) {
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Documents</h3>
-            ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">
                     <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                 </button>
@@ -1214,7 +1214,7 @@ function getClientDocumentsHTML(client) {
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
-                                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
@@ -1227,7 +1227,7 @@ function getClientDocumentsHTML(client) {
                 <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
                     <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
-                    ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                     <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
                     ` : ''}
                 </div>
@@ -1262,10 +1262,10 @@ function getClientComplianceHTML(client) {
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
                 ${['Inquiry', 'Application Received', 'Under Review', 'Contract Sent', 'Contract Signed', 'Active'].map(s => `
                     <span style="padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; 
-                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
                         background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
                         color: ${appStatus === s ? 'white' : '#64748b'};"
-                        ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus(${client.id}, '${s}')"` : ''}>
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus(${client.id}, '${s}')"` : ''}>
                         ${s}
                     </span>
                 `).join('')}
@@ -1293,7 +1293,7 @@ function getClientComplianceHTML(client) {
                         </p>
                     </div>
                 `}
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="window.editClientContract(${client.id})">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
                 </button>
@@ -1319,7 +1319,7 @@ function getClientComplianceHTML(client) {
                         </p>
                     </div>
                 `}
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA(${client.id})">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
                 </button>
@@ -1334,7 +1334,7 @@ function getClientComplianceHTML(client) {
                     <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                     Client Changes Log (ISO 9.6)
                 </h4>
-                ${(window.window.state.currentUser.role === 'Certification Manager' || window.window.state.currentUser.role === 'Admin') ? `
+                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog(${client.id})">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
                 </button>
@@ -2945,7 +2945,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
             // Navigate to Audit Planning module
             window.renderModule('planning');
 
-            const client = window.window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
             const clientName = client ? client.name : '';
 
             if (!clientName) return;
@@ -3951,7 +3951,7 @@ CFO," style="font-family: monospace;"></textarea>
         // ============================================
 
         window.updateClientApplicationStatus = function (clientId, newStatus) {
-            const client = window.window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
             if (!client) return;
 
             if (!client.compliance) client.compliance = {};
@@ -3970,7 +3970,7 @@ CFO," style="font-family: monospace;"></textarea>
         };
 
         window.editClientContract = function (clientId) {
-            const client = window.window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
             if (!client) return;
 
             const contract = client.compliance?.contract || {};
@@ -4023,7 +4023,7 @@ CFO," style="font-family: monospace;"></textarea>
         };
 
         window.editClientNDA = function (clientId) {
-            const client = window.window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
             if (!client) return;
 
             const nda = client.compliance?.nda || {};
@@ -4077,7 +4077,7 @@ CFO," style="font-family: monospace;"></textarea>
         };
 
         window.addClientChangeLog = function (clientId) {
-            const client = window.window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
             if (!client) return;
 
             document.getElementById('modal-title').textContent = 'Log Client Change';
@@ -4107,7 +4107,7 @@ CFO," style="font-family: monospace;"></textarea>
             </div>
             <div class="form-group">
                 <label>Reported By</label>
-                <input type="text" id="change-reported-by" class="form-control" value="${window.window.state.currentUser?.name || ''}" placeholder="Who reported this change?">
+                <input type="text" id="change-reported-by" class="form-control" value="${window.state.currentUser?.name || ''}" placeholder="Who reported this change?">
             </div>
             <div style="padding: 1rem; background: #fef3c7; border-radius: 6px; margin-top: 1rem;">
                 <p style="margin: 0; font-size: 0.85rem; color: #92400e;">
@@ -4630,7 +4630,7 @@ CFO," style="font-family: monospace;"></textarea>
 
         // Sub-Tab Switching for Org Setup
         window.switchClientOrgSubTab = function (btn, subTabId, clientId) {
-            const client = window.window.state.clients.find(c => c.id === clientId);
+            const client = window.state.clients.find(c => c.id === clientId);
             if (!client) return;
 
             // UI Feedback
