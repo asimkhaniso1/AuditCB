@@ -3424,12 +3424,50 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
     const modalContent = document.getElementById('modal-body');
     if (!modalContent) return;
 
+    // Build client options for context selector
+    const clients = window.state.clients || [];
+    const clientOptions = clients.map(c =>
+        `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}${c.industry ? ' (' + c.industry + ')' : ''}</option>`
+    ).join('');
+
     modalContent.innerHTML = `
-        <div style="text-align:center;margin-bottom:1.5rem;">
+        <div style="text-align:center;margin-bottom:1.25rem;">
             <div style="font-size:1.5rem;margin-bottom:0.25rem;">🔍</div>
-            <h3 style="margin:0;font-size:1.2rem;color:#1e293b;">Choose Analysis Depth</h3>
-            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:#64748b;">Select how thorough the AI extraction should be</p>
+            <h3 style="margin:0;font-size:1.2rem;color:#1e293b;">Configure Analysis</h3>
+            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:#64748b;">Choose audit type, depth, and optional client context</p>
         </div>
+
+        <!-- Audit Type Toggle -->
+        <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Audit Type</label>
+            <div id="audit-type-toggle" style="display:flex;gap:0;border:2px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                <div id="at-initial" onclick="window._setAuditType('initial')" 
+                     style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:#3b82f6;color:white;font-weight:600;font-size:0.85rem;transition:all 0.2s;">
+                    🏁 Initial / Recertification
+                </div>
+                <div id="at-surveillance" onclick="window._setAuditType('surveillance')"
+                     style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:#fff;color:#64748b;font-weight:600;font-size:0.85rem;transition:all 0.2s;">
+                    🔄 Surveillance
+                </div>
+            </div>
+            <div id="audit-type-hint" style="font-size:0.75rem;color:#64748b;margin-top:0.35rem;padding:0 0.25rem;">
+                Full scope audit — covers all clauses comprehensively
+            </div>
+        </div>
+
+        <!-- Client Context (Optional) -->
+        <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">
+                Client Context <span style="font-weight:400;text-transform:none;color:#94a3b8;">(optional — tailors questions)</span>
+            </label>
+            <select id="analysis-client-select" style="width:100%;padding:0.5rem 0.75rem;border:2px solid #e2e8f0;border-radius:8px;font-size:0.85rem;color:#334155;background:#fff;">
+                <option value="">— Generic (no client context) —</option>
+                ${clientOptions}
+            </select>
+        </div>
+
+        <!-- Analysis Depth Cards -->
+        <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Analysis Depth</label>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
             <div onclick="window._startAnalysis('${docId}', 'short', ${isReanalyze})" 
                  style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;"
@@ -3476,16 +3514,47 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
     const saveBtn = document.getElementById('modal-save');
     if (saveBtn) saveBtn.style.display = 'none';
 
+    // Store audit type state
+    window._analysisAuditType = 'initial';
+
     window.openModal();
 };
 
-// Internal: Start analysis with selected mode
-window._startAnalysis = async function (docId, mode, isReanalyze) {
-    window.closeModal();
-    if (isReanalyze) {
-        window.reanalyzeStandard(docId, mode);
+// Toggle audit type in the modal
+window._setAuditType = function (type) {
+    window._analysisAuditType = type;
+    const initEl = document.getElementById('at-initial');
+    const survEl = document.getElementById('at-surveillance');
+    const hintEl = document.getElementById('audit-type-hint');
+    if (!initEl || !survEl) return;
+
+    if (type === 'surveillance') {
+        survEl.style.background = '#f59e0b';
+        survEl.style.color = 'white';
+        initEl.style.background = '#fff';
+        initEl.style.color = '#64748b';
+        if (hintEl) hintEl.textContent = 'Focused audit — fewer questions on continued conformity, changes, and correction effectiveness';
     } else {
-        window.analyzeStandard(docId, mode);
+        initEl.style.background = '#3b82f6';
+        initEl.style.color = 'white';
+        survEl.style.background = '#fff';
+        survEl.style.color = '#64748b';
+        if (hintEl) hintEl.textContent = 'Full scope audit — covers all clauses comprehensively';
+    }
+};
+
+// Internal: Start analysis with selected mode, audit type, and client context
+window._startAnalysis = async function (docId, mode, isReanalyze) {
+    const auditType = window._analysisAuditType || 'initial';
+    const clientSelect = document.getElementById('analysis-client-select');
+    const clientId = clientSelect ? clientSelect.value : '';
+
+    window.closeModal();
+
+    if (isReanalyze) {
+        window.reanalyzeStandard(docId, mode, auditType, clientId);
+    } else {
+        window.analyzeStandard(docId, mode, auditType, clientId);
     }
 };
 
@@ -3534,7 +3603,7 @@ window._kbProgress = {
     }
 };
 
-window.analyzeStandard = async function (docId, mode) {
+window.analyzeStandard = async function (docId, mode, auditType, clientId) {
     const kb = window.state.knowledgeBase;
     const doc = kb.standards.find(d => d.id == docId);
     if (!doc) {
@@ -3558,10 +3627,11 @@ window.analyzeStandard = async function (docId, mode) {
     }
 
     // Show progress overlay
-    window._kbProgress.show(`Preparing ${mode} analysis...`, 5);
+    const typeLabel = auditType === 'surveillance' ? 'surveillance ' : '';
+    window._kbProgress.show(`Preparing ${typeLabel}${mode} analysis...`, 5);
 
-    // Extract clauses with selected mode
-    await extractStandardClauses(doc, doc.name, mode);
+    // Extract clauses with selected mode, audit type, and client context
+    await extractStandardClauses(doc, doc.name, mode, auditType || 'initial', clientId || '');
 
     // Complete
     window._kbProgress.show('✅ Analysis complete!', 100);
@@ -3675,7 +3745,7 @@ window.analyzeDocument = async function (type, docId) {
 
 
 // One-time clause extraction from standard
-async function extractStandardClauses(doc, standardName, mode = 'standard') {
+async function extractStandardClauses(doc, standardName, mode = 'standard', auditType = 'initial', clientId = '') {
     // Detect standard type based on the name
     const stdLower = standardName.toLowerCase();
     let systemTerm, abbr;
@@ -3706,7 +3776,7 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
         abbr = 'MS';
     }
 
-    console.log(`[KB Analysis] Starting ${mode.toUpperCase()} AI extraction for: ${standardName} (${abbr})`);
+    console.log(`[KB Analysis] Starting ${mode.toUpperCase()} ${auditType.toUpperCase()} AI extraction for: ${standardName} (${abbr})${clientId ? ' with client context' : ''}`);
 
     // Fix: Define docContent from the document object
     let docContent = doc.extractedText || '';
@@ -3738,6 +3808,53 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
     } else {
         console.log(`[KB Analysis] Source text available: ${docContent.length} chars`);
         window._kbProgress?.show(`Text extracted: ${Math.round(docContent.length / 1000)}K chars`, 15);
+    }
+
+    // ---- BUILD CLIENT CONTEXT STRING ----
+    let clientContext = '';
+    if (clientId) {
+        const client = (window.state.clients || []).find(c => String(c.id) === String(clientId));
+        if (client) {
+            const parts = [];
+            parts.push(`\nCLIENT CONTEXT (tailor questions to this organization):`);
+            parts.push(`Organization: ${client.name}`);
+            if (client.industry) parts.push(`Industry: ${client.industry}`);
+            if (client.employees) parts.push(`Employees: ${client.employees}`);
+            if (client.sites && client.sites.length > 0) {
+                parts.push(`Sites: ${client.sites.map(s => s.name + (s.city ? ' (' + s.city + ')' : '')).join(', ')}`);
+            }
+            if (client.goodsServices && client.goodsServices.length > 0) {
+                parts.push(`Products/Services: ${client.goodsServices.map(g => g.name).join(', ')}`);
+            }
+            if (client.keyProcesses && client.keyProcesses.length > 0) {
+                parts.push(`Key Processes: ${client.keyProcesses.map(p => p.name + ' (' + p.category + ')').join(', ')}`);
+            }
+            if (client.departments && client.departments.length > 0) {
+                parts.push(`Departments: ${client.departments.map(d => d.name).join(', ')}`);
+            }
+            if (client.standard) parts.push(`Certification Standard: ${client.standard}`);
+            if (client.profile) parts.push(`Profile: ${client.profile.substring(0, 500)}`);
+            parts.push(`\nIMPORTANT: Make checklist questions SPECIFIC to this organization's industry, processes, and products. Reference their actual processes/products where relevant.`);
+            clientContext = parts.join('\n');
+            console.log(`[KB Analysis] Client context added: ${client.name} (${client.industry || 'no industry'})`);
+        }
+    }
+
+    // ---- SURVEILLANCE AUDIT INSTRUCTION ----
+    let auditTypeInstruction = '';
+    if (auditType === 'surveillance') {
+        auditTypeInstruction = `
+AUDIT TYPE: SURVEILLANCE AUDIT
+This checklist is for a surveillance audit (NOT initial/recertification). Focus on:
+- Continued conformity with the standard since last audit
+- Effectiveness of corrective actions from previous findings
+- Changes to the management system, processes, or organization
+- Internal audit results and management review outcomes
+- Complaints and customer feedback handling
+- Progress on objectives and targets
+- Use of marks and references to certification
+Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage — focus on risk areas and changes.
+`;
     }
 
     // ---- MODE-DEPENDENT CONFIGURATION ----
@@ -3797,7 +3914,7 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
             );
         }
 
-        console.log(`[KB Analysis] Mode: ${mode} | Batches: ${batches.length} | maxTokens: ${config.maxTokens} | Source: ${config.sourceLimit} chars`);
+        console.log(`[KB Analysis] Mode: ${mode} | AuditType: ${auditType} | Batches: ${batches.length} | maxTokens: ${config.maxTokens} | Source: ${config.sourceLimit} chars`);
 
         let allClauses = [];
         let allChecklist = [];
@@ -3819,7 +3936,7 @@ async function extractStandardClauses(doc, standardName, mode = 'standard') {
             const batchSource = batch.useSource ? sourceSection : `\nUse your expert knowledge of ${standardName}. Be comprehensive — list EVERY control.\n`;
 
             const prompt = `You are an expert ISO Lead Auditor with 20+ years experience in ${systemTerm} certification audits.
-
+${auditTypeInstruction}
 TASK: Extract EVERY auditable requirement from ${batch.range} of "${standardName}".
 
 REQUIREMENTS:
@@ -3829,6 +3946,7 @@ REQUIREMENTS:
 4. "checklistQuestions" = Generate ${config.questionsInstruction}
 5. Use "${abbr}" terminology throughout
 6. IMPORTANT: Skip clauses 1, 2, 3 (non-auditable informative sections)
+${clientContext}
 ${batchSource}
 Return valid JSON only. No markdown formatting. No code blocks. No introductory text.
 [{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?"]}]`;
@@ -4868,7 +4986,7 @@ window.viewKBAnalysis = function (docId) {
 };
 
 // Re-analyze standard with AI for more detailed extraction
-window.reanalyzeStandard = async function (docId, mode = 'standard') {
+window.reanalyzeStandard = async function (docId, mode = 'standard', auditType = 'initial', clientId = '') {
     const kb = window.state.knowledgeBase;
     const doc = kb.standards.find(d => d.id == docId);
     if (!doc) {
@@ -4880,7 +4998,8 @@ window.reanalyzeStandard = async function (docId, mode = 'standard') {
     window.closeModal();
 
     // Show processing notification
-    window.showNotification(`Re-analyzing ${doc.name} (${mode} mode)...`, 'info');
+    const typeLabel = auditType === 'surveillance' ? ' surveillance' : '';
+    window.showNotification(`Re-analyzing ${doc.name} (${mode}${typeLabel} mode)...`, 'info');
 
     // Update status to processing
     doc.status = 'processing';
@@ -4891,10 +5010,10 @@ window.reanalyzeStandard = async function (docId, mode = 'standard') {
 
     try {
         // Show progress overlay
-        window._kbProgress?.show(`Starting ${mode} re-analysis...`, 5);
+        window._kbProgress?.show(`Starting ${mode}${typeLabel} re-analysis...`, 5);
 
         // Reuse the main KB analysis function with selected mode
-        await extractStandardClauses(doc, doc.name, mode);
+        await extractStandardClauses(doc, doc.name, mode, auditType, clientId);
 
         // Complete progress
         window._kbProgress?.show('✅ Re-analysis complete!', 100);
