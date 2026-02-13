@@ -3870,14 +3870,15 @@ Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage �
             ]
         },
         standard: {
-            sourceLimit: 200000, // Increased from 25k to cover full ISO standard
-            maxTokens: 16384,
+            sourceLimit: 200000,
+            maxTokens: 24576, // Increased from 16k to prevent output truncation
             questionsPerClause: '1-2',
             questionsInstruction: '1-2 practical audit checklist questions',
             batchDelay: 2000,
             batches: [
-                { label: 'Clauses 4-7', range: 'Clauses 4 (Context), 5 (Leadership), 6 (Planning), and 7 (Support) — include ALL sub-clauses down to the deepest level', useSource: true },
-                { label: 'Clauses 8-10', range: 'Clauses 8 (Operation), 9 (Performance Evaluation), and 10 (Improvement) — include ALL sub-clauses down to the deepest level', useSource: true }
+                { label: 'Clauses 4-6', range: 'Clauses 4 (Context of the Organization), 5 (Leadership), and 6 (Planning) — include ALL sub-clauses down to the deepest level', useSource: true },
+                { label: 'Clauses 7-8', range: 'Clauses 7 (Support) and 8 (Operation) — include ALL sub-clauses down to the deepest level', useSource: true },
+                { label: 'Clauses 9-10', range: 'Clauses 9 (Performance Evaluation) and 10 (Improvement) — include ALL sub-clauses down to the deepest level. MUST include 9.1, 9.2, 9.3 and 10.1, 10.2, 10.3', useSource: true }
             ]
         },
         comprehensive: {
@@ -4000,6 +4001,16 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
             doc.checklistCount = allChecklist.length;
             doc.status = 'ready';
             doc.lastAnalyzed = new Date().toISOString().split('T')[0];
+            doc.lastAuditType = auditType || 'initial';
+            doc.lastAnalysisMode = mode;
+            if (clientId) {
+                const ctxClient = (window.state.clients || []).find(c => String(c.id) === String(clientId));
+                doc.lastClientName = ctxClient ? ctxClient.name : '';
+                doc.lastClientId = clientId;
+            } else {
+                doc.lastClientName = '';
+                doc.lastClientId = '';
+            }
             window.saveData();
             console.log(`✅ [KB Analysis] SUCCESS! ${allClauses.length} clauses + ${allChecklist.length} checklist Qs from ${standardName}`);
             return;
@@ -4576,6 +4587,15 @@ window.handleReanalyze = function (docId, docType) {
     }
 };
 
+// Build descriptive checklist title from doc metadata
+function _buildChecklistTitle(doc) {
+    const parts = [doc.name];
+    if (doc.lastClientName) parts.push(doc.lastClientName);
+    const typeLabel = doc.lastAuditType === 'surveillance' ? 'Surveillance' : 'Initial';
+    parts.push(`${typeLabel} Audit Checklist`);
+    return parts.join(' - ');
+}
+
 // Create a checklist from KB extracted questions
 window.createChecklistFromKB = async function (docId) {
     const kb = window.state.knowledgeBase;
@@ -4662,9 +4682,11 @@ window.createChecklistFromKB = async function (docId) {
 
     const newChecklist = {
         id: Date.now(),
-        name: `${doc.name} - Audit Checklist`,
+        name: _buildChecklistTitle(doc),
         standard: doc.name,
         type: 'global',
+        auditType: doc.lastAuditType || 'initial',
+        clientName: doc.lastClientName || '',
         clauses: clauseArray,
         createdBy: window.state.currentUser?.name || 'Admin',
         createdAt: new Date().toISOString().split('T')[0],
