@@ -1281,17 +1281,31 @@ window.renderConfigureChecklist = async function (planId) {
     const savedOverrides = plan.selectedChecklistOverrides || {};
     const selectedIds = plan.selectedChecklists || [];
 
-    // Match checklists to plan/client standards
+    // Match checklists to plan/client standards (lenient matching)
     const client = state.clients.find(c => c.name === plan.client);
     const clientStandards = (client?.standard || '').split(', ').map(s => s.trim()).filter(s => s);
     const planStandardsList = (plan.standard || '').split(', ').map(s => s.trim()).filter(s => s);
     const allStandards = [...new Set([...planStandardsList, ...clientStandards])].map(s => s.toLowerCase());
 
+    // Extract ISO numbers (e.g. '9001', '14001', '27001') for fuzzy matching
+    const extractISONumbers = (str) => (str.match(/\d{4,5}/g) || []);
+    const planISONumbers = allStandards.flatMap(s => extractISONumbers(s));
+
     const checklists = state.checklists || [];
     const matchingChecklists = checklists.filter(c => {
-        if (!c.standard) return true;
+        if (!c.standard) return true; // No standard = show always
+        if (allStandards.length === 0) return true; // No plan standard = show all
+
         const clStd = c.standard.toLowerCase();
-        return allStandards.length === 0 || allStandards.some(ps => clStd.includes(ps.split(':')[0]) || ps.includes(clStd.split(':')[0]));
+        const clISO = extractISONumbers(clStd);
+
+        // Match if ANY ISO number overlaps (e.g. '9001' in both)
+        if (clISO.length > 0 && planISONumbers.length > 0) {
+            return clISO.some(n => planISONumbers.includes(n));
+        }
+
+        // Fallback: substring matching
+        return allStandards.some(ps => clStd.includes(ps) || ps.includes(clStd));
     });
 
     const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
