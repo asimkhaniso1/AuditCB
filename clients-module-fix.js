@@ -129,7 +129,12 @@ window.getClientCertificatesHTML = function (client) {
                 </div>
             </div>
             <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
-                <h4 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--primary-color);">Site-Specific Scopes</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin: 0; font-size: 1rem; color: var(--primary-color);">Site-Specific Scopes</h4>
+                    <button class="btn btn-sm" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer;" onclick="window.aiGenerateScope('${client.id}', ${index})">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Gen Scope
+                    </button>
+                </div>
                 ${relevantSites.map(site => {
             const siteScope = (cert.siteScopes && cert.siteScopes[site.name]) ? cert.siteScopes[site.name] : (cert.scope || '');
             return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)">${siteScope}</textarea></div>`;
@@ -839,47 +844,186 @@ window.editSite = function (clientId, siteIndex) {
 };
 
 // ============================================
-// 10. GENERATE COMPANY PROFILE
+// 10. GENERATE COMPANY PROFILE (AI-Enhanced)
 // ============================================
-window.generateCompanyProfile = function (clientId) {
+window.generateCompanyProfile = async function (clientId) {
     var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
     if (!client) return;
-    if (!client.website) {
-        window.showNotification('Website URL is required for AI generation. Please add a website in the client settings first.', 'error');
+
+    // Save previous version to history
+    if (client.profile) {
+        if (!client.profileHistory) client.profileHistory = [];
+        client.profileHistory.push({ content: client.profile, updatedAt: client.profileUpdated || new Date().toISOString(), updatedBy: 'System', method: 'AI' });
+    }
+
+    // Build context data
+    var sitesInfo = (client.sites || []).map(function (s) {
+        return s.name + (s.city ? ', ' + s.city : '') + (s.country ? ', ' + s.country : '') + (s.employees ? ' (' + s.employees + ' employees)' : '') + (s.standards ? ' [' + s.standards + ']' : '');
+    }).join('; ');
+    var goodsInfo = (client.goodsServices || []).map(function (g) {
+        return (g.name || g) + (g.category ? ' (' + g.category + ')' : '') + (g.description ? ': ' + g.description : '');
+    }).join('; ');
+    var processInfo = (client.keyProcesses || []).map(function (p) {
+        return (p.name || p) + (p.category ? ' [' + p.category + ']' : '') + (p.owner ? ' - ' + p.owner : '');
+    }).join('; ');
+    var deptInfo = (client.departments || []).map(function (d) {
+        return d.name + (d.head ? ' (Head: ' + d.head + ')' : '') + (d.employeeCount ? ' [' + d.employeeCount + ' staff]' : '');
+    }).join('; ');
+
+    // Try AI-powered generation first
+    if (window.AI_SERVICE && window.AI_SERVICE.callProxyAPI) {
+        window.showNotification('AI is generating comprehensive company profile...', 'info');
+        try {
+            var prompt = 'You are an ISO Certification Body auditor preparing an Organization Context profile for an audit. Write a comprehensive, professional Organization Context / Company Profile based on the following data.' +
+                '\n\nCompany: ' + client.name +
+                '\nIndustry: ' + (client.industry || 'Not specified') +
+                '\nWebsite: ' + (client.website || 'Not provided') +
+                '\nTotal Employees: ' + (client.employees || 'Not specified') +
+                '\nStandards: ' + (client.standard || 'Not specified') +
+                '\nSites/Locations: ' + (sitesInfo || 'None listed') +
+                '\nDepartments: ' + (deptInfo || 'None listed') +
+                '\nGoods and Services: ' + (goodsInfo || 'None listed') +
+                '\nKey Processes: ' + (processInfo || 'None listed') +
+                (client.shifts === 'Yes' ? '\nShift Work: Yes' : '') +
+                '\n\nInstructions:' +
+                '\n1. If website URL is provided, infer additional context about the company (products, services, market position) based on the URL domain and any available info.' +
+                '\n2. Include sections: Company Overview, Industry and Market Context, Products/Services Offered, Organizational Structure, Operational Locations, Management System Scope, Key Processes, and Context for Audit.' +
+                '\n3. Write in professional audit report language suitable for ISO 17021 certification body documentation.' +
+                '\n4. Keep it between 300-500 words.' +
+                '\n5. Return ONLY the profile text, no JSON wrapping or markdown formatting.';
+
+            var aiResult = await window.AI_SERVICE.callProxyAPI(prompt);
+            var cleanResult = aiResult.replace(/```/g, '').trim();
+            client.profile = cleanResult;
+            client.profileUpdated = new Date().toISOString();
+            window.saveData();
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
+            if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
+            if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 1);
+            window.showNotification('AI Company profile generated successfully!', 'success');
+            return;
+        } catch (err) {
+            console.warn('AI profile generation failed, falling back to template:', err);
+            window.showNotification('AI unavailable, generating from template...', 'warning');
+        }
+    }
+
+    // Fallback: Template-based generation
+    window.showNotification('Generating company profile from template...', 'info');
+    var parts = [];
+    parts.push(client.name + ' - Organization Context');
+    parts.push('\nIndustry: ' + (client.industry || 'Not specified'));
+    if (client.website) parts.push('Website: ' + client.website);
+    parts.push('\n--- Company Overview ---');
+    var empText = client.employees ? ' with approximately ' + client.employees + ' employees' : '';
+    var siteText = (client.sites && client.sites.length > 1) ? ' operating across ' + client.sites.length + ' locations' : ' operating from a single location';
+    parts.push(client.name + ' is a ' + (client.industry || 'professional') + ' organization' + empText + siteText + '.');
+    if (client.standard) parts.push('\nThe organization maintains certification to ' + client.standard + ' standards, demonstrating its commitment to quality, safety and continuous improvement.');
+    if (client.sites && client.sites.length > 0) {
+        parts.push('\n--- Operational Locations ---');
+        client.sites.forEach(function (s) { parts.push('- ' + s.name + (s.city ? ', ' + s.city : '') + (s.country ? ', ' + s.country : '') + (s.employees ? ' (' + s.employees + ' employees)' : '')); });
+    }
+    if (client.departments && client.departments.length > 0) {
+        parts.push('\n--- Key Departments ---');
+        client.departments.forEach(function (d) { parts.push('- ' + d.name + (d.head ? ' - Led by ' + d.head : '') + (d.employeeCount ? ' (' + d.employeeCount + ' staff)' : '')); });
+    }
+    if (goodsInfo) {
+        parts.push('\n--- Goods and Services ---');
+        (client.goodsServices || []).forEach(function (g) { parts.push('- ' + (g.name || g) + (g.category ? ' [' + g.category + ']' : '') + (g.description ? ': ' + g.description : '')); });
+    }
+    if (processInfo) {
+        parts.push('\n--- Key Processes ---');
+        (client.keyProcesses || []).forEach(function (p) { parts.push('- ' + (p.name || p) + (p.category ? ' [' + p.category + ']' : '') + (p.owner ? ' - Owner: ' + p.owner : '')); });
+    }
+    parts.push('\n--- Context for Audit ---');
+    parts.push('This profile provides organizational context for audit planning and execution activities under ISO 17021 requirements.');
+    client.profile = parts.join('\n');
+    client.profileUpdated = new Date().toISOString();
+    window.saveData();
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
+    if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
+    if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 1);
+    window.showNotification('Company profile generated from template.', 'success');
+};
+
+// ============================================
+// 11. AI GENERATE SCOPE
+// ============================================
+window.aiGenerateScope = async function (clientId, certIndex) {
+    var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+    if (!client) return;
+    var cert = (client.certificates || [])[certIndex];
+    if (!cert) { window.showNotification('Certificate not found', 'error'); return; }
+
+    var relevantSites = (client.sites || []).filter(function (s) {
+        return (s.standards && s.standards.includes(cert.standard)) || (!s.standards && client.standard && client.standard.includes(cert.standard));
+    });
+    if (relevantSites.length === 0) { window.showNotification('No sites found for this standard', 'warning'); return; }
+
+    if (!window.AI_SERVICE || !window.AI_SERVICE.callProxyAPI) {
+        // Fallback: template-based scope
+        relevantSites.forEach(function (site) {
+            if (!cert.siteScopes) cert.siteScopes = {};
+            var goods = (client.goodsServices || []).map(function (g) { return g.name || g; }).join(', ');
+            var processes = (client.keyProcesses || []).map(function (p) { return p.name || p; }).join(', ');
+            cert.siteScopes[site.name] = 'The ' + cert.standard + ' management system covering ' + (goods || 'all products and services') + ' through ' + (processes || 'key operational processes') + ' at ' + site.name + (site.city ? ', ' + site.city : '') + '.';
+        });
+        window.saveData();
+        if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
+        window.showNotification('Scope generated from template.', 'success');
         return;
     }
-    window.showNotification('Generating company profile from data...', 'info');
-    setTimeout(function () {
-        if (client.profile) {
-            if (!client.profileHistory) client.profileHistory = [];
-            client.profileHistory.push({ content: client.profile, updatedAt: client.profileUpdated || new Date().toISOString(), updatedBy: 'System', method: 'Manual' });
-        }
-        var parts = [];
-        parts.push(client.name + ' - Company Overview');
-        parts.push('\nIndustry: ' + (client.industry || 'Not specified'));
-        parts.push('Website: ' + client.website);
-        parts.push('\nAbout the Organization:');
-        var empText = client.employees ? ' with approximately ' + client.employees + ' employees' : '';
-        var siteText = (client.sites && client.sites.length > 1) ? ' operating across ' + client.sites.length + ' locations' : ' operating from a single location';
-        parts.push(client.name + ' is a ' + (client.industry || 'professional') + ' organization' + empText + siteText + '.');
-        if (client.standard) parts.push('\nThe organization maintains certification to ' + client.standard + ' standards.');
-        if (client.sites && client.sites.length > 0) {
-            parts.push('\nOperational Locations:');
-            client.sites.forEach(function (s) { parts.push('- ' + s.name + (s.city ? ' - ' + s.city : '') + (s.employees ? ' (' + s.employees + ' employees)' : '')); });
-        }
-        if (client.departments && client.departments.length > 0) {
-            parts.push('\nKey Departments:');
-            client.departments.forEach(function (d) { parts.push('- ' + d.name + (d.head ? ' - Led by ' + d.head : '')); });
-        }
-        parts.push('\nThis profile provides context for audit activities.');
-        client.profile = parts.join('\n');
-        client.profileUpdated = new Date().toISOString();
+
+    window.showNotification('AI is generating certification scope...', 'info');
+    try {
+        var siteNames = relevantSites.map(function (s) { return s.name + (s.city ? ', ' + s.city : ''); }).join('; ');
+        var goods = (client.goodsServices || []).map(function (g) { return (g.name || g) + (g.description ? ': ' + g.description : ''); }).join('; ');
+        var processes = (client.keyProcesses || []).map(function (p) { return p.name || p; }).join('; ');
+
+        var prompt = 'You are an ISO Certification Body auditor. Generate certification scope statements for each site listed below.' +
+            '\n\nCompany: ' + client.name +
+            '\nStandard: ' + cert.standard +
+            '\nIndustry: ' + (client.industry || 'General') +
+            '\nWebsite: ' + (client.website || 'Not provided') +
+            '\nGoods and Services: ' + (goods || 'Not specified') +
+            '\nKey Processes: ' + (processes || 'Not specified') +
+            '\nSites: ' + siteNames +
+            '\n\nRequirements:' +
+            '\n1. Write a concise, professional certification scope statement for EACH site.' +
+            '\n2. The scope must describe what activities are covered under the ' + cert.standard + ' certificate at that site.' +
+            '\n3. Include relevant goods/services and key processes applicable to each site.' +
+            '\n4. Each scope should be 1-3 sentences, professional language suitable for the certificate.' +
+            '\n5. Return as raw JSON object with site names as keys and scope text as values.' +
+            '\nExample: {"Head Office": "Design, development and...", "Factory": "Manufacturing of..."}' +
+            '\nReturn ONLY the JSON, no markdown formatting.';
+
+        var aiResult = await window.AI_SERVICE.callProxyAPI(prompt);
+        var cleanResult = aiResult.replace(/```json/g, '').replace(/```/g, '').trim();
+        var scopes = JSON.parse(cleanResult);
+
+        if (!cert.siteScopes) cert.siteScopes = {};
+        relevantSites.forEach(function (site) {
+            var scopeText = scopes[site.name];
+            if (!scopeText) {
+                var keys = Object.keys(scopes);
+                for (var i = 0; i < keys.length; i++) {
+                    if (keys[i].toLowerCase().indexOf(site.name.toLowerCase()) >= 0 || site.name.toLowerCase().indexOf(keys[i].toLowerCase()) >= 0) {
+                        scopeText = scopes[keys[i]];
+                        break;
+                    }
+                }
+            }
+            if (scopeText) cert.siteScopes[site.name] = scopeText;
+        });
+
         window.saveData();
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
         if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
-        if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 1);
-        window.showNotification('Company profile generated successfully!');
-    }, 500);
+        window.showNotification('AI certification scope generated successfully!', 'success');
+    } catch (err) {
+        console.error('AI Scope generation error:', err);
+        window.showNotification('AI scope generation failed: ' + err.message, 'error');
+    }
 };
 
 console.log('[DEBUG] clients-module-fix.js loaded successfully with HTML generators.');
