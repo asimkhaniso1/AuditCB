@@ -1281,32 +1281,20 @@ window.renderConfigureChecklist = async function (planId) {
     const savedOverrides = plan.selectedChecklistOverrides || {};
     const selectedIds = plan.selectedChecklists || [];
 
-    // Match checklists to plan/client standards (lenient matching)
+    // Get all checklists - don't filter by standard match
+    // Users should see all available checklists when configuring an audit plan
+    const checklists = state.checklists || [];
+
+    // For sorting/highlighting: extract plan standards for reference
     const client = state.clients.find(c => c.name === plan.client);
     const clientStandards = (client?.standard || '').split(', ').map(s => s.trim()).filter(s => s);
     const planStandardsList = (plan.standard || '').split(', ').map(s => s.trim()).filter(s => s);
     const allStandards = [...new Set([...planStandardsList, ...clientStandards])].map(s => s.toLowerCase());
 
-    // Extract ISO numbers (e.g. '9001', '14001', '27001') for fuzzy matching
     const extractISONumbers = (str) => (str.match(/\d{4,5}/g) || []);
     const planISONumbers = allStandards.flatMap(s => extractISONumbers(s));
 
-    const checklists = state.checklists || [];
-    const matchingChecklists = checklists.filter(c => {
-        if (!c.standard) return true; // No standard = show always
-        if (allStandards.length === 0) return true; // No plan standard = show all
-
-        const clStd = c.standard.toLowerCase();
-        const clISO = extractISONumbers(clStd);
-
-        // Match if ANY ISO number overlaps (e.g. '9001' in both)
-        if (clISO.length > 0 && planISONumbers.length > 0) {
-            return clISO.some(n => planISONumbers.includes(n));
-        }
-
-        // Fallback: substring matching
-        return allStandards.some(ps => clStd.includes(ps) || ps.includes(clStd));
-    });
+    const matchingChecklists = checklists; // Show ALL checklists
 
     const globalChecklists = matchingChecklists.filter(c => c.type === 'global');
     const customChecklists = matchingChecklists.filter(c => c.type === 'custom' || !c.type);
