@@ -1305,8 +1305,7 @@ window.renderConfigureChecklist = async function (planId) {
             cl.clauses.forEach(clause => {
                 if (clause.subClauses) {
                     clause.subClauses.forEach((sub, idx) => {
-                        // Check for nested items array or flat properties
-                        const text = sub.requirement || sub.title || sub.requirement_text || sub.text || (sub.items && sub.items[0] && sub.items[0].requirement) || 'No requirement text provided';
+                        const text = sub.requirement || sub.title || sub.requirement_text || 'No requirement text provided';
                         items.push({ id: `${clause.mainClause}-${idx}`, text: text, clause: clause.mainClause });
                     });
                 }
