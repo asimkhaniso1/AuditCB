@@ -2066,10 +2066,7 @@ window.renderEditClient = function (clientId) {
                                 <option value="Yes" ${client.shifts === 'Yes' ? 'selected' : ''}>Yes (Multiple Shifts)</option>
                              </select>
                         </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                             <label style="font-size: 0.8rem;">Target Audit Date</label>
-                             <input type="date" class="form-control" id="client-next-audit" value="${client.nextAudit || ''}">
-                        </div>
+
                     </div>
                 </div>
 
