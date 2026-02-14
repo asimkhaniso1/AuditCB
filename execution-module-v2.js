@@ -557,7 +557,7 @@ function renderExecutionDetail(reportId) {
 
     assignedChecklists.forEach(cl => {
         const allowedIds = selectionMap[cl.id]; // Array of strings/ints or undefined
-        const isSelective = Array.isArray(allowedIds);
+        const isSelective = Array.isArray(allowedIds) && allowedIds.length > 0;
 
         if (cl.clauses) {
             cl.clauses.forEach(clause => {
@@ -840,7 +840,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </h4>
                                 ${checklist.clauses.map((clause, clauseIdx) => {
                             const allowedIds = selectionMap[checklist.id];
-                            const isSelective = Array.isArray(allowedIds);
+                            const isSelective = Array.isArray(allowedIds) && allowedIds.length > 0;
 
                             // Filter valid items first
                             const itemsToRender = clause.subClauses
