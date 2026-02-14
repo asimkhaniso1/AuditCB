@@ -135,8 +135,26 @@ window.getClientCertificatesHTML = function (client) {
             return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)">${siteScope}</textarea></div>`;
         }).join('')}
             </div>
-            <div style="margin-top: 1rem; text-align: right;">
-                 <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">Save Changes</button>
+            <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                 <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="font-size: 0.8rem;">Initial Date</label>
+                        <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'initialDate', this.value)">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.8rem;">Current Issue</label>
+                        <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'currentIssue', this.value)">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.8rem;">Expiry Date</label>
+                        <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'expiryDate', this.value)">
+                    </div>
+                 </div>
+                 <div style="display: flex; align-items: flex-end;">
+                    <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">
+                        <i class="fa-solid fa-save"></i> Save Changes
+                    </button>
+                 </div>
             </div>
         </div>`;
     }).join('')}
@@ -752,6 +770,116 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
     if (window.SupabaseClient?.isInitialized) window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId);
     if (window.renderClientDetail) renderClientDetail(clientId);
     window.showNotification('Removed');
+};
+
+// ============================================
+// 9. EDIT SITE FUNCTION
+// ============================================
+window.editSite = function (clientId, siteIndex) {
+    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.sites || !client.sites[siteIndex]) return;
+    const site = client.sites[siteIndex];
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalSave = document.getElementById('modal-save');
+    modalTitle.textContent = 'Edit Site Location';
+    const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
+    const stdHtml = stdOptions.map(function (std) {
+        var sel = (site.standards || client.standard || '').includes(std) ? 'selected' : '';
+        return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
+    }).join('');
+    modalBody.innerHTML = '<form id="site-form">' +
+        '<div class="form-group"><label>Site Name <span style="color:var(--danger-color)">*</span></label>' +
+        '<input type="text" class="form-control" id="site-name" value="' + (site.name || '') + '" required></div>' +
+        '<div class="form-group"><label>Address</label>' +
+        '<input type="text" class="form-control" id="site-address" value="' + (site.address || '') + '"></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">' +
+        '<div class="form-group"><label>City</label><input type="text" class="form-control" id="site-city" value="' + (site.city || '') + '"></div>' +
+        '<div class="form-group"><label>Country</label><input type="text" class="form-control" id="site-country" value="' + (site.country || '') + '"></div>' +
+        '</div>' +
+        '<div style="border-top:1px solid var(--border-color);margin:1rem 0;padding-top:1rem">' +
+        '<div class="form-group"><label>Applicable Standards</label>' +
+        '<select class="form-control" id="site-standards" multiple style="height:100px">' + stdHtml + '</select>' +
+        '<small style="color:var(--text-secondary)">Hold Ctrl/Cmd to select multiple</small></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">' +
+        '<div class="form-group"><label>Employees</label><input type="number" class="form-control" id="site-employees" min="0" value="' + (site.employees || '') + '"></div>' +
+        '<div class="form-group"><label>Shift Work?</label><select class="form-control" id="site-shift">' +
+        '<option value=""' + (!site.shift ? ' selected' : '') + '>-- Not specified --</option>' +
+        '<option value="No"' + (site.shift === 'No' ? ' selected' : '') + '>No</option>' +
+        '<option value="Yes"' + (site.shift === 'Yes' ? ' selected' : '') + '>Yes</option></select></div>' +
+        '</div></div>' +
+        '<div class="form-group"><label>Geotag</label><div style="display:flex;gap:0.5rem">' +
+        '<input type="text" class="form-control" id="site-geotag" value="' + (site.geotag || '') + '">' +
+        '<button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(function(pos){document.getElementById(\'site-geotag\').value=pos.coords.latitude.toFixed(4)+\', \'+pos.coords.longitude.toFixed(4)})">' +
+        '<i class="fa-solid fa-location-crosshairs"></i></button></div></div></form>';
+    window.openModal();
+    modalSave.onclick = function () {
+        var name = document.getElementById('site-name').value;
+        var address = document.getElementById('site-address').value;
+        var city = document.getElementById('site-city').value;
+        var country = document.getElementById('site-country').value;
+        var geotag = document.getElementById('site-geotag').value;
+        var employees = parseInt(document.getElementById('site-employees').value) || null;
+        var shift = document.getElementById('site-shift').value || null;
+        if (name) {
+            var standards = Array.from(document.getElementById('site-standards').selectedOptions).map(function (o) { return o.value }).join(', ');
+            client.sites[siteIndex] = Object.assign({}, site, { name: name, address: address, city: city, country: country, geotag: geotag, employees: employees, shift: shift, standards: standards });
+            window.saveData();
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(function (err) { console.error('Supabase sync failed:', err) });
+            }
+            window.closeModal();
+            if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
+            window.showNotification('Site updated successfully');
+        } else {
+            window.showNotification('Site name is required', 'error');
+        }
+    };
+};
+
+// ============================================
+// 10. GENERATE COMPANY PROFILE
+// ============================================
+window.generateCompanyProfile = function (clientId) {
+    var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+    if (!client) return;
+    if (!client.website) {
+        window.showNotification('Website URL is required for AI generation. Please add a website in the client settings first.', 'error');
+        return;
+    }
+    window.showNotification('Generating company profile from data...', 'info');
+    setTimeout(function () {
+        if (client.profile) {
+            if (!client.profileHistory) client.profileHistory = [];
+            client.profileHistory.push({ content: client.profile, updatedAt: client.profileUpdated || new Date().toISOString(), updatedBy: 'System', method: 'Manual' });
+        }
+        var parts = [];
+        parts.push(client.name + ' - Company Overview');
+        parts.push('\nIndustry: ' + (client.industry || 'Not specified'));
+        parts.push('Website: ' + client.website);
+        parts.push('\nAbout the Organization:');
+        var empText = client.employees ? ' with approximately ' + client.employees + ' employees' : '';
+        var siteText = (client.sites && client.sites.length > 1) ? ' operating across ' + client.sites.length + ' locations' : ' operating from a single location';
+        parts.push(client.name + ' is a ' + (client.industry || 'professional') + ' organization' + empText + siteText + '.');
+        if (client.standard) parts.push('\nThe organization maintains certification to ' + client.standard + ' standards.');
+        if (client.sites && client.sites.length > 0) {
+            parts.push('\nOperational Locations:');
+            client.sites.forEach(function (s) { parts.push('- ' + s.name + (s.city ? ' - ' + s.city : '') + (s.employees ? ' (' + s.employees + ' employees)' : '')); });
+        }
+        if (client.departments && client.departments.length > 0) {
+            parts.push('\nKey Departments:');
+            client.departments.forEach(function (d) { parts.push('- ' + d.name + (d.head ? ' - Led by ' + d.head : '')); });
+        }
+        parts.push('\nThis profile provides context for audit activities.');
+        client.profile = parts.join('\n');
+        client.profileUpdated = new Date().toISOString();
+        window.saveData();
+        if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
+        if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
+        if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 1);
+        window.showNotification('Company profile generated successfully!');
+    }, 500);
 };
 
 console.log('[DEBUG] clients-module-fix.js loaded successfully with HTML generators.');
