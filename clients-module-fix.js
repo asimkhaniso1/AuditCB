@@ -292,18 +292,49 @@ window.getClientSitesHTML = function (client) {
 window.getClientProfileHTML = function (client) {
     const profile = client.profile || '';
     const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
+    function formatProfileText(text) {
+        if (!text) return '';
+        var esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml(text) : text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        var lines = esc.split('\n');
+        var html = '';
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) { html += '<div style="height:0.5rem"></div>'; continue; }
+            if (line.match(/^---\s*.+\s*---$/)) {
+                html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem;text-transform:uppercase;letter-spacing:0.5px">' + line.replace(/---/g, '').trim() + '</strong></div>';
+            } else if (line.match(/^(Company Overview|Industry and Market|Products\/Services|Organizational Structure|Operational Locations|Management System|Key Processes|Context for Audit)/i)) {
+                html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem">' + line + '</strong></div>';
+            } else if (line.startsWith('- ')) {
+                html += '<div style="padding:0.2rem 0 0.2rem 1.2rem;position:relative"><span style="position:absolute;left:0.4rem;color:#3b82f6">&#8226;</span>' + line.substring(2) + '</div>';
+            } else if (line.match(/^(Industry|Website|Standards|Total Employees):/)) {
+                var p = line.split(':'); var lbl = p[0]; var v = p.slice(1).join(':').trim();
+                html += '<div style="padding:0.3rem 0"><span style="font-weight:600;color:#475569">' + lbl + ':</span> ' + v + '</div>';
+            } else if (line.match(/^.+ - (Company|Organization)/)) {
+                html += '<h4 style="margin:0 0 0.8rem 0;color:#0f172a;font-size:1.1rem;font-weight:700">' + line + '</h4>';
+            } else {
+                html += '<p style="margin:0.3rem 0;line-height:1.6;color:#334155">' + line + '</p>';
+            }
+        }
+        return html;
+    }
     return `
-    <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <div><h3 style="margin: 0;">Organization Context</h3><p>Last updated: ${lastUpdated}</p></div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">Edit Manually</button>
-                <button class="btn btn-sm" onclick="window.generateCompanyProfile(${client.id})">AI Generate</button>
+    <div class="card" style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);padding:1rem 1.5rem;display:flex;justify-content:space-between;align-items:center">
+            <div>
+                <h3 style="margin:0;color:white;font-size:1.1rem"><i class="fa-solid fa-building" style="margin-right:0.5rem"></i>Organization Context</h3>
+                <p style="margin:0.3rem 0 0 0;color:rgba(255,255,255,0.8);font-size:0.8rem">Last updated: ${lastUpdated}</p>
+            </div>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);font-size:0.8rem" onclick="window.editCompanyProfile('${client.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
+                <button class="btn btn-sm" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border:none;font-size:0.8rem" onclick="window.generateCompanyProfile('${client.id}')"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate</button>
             </div>
         </div>
-        ${profile ? `<div style="background: #f8fafc; padding: 1.5rem; white-space: pre-wrap;">${window.UTILS.escapeHtml(profile)}</div>` : `<div style="text-align: center; padding: 2rem;">No profile.</div>`}
+        <div style="padding:1.5rem">
+            ${profile ? formatProfileText(profile) : '<div style="text-align:center;padding:2rem;color:#94a3b8"><i class="fa-solid fa-file-circle-plus" style="font-size:2rem;margin-bottom:0.5rem;display:block"></i>No profile generated yet. Click AI Generate to create one.</div>'}
+        </div>
     </div>`;
 };
+
 
 window.getClientContactsHTML = function (client) {
     return `

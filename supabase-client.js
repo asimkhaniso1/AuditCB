@@ -1101,8 +1101,15 @@ const SupabaseClient = {
                 logo_url: client.logoUrl || null,
                 // Use current user ID from app state
                 created_by: client.createdBy || window.state?.currentUser?.id || null,
-                updated_at: new Date().toISOString()
-                // data: REMOVED - might not exist, using individual columns instead
+                updated_at: new Date().toISOString(),
+                // Store extended data in JSONB column
+                data: {
+                    profile: client.profile || null,
+                    profileUpdated: client.profileUpdated || null,
+                    profileHistory: client.profileHistory || [],
+                    certificates: client.certificates || [],
+                    nextAudit: client.nextAudit || null
+                }
             };
 
             console.log('[upsertClient] Sending payload:', JSON.stringify(clientData, null, 2));
@@ -1162,7 +1169,14 @@ const SupabaseClient = {
                     key_processes: client.keyProcesses || [],
                     contact_person: client.contactPerson || null,
                     logo_url: client.logoUrl || null,
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    data: {
+                        profile: client.profile || null,
+                        profileUpdated: client.profileUpdated || null,
+                        profileHistory: client.profileHistory || [],
+                        certificates: client.certificates || [],
+                        nextAudit: client.nextAudit || null
+                    }
                 }));
 
                 const { error } = await this.client
@@ -1259,7 +1273,13 @@ const SupabaseClient = {
                     keyProcesses: client.key_processes || [],
                     contactPerson: client.contact_person,
                     updatedAt: client.updated_at,
-                    logoUrl: client.logo_url
+                    logoUrl: client.logo_url,
+                    // Restore extended data from JSONB
+                    profile: (client.data && client.data.profile) || null,
+                    profileUpdated: (client.data && client.data.profileUpdated) || null,
+                    profileHistory: (client.data && client.data.profileHistory) || [],
+                    certificates: (client.data && client.data.certificates) || [],
+                    nextAudit: (client.data && client.data.nextAudit) || null
                 };
 
                 const existing = localClients.find(c => String(c.id) === String(client.id));

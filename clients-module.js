@@ -2012,7 +2012,7 @@ window.renderEditClient = function (clientId) {
                          <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
                             <i class="fa-solid fa-cloud-arrow-up"></i> Change Logo
                          </label>
-                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleClientLogoUpload(this)">
+                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleClientLogoUpload(this, '${client.id}')">
                          <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
                     </div>
                  </div>
