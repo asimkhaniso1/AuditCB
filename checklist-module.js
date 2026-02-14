@@ -693,11 +693,22 @@ function renderChecklistEditor(checklistId) {
                         </div>
                         <div class="form-group">
                             <label>Type</label>
-                            <select class="form-control" id="checklist-type">
+                            <select class="form-control" id="checklist-type" onchange="document.getElementById('checklist-client-group').style.display = this.value === 'custom' ? 'block' : 'none'">
                                 <option value="custom" ${checklist?.type === 'custom' || !checklist ? 'selected' : ''}>Custom (Personal)</option>
                                 ${canEditGlobal ? `<option value="global" ${checklist?.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                             </select>
                             ${isAdmin ? '<small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;"><i class="fa-solid fa-shield-halved" style="margin-right: 0.25rem;"></i>Admin: can change type</small>' : ''}
+                        </div>
+                        <div class="form-group" id="checklist-client-group" style="display: ${checklist?.type === 'custom' || !checklist?.type ? 'block' : 'none'}">
+                            <label>Client <small style="color: var(--text-secondary);">(optional - for client-specific checklists)</small></label>
+                            <select class="form-control" id="checklist-client">
+                                <option value="">-- Not client-specific --</option>
+                                ${(window.state.clients || []).map(c => `<option value="${c.id}" ${checklist?.clientId === c.id ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                            <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                <i class="fa-solid fa-info-circle" style="margin-right: 0.25rem;"></i>
+                                If selected, this checklist will appear in that client's audit plan configuration
+                            </small>
                         </div>
                         <!-- Audit Type field removed -->
                         <div class="form-group">
@@ -808,7 +819,7 @@ function saveChecklistFromEditor(checklistId) {
     const name = document.getElementById('checklist-name').value.trim();
     const standard = document.getElementById('checklist-standard').value;
     const type = document.getElementById('checklist-type').value;
-    // Audit Type retrieval removed
+    const clientId = document.getElementById('checklist-client')?.value || null;
     const auditScope = document.getElementById('checklist-audit-scope').value;
 
     if (!name) {

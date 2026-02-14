@@ -1012,6 +1012,7 @@ function closeModal() {
     document.getElementById('modal-body').innerHTML = '';
     document.getElementById('modal-save').onclick = null;
     document.getElementById('modal-save').textContent = 'Save'; // Reset button text
+    document.getElementById('modal-save').style.display = ''; // Reset visibility for next modal
 }
 
 // Export to window for global access
