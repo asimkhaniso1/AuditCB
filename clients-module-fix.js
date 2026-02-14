@@ -300,19 +300,25 @@ window.getClientProfileHTML = function (client) {
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i].trim();
             if (!line) { html += '<div style="height:0.5rem"></div>'; continue; }
-            if (line.match(/^---\s*.+\s*---$/)) {
+            // Convert inline **bold** to <strong>
+            var processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Section headers: lines that are entirely bold like **Title:** or **Title**
+            if (line.match(/^\*\*[^*]+\*\*:?$/)) {
+                var title = line.replace(/\*\*/g, '').replace(/:$/, '');
+                html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem">' + title + '</strong></div>';
+            } else if (line.match(/^---\s*.+\s*---$/)) {
                 html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem;text-transform:uppercase;letter-spacing:0.5px">' + line.replace(/---/g, '').trim() + '</strong></div>';
-            } else if (line.match(/^(Company Overview|Industry and Market|Products\/Services|Organizational Structure|Operational Locations|Management System|Key Processes|Context for Audit)/i)) {
-                html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem">' + line + '</strong></div>';
-            } else if (line.startsWith('- ')) {
-                html += '<div style="padding:0.2rem 0 0.2rem 1.2rem;position:relative"><span style="position:absolute;left:0.4rem;color:#3b82f6">&#8226;</span>' + line.substring(2) + '</div>';
+            } else if (line.match(/^(Company Overview|Industry and Market|Products\/Services|Products\/Services Offered|Organizational Structure|Operational Locations|Management System|Key Processes|Context for Audit)/i)) {
+                html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem">' + processedLine + '</strong></div>';
+            } else if (line.match(/^[-*] /)) {
+                var bulletText = line.replace(/^[-*]\s+/, '');
+                bulletText = bulletText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                html += '<div style="padding:0.2rem 0 0.2rem 1.2rem;position:relative"><span style="position:absolute;left:0.4rem;color:#3b82f6">&#8226;</span>' + bulletText + '</div>';
             } else if (line.match(/^(Industry|Website|Standards|Total Employees):/)) {
                 var p = line.split(':'); var lbl = p[0]; var v = p.slice(1).join(':').trim();
                 html += '<div style="padding:0.3rem 0"><span style="font-weight:600;color:#475569">' + lbl + ':</span> ' + v + '</div>';
-            } else if (line.match(/^.+ - (Company|Organization)/)) {
-                html += '<h4 style="margin:0 0 0.8rem 0;color:#0f172a;font-size:1.1rem;font-weight:700">' + line + '</h4>';
             } else {
-                html += '<p style="margin:0.3rem 0;line-height:1.6;color:#334155">' + line + '</p>';
+                html += '<p style="margin:0.3rem 0;line-height:1.6;color:#334155">' + processedLine + '</p>';
             }
         }
         return html;

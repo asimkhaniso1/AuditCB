@@ -710,7 +710,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const s = saved.status || ''; // 'conform', 'nc', 'na' or ''
 
                 // APPLY LOCAL OVERRIDES
-                let requirementText = item.requirement || item.text || item.title || item.requirement_text || 'No requirement text provided';
+                const getNestedReq = (obj) => { if (!obj || !obj.items || !obj.items[0]) return null; return obj.items[0].requirement; };
+                let requirementText = item.requirement || item.text || item.title || item.requirement_text || getNestedReq(item) || 'No requirement text provided';
                 if (overridesMap && overridesMap[checklistId] && overridesMap[checklistId][idx]) {
                     requirementText = overridesMap[checklistId][idx];
                 }
