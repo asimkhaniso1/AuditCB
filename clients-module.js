@@ -1841,38 +1841,7 @@ window.saveNewClient = async function () {
 
 
 
-window.handleClientLogoUpload = function (input) {
-    if (input.files && input.files[0]) {
-        const file = input.files[0];
-        if (file.size > 2 * 1024 * 1024) {
-            window.showNotification('File is too large. Max size is 2MB.', 'error');
-            input.value = ''; // Reset input
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const dataUrl = e.target.result;
-
-            // Store for saving (both file object for cloud and dataUrl for local fallback)
-            window._tempLogoFile = file;
-            window._tempClientLogo = dataUrl;
-
-            // Update Preview UI
-            const previewImg = document.getElementById('client-logo-preview-img');
-            const placeholder = document.getElementById('client-logo-placeholder');
-
-            if (previewImg) {
-                previewImg.style.backgroundImage = `url(${dataUrl})`;
-                previewImg.style.display = 'block';
-            }
-            if (placeholder) {
-                placeholder.style.display = 'none';
-            }
-        };
-        reader.readAsDataURL(file);
-    }
-};
+// Note: handleClientLogoUpload defined later (~L5223) with direct save + Supabase sync
 
 window.renderEditClient = function (clientId) {
     // Use loose equality to handle string/number ID mismatch
