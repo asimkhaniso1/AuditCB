@@ -844,6 +844,45 @@ window.editSite = function (clientId, siteIndex) {
 };
 
 // ============================================
+// 9b. CLIENT LOGO UPLOAD
+// ============================================
+window.handleClientLogoUpload = function (input, clientId) {
+    if (!clientId) clientId = window.state.activeClientId;
+    var file = input.files[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+        window.showNotification('Logo too large. Max 1MB', 'error');
+        input.value = '';
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+        if (client) {
+            client.logoUrl = e.target.result;
+            window.saveData();
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                window.SupabaseClient.upsertClient(client).catch(function (err) { console.error('Supabase sync failed:', err); });
+            }
+            var preview = document.getElementById('edit-client-logo-preview') || document.getElementById('client-logo-preview-img');
+            if (preview) {
+                if (preview.tagName === 'DIV') {
+                    preview.style.display = 'block';
+                    preview.style.backgroundImage = 'url(' + e.target.result + ')';
+                    preview.style.backgroundSize = 'cover';
+                    preview.style.backgroundPosition = 'center';
+                } else {
+                    preview.innerHTML = '<img src="' + e.target.result + '" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">';
+                }
+            }
+            var placeholder = document.getElementById('client-logo-placeholder');
+            if (placeholder) placeholder.style.display = 'none';
+            window.showNotification('Logo uploaded', 'success');
+        }
+    };
+    reader.readAsDataURL(file);
+};
+// ============================================
 // 10. GENERATE COMPANY PROFILE (AI-Enhanced)
 // ============================================
 window.generateCompanyProfile = async function (clientId) {
