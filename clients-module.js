@@ -5190,6 +5190,7 @@ CFO," style="font-family: monospace;"></textarea>
         };
 
         window.handleClientLogoUpload = function (input, clientId) {
+            if (!clientId) clientId = window.state.activeClientId;
             const file = input.files[0];
             if (!file) return;
 
