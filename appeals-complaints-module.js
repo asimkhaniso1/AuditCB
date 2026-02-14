@@ -1002,6 +1002,5 @@ window.managePanelRecords = function (appealId) {
 
 // Export
 window.renderAppealsComplaintsModule = renderAppealsComplaintsModule;
-window.switchACTab = switchNCRTab; // Re-use simpler switching if possible or define own
-window.switchACTab = function (tab) { window.state.appealsComplaintsTab = tab; renderAppealsComplaintsModule(); };
+// Note: switchACTab already defined at line ~435
 

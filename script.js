@@ -1242,22 +1242,7 @@ window.exitDemoMode = function () {
 };
 
 // Logout user
-window.logoutUser = function () {
-    if (confirm('Are you sure you want to logout?')) {
-        // Clear current user and redirect to login
-        state.currentUser = null;
-        saveState();
-
-        // Sign out from Supabase if available
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.signOut();
-        }
-
-        window.showNotification('Logged out successfully', 'success');
-        window.location.hash = 'login';
-        window.renderModule('login');
-    }
-};
+// Note: logoutUser defined later (~L1721) with proper dropdown close + login overlay
 
 window.switchUserRole = function (role) {
     if (!state.currentUser) {
