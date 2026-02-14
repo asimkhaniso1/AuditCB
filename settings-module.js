@@ -738,23 +738,7 @@ function getAccreditationHTML() {
     `;
 }
 
-window.saveAccreditation = async function () {
-    const settings = window.state.cbSettings;
-    settings.accreditationBody = document.getElementById('ab-name').value;
-    settings.accreditationNumber = document.getElementById('ab-number').value;
-    settings.accreditationExpiry = document.getElementById('ab-expiry').value;
-    settings.iafMlaStatus = document.getElementById('iaf-mla').checked;
-
-    settings.standardsOffered = Array.from(document.querySelectorAll('.standard-checkbox:checked')).map(cb => cb.value);
-
-    window.saveData();
-
-    if (window.SupabaseClient?.isInitialized) {
-        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
-    }
-
-    window.showNotification('Accreditation settings saved', 'success');
-};
+// Note: saveAccreditation defined in sanitized save functions section (~line 2603)
 
 window.addStandardToMasterlist = function () {
     document.getElementById('modal-title').textContent = 'Add New Standard';
@@ -2034,21 +2018,7 @@ function getQualityPolicyHTML() {
     `;
 }
 
-window.saveQualityPolicy = async function () {
-    const settings = window.state.cbSettings;
-    settings.qualityPolicy = document.getElementById('quality-policy').value;
-    settings.msScope = document.getElementById('ms-scope').value;
-    settings.policyLastReviewed = document.getElementById('policy-reviewed').value;
-    settings.policyApprovedBy = document.getElementById('policy-approved').value;
-
-    window.saveData();
-
-    if (window.SupabaseClient?.isInitialized) {
-        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
-    }
-
-    window.showNotification('Quality Policy saved', 'success');
-};
+// Note: saveQualityPolicy defined in sanitized save functions section (~line 2621)
 
 // ============================================
 // TAB 7: SYSTEM DEFAULTS
@@ -2120,20 +2090,7 @@ function getDefaultsHTML() {
     `;
 }
 
-window.saveDefaults = function () {
-    const settings = window.state.cbSettings;
-    settings.certificateNumberFormat = document.getElementById('cert-format').value;
-    settings.dateFormat = document.getElementById('date-format').value;
-    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration').value);
-    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration').value);
-    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead').value);
-    settings.sessionTimeout = parseInt(document.getElementById('session-timeout').value);
-    settings.currency = document.getElementById('currency').value;
-    settings.manDayCalculationMode = document.getElementById('manday-mode').value;
-
-    window.saveData();
-    window.showNotification('System defaults saved', 'success');
-};
+// Note: saveDefaults defined in sanitized save functions section (~line 2637)
 
 // ============================================
 // TAB 8: DATA BACKUP & MANAGEMENT
