@@ -1305,7 +1305,12 @@ window.renderConfigureChecklist = async function (planId) {
             cl.clauses.forEach(clause => {
                 if (clause.subClauses) {
                     clause.subClauses.forEach((sub, idx) => {
-                        const text = sub.requirement || sub.title || sub.requirement_text || 'No requirement text provided';
+                        // Helper to safely get nested property
+                        const getNestedReq = (obj) => {
+                            if (!obj.items || !obj.items[0]) return null;
+                            return obj.items[0].requirement;
+                        };
+                        const text = sub.requirement || sub.title || sub.requirement_text || sub.text || getNestedReq(sub) || 'No requirement text provided';
                         items.push({ id: `${clause.mainClause}-${idx}`, text: text, clause: clause.mainClause });
                     });
                 }
