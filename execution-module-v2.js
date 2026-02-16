@@ -1255,8 +1255,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Destructure for lookup
             const { assignedChecklists = [] } = contextData;
 
-            // Collect checklist NCs
-            (report.checklistProgress || []).filter(p => p.status === 'nc').forEach((item, idx) => {
+            // Collect checklist NCs — use original index into checklistProgress
+            (report.checklistProgress || []).forEach((item, originalIdx) => {
+                if (item.status !== 'nc') return;
                 // Lookup Requirement
                 let clauseText = '';
                 let reqText = '';
@@ -1278,7 +1279,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }
 
                 allFindings.push({
-                    id: `checklist-${idx}`,
+                    id: `checklist-${originalIdx}`,
                     source: 'Checklist',
                     type: item.ncrType || 'observation',
                     description: item.ncrDescription || reqText || item.comment || 'Non-conformity identified',
@@ -1290,7 +1291,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     clause: clauseText,
                     requirement: reqText
                 });
-                if (item.evidenceImage) window._evidenceCache[`checklist-${idx}`] = item.evidenceImage;
+                if (item.evidenceImage) window._evidenceCache[`checklist-${originalIdx}`] = item.evidenceImage;
             });
 
             // Collect manual NCRs
@@ -1911,9 +1912,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 if (findingId.startsWith('checklist-')) {
                     const idx = parseInt(findingId.replace('checklist-', ''));
-                    if (report.checklistProgress[idx]) {
+                    // idx is the ORIGINAL index into checklistProgress (not a filtered sequential index)
+                    if (report.checklistProgress && report.checklistProgress[idx]) {
                         report.checklistProgress[idx].ncrType = newType;
-                        report.checklistProgress[idx].comment = remarks;
+                        if (remarks) report.checklistProgress[idx].comment = remarks;
                     }
                 } else if (findingId.startsWith('ncr-')) {
                     const idx = parseInt(findingId.replace('ncr-', ''));
