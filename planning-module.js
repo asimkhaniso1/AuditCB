@@ -1271,9 +1271,26 @@ window.closeAuditPlan = function (planId) {
 
     if (confirm('Are you sure you want to close this audit? This represents the completion of the audit cycle and issuance of the certificate.')) {
         plan.status = 'Completed';
+
+        // Auto-generate certificate if not already exists
+        const report = window.state.auditReports?.find(r => String(r.auditPlanId) === String(planId));
+        if (report && report.status === 'Finalized') {
+            // Check if certificate already exists
+            if (!window.state.certificates) window.state.certificates = [];
+            const existingCert = window.state.certificates.find(c => String(c.reportId) === String(report.id));
+
+            if (!existingCert && typeof window.generateCertificate === 'function') {
+                const newCert = window.generateCertificate(report.id);
+                if (newCert) {
+                    window.state.certificates.push(newCert);
+                    window.showNotification(`Certificate ${newCert.certificateNumber} generated successfully`, 'success');
+                }
+            }
+        }
+
         window.saveData();
         viewAuditPlan(planId);
-        window.showNotification('Audit closed and certificate issued successfully.');
+        window.showNotification('Audit closed successfully.');
     }
 };
 

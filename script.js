@@ -754,6 +754,14 @@ async function renderModule(moduleName, syncHash = true) {
                     renderPlaceholder(moduleName);
                 }
                 break;
+            case 'certificates':
+                await loadScript('certificate-module.js');
+                if (typeof renderCertificates === 'function') {
+                    renderCertificates();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
             case 'record-retention':
                 if (typeof renderRecordRetentionModule === 'function') {
                     renderRecordRetentionModule();
