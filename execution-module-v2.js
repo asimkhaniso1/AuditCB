@@ -2974,17 +2974,219 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         ${d.report.ofi ? '<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;font-size:0.88rem;"><strong style="color:#854d0e;">Opportunities for Improvement:</strong><div style="color:#a16207;margin-top:4px;">' + d.report.ofi + '</div></div>' : ''}
                     </div>
                 </div>
-                <!-- 3: Compliance Overview -->
+                <!-- 3: Analytics & Insights -->
                 <div class="rp-sec" id="sec-charts">
-                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">3</span>COMPLIANCE OVERVIEW<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">3</span>ANALYTICS & INSIGHTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-                            <div style="text-align:center;padding:14px 8px;background:#f0fdf4;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#16a34a;">${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">COMPLIANCE</div></div>
-                            <div style="text-align:center;padding:14px 8px;background:#fef2f2;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#dc2626;">${d.stats.ncCount}</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">NON-CONFORMITIES</div></div>
-                            <div style="text-align:center;padding:14px 8px;background:#fffbeb;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#d97706;">${d.stats.observationCount}</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">OBSERVATIONS</div></div>
-                            <div style="text-align:center;padding:14px 8px;background:#eff6ff;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#2563eb;">${d.stats.totalItems}</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">TOTAL CHECKS</div></div>
+                        <!-- KPI Metrics Dashboard -->
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem;">
+                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;color:white;">
+                                <div style="font-size:2.2rem;font-weight:800;">${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%</div>
+                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">COMPLIANCE RATE</div>
+                            </div>
+                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;color:white;">
+                                <div style="font-size:2.2rem;font-weight:800;">${d.stats.ncCount}</div>
+                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">NON-CONFORMITIES</div>
+                            </div>
+                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;color:white;">
+                                <div style="font-size:2.2rem;font-weight:800;">${d.stats.observationCount}</div>
+                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">OBSERVATIONS</div>
+                            </div>
+                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:10px;color:white;">
+                                <div style="font-size:2.2rem;font-weight:800;">${d.stats.totalItems}</div>
+                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">TOTAL CHECKS</div>
+                            </div>
                         </div>
-                        <div style="color:#64748b;font-size:0.82rem;text-align:center;margin-top:10px;"><i class="fa-solid fa-chart-pie" style="margin-right:4px;"></i>3 interactive charts will render in the exported PDF</div>
+                        
+                        <!-- Charts Grid -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+                            <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
+                                <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;">Compliance Distribution</h4>
+                                <canvas id="compliance-pie-chart" style="max-height:250px;"></canvas>
+                            </div>
+                            <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
+                                <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;">Severity Breakdown</h4>
+                                <canvas id="severity-bar-chart" style="max-height:250px;"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Findings by Main Clause Chart -->
+                        <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
+                            <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;">Findings by ISO Clause (Main Clauses 4-10)</h4>
+                            <canvas id="clause-findings-chart" style="max-height:300px;"></canvas>
+                        </div>
+                        
+                        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+                        <script>
+                        (function() {
+                            // Wait for Chart.js to load
+                            setTimeout(() => {
+                                if (typeof Chart === 'undefined') {
+                                    console.error('Chart.js failed to load');
+                                    return;
+                                }
+                                
+                                // 1. Compliance Pie Chart
+                                const pieCtx = document.getElementById('compliance-pie-chart');
+                                if (pieCtx) {
+                                    new Chart(pieCtx.getContext('2d'), {
+                                        type: 'doughnut',
+                                        data: {
+                                            labels: ['Conforming', 'Non-Conformity', 'Observation'],
+                                            datasets: [{
+                                                data: [${d.stats.conformCount}, ${d.stats.ncCount}, ${d.stats.observationCount}],
+                                                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                                                borderWidth: 0
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: true,
+                                            plugins: {
+                                                legend: { 
+                                                    position: 'bottom',
+                                                    labels: { font: { size: 11 }, padding: 10 }
+                                                },
+                                                tooltip: {
+                                                    callbacks: {
+                                                        label: (context) => {
+                                                            const total = ${d.stats.conformCount + d.stats.ncCount + d.stats.observationCount};
+                                                            const pct = ((context.parsed / total) * 100).toFixed(1);
+                                                            return context.label + ': ' + context.parsed + ' (' + pct + '%)';
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                                
+                                // 2. Severity Bar Chart
+                                const sevCtx = document.getElementById('severity-bar-chart');
+                                if (sevCtx) {
+                                    const majorCount = ${d.hydratedProgress.filter(i => i.ncrType === 'Major').length};
+                                    const minorCount = ${d.hydratedProgress.filter(i => i.ncrType === 'Minor').length};
+                                    const obsCount = ${d.stats.observationCount};
+                                    
+                                    new Chart(sevCtx.getContext('2d'), {
+                                        type: 'bar',
+                                        data: {
+                                            labels: ['Major NC', 'Minor NC', 'Observations'],
+                                            datasets: [{
+                                                label: 'Count',
+                                                data: [majorCount, minorCount, obsCount],
+                                                backgroundColor: ['#dc2626', '#f59e0b', '#fbbf24'],
+                                                borderWidth: 0
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: true,
+                                            plugins: {
+                                                legend: { display: false }
+                                            },
+                                            scales: {
+                                                y: { 
+                                                    beginAtZero: true,
+                                                    ticks: { stepSize: 1 }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                                
+                                // 3. Findings by Main Clause Chart
+                                const clauseCtx = document.getElementById('clause-findings-chart');
+                                if (clauseCtx) {
+                                    // Group findings by main clause (e.g., 4.x -> 4, 5.x -> 5)
+                                    const clauseData = {};
+                                    const allItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
+            clause: i.kbMatch?.clause || i.clause || 'N/A',
+            status: i.status,
+            ncrType: i.ncrType
+        })))};
+                                    
+                                    allItems.forEach(item => {
+                                        const mainClause = item.clause.split('.')[0]; // Extract main clause (e.g., "4" from "4.1.2")
+                                        if (!clauseData[mainClause]) {
+                                            clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ok: 0 };
+                                        }
+                                        
+                                        if (item.status === 'nc') {
+                                            if (item.ncrType === 'Major') clauseData[mainClause].major++;
+                                            else if (item.ncrType === 'Minor') clauseData[mainClause].minor++;
+                                        } else if (item.status === 'observation') {
+                                            clauseData[mainClause].obs++;
+                                        } else if (item.status === 'ok') {
+                                            clauseData[mainClause].ok++;
+                                        }
+                                    });
+                                    
+                                    // Sort clauses numerically
+                                    const sortedClauses = Object.keys(clauseData).sort((a, b) => {
+                                        const numA = parseInt(a) || 999;
+                                        const numB = parseInt(b) || 999;
+                                        return numA - numB;
+                                    });
+                                    
+                                    new Chart(clauseCtx.getContext('2d'), {
+                                        type: 'bar',
+                                        data: {
+                                            labels: sortedClauses.map(c => 'Clause ' + c),
+                                            datasets: [
+                                                {
+                                                    label: 'Major NC',
+                                                    data: sortedClauses.map(c => clauseData[c].major),
+                                                    backgroundColor: '#dc2626',
+                                                    stack: 'findings'
+                                                },
+                                                {
+                                                    label: 'Minor NC',
+                                                    data: sortedClauses.map(c => clauseData[c].minor),
+                                                    backgroundColor: '#f59e0b',
+                                                    stack: 'findings'
+                                                },
+                                                {
+                                                    label: 'Observations',
+                                                    data: sortedClauses.map(c => clauseData[c].obs),
+                                                    backgroundColor: '#fbbf24',
+                                                    stack: 'findings'
+                                                },
+                                                {
+                                                    label: 'Conforming',
+                                                    data: sortedClauses.map(c => clauseData[c].ok),
+                                                    backgroundColor: '#10b981',
+                                                    stack: 'findings'
+                                                }
+                                            ]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: true,
+                                            plugins: {
+                                                legend: { 
+                                                    position: 'bottom',
+                                                    labels: { font: { size: 11 }, padding: 10 }
+                                                },
+                                                tooltip: {
+                                                    mode: 'index',
+                                                    intersect: false
+                                                }
+                                            },
+                                            scales: {
+                                                x: { stacked: true },
+                                                y: { 
+                                                    stacked: true,
+                                                    beginAtZero: true,
+                                                    ticks: { stepSize: 1 }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            }, 300);
+                        })();
+                        </script>
                     </div>
                 </div>
                 <!-- 4: Findings -->
