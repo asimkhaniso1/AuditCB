@@ -389,16 +389,43 @@ Example:
     // Parse the text response into JSON
     parseAgendaResponse: (text) => {
         // Clean up markdown code blocks if present
-        let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        let cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
+        // Strategy 1: Direct parse
         try {
             const json = JSON.parse(cleanText);
-            if (!Array.isArray(json)) throw new Error("AI response is not an array");
-            return json;
-        } catch (e) {
-            console.error("JSON Parse Error. Raw Text:", text);
-            throw new Error("Failed to parse AI response. Please try again.");
+            if (Array.isArray(json)) return json;
+            // If it's an object, check common wrapper keys
+            if (json && typeof json === 'object') {
+                for (const key of ['classifications', 'findings', 'results', 'data', 'items', 'agenda']) {
+                    if (Array.isArray(json[key])) return json[key];
+                }
+                return [json];
+            }
+        } catch (e) { /* try next strategy */ }
+
+        // Strategy 2: Extract JSON array [...] from the text (greedy to handle nested objects)
+        const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+            try {
+                const json = JSON.parse(arrayMatch[0]);
+                if (Array.isArray(json)) return json;
+            } catch (e) { /* try next strategy */ }
         }
+
+        // Strategy 3: Extract individual JSON objects and collect them
+        const objects = [];
+        const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+        let match;
+        while ((match = objRegex.exec(cleanText)) !== null) {
+            try {
+                objects.push(JSON.parse(match[0]));
+            } catch (e) { /* skip invalid */ }
+        }
+        if (objects.length > 0) return objects;
+
+        console.error("JSON Parse Error. Raw Text:", text);
+        throw new Error("Failed to parse AI response. Please try again.");
     }
 };
 
