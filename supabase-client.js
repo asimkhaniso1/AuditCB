@@ -1544,6 +1544,7 @@ const SupabaseClient = {
                     end_date: plan.endDate || plan.date || null,
                     lead_auditor: plan.leadAuditor || null,
                     audit_team: auditTeam,
+                    pre_audit: plan.preAudit || null,  // Pre-Audit (Stage 1) data
                     updated_at: new Date().toISOString()
                 };
 

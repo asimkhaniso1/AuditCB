@@ -831,6 +831,17 @@ function renderDashboard() {
             alerts.push({ type: 'Overdue', msg: `${aud.name} - Overdue`, id: aud.id, severity: 'critical' });
         }
     });
+
+    // Pre-Audit metrics
+    const allPlans = state.auditPlans || [];
+    const plansWithPreAudit = allPlans.filter(p => p.preAudit);
+    const completedPreAudits = plansWithPreAudit.filter(p => p.preAudit?.status === 'Complete').length;
+    const readyCount = plansWithPreAudit.filter(p => p.preAudit?.readinessDecision === 'Ready').length;
+    const conditionalCount = plansWithPreAudit.filter(p => p.preAudit?.readinessDecision === 'Conditional').length;
+    const notReadyCount = plansWithPreAudit.filter(p => p.preAudit?.readinessDecision === 'Not Ready').length;
+    const pendingCount = plansWithPreAudit.filter(p => !p.preAudit?.status || p.preAudit?.status === 'Not Started' || p.preAudit?.status === 'In Progress').length;
+    const completionRate = allPlans.length > 0 ? Math.round((completedPreAudits / allPlans.length) * 100) : 0;
+
     const dashboardHTML = `
         <div class="dashboard-grid fade-in">
             <div class="card stat-card">
@@ -849,6 +860,62 @@ function renderDashboard() {
                 <h3>Certificates Issued</h3>
                 <p class="stat-value">12</p>
             </div>
+        </div>
+        
+        <!-- Pre-Audit Metrics Card -->
+        <div class="card fade-in" style="margin-top: 2rem; border-top: 3px solid #8b5cf6;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+                <div>
+                    <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-file-magnifying-glass" style="color: #8b5cf6;"></i>
+                        Pre-Audit (Stage 1) Status
+                    </h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.25rem 0 0 0;">ISO 17021-1 Document Review & Readiness Assessment</p>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">${completedPreAudits}/${allPlans.length}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">Completed</div>
+                    <div style="margin-top: 0.5rem; padding: 4px 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                        ${completionRate}% Rate
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #16a34a;">${readyCount}</div>
+                    <div style="font-size: 0.85rem; color: #15803d; margin-top: 0.25rem;">
+                        <i class="fa-solid fa-check-circle"></i> Ready
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #d97706;">${conditionalCount}</div>
+                    <div style="font-size: 0.85rem; color: #b45309; margin-top: 0.25rem;">
+                        <i class="fa-solid fa-exclamation-triangle"></i> Conditional
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #dc2626;">${notReadyCount}</div>
+                    <div style="font-size: 0.85rem; color: #b91c1c; margin-top: 0.25rem;">
+                        <i class="fa-solid fa-times-circle"></i> Not Ready
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #64748b;">${pendingCount}</div>
+                    <div style="font-size: 0.85rem; color: #475569; margin-top: 0.25rem;">
+                        <i class="fa-solid fa-clock"></i> Pending
+                    </div>
+                </div>
+            </div>
+            
+            ${pendingCount > 0 ? `
+                <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+                    <div style="font-size: 0.85rem; color: #92400e;">
+                        <i class="fa-solid fa-info-circle"></i> 
+                        <strong>${pendingCount}</strong> audit plan${pendingCount !== 1 ? 's' : ''} pending Pre-Audit review
+                    </div>
+                </div>
+            ` : ''}
         </div>
         
         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-top: 2rem;">

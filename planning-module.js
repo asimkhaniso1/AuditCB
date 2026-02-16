@@ -2382,9 +2382,61 @@ window.renderPreAuditReview = function (planId) {
     const completionPct = Math.round((reviewedItems / totalItems) * 100);
 
     const html = `
-        <div class="fade-in">
+        <style>
+            /* Mobile-responsive styles for Pre-Audit form */
+            @media (max-width: 768px) {
+                /* Header - Stack buttons vertically */
+                .pre-audit-header {
+                    flex-direction: column !important;
+                    gap: 1rem !important;
+                }
+                
+                .pre-audit-header > div:last-child {
+                    width: 100%;
+                }
+                
+                .pre-audit-header button {
+                    width: 100% !important;
+                }
+                
+                /* Progress cards - 2x2 grid on mobile */
+                .pre-audit-progress-grid {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                    gap: 1rem !important;
+                }
+                
+                /* Checklist items - Stack all columns vertically */
+                .pre-audit-item-grid {
+                    grid-template-columns: 1fr !important;
+                    gap: 0.75rem !important;
+                }
+                
+                /* Touch-optimized controls */
+                .pre-audit-item-grid select,
+                .pre-audit-item-grid textarea,
+                .pre-audit-form button {
+                    min-height: 44px !important;
+                    font-size: 16px !important; /* Prevents iOS zoom */
+                }
+                
+                .pre-audit-item-grid textarea {
+                    min-height: 80px !important;
+                }
+                
+                /* Readiness decision - Stack vertically */
+                .readiness-grid {
+                    grid-template-columns: 1fr !important;
+                    gap: 1rem !important;
+                }
+                
+                .readiness-grid select {
+                    width: 100% !important;
+                }
+            }
+        </style>
+        <div class="fade-in pre-audit-form">
             <!-- Header -->
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
+            <div class="pre-audit-header" style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
                 <div>
                     <button class="btn btn-secondary" onclick="viewAuditPlan('${plan.id}')">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Audit Plan
@@ -2410,7 +2462,7 @@ window.renderPreAuditReview = function (planId) {
 
             <!-- Progress Summary -->
             <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem;">
+                <div class="pre-audit-progress-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem;">
                     <div style="text-align: center; color: white;">
                         <div style="font-size: 2rem; font-weight: bold;">${reviewedItems}/${totalItems}</div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">Items Reviewed</div>
@@ -2451,7 +2503,7 @@ window.renderPreAuditReview = function (planId) {
         const review = plan.preAudit.documentReview[item.id] || {};
         return `
                                 <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 4px solid ${review.status === 'ok' ? '#10b981' : review.status === 'minor' ? '#f59e0b' : review.status === 'major' ? '#ef4444' : '#cbd5e1'};">
-                                    <div style="display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 1rem; align-items: start;">
+                                    <div class="pre-audit-item-grid" style="display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 1rem; align-items: start;">
                                         <div>
                                             <label style="font-weight: 600; color: #1e293b; display: block; margin-bottom: 0.5rem;">
                                                 ${item.label}
@@ -2491,7 +2543,7 @@ window.renderPreAuditReview = function (planId) {
                     <i class="fa-solid fa-gavel" style="margin-right: 0.5rem;"></i>
                     Readiness Decision
                 </h3>
-                <div style="display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; align-items: start;">
+                <div class="readiness-grid" style="display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; align-items: start;">
                     <div>
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Decision</label>
                         <select 
