@@ -683,5 +683,68 @@
         addShortcutHint();
     }
 
-    console.log('✅ Enhancements module loaded: Lazy Load | Shortcuts | Analytics | PDF Export | Responsive');
+    // ============================================
+    // 6. DATE PASTE HANDLER
+    // Allows pasting dates into input[type=date] fields
+    // Parses common formats: dd/mm/yyyy, mm/dd/yyyy, yyyy-mm-dd, etc.
+    // ============================================
+
+    function parsePastedDate(text) {
+        if (!text) return null;
+        text = text.trim();
+
+        // Already ISO format: yyyy-mm-dd
+        if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+        // dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
+        let m = text.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+        if (m) {
+            const day = m[1].padStart(2, '0');
+            const month = m[2].padStart(2, '0');
+            const year = m[3];
+            // Heuristic: if first num > 12, it's dd/mm/yyyy; otherwise try mm/dd/yyyy
+            if (parseInt(m[1]) > 12) {
+                return `${year}-${month}-${day}`;
+            } else if (parseInt(m[2]) > 12) {
+                // mm/dd/yyyy format
+                return `${year}-${day}-${month}`;
+            }
+            // Default: dd/mm/yyyy (international)
+            return `${year}-${month}-${day}`;
+        }
+
+        // yyyy/mm/dd
+        m = text.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+        if (m) {
+            return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        }
+
+        // Try native Date parsing as last resort (handles "Feb 16, 2026", etc.)
+        const d = new Date(text);
+        if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
+            return d.toISOString().split('T')[0];
+        }
+
+        return null;
+    }
+
+    // Delegated paste handler — works on dynamically created date inputs
+    document.addEventListener('paste', function (e) {
+        const input = e.target;
+        if (!input || input.tagName !== 'INPUT' || input.type !== 'date') return;
+
+        const pastedText = (e.clipboardData || window.clipboardData)?.getData('text');
+        if (!pastedText) return;
+
+        const isoDate = parsePastedDate(pastedText);
+        if (isoDate) {
+            e.preventDefault();
+            input.value = isoDate;
+            // Fire change event so onchange handlers trigger
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log(`[Date Paste] "${pastedText}" → ${isoDate}`);
+        }
+    });
+
+    console.log('✅ Enhancements module loaded: Lazy Load | Shortcuts | Analytics | PDF Export | Responsive | Date Paste');
 })();
