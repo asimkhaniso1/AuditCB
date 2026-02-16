@@ -546,7 +546,21 @@ window.runFollowUpAIAnalysis = async function (reportId) {
         });
 
         if (updateCount > 0) {
-            window.saveChecklist(reportId);
+            // IMPORTANT: Do NOT call saveChecklist here — it reads stale DOM values
+            // from Review tab dropdowns and overwrites our AI changes.
+            // Instead, persist directly to localStorage.
+            try {
+                const idx = window.state.auditReports.findIndex(r => String(r.id) === String(reportId));
+                if (idx >= 0) {
+                    localStorage.setItem('auditReports', JSON.stringify(window.state.auditReports));
+                    console.log('[AI Classify] Persisted to localStorage directly (bypassed saveChecklist DOM read)');
+                }
+                // Also try Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.db.update('audit_reports', String(reportId), { data: report }).catch(e => console.warn('[AI Classify] Supabase save failed:', e));
+                }
+            } catch (e) { console.warn('[AI Classify] Direct save failed:', e); }
+
             window.renderExecutionDetail && window.renderExecutionDetail(reportId);
             setTimeout(() => {
                 document.querySelector('.tab-btn[data-tab="review"]')?.click();
