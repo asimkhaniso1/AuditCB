@@ -544,6 +544,25 @@ function renderExecutionDetail(reportId) {
         ...((clientData && clientData.designations) || []).map(d => d.title || d),
         ...((clientData && clientData.contacts) || []).map(c => c.designation).filter(Boolean)
     ]));
+    // Collect audit team members
+    const auditTeam = [];
+    if (plan) {
+        if (plan.team && Array.isArray(plan.team)) {
+            plan.team.forEach((name, i) => auditTeam.push({ name, role: i === 0 ? 'Lead Auditor' : 'Team Auditor' }));
+        } else if (plan.auditors && Array.isArray(plan.auditors)) {
+            plan.auditors.forEach((id, i) => {
+                const a = (state.auditors || []).find(x => x.id == id);
+                if (a) auditTeam.push({ name: a.name, role: i === 0 ? 'Lead Auditor' : (a.role || 'Team Auditor') });
+            });
+        }
+        if (plan.lead && !auditTeam.some(a => a.name === plan.lead)) {
+            auditTeam.unshift({ name: plan.lead, role: 'Lead Auditor' });
+        }
+    }
+    // Client personnel for attendee picker
+    const clientPersonnel = ((clientData && clientData.contacts) || []).map(c => ({
+        name: c.name, role: c.designation || '', organization: clientData?.name || report.client
+    }));
 
     const planChecklists = plan?.selectedChecklists || [];
     const checklists = state.checklists || [];
@@ -695,11 +714,11 @@ function renderExecutionDetail(reportId) {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments, designations, selectionMap, overridesMap });
+            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments, designations, auditTeam, clientPersonnel, clientData, plan, selectionMap, overridesMap });
         });
     });
 
-    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments, designations, selectionMap, overridesMap });
+    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments, designations, auditTeam, clientPersonnel, clientData, plan, selectionMap, overridesMap });
 }
 
 function renderExecutionTab(report, tabName, contextData = {}) {
@@ -707,7 +726,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     switch (tabName) {
         case 'checklist':
-            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], designations = [], selectionMap = {}, overridesMap = {} } = contextData;
+            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], designations = [], auditTeam = [], clientPersonnel = [], clientData = null, plan = null, selectionMap = {}, overridesMap = {} } = contextData;
 
 
             // Helper to render row
@@ -1448,21 +1467,24 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </div>
                         
 
-                        <!-- Meeting Records Section -->
+                        <!-- Meeting Records Summary (from Meetings Tab) -->
                         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
-                            <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Meeting Records</h4>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <h4 style="font-size: 0.95rem; margin: 0; color: var(--text-secondary); text-transform: uppercase;">Meeting Records</h4>
+                                <button class="btn btn-sm btn-outline-primary" onclick="document.querySelector('.tab-btn[data-tab=&quot;meetings&quot;]')?.click()">
+                                    <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i>Edit in Meetings Tab
+                                </button>
+                            </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                                <!-- Opening Meeting -->
                                 <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
-                                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #2563eb;">Opening Meeting</label>
-                                    <input type="datetime-local" id="opening-date-${report.id}" class="form-control" style="margin-bottom: 0.5rem;" value="${report.openingMeeting?.dateTime || ''}" onchange="window.updateMeetingData('${report.id}', 'opening', 'dateTime', this.value)">
-                                    <textarea id="opening-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'opening', 'attendees', this.value)">${Array.isArray(report.openingMeeting?.attendees) ? report.openingMeeting.attendees.join(', ') : (report.openingMeeting?.attendees || '')}</textarea>
+                                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #2563eb;"><i class="fa-solid fa-door-open" style="margin-right: 0.25rem;"></i>Opening Meeting</label>
+                                    ${report.openingMeeting?.date ? `<div style="font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Date:</strong> ${report.openingMeeting.date} ${report.openingMeeting.time || ''}</div>` : '<div style="font-size: 0.85rem; color: #94a3b8;">Not recorded yet</div>'}
+                                    ${(() => { const att = report.openingMeeting?.attendees; if (!att) return ''; if (Array.isArray(att)) return '<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong></div>' + att.map(a => typeof a === 'object' ? `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a.name}${a.role ? ' - ' + a.role : ''}${a.organization ? ' (' + a.organization + ')' : ''}</div>` : `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a}</div>`).join(''); return `<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong> ${att}</div>`; })()}
                                 </div>
-                                <!-- Closing Meeting -->
                                 <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px dashed #fdba74;">
-                                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #ea580c;">Closing Meeting</label>
-                                    <input type="datetime-local" id="closing-date-${report.id}" class="form-control" style="margin-bottom: 0.5rem;" value="${report.closingMeeting?.dateTime || ''}" onchange="window.updateMeetingData('${report.id}', 'closing', 'dateTime', this.value)">
-                                    <textarea id="closing-attendees-${report.id}" rows="2" class="form-control" style="font-size: 0.85rem;" placeholder="Attendees (comma separated)..." onchange="window.updateMeetingData('${report.id}', 'closing', 'attendees', this.value)">${Array.isArray(report.closingMeeting?.attendees) ? report.closingMeeting.attendees.join(', ') : (report.closingMeeting?.attendees || '')}</textarea>
+                                    <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: #ea580c;"><i class="fa-solid fa-door-closed" style="margin-right: 0.25rem;"></i>Closing Meeting</label>
+                                    ${report.closingMeeting?.date ? `<div style="font-size: 0.85rem; margin-bottom: 0.5rem;"><strong>Date:</strong> ${report.closingMeeting.date} ${report.closingMeeting.time || ''}</div>` : '<div style="font-size: 0.85rem; color: #94a3b8;">Not recorded yet</div>'}
+                                    ${(() => { const att = report.closingMeeting?.attendees; if (!att) return ''; if (Array.isArray(att)) return '<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong></div>' + att.map(a => typeof a === 'object' ? `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a.name}${a.role ? ' - ' + a.role : ''}${a.organization ? ' (' + a.organization + ')' : ''}</div>` : `<div style="font-size: 0.8rem; padding: 0.15rem 0;">• ${a}</div>`).join(''); return `<div style="font-size: 0.8rem; margin-top: 0.5rem;"><strong>Attendees:</strong> ${att}</div>`; })()}
                                 </div>
                             </div>
                         </div>
@@ -1501,10 +1523,61 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }, 500);
             break;
 
-        case 'meetings':
+        case 'meetings': {
             // ISO 17021-1 Opening/Closing Meeting Records
             const openingMeeting = report.openingMeeting || {};
             const closingMeeting = report.closingMeeting || {};
+            // Build attendee picker data
+            const { auditTeam: mAuditTeam = [], clientPersonnel: mClientPersonnel = [], clientData: mClientData = null } = contextData;
+            const cbName = window.state.settings?.orgName || window.state.settings?.cbName || 'CB';
+            const clientOrgName = mClientData?.name || report.client || 'Client';
+            // Parse existing attendees to check who's already selected
+            const parseExisting = (att) => {
+                if (!att) return [];
+                if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? a.name : a);
+                return att.split('\n').map(l => l.split('-')[0].trim()).filter(Boolean);
+            };
+            const existingOpeningNames = parseExisting(openingMeeting.attendees);
+            const existingClosingNames = parseExisting(closingMeeting.attendees);
+
+            const buildAttendeeSection = (prefix, existingNames) => {
+                let html = '<div style="margin-bottom: 1rem;">';
+                // Audit Team section
+                if (mAuditTeam.length > 0) {
+                    html += '<div style="margin-bottom: 0.75rem;"><div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;"><i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team</div>';
+                    mAuditTeam.forEach(a => {
+                        const checked = existingNames.includes(a.name) ? 'checked' : '';
+                        html += `<label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">`;
+                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(a.name || '').replace(/"/g, '&quot;')}" data-role="${(a.role || '').replace(/"/g, '&quot;')}" data-org="${cbName.replace(/"/g, '&quot;')}" ${checked} style="width: 16px; height: 16px;">`;
+                        html += `<span style="font-weight: 500;">${a.name}</span><span style="color: #64748b; font-size: 0.8rem;">– ${a.role}</span>`;
+                        html += '</label>';
+                    });
+                    html += '</div>';
+                }
+                // Client Personnel section
+                if (mClientPersonnel.length > 0) {
+                    html += '<div style="margin-bottom: 0.75rem;"><div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;"><i class="fa-solid fa-building" style="margin-right: 0.25rem;"></i>Client Personnel</div>';
+                    mClientPersonnel.forEach(p => {
+                        const checked = existingNames.includes(p.name) ? 'checked' : '';
+                        html += `<label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">`;
+                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(p.name || '').replace(/"/g, '&quot;')}" data-role="${(p.role || '').replace(/"/g, '&quot;')}" data-org="${clientOrgName.replace(/"/g, '&quot;')}" ${checked} style="width: 16px; height: 16px;">`;
+                        html += `<span style="font-weight: 500;">${p.name}</span>${p.role ? `<span style="color: #64748b; font-size: 0.8rem;">– ${p.role}</span>` : ''}`;
+                        html += '</label>';
+                    });
+                    html += '</div>';
+                }
+                // Custom add
+                html += `<div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">`;
+                html += `<input type="text" id="${prefix}-custom-name" class="form-control form-control-sm" placeholder="Name" style="flex: 2;">`;
+                html += `<input type="text" id="${prefix}-custom-role" class="form-control form-control-sm" placeholder="Role" style="flex: 1.5;">`;
+                html += `<input type="text" id="${prefix}-custom-org" class="form-control form-control-sm" placeholder="Organization" style="flex: 1.5;">`;
+                html += `<button class="btn btn-sm btn-outline-primary" onclick="window.addCustomMeetingAttendee('${prefix}')"><i class="fa-solid fa-plus"></i></button>`;
+                html += '</div>';
+                // Custom attendees list
+                html += `<div id="${prefix}-custom-list" style="margin-top: 0.5rem;"></div>`;
+                html += '</div>';
+                return html;
+            };
 
             tabContent.innerHTML = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
@@ -1524,8 +1597,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Attendees (one per line: Name - Role - Organization)</label>
-                            <textarea id="opening-attendees" class="form-control" rows="4" placeholder="John Smith - Lead Auditor - CB Name&#10;Jane Doe - Quality Manager - Client Name">${openingMeeting.attendees || ''}</textarea>
+                            <label style="font-weight: 600; margin-bottom: 0.5rem;"><i class="fa-solid fa-users" style="margin-right: 0.25rem;"></i>Attendees</label>
+                            ${buildAttendeeSection('opening', existingOpeningNames)}
                         </div>
                         <div class="form-group">
                             <label>Meeting Notes</label>
@@ -1549,8 +1622,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Attendees (one per line: Name - Role - Organization)</label>
-                            <textarea id="closing-attendees" class="form-control" rows="4" placeholder="John Smith - Lead Auditor - CB Name&#10;Jane Doe - Quality Manager - Client Name">${closingMeeting.attendees || ''}</textarea>
+                            <label style="font-weight: 600; margin-bottom: 0.5rem;"><i class="fa-solid fa-users" style="margin-right: 0.25rem;"></i>Attendees</label>
+                            ${buildAttendeeSection('closing', existingClosingNames)}
                         </div>
                         <div class="form-group">
                             <label>Findings Summary Presented</label>
@@ -1577,146 +1650,146 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
             `;
             break;
-    }
-}
-
-// Helper functions for execution module
-
-// Accordion toggle for clause sections
-window.toggleAccordion = function (sectionId) {
-    const content = document.getElementById(sectionId);
-    const icon = document.getElementById('icon-' + sectionId);
-    if (content) {
-        const isVisible = content.style.display === 'block';
-        content.style.display = isVisible ? 'none' : 'block';
-        if (icon) {
-            icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
         }
     }
-};
 
-window.toggleSectionSelection = function (sectionId, checkbox) {
-    window.Logger.debug('Execution', 'toggleSectionSelection called for:', sectionId);
-    const section = document.getElementById(sectionId);
-    if (!section) {
-        window.Logger.error('Execution', 'Section not found: ' + sectionId);
-        return;
-    }
+    // Helper functions for execution module
 
-    // Use passed checkbox or find it
-    const box = checkbox || document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
-    const isChecked = box ? box.checked : false;
+    // Accordion toggle for clause sections
+    window.toggleAccordion = function (sectionId) {
+        const content = document.getElementById(sectionId);
+        const icon = document.getElementById('icon-' + sectionId);
+        if (content) {
+            const isVisible = content.style.display === 'block';
+            content.style.display = isVisible ? 'none' : 'block';
+            if (icon) {
+                icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+            }
+        }
+    };
 
-    window.Logger.debug('Execution', 'Checkbox is checked:', isChecked);
+    window.toggleSectionSelection = function (sectionId, checkbox) {
+        window.Logger.debug('Execution', 'toggleSectionSelection called for:', sectionId);
+        const section = document.getElementById(sectionId);
+        if (!section) {
+            window.Logger.error('Execution', 'Section not found: ' + sectionId);
+            return;
+        }
 
-    // Toggle items in this section
-    let count = 0;
-    const items = section.querySelectorAll('.checklist-item');
-    window.Logger.debug('Execution', 'Found items:', items.length);
-    items.forEach(item => {
-        if (isChecked) {
-            item.classList.add('selected-item');
-            item.style.background = '#eff6ff'; // Light blue highlight
-            item.style.borderLeft = '4px solid var(--primary-color)';
-            count++;
+        // Use passed checkbox or find it
+        const box = checkbox || document.querySelector(`.section-checkbox[data-section-id="${sectionId}"]`);
+        const isChecked = box ? box.checked : false;
+
+        window.Logger.debug('Execution', 'Checkbox is checked:', isChecked);
+
+        // Toggle items in this section
+        let count = 0;
+        const items = section.querySelectorAll('.checklist-item');
+        window.Logger.debug('Execution', 'Found items:', items.length);
+        items.forEach(item => {
+            if (isChecked) {
+                item.classList.add('selected-item');
+                item.style.background = '#eff6ff'; // Light blue highlight
+                item.style.borderLeft = '4px solid var(--primary-color)';
+                count++;
+            } else {
+                item.classList.remove('selected-item');
+                item.style.background = ''; // Reset
+                item.style.borderLeft = '4px solid #e2e8f0'; // Reset
+            }
+        });
+
+        // Optional: Update UI or show brief feedback
+        // window.showNotification(isChecked ? `Selected ${count} items` : 'Selection cleared', 'info');
+    };
+
+    window.setChecklistStatus = function (uniqueId, status) {
+        window.Logger.debug('Execution', 'setChecklistStatus called:', { uniqueId, status });
+
+        const row = document.getElementById('row-' + uniqueId);
+        if (!row) {
+            window.Logger.error('Execution', 'Row not found: row-' + uniqueId);
+            return;
+        }
+
+        // Update buttons
+        row.querySelectorAll('.btn-icon').forEach(btn => btn.classList.remove('active'));
+
+        let activeBtnClass = '';
+        if (status === window.CONSTANTS.STATUS.CONFORM) activeBtnClass = '.btn-ok';
+        else if (status === window.CONSTANTS.STATUS.NC) activeBtnClass = '.btn-nc';
+        else if (status === window.CONSTANTS.STATUS.NA) activeBtnClass = '.btn-na';
+
+        if (activeBtnClass) row.querySelector(activeBtnClass)?.classList.add('active');
+
+        // Show/Hide NCR Panel
+        const panelId = 'ncr-panel-' + uniqueId;
+        const panel = document.getElementById(panelId);
+        window.Logger.debug('Execution', 'Looking for panel:', { panelId, found: !!panel });
+
+        if (panel) {
+            if (status === window.CONSTANTS.STATUS.NC) {
+                panel.style.display = 'block';
+                window.Logger.debug('Execution', 'NCR Panel shown for:', uniqueId);
+            } else {
+                panel.style.display = 'none';
+            }
         } else {
-            item.classList.remove('selected-item');
-            item.style.background = ''; // Reset
-            item.style.borderLeft = '4px solid #e2e8f0'; // Reset
+            window.Logger.error('Execution', 'NCR Panel not found: ' + panelId);
         }
-    });
 
-    // Optional: Update UI or show brief feedback
-    // window.showNotification(isChecked ? `Selected ${count} items` : 'Selection cleared', 'info');
-};
-
-window.setChecklistStatus = function (uniqueId, status) {
-    window.Logger.debug('Execution', 'setChecklistStatus called:', { uniqueId, status });
-
-    const row = document.getElementById('row-' + uniqueId);
-    if (!row) {
-        window.Logger.error('Execution', 'Row not found: row-' + uniqueId);
-        return;
-    }
-
-    // Update buttons
-    row.querySelectorAll('.btn-icon').forEach(btn => btn.classList.remove('active'));
-
-    let activeBtnClass = '';
-    if (status === window.CONSTANTS.STATUS.CONFORM) activeBtnClass = '.btn-ok';
-    else if (status === window.CONSTANTS.STATUS.NC) activeBtnClass = '.btn-nc';
-    else if (status === window.CONSTANTS.STATUS.NA) activeBtnClass = '.btn-na';
-
-    if (activeBtnClass) row.querySelector(activeBtnClass)?.classList.add('active');
-
-    // Show/Hide NCR Panel
-    const panelId = 'ncr-panel-' + uniqueId;
-    const panel = document.getElementById(panelId);
-    window.Logger.debug('Execution', 'Looking for panel:', { panelId, found: !!panel });
-
-    if (panel) {
-        if (status === window.CONSTANTS.STATUS.NC) {
-            panel.style.display = 'block';
-            window.Logger.debug('Execution', 'NCR Panel shown for:', uniqueId);
-        } else {
-            panel.style.display = 'none';
+        // Update hidden input
+        const statusInput = document.getElementById('status-' + uniqueId);
+        if (statusInput) {
+            statusInput.value = status;
         }
-    } else {
-        window.Logger.error('Execution', 'NCR Panel not found: ' + panelId);
-    }
 
-    // Update hidden input
-    const statusInput = document.getElementById('status-' + uniqueId);
-    if (statusInput) {
-        statusInput.value = status;
-    }
+        // Update accordion counter dynamically
+        window.updateAccordionCounter(uniqueId);
+    };
 
-    // Update accordion counter dynamically
-    window.updateAccordionCounter(uniqueId);
-};
+    // Update accordion counter based on current statuses
+    window.updateAccordionCounter = function (changedId) {
+        // Find the section containing this item
+        const row = document.getElementById('row-' + changedId);
+        if (!row) return;
 
-// Update accordion counter based on current statuses
-window.updateAccordionCounter = function (changedId) {
-    // Find the section containing this item
-    const row = document.getElementById('row-' + changedId);
-    if (!row) return;
+        const accordionContent = row.closest('.accordion-content');
+        if (!accordionContent) return;
 
-    const accordionContent = row.closest('.accordion-content');
-    if (!accordionContent) return;
+        const sectionId = accordionContent.id;
+        const items = accordionContent.querySelectorAll('.checklist-item');
+        let completed = 0;
 
-    const sectionId = accordionContent.id;
-    const items = accordionContent.querySelectorAll('.checklist-item');
-    let completed = 0;
+        items.forEach(item => {
+            const itemId = item.id.replace('row-', '');
+            const statusInput = document.getElementById('status-' + itemId);
+            const status = statusInput?.value || '';
+            if (status === 'conform' || status === 'nc' || status === 'na') {
+                completed++;
+            }
+        });
 
-    items.forEach(item => {
-        const itemId = item.id.replace('row-', '');
-        const statusInput = document.getElementById('status-' + itemId);
-        const status = statusInput?.value || '';
-        if (status === 'conform' || status === 'nc' || status === 'na') {
-            completed++;
+        // Update the counter text in the accordion header
+        const accordionSection = accordionContent.closest('.accordion-section');
+        if (accordionSection) {
+            const counterSpan = accordionSection.querySelector('.accordion-header span[style*="text-secondary"]');
+            if (counterSpan && counterSpan.textContent.includes('/')) {
+                counterSpan.textContent = `${completed}/${items.length}`;
+            }
         }
-    });
+    };
 
-    // Update the counter text in the accordion header
-    const accordionSection = accordionContent.closest('.accordion-section');
-    if (accordionSection) {
-        const counterSpan = accordionSection.querySelector('.accordion-header span[style*="text-secondary"]');
-        if (counterSpan && counterSpan.textContent.includes('/')) {
-            counterSpan.textContent = `${completed}/${items.length}`;
-        }
-    }
-};
+    window.addCustomQuestion = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-window.addCustomQuestion = function (reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Add Custom Question';
-    modalBody.innerHTML = `
+        modalTitle.textContent = 'Add Custom Question';
+        modalBody.innerHTML = `
         <form id="custom-question-form">
             <div class="form-group">
                 <label>Clause Number/Title <span style="color: var(--danger-color);">*</span></label>
@@ -1729,396 +1802,396 @@ window.addCustomQuestion = function (reportId) {
         </form>
     `;
 
-    window.openModal();
+        window.openModal();
 
-    modalSave.onclick = () => {
-        const clause = document.getElementById('custom-clause').value;
-        const req = document.getElementById('custom-req').value;
+        modalSave.onclick = () => {
+            const clause = document.getElementById('custom-clause').value;
+            const req = document.getElementById('custom-req').value;
 
-        if (clause && req) {
-            if (!report.customItems) report.customItems = [];
-            report.customItems.push({ clause, requirement: req });
+            if (clause && req) {
+                if (!report.customItems) report.customItems = [];
+                report.customItems.push({ clause, requirement: req });
 
-            window.saveData();
-            window.closeModal();
-            window.renderExecutionDetail(reportId);
-            window.showNotification('Custom question added successfully');
-        } else {
-            window.showNotification('Please fill in both fields', 'error');
-        }
+                window.saveData();
+                window.closeModal();
+                window.renderExecutionDetail(reportId);
+                window.showNotification('Custom question added successfully');
+            } else {
+                window.showNotification('Please fill in both fields', 'error');
+            }
+        };
     };
-};
 
-window.saveChecklist = function (reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
+    window.saveChecklist = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-    // Show indicator immediately
-    const indicator = document.getElementById('save-indicator');
-    if (indicator) {
-        indicator.textContent = 'Saving Changes...';
-        indicator.style.display = 'block';
-        indicator.style.background = '#3b82f6'; // Blue for loading
-    }
+        // Show indicator immediately
+        const indicator = document.getElementById('save-indicator');
+        if (indicator) {
+            indicator.textContent = 'Saving Changes...';
+            indicator.style.display = 'block';
+            indicator.style.background = '#3b82f6'; // Blue for loading
+        }
 
-    const statusInputs = document.querySelectorAll('.status-input');
-    const checklistData = [];
+        const statusInputs = document.querySelectorAll('.status-input');
+        const checklistData = [];
 
-    // Only update checklistProgress if we are on a screen that has checklist inputs
-    if (statusInputs.length > 0) {
-        statusInputs.forEach(input => {
-            const uniqueId = input.id.replace('status-', '');
+        // Only update checklistProgress if we are on a screen that has checklist inputs
+        if (statusInputs.length > 0) {
+            statusInputs.forEach(input => {
+                const uniqueId = input.id.replace('status-', '');
 
-            const status = input.value;
-            const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
-            const ncrDesc = Sanitizer.sanitizeText(document.getElementById('ncr-desc-' + uniqueId)?.value || '');
-            const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
-            const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
+                const status = input.value;
+                const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
+                const ncrDesc = Sanitizer.sanitizeText(document.getElementById('ncr-desc-' + uniqueId)?.value || '');
+                const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
+                const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
 
-            // Get evidence image data
-            const evidenceImg = document.getElementById('evidence-img-' + uniqueId);
-            const evidenceData = document.getElementById('evidence-data-' + uniqueId)?.value || '';
-            const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
-            const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
+                // Get evidence image data
+                const evidenceImg = document.getElementById('evidence-img-' + uniqueId);
+                const evidenceData = document.getElementById('evidence-data-' + uniqueId)?.value || '';
+                const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
+                const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
 
-            // Get designation and department
-            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
-            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
+                // Get designation and department
+                const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
+                const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
 
-            // Extract clause and requirement text from the DOM for report display
-            const itemContainer = input.closest('.checklist-item-card') || input.closest('.checklist-item');
-            let clauseText = '';
-            let requirementText = '';
+                // Extract clause and requirement text from the DOM for report display
+                const itemContainer = input.closest('.checklist-item-card') || input.closest('.checklist-item');
+                let clauseText = '';
+                let requirementText = '';
 
-            if (itemContainer) {
-                // Try to find the clause/section title (usually in a heading or strong tag above the input)
-                const sectionHeader = itemContainer.querySelector('.section-title, .clause-title, strong, h5, h6');
-                if (sectionHeader) {
-                    clauseText = sectionHeader.textContent?.trim() || '';
+                if (itemContainer) {
+                    // Try to find the clause/section title (usually in a heading or strong tag above the input)
+                    const sectionHeader = itemContainer.querySelector('.section-title, .clause-title, strong, h5, h6');
+                    if (sectionHeader) {
+                        clauseText = sectionHeader.textContent?.trim() || '';
+                    }
+
+                    // Try to find the requirement text (usually the question text)
+                    const questionText = itemContainer.querySelector('.item-text, .question-text, p, label');
+                    if (questionText) {
+                        requirementText = questionText.textContent?.trim() || '';
+                    }
                 }
 
-                // Try to find the requirement text (usually the question text)
-                const questionText = itemContainer.querySelector('.item-text, .question-text, p, label');
-                if (questionText) {
-                    requirementText = questionText.textContent?.trim() || '';
-                }
-            }
-
-            // Save ALL items (not just ones with status/comment)
-            // This ensures Conform/NC/NA selections persist even without comments
-            checklistData.push({
-                checklistId: input.dataset.checklist,
-                itemIdx: input.dataset.item,
-                isCustom: input.dataset.custom === 'true',
-                status: status,
-                comment: comment,
-                ncrDescription: ncrDesc,
-                transcript: transcript,
-                ncrType: ncrType,
-                evidenceImage: evidenceImage,
-                evidenceSize: evidenceSize,
-                designation: designation,
-                department: department,
-                // Include clause and requirement for report display
-                clause: clauseText || input.dataset.clause || '',
-                requirement: requirementText || input.dataset.requirement || ''
+                // Save ALL items (not just ones with status/comment)
+                // This ensures Conform/NC/NA selections persist even without comments
+                checklistData.push({
+                    checklistId: input.dataset.checklist,
+                    itemIdx: input.dataset.item,
+                    isCustom: input.dataset.custom === 'true',
+                    status: status,
+                    comment: comment,
+                    ncrDescription: ncrDesc,
+                    transcript: transcript,
+                    ncrType: ncrType,
+                    evidenceImage: evidenceImage,
+                    evidenceSize: evidenceSize,
+                    designation: designation,
+                    department: department,
+                    // Include clause and requirement for report display
+                    clause: clauseText || input.dataset.clause || '',
+                    requirement: requirementText || input.dataset.requirement || ''
+                });
             });
-        });
-        report.checklistProgress = checklistData;
-    }
+            report.checklistProgress = checklistData;
+        }
 
-    // Handle Review & Submit Tab classifications if present
-    const reviewSeverities = document.querySelectorAll('.review-severity');
-    if (reviewSeverities.length > 0) {
-        reviewSeverities.forEach(select => {
-            const findingId = select.dataset.findingId;
-            const newType = select.value;
-            const remarks = document.querySelector(`.review-remarks[data-finding-id="${findingId}"]`)?.value || '';
+        // Handle Review & Submit Tab classifications if present
+        const reviewSeverities = document.querySelectorAll('.review-severity');
+        if (reviewSeverities.length > 0) {
+            reviewSeverities.forEach(select => {
+                const findingId = select.dataset.findingId;
+                const newType = select.value;
+                const remarks = document.querySelector(`.review-remarks[data-finding-id="${findingId}"]`)?.value || '';
 
-            if (findingId.startsWith('checklist-')) {
-                const idx = parseInt(findingId.replace('checklist-', ''));
-                if (report.checklistProgress[idx]) {
-                    report.checklistProgress[idx].ncrType = newType;
-                    report.checklistProgress[idx].comment = remarks;
+                if (findingId.startsWith('checklist-')) {
+                    const idx = parseInt(findingId.replace('checklist-', ''));
+                    if (report.checklistProgress[idx]) {
+                        report.checklistProgress[idx].ncrType = newType;
+                        report.checklistProgress[idx].comment = remarks;
+                    }
+                } else if (findingId.startsWith('ncr-')) {
+                    const idx = parseInt(findingId.replace('ncr-', ''));
+                    if (report.ncrs && report.ncrs[idx]) {
+                        report.ncrs[idx].type = newType;
+                        report.ncrs[idx].description = remarks;
+                    }
                 }
-            } else if (findingId.startsWith('ncr-')) {
-                const idx = parseInt(findingId.replace('ncr-', ''));
-                if (report.ncrs && report.ncrs[idx]) {
-                    report.ncrs[idx].type = newType;
-                    report.ncrs[idx].description = remarks;
-                }
-            }
-        });
-    }
-
-    // Save Executive Summary & Observations (Unified View)
-    const execSumInput = document.getElementById(`exec-summary-${reportId}`);
-    if (execSumInput) report.executiveSummary = Sanitizer.sanitizeText(execSumInput.value);
-
-    const posObsInput = document.getElementById('positive-observations');
-    if (posObsInput) report.positiveObservations = Sanitizer.sanitizeText(posObsInput.value);
-
-    const ofiInput = document.getElementById('ofi');
-    if (ofiInput) report.ofi = Sanitizer.sanitizeText(ofiInput.value);
-
-    // Persist to Database (Async)
-    (async () => {
-        try {
-            // Use correct DB column names (client_name, not client)
-            await window.SupabaseClient.db.upsert('audit_reports', {
-                id: String(reportId),  // DB uses TEXT for id
-                plan_id: report.planId ? String(report.planId) : null,
-                client_name: report.client,  // DB column is client_name, not client
-                client_id: report.clientId || null,
-                date: report.date,
-                status: report.status,
-                findings: report.findings || 0,
-                checklist_progress: report.checklistProgress || [],  // Standardized column name
-                data: report || {},
-                custom_items: report.customItems || [],
-                opening_meeting: report.openingMeeting || {},
-                closing_meeting: report.closingMeeting || {},
-                ncrs: report.ncrs || []
             });
+        }
 
-            // Success UI
-            if (indicator) {
-                indicator.innerHTML = '<i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Changes Saved Successfully';
-                indicator.style.background = '#10b981'; // Green
-                setTimeout(() => {
-                    indicator.style.display = 'none';
-                }, 2000);
-            }
-            window.showNotification('Audit progress saved to cloud', 'success');
+        // Save Executive Summary & Observations (Unified View)
+        const execSumInput = document.getElementById(`exec-summary-${reportId}`);
+        if (execSumInput) report.executiveSummary = Sanitizer.sanitizeText(execSumInput.value);
 
-        } catch (dbError) {
-            console.error('Database Sync Error:', JSON.stringify(dbError, null, 2));
+        const posObsInput = document.getElementById('positive-observations');
+        if (posObsInput) report.positiveObservations = Sanitizer.sanitizeText(posObsInput.value);
 
-            // Attempt Fallback: Save BASIC info only
+        const ofiInput = document.getElementById('ofi');
+        if (ofiInput) report.ofi = Sanitizer.sanitizeText(ofiInput.value);
+
+        // Persist to Database (Async)
+        (async () => {
             try {
-                console.warn('Attempting fallback save (basic info only)...');
+                // Use correct DB column names (client_name, not client)
                 await window.SupabaseClient.db.upsert('audit_reports', {
-                    id: String(reportId),
-                    client_name: report.client,
+                    id: String(reportId),  // DB uses TEXT for id
+                    plan_id: report.planId ? String(report.planId) : null,
+                    client_name: report.client,  // DB column is client_name, not client
+                    client_id: report.clientId || null,
                     date: report.date,
                     status: report.status,
-                    findings: report.findings || 0
+                    findings: report.findings || 0,
+                    checklist_progress: report.checklistProgress || [],  // Standardized column name
+                    data: report || {},
+                    custom_items: report.customItems || [],
+                    opening_meeting: report.openingMeeting || {},
+                    closing_meeting: report.closingMeeting || {},
+                    ncrs: report.ncrs || []
                 });
-                window.showNotification('Partial save: Basic info saved. Full data saved locally.', 'warning');
-            } catch (fallbackError) {
-                console.error('Fallback save also failed:', fallbackError);
-                window.showNotification(`Sync Failed: ${dbError.message || dbError.error_description || 'Unknown error'}`, 'error');
+
+                // Success UI
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> Changes Saved Successfully';
+                    indicator.style.background = '#10b981'; // Green
+                    setTimeout(() => {
+                        indicator.style.display = 'none';
+                    }, 2000);
+                }
+                window.showNotification('Audit progress saved to cloud', 'success');
+
+            } catch (dbError) {
+                console.error('Database Sync Error:', JSON.stringify(dbError, null, 2));
+
+                // Attempt Fallback: Save BASIC info only
+                try {
+                    console.warn('Attempting fallback save (basic info only)...');
+                    await window.SupabaseClient.db.upsert('audit_reports', {
+                        id: String(reportId),
+                        client_name: report.client,
+                        date: report.date,
+                        status: report.status,
+                        findings: report.findings || 0
+                    });
+                    window.showNotification('Partial save: Basic info saved. Full data saved locally.', 'warning');
+                } catch (fallbackError) {
+                    console.error('Fallback save also failed:', fallbackError);
+                    window.showNotification(`Sync Failed: ${dbError.message || dbError.error_description || 'Unknown error'}`, 'error');
+                }
+
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Sync Error';
+                    indicator.style.background = '#ef4444'; // Red
+                }
             }
+        })();
 
-            if (indicator) {
-                indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Sync Error';
-                indicator.style.background = '#ef4444'; // Red
+        window.saveData();
+    };
+
+    // Filter checklist items by status
+    window.filterChecklistItems = function (filterType) {
+        // Update filter button states
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.filter === filterType) {
+                btn.classList.add('active');
             }
-        }
-    })();
-
-    window.saveData();
-};
-
-// Filter checklist items by status
-window.filterChecklistItems = function (filterType) {
-    // Update filter button states
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.filter === filterType) {
-            btn.classList.add('active');
-        }
-    });
-
-    // Filter items
-    document.querySelectorAll('.checklist-item').forEach(item => {
-        const uniqueId = item.id.replace('row-', '');
-        const statusInput = document.getElementById('status-' + uniqueId);
-        const status = statusInput?.value || '';
-
-        let shouldShow = false;
-
-        if (filterType === 'all') {
-            shouldShow = true;
-        } else if (filterType === 'pending') {
-            shouldShow = !status || status === '';
-        } else {
-            shouldShow = status === filterType;
-        }
-
-        if (shouldShow) {
-            item.classList.remove('filtered-out');
-        } else {
-            item.classList.add('filtered-out');
-        }
-    });
-};
-
-// Bulk update status - prioritizes selected items, falls back to filtered items
-window.bulkUpdateStatus = function (reportId, status) {
-    window.Logger.debug('Execution', 'bulkUpdateStatus called:', { reportId, status });
-
-    // Check if any items are selected via checkboxes
-    let targetItems = document.querySelectorAll('.checklist-item.selected-item');
-    let useSelection = targetItems.length > 0;
-
-    window.Logger.debug('Execution', 'Selected items:', targetItems.length);
-
-    // If no items selected, fall back to filtered items
-    if (!useSelection) {
-        targetItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
-        window.Logger.debug('Execution', 'Using filtered items:', targetItems.length);
-    }
-
-    if (targetItems.length === 0) {
-        window.showNotification('No items to update', 'warning');
-        return;
-    }
-
-    window.Logger.debug('Execution', `Bulk updating ${targetItems.length} items to status: ${status}`);
-    let updatedCount = 0;
-    targetItems.forEach(item => {
-        const uniqueId = item.id.replace('row-', '');
-        window.Logger.debug('Execution', 'Updating item:', { uniqueId, status });
-        window.setChecklistStatus(uniqueId, status);
-        updatedCount++;
-    });
-    window.Logger.debug('Execution', 'Updated items count:', updatedCount);
-
-    // Clear selections if items were selected
-    if (useSelection) {
-        document.querySelectorAll('.section-checkbox').forEach(cb => cb.checked = false);
-        document.querySelectorAll('.checklist-item.selected-item').forEach(item => {
-            item.classList.remove('selected-item');
-            item.style.background = '';
-            item.style.borderLeft = '';
         });
-    }
 
-    // Close dropdown
-    const menu = document.getElementById(`bulk-menu-${reportId}`);
-    if (menu) {
-        menu.classList.add('hidden');
-        window.Logger.debug('Execution', 'Menu closed');
-    } else {
-        window.Logger.error('Execution', 'Menu not found: bulk-menu-' + reportId);
-    }
+        // Filter items
+        document.querySelectorAll('.checklist-item').forEach(item => {
+            const uniqueId = item.id.replace('row-', '');
+            const statusInput = document.getElementById('status-' + uniqueId);
+            const status = statusInput?.value || '';
 
-    window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
-    window.saveChecklist(reportId);
-};
+            let shouldShow = false;
 
-
-// Submit findings to Lead Auditor for review
-window.submitToLeadAuditor = function (reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
-
-    // Use saveChecklist to gather all UI changes first
-    window.saveChecklist(reportId);
-
-    // Update report status to In Review (as per CONSTANTS)
-    report.status = window.CONSTANTS.STATUS.IN_REVIEW;
-    report.submittedAt = new Date().toISOString();
-    report.submittedBy = window.state.currentUser?.name || 'Auditor';
-
-    // Persist to Database
-    (async () => {
-        try {
-            await window.SupabaseClient.db.update('audit_reports', String(reportId), {
-                status: report.status,
-                data: report
-            });
-            window.showNotification('Findings submitted to Lead Auditor for review!', 'success');
-        } catch (err) {
-            console.error('Submission failed:', err);
-            window.showNotification('Submitted locally. Cloud sync pending.', 'warning');
-        }
-    })();
-
-    window.saveData();
-
-    // Navigate back to execution list
-    setTimeout(() => {
-        renderAuditExecutionEnhanced();
-    }, 1500);
-};
-
-window.startDictation = function (uniqueId) {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert('Voice dictation is not supported in this browser. Please use Chrome or Edge.');
-        return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-
-    const micBtn = document.getElementById('mic-btn-' + uniqueId);
-    const textarea = document.getElementById('comment-' + uniqueId);
-
-    recognition.lang = 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = true; // Use interim to show real-time transcription if possible, or false for simplicity
-
-    // Visual feedback
-    const originalIcon = '<i class="fa-solid fa-microphone"></i>';
-    micBtn.innerHTML = '<i class="fa-solid fa-circle-dot fa-fade" style="color: red;"></i>';
-    micBtn.setAttribute('disabled', 'true');
-
-    recognition.start();
-
-    let finalTranscript = '';
-
-    // Auto-stop after 10 seconds
-    const timeout = setTimeout(() => {
-        recognition.stop();
-        window.showNotification('Recording limit (10s) reached.', 'info');
-    }, 10000);
-
-    recognition.onresult = function (event) {
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
+            if (filterType === 'all') {
+                shouldShow = true;
+            } else if (filterType === 'pending') {
+                shouldShow = !status || status === '';
             } else {
-                interimTranscript += event.results[i][0].transcript;
+                shouldShow = status === filterType;
             }
-        }
+
+            if (shouldShow) {
+                item.classList.remove('filtered-out');
+            } else {
+                item.classList.add('filtered-out');
+            }
+        });
     };
 
-    recognition.onend = function () {
-        clearTimeout(timeout);
-        // Append result to textarea
-        if (finalTranscript) {
-            const currentVal = textarea.value;
-            textarea.value = currentVal ? currentVal + ' ' + finalTranscript : finalTranscript;
+    // Bulk update status - prioritizes selected items, falls back to filtered items
+    window.bulkUpdateStatus = function (reportId, status) {
+        window.Logger.debug('Execution', 'bulkUpdateStatus called:', { reportId, status });
+
+        // Check if any items are selected via checkboxes
+        let targetItems = document.querySelectorAll('.checklist-item.selected-item');
+        let useSelection = targetItems.length > 0;
+
+        window.Logger.debug('Execution', 'Selected items:', targetItems.length);
+
+        // If no items selected, fall back to filtered items
+        if (!useSelection) {
+            targetItems = document.querySelectorAll('.checklist-item:not(.filtered-out)');
+            window.Logger.debug('Execution', 'Using filtered items:', targetItems.length);
         }
 
-        micBtn.innerHTML = originalIcon;
-        micBtn.removeAttribute('disabled');
-    };
-
-    recognition.onerror = function (event) {
-        window.Logger.error('Execution', 'Speech recognition error', event.error);
-        if (event.error !== 'no-speech') {
-            window.showNotification('Error recording audio: ' + event.error, 'error');
+        if (targetItems.length === 0) {
+            window.showNotification('No items to update', 'warning');
+            return;
         }
-        micBtn.innerHTML = originalIcon;
-        micBtn.removeAttribute('disabled');
-        clearTimeout(timeout);
+
+        window.Logger.debug('Execution', `Bulk updating ${targetItems.length} items to status: ${status}`);
+        let updatedCount = 0;
+        targetItems.forEach(item => {
+            const uniqueId = item.id.replace('row-', '');
+            window.Logger.debug('Execution', 'Updating item:', { uniqueId, status });
+            window.setChecklistStatus(uniqueId, status);
+            updatedCount++;
+        });
+        window.Logger.debug('Execution', 'Updated items count:', updatedCount);
+
+        // Clear selections if items were selected
+        if (useSelection) {
+            document.querySelectorAll('.section-checkbox').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.checklist-item.selected-item').forEach(item => {
+                item.classList.remove('selected-item');
+                item.style.background = '';
+                item.style.borderLeft = '';
+            });
+        }
+
+        // Close dropdown
+        const menu = document.getElementById(`bulk-menu-${reportId}`);
+        if (menu) {
+            menu.classList.add('hidden');
+            window.Logger.debug('Execution', 'Menu closed');
+        } else {
+            window.Logger.error('Execution', 'Menu not found: bulk-menu-' + reportId);
+        }
+
+        window.showNotification(`Updated ${updatedCount} item(s) to ${status.toUpperCase()}`, 'success');
+        window.saveChecklist(reportId);
     };
-};
 
-function createNCR(reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+    // Submit findings to Lead Auditor for review
+    window.submitToLeadAuditor = function (reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-    modalTitle.textContent = 'Create Non-Conformity Report';
-    modalBody.innerHTML = `
+        // Use saveChecklist to gather all UI changes first
+        window.saveChecklist(reportId);
+
+        // Update report status to In Review (as per CONSTANTS)
+        report.status = window.CONSTANTS.STATUS.IN_REVIEW;
+        report.submittedAt = new Date().toISOString();
+        report.submittedBy = window.state.currentUser?.name || 'Auditor';
+
+        // Persist to Database
+        (async () => {
+            try {
+                await window.SupabaseClient.db.update('audit_reports', String(reportId), {
+                    status: report.status,
+                    data: report
+                });
+                window.showNotification('Findings submitted to Lead Auditor for review!', 'success');
+            } catch (err) {
+                console.error('Submission failed:', err);
+                window.showNotification('Submitted locally. Cloud sync pending.', 'warning');
+            }
+        })();
+
+        window.saveData();
+
+        // Navigate back to execution list
+        setTimeout(() => {
+            renderAuditExecutionEnhanced();
+        }, 1500);
+    };
+
+    window.startDictation = function (uniqueId) {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            alert('Voice dictation is not supported in this browser. Please use Chrome or Edge.');
+            return;
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+
+        const micBtn = document.getElementById('mic-btn-' + uniqueId);
+        const textarea = document.getElementById('comment-' + uniqueId);
+
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true; // Use interim to show real-time transcription if possible, or false for simplicity
+
+        // Visual feedback
+        const originalIcon = '<i class="fa-solid fa-microphone"></i>';
+        micBtn.innerHTML = '<i class="fa-solid fa-circle-dot fa-fade" style="color: red;"></i>';
+        micBtn.setAttribute('disabled', 'true');
+
+        recognition.start();
+
+        let finalTranscript = '';
+
+        // Auto-stop after 10 seconds
+        const timeout = setTimeout(() => {
+            recognition.stop();
+            window.showNotification('Recording limit (10s) reached.', 'info');
+        }, 10000);
+
+        recognition.onresult = function (event) {
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+        };
+
+        recognition.onend = function () {
+            clearTimeout(timeout);
+            // Append result to textarea
+            if (finalTranscript) {
+                const currentVal = textarea.value;
+                textarea.value = currentVal ? currentVal + ' ' + finalTranscript : finalTranscript;
+            }
+
+            micBtn.innerHTML = originalIcon;
+            micBtn.removeAttribute('disabled');
+        };
+
+        recognition.onerror = function (event) {
+            window.Logger.error('Execution', 'Speech recognition error', event.error);
+            if (event.error !== 'no-speech') {
+                window.showNotification('Error recording audio: ' + event.error, 'error');
+            }
+            micBtn.innerHTML = originalIcon;
+            micBtn.removeAttribute('disabled');
+            clearTimeout(timeout);
+        };
+    };
+
+    function createNCR(reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
+
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        modalTitle.textContent = 'Create Non-Conformity Report';
+        modalBody.innerHTML = `
         <form id="ncr-form">
             <div class="form-group">
                 <label>Type <span style="color: var(--danger-color);">*</span></label>
@@ -2173,164 +2246,164 @@ function createNCR(reportId) {
         </form>
     `;
 
-    window.openModal();
+        window.openModal();
 
-    // Voice Dictation Logic for Modal
-    const micBtn = document.getElementById('mic-btn-modal');
-    if (micBtn) {
-        micBtn.onclick = () => {
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
-                recognition.lang = 'en-US';
-                recognition.interimResults = false;
+        // Voice Dictation Logic for Modal
+        const micBtn = document.getElementById('mic-btn-modal');
+        if (micBtn) {
+            micBtn.onclick = () => {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'en-US';
+                    recognition.interimResults = false;
 
-                micBtn.innerHTML = '<i class="fa-solid fa-circle-dot fa-fade" style="color: red;"></i>';
-                recognition.start();
+                    micBtn.innerHTML = '<i class="fa-solid fa-circle-dot fa-fade" style="color: red;"></i>';
+                    recognition.start();
 
-                recognition.onresult = (event) => {
-                    const transcript = event.results[0][0].transcript;
-                    const desc = document.getElementById('ncr-description');
-                    desc.value = desc.value ? desc.value + ' ' + transcript : transcript;
-                };
+                    recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        const desc = document.getElementById('ncr-description');
+                        desc.value = desc.value ? desc.value + ' ' + transcript : transcript;
+                    };
 
-                recognition.onend = () => {
-                    micBtn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
-                };
-            } else {
-                alert('Speech recognition not supported in this browser.');
-            }
-        };
-    }
-
-    // Camera Capture Logic - triggers file input for real image upload
-    const captureBtn = document.getElementById('btn-capture-img');
-    if (captureBtn) {
-        captureBtn.onclick = function () {
-            // Create file input for image selection
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = 'image/*';
-            fileInput.capture = 'environment'; // Use back camera on mobile
-
-            fileInput.onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                captureBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
-
-                try {
-                    // Upload to Supabase if available
-                    if (window.SupabaseClient?.isInitialized) {
-                        const result = await window.SupabaseClient.storage.uploadAuditImage(file, 'ncr-evidence', Date.now().toString());
-                        if (result?.url) {
-                            document.getElementById('ncr-evidence-image-url').value = result.url;
-                            document.getElementById('image-preview').innerHTML = `<img src="${result.url}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
-                            document.getElementById('img-status').textContent = "Image uploaded successfully";
-                        }
-                    } else {
-                        // Fallback: Use base64 data URL for local storage
-                        const reader = new FileReader();
-                        reader.onload = (ev) => {
-                            document.getElementById('ncr-evidence-image-url').value = ev.target.result;
-                            document.getElementById('image-preview').innerHTML = `<img src="${ev.target.result}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
-                            document.getElementById('img-status').textContent = "Image captured (stored locally)";
-                        };
-                        reader.readAsDataURL(file);
-                    }
-
-                    captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Retake';
-                    captureBtn.classList.remove('btn-secondary');
-                    captureBtn.classList.add('btn-success');
-                } catch (error) {
-                    console.error('Image upload failed:', error);
-                    document.getElementById('img-status').textContent = "Upload failed: " + error.message;
-                    captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Retry';
+                    recognition.onend = () => {
+                        micBtn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+                    };
+                } else {
+                    alert('Speech recognition not supported in this browser.');
                 }
             };
+        }
 
-            fileInput.click();
+        // Camera Capture Logic - triggers file input for real image upload
+        const captureBtn = document.getElementById('btn-capture-img');
+        if (captureBtn) {
+            captureBtn.onclick = function () {
+                // Create file input for image selection
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.capture = 'environment'; // Use back camera on mobile
+
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    captureBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+                    try {
+                        // Upload to Supabase if available
+                        if (window.SupabaseClient?.isInitialized) {
+                            const result = await window.SupabaseClient.storage.uploadAuditImage(file, 'ncr-evidence', Date.now().toString());
+                            if (result?.url) {
+                                document.getElementById('ncr-evidence-image-url').value = result.url;
+                                document.getElementById('image-preview').innerHTML = `<img src="${result.url}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
+                                document.getElementById('img-status').textContent = "Image uploaded successfully";
+                            }
+                        } else {
+                            // Fallback: Use base64 data URL for local storage
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                                document.getElementById('ncr-evidence-image-url').value = ev.target.result;
+                                document.getElementById('image-preview').innerHTML = `<img src="${ev.target.result}" style="max-height: 150px; border-radius: 4px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
+                                document.getElementById('img-status').textContent = "Image captured (stored locally)";
+                            };
+                            reader.readAsDataURL(file);
+                        }
+
+                        captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Retake';
+                        captureBtn.classList.remove('btn-secondary');
+                        captureBtn.classList.add('btn-success');
+                    } catch (error) {
+                        console.error('Image upload failed:', error);
+                        document.getElementById('img-status').textContent = "Upload failed: " + error.message;
+                        captureBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Retry';
+                    }
+                };
+
+                fileInput.click();
+            };
+        }
+
+        modalSave.onclick = () => {
+            // 1. Define Fields
+            const fieldIds = {
+                description: 'ncr-description',
+                type: 'ncr-type'
+            };
+
+            // 2. Define Rules
+            const rules = {
+                description: [
+                    { rule: 'required', fieldName: 'Description' },
+                    { rule: 'noHtmlTags' }
+                ],
+                type: [{ rule: 'required', fieldName: 'Type' }]
+            };
+
+            // 3. Validate
+            const result = Validator.validateFormElements(fieldIds, rules);
+            if (!result.valid) {
+                Validator.displayErrors(result.errors, fieldIds);
+                window.showNotification('Please fix the form errors', 'error');
+                return;
+            }
+            Validator.clearErrors(fieldIds);
+
+            // 4. Sanitize Input
+            const type = document.getElementById('ncr-type').value;
+            const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
+            const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
+            const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
+            const evidenceImage = Sanitizer.sanitizeURL(document.getElementById('ncr-evidence-image-url').value);
+            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation').value);
+            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department').value);
+
+            // 5. Save
+            if (!report.ncrs) report.ncrs = [];
+            report.ncrs.push({
+                type,
+                clause,
+                description,
+                evidence,
+                evidenceImage,
+                transcript: description,
+                designation,
+                department,
+                status: 'Open',
+                createdAt: new Date().toISOString()
+            });
+            report.findings = report.ncrs.length;
+
+            window.saveData();
+
+            // Queue NCR for offline sync
+            if (window.OfflineManager) {
+                window.OfflineManager.queueAction('CREATE_NCR', {
+                    reportId: reportId,
+                    client: report.client,
+                    ncr: report.ncrs[report.ncrs.length - 1]
+                });
+            }
+            window.closeModal();
+            renderExecutionDetail(reportId);
+            window.showNotification('NCR created successfully with evidence', 'success');
         };
     }
 
-    modalSave.onclick = () => {
-        // 1. Define Fields
-        const fieldIds = {
-            description: 'ncr-description',
-            type: 'ncr-type'
-        };
+    function createCAPA(reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-        // 2. Define Rules
-        const rules = {
-            description: [
-                { rule: 'required', fieldName: 'Description' },
-                { rule: 'noHtmlTags' }
-            ],
-            type: [{ rule: 'required', fieldName: 'Type' }]
-        };
+        const ncrs = report.ncrs || [];
 
-        // 3. Validate
-        const result = Validator.validateFormElements(fieldIds, rules);
-        if (!result.valid) {
-            Validator.displayErrors(result.errors, fieldIds);
-            window.showNotification('Please fix the form errors', 'error');
-            return;
-        }
-        Validator.clearErrors(fieldIds);
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-        // 4. Sanitize Input
-        const type = document.getElementById('ncr-type').value;
-        const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
-        const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
-        const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
-        const evidenceImage = Sanitizer.sanitizeURL(document.getElementById('ncr-evidence-image-url').value);
-        const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation').value);
-        const department = Sanitizer.sanitizeText(document.getElementById('ncr-department').value);
-
-        // 5. Save
-        if (!report.ncrs) report.ncrs = [];
-        report.ncrs.push({
-            type,
-            clause,
-            description,
-            evidence,
-            evidenceImage,
-            transcript: description,
-            designation,
-            department,
-            status: 'Open',
-            createdAt: new Date().toISOString()
-        });
-        report.findings = report.ncrs.length;
-
-        window.saveData();
-
-        // Queue NCR for offline sync
-        if (window.OfflineManager) {
-            window.OfflineManager.queueAction('CREATE_NCR', {
-                reportId: reportId,
-                client: report.client,
-                ncr: report.ncrs[report.ncrs.length - 1]
-            });
-        }
-        window.closeModal();
-        renderExecutionDetail(reportId);
-        window.showNotification('NCR created successfully with evidence', 'success');
-    };
-}
-
-function createCAPA(reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
-
-    const ncrs = report.ncrs || [];
-
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Create CAPA';
-    modalBody.innerHTML = `
+        modalTitle.textContent = 'Create CAPA';
+        modalBody.innerHTML = `
         <form id="capa-form">
             <div class="form-group">
                 <label>Linked NCR</label>
@@ -2354,170 +2427,205 @@ function createCAPA(reportId) {
         </form>
     `;
 
-    window.openModal();
+        window.openModal();
 
-    modalSave.onclick = () => {
-        const linkedNCR = document.getElementById('capa-ncr').value;
-        const rootCause = document.getElementById('capa-root-cause').value;
-        const actionPlan = document.getElementById('capa-action').value;
-        const dueDate = document.getElementById('capa-due').value;
+        modalSave.onclick = () => {
+            const linkedNCR = document.getElementById('capa-ncr').value;
+            const rootCause = document.getElementById('capa-root-cause').value;
+            const actionPlan = document.getElementById('capa-action').value;
+            const dueDate = document.getElementById('capa-due').value;
 
-        if (rootCause && actionPlan) {
-            if (!report.capas) report.capas = [];
-            report.capas.push({
-                linkedNCR,
-                rootCause,
-                actionPlan,
-                dueDate,
-                status: 'In Progress',
-                createdAt: new Date().toISOString()
-            });
+            if (rootCause && actionPlan) {
+                if (!report.capas) report.capas = [];
+                report.capas.push({
+                    linkedNCR,
+                    rootCause,
+                    actionPlan,
+                    dueDate,
+                    status: 'In Progress',
+                    createdAt: new Date().toISOString()
+                });
 
-            window.saveData();
-            window.closeModal();
-            renderExecutionDetail(reportId);
-            window.showNotification('CAPA created successfully');
-        } else {
-            window.showNotification('Please fill in all required fields', 'error');
-        }
-    };
-}
+                window.saveData();
+                window.closeModal();
+                renderExecutionDetail(reportId);
+                window.showNotification('CAPA created successfully');
+            } else {
+                window.showNotification('Please fill in all required fields', 'error');
+            }
+        };
+    }
 
-function saveObservations(reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
+    function saveObservations(reportId) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-    report.positiveObservations = document.getElementById('positive-observations')?.value || '';
-    report.ofi = document.getElementById('ofi')?.value || '';
+        report.positiveObservations = document.getElementById('positive-observations')?.value || '';
+        report.ofi = document.getElementById('ofi')?.value || '';
 
-    window.saveData();
-    window.showNotification('Observations saved successfully');
-}
+        window.saveData();
+        window.showNotification('Observations saved successfully');
+    }
 
-// Save Opening/Closing Meeting Records (ISO 17021-1 Clause 9.4.7)
-window.saveMeetingRecords = function (reportId) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
-
-    report.openingMeeting = {
-        date: document.getElementById('opening-date')?.value || '',
-        time: document.getElementById('opening-time')?.value || '',
-        attendees: document.getElementById('opening-attendees')?.value || '',
-        notes: document.getElementById('opening-notes')?.value || ''
-    };
-
-    report.closingMeeting = {
-        date: document.getElementById('closing-date')?.value || '',
-        time: document.getElementById('closing-time')?.value || '',
-        attendees: document.getElementById('closing-attendees')?.value || '',
-        summary: document.getElementById('closing-summary')?.value || '',
-        response: document.getElementById('closing-response')?.value || ''
-    };
-
-    window.saveData();
-
-    // Queue meeting records for offline sync
-    if (window.OfflineManager) {
-        window.OfflineManager.queueAction('SAVE_MEETINGS', {
-            reportId: reportId,
-            client: report.client,
-            openingMeeting: report.openingMeeting,
-            closingMeeting: report.closingMeeting
+    // Save Opening/Closing Meeting Records (ISO 17021-1 Clause 9.4.7)
+    // Collect attendees from checkboxes + custom list
+    window._collectMeetingAttendees = function (prefix) {
+        const attendees = [];
+        document.querySelectorAll(`.${prefix}-attendee-cb:checked`).forEach(cb => {
+            attendees.push({ name: cb.dataset.name, role: cb.dataset.role || '', organization: cb.dataset.org || '' });
         });
-    }
+        // Custom attendees
+        document.querySelectorAll(`#${prefix}-custom-list .custom-attendee-item`).forEach(el => {
+            attendees.push({ name: el.dataset.name, role: el.dataset.role || '', organization: el.dataset.org || '' });
+        });
+        return attendees;
+    };
 
-    window.showNotification('Meeting records saved successfully', 'success');
-};
+    window.addCustomMeetingAttendee = function (prefix) {
+        const nameEl = document.getElementById(`${prefix}-custom-name`);
+        const roleEl = document.getElementById(`${prefix}-custom-role`);
+        const orgEl = document.getElementById(`${prefix}-custom-org`);
+        if (!nameEl || !nameEl.value.trim()) { window.showNotification('Please enter a name', 'error'); return; }
+        const name = nameEl.value.trim();
+        const role = roleEl?.value?.trim() || '';
+        const org = orgEl?.value?.trim() || '';
+        const list = document.getElementById(`${prefix}-custom-list`);
+        if (list) {
+            const div = document.createElement('div');
+            div.className = 'custom-attendee-item';
+            div.dataset.name = name;
+            div.dataset.role = role;
+            div.dataset.org = org;
+            div.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; background: #eff6ff; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.25rem;';
+            div.innerHTML = `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${name}</strong>${role ? ' – ' + role : ''}${org ? ' (' + org + ')' : ''}<button class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" onclick="this.parentElement.remove()"><i class="fa-solid fa-times"></i></button>`;
+            list.appendChild(div);
+        }
+        nameEl.value = ''; if (roleEl) roleEl.value = ''; if (orgEl) orgEl.value = '';
+    };
 
-// Export functions
-window.renderAuditExecutionEnhanced = renderAuditExecutionEnhanced;
-window.renderAuditExecution = renderAuditExecutionEnhanced;
-window.renderExecutionDetail = renderExecutionDetail;
-window.saveChecklist = saveChecklist;
-window.createNCR = createNCR;
-window.createCAPA = createCAPA;
-// Note: submitForReview, publishReport, revertToDraft, saveReportDraft,
-//       generateAIConclusion, generateAuditReport are now in reporting-module.js
+    window.saveMeetingRecords = function (reportId) {
+        const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-// ============================================
-// EVIDENCE IMAGE HANDLING (Compression & Upload)
-// ============================================
+        report.openingMeeting = {
+            date: document.getElementById('opening-date')?.value || '',
+            time: document.getElementById('opening-time')?.value || '',
+            attendees: window._collectMeetingAttendees('opening'),
+            notes: document.getElementById('opening-notes')?.value || ''
+        };
 
-// Handle evidence image upload with compression and 5MB limit
-window.handleEvidenceUpload = function (uniqueId, input) {
-    const file = input.files[0];
-    if (!file) return;
+        report.closingMeeting = {
+            date: document.getElementById('closing-date')?.value || '',
+            time: document.getElementById('closing-time')?.value || '',
+            attendees: window._collectMeetingAttendees('closing'),
+            summary: document.getElementById('closing-summary')?.value || '',
+            response: document.getElementById('closing-response')?.value || ''
+        };
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-        window.showNotification('Please select an image file', 'error');
-        input.value = '';
-        return;
-    }
+        window.saveData();
 
-    // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-        window.showNotification('Image exceeds 5MB limit', 'error');
-        input.value = '';
-        return;
-    }
+        // Queue meeting records for offline sync
+        if (window.OfflineManager) {
+            window.OfflineManager.queueAction('SAVE_MEETINGS', {
+                reportId: reportId,
+                client: report.client,
+                openingMeeting: report.openingMeeting,
+                closingMeeting: report.closingMeeting
+            });
+        }
 
-    // Show loading indicator
-    const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-    if (previewDiv) {
-        previewDiv.style.display = 'block';
-        previewDiv.innerHTML = `
+        window.showNotification('Meeting records saved successfully', 'success');
+    };
+
+    // Export functions
+    window.renderAuditExecutionEnhanced = renderAuditExecutionEnhanced;
+    window.renderAuditExecution = renderAuditExecutionEnhanced;
+    window.renderExecutionDetail = renderExecutionDetail;
+    window.saveChecklist = saveChecklist;
+    window.createNCR = createNCR;
+    window.createCAPA = createCAPA;
+    // Note: submitForReview, publishReport, revertToDraft, saveReportDraft,
+    //       generateAIConclusion, generateAuditReport are now in reporting-module.js
+
+    // ============================================
+    // EVIDENCE IMAGE HANDLING (Compression & Upload)
+    // ============================================
+
+    // Handle evidence image upload with compression and 5MB limit
+    window.handleEvidenceUpload = function (uniqueId, input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            window.showNotification('Please select an image file', 'error');
+            input.value = '';
+            return;
+        }
+
+        // Validate file size (5MB max)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            window.showNotification('Image exceeds 5MB limit', 'error');
+            input.value = '';
+            return;
+        }
+
+        // Show loading indicator
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        if (previewDiv) {
+            previewDiv.style.display = 'block';
+            previewDiv.innerHTML = `
             <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); text-align: center;">
                 <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color);"></i>
                 <span style="margin-left: 0.5rem; font-size: 0.85rem;">Compressing & Uploading...</span>
             </div>
         `;
-    }
+        }
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const img = new Image();
-        img.onload = async function () {
-            try {
-                // 1. Compress
-                const compressedDataUrl = compressImage(img, file.type);
-                const compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = async function () {
+                try {
+                    // 1. Compress
+                    const compressedDataUrl = compressImage(img, file.type);
+                    const compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
 
-                let finalUrl = compressedDataUrl;
-                let isCloud = false;
+                    let finalUrl = compressedDataUrl;
+                    let isCloud = false;
 
-                // 2. Upload to Supabase (if online)
-                if (window.navigator.onLine && window.SupabaseClient) {
-                    try {
-                        // Check if Supabase is initialized
-                        if (!window.SupabaseClient.isInitialized) {
-                            console.warn('Supabase not initialized - image saved locally only');
-                        } else {
-                            // Convert DataURL to Blob
-                            const res = await fetch(compressedDataUrl);
-                            const blob = await res.blob();
-                            const uploadFile = new File([blob], file.name, { type: file.type });
-
-                            const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
-                            if (result && result.url) {
-                                finalUrl = result.url;
-                                isCloud = true;
-                                console.log('Image uploaded to cloud:', result.path);
+                    // 2. Upload to Supabase (if online)
+                    if (window.navigator.onLine && window.SupabaseClient) {
+                        try {
+                            // Check if Supabase is initialized
+                            if (!window.SupabaseClient.isInitialized) {
+                                console.warn('Supabase not initialized - image saved locally only');
                             } else {
-                                console.warn('Upload returned no URL - check if audit-images bucket exists');
-                            }
-                        }
-                    } catch (uploadErr) {
-                        console.error('Image upload failed:', uploadErr);
-                        console.warn('Falling back to local base64 storage');
-                    }
-                }
+                                // Convert DataURL to Blob
+                                const res = await fetch(compressedDataUrl);
+                                const blob = await res.blob();
+                                const uploadFile = new File([blob], file.name, { type: file.type });
 
-                // 3. Update Preview UI
-                if (previewDiv) {
-                    previewDiv.style.display = 'block';
-                    previewDiv.innerHTML = `
+                                const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
+                                if (result && result.url) {
+                                    finalUrl = result.url;
+                                    isCloud = true;
+                                    console.log('Image uploaded to cloud:', result.path);
+                                } else {
+                                    console.warn('Upload returned no URL - check if audit-images bucket exists');
+                                }
+                            }
+                        } catch (uploadErr) {
+                            console.error('Image upload failed:', uploadErr);
+                            console.warn('Falling back to local base64 storage');
+                        }
+                    }
+
+                    // 3. Update Preview UI
+                    if (previewDiv) {
+                        previewDiv.style.display = 'block';
+                        previewDiv.innerHTML = `
                         <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
                             <img id="evidence-img-${uniqueId}" src="${finalUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
                             <div style="flex: 1;">
@@ -2531,117 +2639,117 @@ window.handleEvidenceUpload = function (uniqueId, input) {
                             <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     `;
+                    }
+
+                    // 4. Update Hidden Inputs
+                    const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+                    if (evidenceData) evidenceData.value = 'attached';
+
+                    window.showNotification(isCloud ? 'Image uploaded to cloud' : 'Image saved locally', 'success');
+
+                } catch (err) {
+                    console.error('Image processing error:', err);
+                    window.showNotification('Error processing image', 'error');
+                    if (previewDiv) previewDiv.style.display = 'none';
+                    input.value = '';
                 }
-
-                // 4. Update Hidden Inputs
-                const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-                if (evidenceData) evidenceData.value = 'attached';
-
-                window.showNotification(isCloud ? 'Image uploaded to cloud' : 'Image saved locally', 'success');
-
-            } catch (err) {
-                console.error('Image processing error:', err);
-                window.showNotification('Error processing image', 'error');
-                if (previewDiv) previewDiv.style.display = 'none';
-                input.value = '';
-            }
+            };
+            img.src = e.target.result;
         };
-        img.src = e.target.result;
+        reader.readAsDataURL(file);
     };
-    reader.readAsDataURL(file);
-};
 
-// Compress image to reduce storage size
-function compressImage(img, fileType) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    // Compress image to reduce storage size
+    function compressImage(img, fileType) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-    // Calculate new dimensions (max 800px on longest side)
-    const maxDimension = 800;
-    let width = img.width;
-    let height = img.height;
+        // Calculate new dimensions (max 800px on longest side)
+        const maxDimension = 800;
+        let width = img.width;
+        let height = img.height;
 
-    if (width > maxDimension || height > maxDimension) {
-        if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-        } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
+        if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+            } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+            }
         }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to JPEG with 0.7 quality for compression
+        return canvas.toDataURL('image/jpeg', 0.7);
     }
 
-    canvas.width = width;
-    canvas.height = height;
+    // View evidence image in full size (modal/popup)
+    // View evidence image in full size (modal/popup)
+    // View evidence image in full size (modal/popup)
+    window.viewEvidenceImage = function (uniqueId) {
+        console.log('[viewEvidenceImage] Attempting to view image for:', uniqueId);
 
-    // Draw and compress
-    ctx.drawImage(img, 0, 0, width, height);
+        // Strategy 1: Standard ID
+        let imgEl = document.getElementById('evidence-img-' + uniqueId);
 
-    // Convert to JPEG with 0.7 quality for compression
-    return canvas.toDataURL('image/jpeg', 0.7);
-}
+        // Strategy 2: If uniqueId looks like "0" (index-only), try to find it via the row container
+        if (!imgEl) {
+            console.warn(`[viewEvidenceImage] Element 'evidence-img-${uniqueId}' not found. Searching by context...`);
 
-// View evidence image in full size (modal/popup)
-// View evidence image in full size (modal/popup)
-// View evidence image in full size (modal/popup)
-window.viewEvidenceImage = function (uniqueId) {
-    console.log('[viewEvidenceImage] Attempting to view image for:', uniqueId);
-
-    // Strategy 1: Standard ID
-    let imgEl = document.getElementById('evidence-img-' + uniqueId);
-
-    // Strategy 2: If uniqueId looks like "0" (index-only), try to find it via the row container
-    if (!imgEl) {
-        console.warn(`[viewEvidenceImage] Element 'evidence-img-${uniqueId}' not found. Searching by context...`);
-
-        // Try to find the file input which usually has the same ID suffix
-        const fileInput = document.getElementById('img-' + uniqueId);
-        if (fileInput) {
-            // Look for sibling/cousin image in the same container
-            const container = fileInput.closest('.ncr-panel') || fileInput.parentElement.parentElement;
-            if (container) {
-                const nearbyImg = container.querySelector('img[id^="evidence-img-"]');
-                if (nearbyImg) {
-                    console.log('[viewEvidenceImage] Found image via context:', nearbyImg.id);
-                    imgEl = nearbyImg;
+            // Try to find the file input which usually has the same ID suffix
+            const fileInput = document.getElementById('img-' + uniqueId);
+            if (fileInput) {
+                // Look for sibling/cousin image in the same container
+                const container = fileInput.closest('.ncr-panel') || fileInput.parentElement.parentElement;
+                if (container) {
+                    const nearbyImg = container.querySelector('img[id^="evidence-img-"]');
+                    if (nearbyImg) {
+                        console.log('[viewEvidenceImage] Found image via context:', nearbyImg.id);
+                        imgEl = nearbyImg;
+                    }
                 }
             }
         }
-    }
 
-    if (!imgEl) {
-        // Strategy 3: Try to find ANY evidence image if we are desperate and uniqueId is just '0'
-        if (uniqueId === 0 || uniqueId === '0') {
-            const firstImg = document.querySelector('img[id^="evidence-img-"]');
-            if (firstImg) {
-                console.log('[viewEvidenceImage] Fallback: Using first found evidence image:', firstImg.id);
-                imgEl = firstImg;
+        if (!imgEl) {
+            // Strategy 3: Try to find ANY evidence image if we are desperate and uniqueId is just '0'
+            if (uniqueId === 0 || uniqueId === '0') {
+                const firstImg = document.querySelector('img[id^="evidence-img-"]');
+                if (firstImg) {
+                    console.log('[viewEvidenceImage] Fallback: Using first found evidence image:', firstImg.id);
+                    imgEl = firstImg;
+                }
             }
         }
-    }
 
-    if (!imgEl) {
-        console.error('[viewEvidenceImage] Image element DEFINITELY not found for:', uniqueId);
-        window.showNotification('Error: Image element not found. Please refresh and try again.', 'error');
-        return;
-    }
+        if (!imgEl) {
+            console.error('[viewEvidenceImage] Image element DEFINITELY not found for:', uniqueId);
+            window.showNotification('Error: Image element not found. Please refresh and try again.', 'error');
+            return;
+        }
 
-    if (!imgEl.src || imgEl.src === '' || imgEl.src.includes('placeholder')) {
-        console.warn('[viewEvidenceImage] Image source is empty or invalid');
-        window.showNotification('No image source found', 'warning');
-        return;
-    }
+        if (!imgEl.src || imgEl.src === '' || imgEl.src.includes('placeholder')) {
+            console.warn('[viewEvidenceImage] Image source is empty or invalid');
+            window.showNotification('No image source found', 'warning');
+            return;
+        }
 
-    console.log('[viewEvidenceImage] Opening modal for src:', imgEl.src.substring(0, 50) + '...');
+        console.log('[viewEvidenceImage] Opening modal for src:', imgEl.src.substring(0, 50) + '...');
 
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'evidence-modal-overlay';
-    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
-    overlay.onclick = function () { overlay.remove(); };
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'evidence-modal-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
+        overlay.onclick = function () { overlay.remove(); };
 
-    // Create image container
-    overlay.innerHTML = `
+        // Create image container
+        overlay.innerHTML = `
         <div style="position: relative; max-width: 90%; max-height: 90%;">
             <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
             <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
@@ -2650,152 +2758,152 @@ window.viewEvidenceImage = function (uniqueId) {
         </div>
     `;
 
-    document.body.appendChild(overlay);
-};
-
-// Remove evidence image
-window.removeEvidence = function (uniqueId) {
-    const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-    const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-    const fileInput = document.getElementById('img-' + uniqueId);
-
-    if (previewDiv) previewDiv.style.display = 'none';
-    if (evidenceData) evidenceData.value = '';
-    if (fileInput) fileInput.value = '';
-
-    window.showNotification('Evidence image removed', 'info');
-};
-// Generate Printable Report - Enhanced Version
-// Generate Printable Report - Enhanced Version
-window.generateAuditReport = function (reportId) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) {
-        window.showNotification('Report not found', 'error');
-        return;
-    }
-
-    // 1. Hydrate Checklist Data (Clause & Requirements) - ENHANCED
-    const hydratedProgress = (report.checklistProgress || []).map(item => {
-        let clause = item.clause;
-        let requirement = item.requirement;
-        let text = item.text;
-
-        // Try to lookup from source checklist if text is missing
-        if ((!requirement || !clause) && item.checklistId) {
-            const checklist = window.state.checklists.find(c => String(c.id) === String(item.checklistId));
-            if (checklist) {
-                // Support both data structures: sections[] and clauses[]
-                const sections = checklist.sections || [];
-                const clauseGroups = checklist.clauses || [];
-
-                if (sections.length > 0) {
-                    // Old structure: sections with items
-                    let cumulativeIdx = 0;
-                    let found = false;
-                    for (const section of sections) {
-                        if (found) break;
-                        for (const q of (section.items || [])) {
-                            if (String(cumulativeIdx) === String(item.itemIdx)) {
-                                clause = section.clauseNumber
-                                    ? `${section.clauseNumber} ${section.title || ''}`.trim()
-                                    : (section.title || section.clause || `Section ${section.id || ''}`);
-                                requirement = q.text || q.requirement || q.description || '';
-                                found = true;
-                                break;
-                            }
-                            cumulativeIdx++;
-                        }
-                    }
-                } else if (clauseGroups.length > 0) {
-                    // New structure: clauses with subClauses
-                    let cumulativeIdx = 0;
-                    let found = false;
-                    for (const group of clauseGroups) {
-                        if (found) break;
-                        for (const sub of (group.subClauses || [])) {
-                            if (String(cumulativeIdx) === String(item.itemIdx)) {
-                                clause = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
-                                requirement = sub.requirement || sub.text || '';
-                                found = true;
-                                break;
-                            }
-                            cumulativeIdx++;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fallback: Try KB clause lookup if still missing
-        if ((!requirement || requirement === 'Requirement details not available') && clause && report.standard) {
-            const kb = window.state.knowledgeBase;
-            if (kb?.standards?.length > 0) {
-                const stdDoc = kb.standards.find(s =>
-                    s.status === 'ready' && s.clauses?.length > 0 &&
-                    s.name.toLowerCase().includes(report.standard.toLowerCase().replace('iso ', ''))
-                );
-                if (stdDoc) {
-                    // Try to match clause number
-                    const clauseNum = clause.split(' ')[0]; // e.g. "5.1" from "5.1 Leadership"
-                    const kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
-                    if (kbClause) {
-                        requirement = kbClause.requirement || requirement;
-                        if (!clause || clause === 'General Requirement') {
-                            clause = `${kbClause.clause} ${kbClause.title}`;
-                        }
-                    }
-                }
-            }
-        }
-
-        return {
-            ...item,
-            clause: clause || item.clause || item.sectionName || 'General Requirement',
-            requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available',
-            comment: item.comment || ''
-        };
-    });
-
-    // Attempt to get client details for address/logo if available
-    const client = window.state.clients.find(c => c.name === report.client) || {};
-    const clientLogo = client.logoUrl || 'https://via.placeholder.com/150?text=Client+Logo';
-
-    // Get audit plan reference
-    const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
-
-    // QR Code for Report Verification (using report ID)
-    // QR Code for Report Verification (using report ID)
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
-
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        window.showNotification('Pop-up blocked. Please allow pop-ups to print.', 'warning');
-        return;
-    }
-
-    const today = new Date().toLocaleDateString();
-
-    // Helper function to format text (markdown + newlines)
-    const formatText = (text) => {
-        if (!text) return '';
-        return text
-            .replace(/\\n/g, '<br>')  // Handle escaped newlines
-            .replace(/\n/g, '<br>')   // Handle actual newlines
-            .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>')  // ***bold***
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')      // **bold**
-            .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size: 0.9em; color: #059669;">(Clause $1)</em>');
+        document.body.appendChild(overlay);
     };
 
-    // Calculate stats from Hydrated Data
-    const totalItems = hydratedProgress.length;
-    const ncItems = hydratedProgress.filter(i => i.status === 'nc');
-    const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
-    const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
-    const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
-    const observationCount = hydratedProgress.filter(i => i.status === 'nc' && i.ncrType === 'Observation').length;
+    // Remove evidence image
+    window.removeEvidence = function (uniqueId) {
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+        const fileInput = document.getElementById('img-' + uniqueId);
 
-    const reportHtml = `
+        if (previewDiv) previewDiv.style.display = 'none';
+        if (evidenceData) evidenceData.value = '';
+        if (fileInput) fileInput.value = '';
+
+        window.showNotification('Evidence image removed', 'info');
+    };
+    // Generate Printable Report - Enhanced Version
+    // Generate Printable Report - Enhanced Version
+    window.generateAuditReport = function (reportId) {
+        const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) {
+            window.showNotification('Report not found', 'error');
+            return;
+        }
+
+        // 1. Hydrate Checklist Data (Clause & Requirements) - ENHANCED
+        const hydratedProgress = (report.checklistProgress || []).map(item => {
+            let clause = item.clause;
+            let requirement = item.requirement;
+            let text = item.text;
+
+            // Try to lookup from source checklist if text is missing
+            if ((!requirement || !clause) && item.checklistId) {
+                const checklist = window.state.checklists.find(c => String(c.id) === String(item.checklistId));
+                if (checklist) {
+                    // Support both data structures: sections[] and clauses[]
+                    const sections = checklist.sections || [];
+                    const clauseGroups = checklist.clauses || [];
+
+                    if (sections.length > 0) {
+                        // Old structure: sections with items
+                        let cumulativeIdx = 0;
+                        let found = false;
+                        for (const section of sections) {
+                            if (found) break;
+                            for (const q of (section.items || [])) {
+                                if (String(cumulativeIdx) === String(item.itemIdx)) {
+                                    clause = section.clauseNumber
+                                        ? `${section.clauseNumber} ${section.title || ''}`.trim()
+                                        : (section.title || section.clause || `Section ${section.id || ''}`);
+                                    requirement = q.text || q.requirement || q.description || '';
+                                    found = true;
+                                    break;
+                                }
+                                cumulativeIdx++;
+                            }
+                        }
+                    } else if (clauseGroups.length > 0) {
+                        // New structure: clauses with subClauses
+                        let cumulativeIdx = 0;
+                        let found = false;
+                        for (const group of clauseGroups) {
+                            if (found) break;
+                            for (const sub of (group.subClauses || [])) {
+                                if (String(cumulativeIdx) === String(item.itemIdx)) {
+                                    clause = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
+                                    requirement = sub.requirement || sub.text || '';
+                                    found = true;
+                                    break;
+                                }
+                                cumulativeIdx++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fallback: Try KB clause lookup if still missing
+            if ((!requirement || requirement === 'Requirement details not available') && clause && report.standard) {
+                const kb = window.state.knowledgeBase;
+                if (kb?.standards?.length > 0) {
+                    const stdDoc = kb.standards.find(s =>
+                        s.status === 'ready' && s.clauses?.length > 0 &&
+                        s.name.toLowerCase().includes(report.standard.toLowerCase().replace('iso ', ''))
+                    );
+                    if (stdDoc) {
+                        // Try to match clause number
+                        const clauseNum = clause.split(' ')[0]; // e.g. "5.1" from "5.1 Leadership"
+                        const kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+                        if (kbClause) {
+                            requirement = kbClause.requirement || requirement;
+                            if (!clause || clause === 'General Requirement') {
+                                clause = `${kbClause.clause} ${kbClause.title}`;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return {
+                ...item,
+                clause: clause || item.clause || item.sectionName || 'General Requirement',
+                requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available',
+                comment: item.comment || ''
+            };
+        });
+
+        // Attempt to get client details for address/logo if available
+        const client = window.state.clients.find(c => c.name === report.client) || {};
+        const clientLogo = client.logoUrl || 'https://via.placeholder.com/150?text=Client+Logo';
+
+        // Get audit plan reference
+        const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
+
+        // QR Code for Report Verification (using report ID)
+        // QR Code for Report Verification (using report ID)
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
+
+        // Create a new window for printing
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            window.showNotification('Pop-up blocked. Please allow pop-ups to print.', 'warning');
+            return;
+        }
+
+        const today = new Date().toLocaleDateString();
+
+        // Helper function to format text (markdown + newlines)
+        const formatText = (text) => {
+            if (!text) return '';
+            return text
+                .replace(/\\n/g, '<br>')  // Handle escaped newlines
+                .replace(/\n/g, '<br>')   // Handle actual newlines
+                .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>')  // ***bold***
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')      // **bold**
+                .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size: 0.9em; color: #059669;">(Clause $1)</em>');
+        };
+
+        // Calculate stats from Hydrated Data
+        const totalItems = hydratedProgress.length;
+        const ncItems = hydratedProgress.filter(i => i.status === 'nc');
+        const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
+        const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
+        const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
+        const observationCount = hydratedProgress.filter(i => i.status === 'nc' && i.ncrType === 'Observation').length;
+
+        const reportHtml = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -3141,7 +3249,7 @@ window.generateAuditReport = function (reportId) {
                 </div>
                 `).join('')}
             </div>` : ''
-        }
+            }
 
     < !--4. Meetings-- >
             <div id="section-meetings" class="page-break table-container">
@@ -3212,128 +3320,128 @@ window.generateAuditReport = function (reportId) {
         </html >
     `;
 
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
+        printWindow.document.write(reportHtml);
+        printWindow.document.close();
 
-    // Auto-print after delay to allow styles to load
-    setTimeout(() => {
-        printWindow.print();
-    }, 1000);
-};
+        // Auto-print after delay to allow styles to load
+        setTimeout(() => {
+            printWindow.print();
+        }, 1000);
+    };
 
-window.openCreateReportModal = openCreateReportModal;
-window.openEditReportModal = openEditReportModal;
+    window.openCreateReportModal = openCreateReportModal;
+    window.openEditReportModal = openEditReportModal;
 
-// Persistent stream for remote audits
-window.activeAuditScreenStream = null;
+    // Persistent stream for remote audits
+    window.activeAuditScreenStream = null;
 
-window.captureScreenEvidence = async function (uniqueId) {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
-        return;
-    }
-
-    try {
-        let stream = window.activeAuditScreenStream;
-        let isNew = false;
-
-        // Check active stream
-        if (!stream || !stream.active) {
-            window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
-            stream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always" },
-                audio: false
-            });
-            window.activeAuditScreenStream = stream;
-            isNew = true;
-
-            // Handle stop sharing
-            stream.getVideoTracks()[0].onended = () => {
-                window.activeAuditScreenStream = null;
-                window.showNotification('Screen sharing session ended.', 'info');
-            };
+    window.captureScreenEvidence = async function (uniqueId) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+            return;
         }
 
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.muted = true;
-        video.play();
+        try {
+            let stream = window.activeAuditScreenStream;
+            let isNew = false;
 
-        // Wait for buffer
-        await new Promise(r => setTimeout(r, isNew ? 500 : 200));
+            // Check active stream
+            if (!stream || !stream.active) {
+                window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: false
+                });
+                window.activeAuditScreenStream = stream;
+                isNew = true;
 
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+                // Handle stop sharing
+                stream.getVideoTracks()[0].onended = () => {
+                    window.activeAuditScreenStream = null;
+                    window.showNotification('Screen sharing session ended.', 'info');
+                };
+            }
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.muted = true;
+            video.play();
 
-        // DO NOT stop tracks here. We reuse them.
+            // Wait for buffer
+            await new Promise(r => setTimeout(r, isNew ? 500 : 200));
 
-        // Update UI
-        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-        const imgElem = document.getElementById('evidence-img-' + uniqueId);
-        const dataInput = document.getElementById('evidence-data-' + uniqueId);
-        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
 
-        if (imgElem) imgElem.src = dataUrl;
-        if (previewDiv) previewDiv.style.display = 'block';
-        if (dataInput) dataInput.value = 'attached';
-        if (sizeElem) sizeElem.textContent = 'Screen Capture';
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
-        window.showNotification('Captured!', 'success');
+            // DO NOT stop tracks here. We reuse them.
 
-        // Cleanup element
-        video.pause();
-        video.srcObject = null;
-        video.remove();
+            // Update UI
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            const imgElem = document.getElementById('evidence-img-' + uniqueId);
+            const dataInput = document.getElementById('evidence-data-' + uniqueId);
+            const sizeElem = document.getElementById('evidence-size-' + uniqueId);
 
-    } catch (err) {
-        if (err.name !== 'NotAllowedError') {
-            console.error(err);
-            window.showNotification('Capture failed: ' + err.message, 'error');
+            if (imgElem) imgElem.src = dataUrl;
+            if (previewDiv) previewDiv.style.display = 'block';
+            if (dataInput) dataInput.value = 'attached';
+            if (sizeElem) sizeElem.textContent = 'Screen Capture';
+
+            window.showNotification('Captured!', 'success');
+
+            // Cleanup element
+            video.pause();
+            video.srcObject = null;
+            video.remove();
+
+        } catch (err) {
+            if (err.name !== 'NotAllowedError') {
+                console.error(err);
+                window.showNotification('Capture failed: ' + err.message, 'error');
+            }
         }
-    }
-};
-window.renderExecutionDetail = renderExecutionDetail;
+    };
+    window.renderExecutionDetail = renderExecutionDetail;
 
-// Toggle selection of all items in a section
-// toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
+    // Toggle selection of all items in a section
+    // toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
 
-// ============================================
-// Webcam Handling for Desktop 'Camera' Button
-// ============================================
-window.activeWebcamStream = null;
+    // ============================================
+    // Webcam Handling for Desktop 'Camera' Button
+    // ============================================
+    window.activeWebcamStream = null;
 
-window.handleCameraButton = function (uniqueId) {
-    // Check if mobile device (simple check)
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    window.handleCameraButton = function (uniqueId) {
+        // Check if mobile device (simple check)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    if (isMobile) {
-        // Use the native input for mobile (file picker / camera app)
-        const inp = document.getElementById('cam-' + uniqueId);
-        if (inp) inp.click();
-    } else {
-        // Use Webcam Modal for desktop
-        window.openWebcamModal(uniqueId);
-    }
-};
+        if (isMobile) {
+            // Use the native input for mobile (file picker / camera app)
+            const inp = document.getElementById('cam-' + uniqueId);
+            if (inp) inp.click();
+        } else {
+            // Use Webcam Modal for desktop
+            window.openWebcamModal(uniqueId);
+        }
+    };
 
-window.openWebcamModal = async function (uniqueId) {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
+    window.openWebcamModal = async function (uniqueId) {
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
 
-    // Cleanup any existing stream first
-    if (window.activeWebcamStream) {
-        window.activeWebcamStream.getTracks().forEach(track => track.stop());
-        window.activeWebcamStream = null;
-    }
+        // Cleanup any existing stream first
+        if (window.activeWebcamStream) {
+            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
+        }
 
-    modalTitle.textContent = 'Capture from Webcam';
+        modalTitle.textContent = 'Capture from Webcam';
 
-    modalBody.innerHTML = `
+        modalBody.innerHTML = `
     < div style = "display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
             <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                 <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
@@ -3344,207 +3452,208 @@ window.openWebcamModal = async function (uniqueId) {
         </div >
     `;
 
-    // Configure "Capture" button
-    modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
-    modalSave.onclick = () => window.captureWebcam(uniqueId);
+        // Configure "Capture" button
+        modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+        modalSave.onclick = () => window.captureWebcam(uniqueId);
 
-    // Show modal BEFORE requesting media
-    if (window.openModal) window.openModal();
+        // Show modal BEFORE requesting media
+        if (window.openModal) window.openModal();
 
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        window.activeWebcamStream = stream;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            window.activeWebcamStream = stream;
 
+            const video = document.getElementById('webcam-video');
+            const loading = document.getElementById('webcam-loading');
+
+            if (video) {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    if (loading) loading.style.display = 'none';
+                };
+            }
+        } catch (err) {
+            const errDiv = document.getElementById('webcam-error');
+            const loading = document.getElementById('webcam-loading');
+            if (loading) loading.style.display = 'none';
+
+            if (errDiv) {
+                errDiv.style.display = 'block';
+                errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+            }
+            console.error("Webcam error:", err);
+        }
+    };
+
+    window.captureWebcam = function (uniqueId) {
         const video = document.getElementById('webcam-video');
-        const loading = document.getElementById('webcam-loading');
+        if (!video || !window.activeWebcamStream) return;
 
-        if (video) {
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                if (loading) loading.style.display = 'none';
-            };
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const ctx = canvas.getContext('2d');
+            // Mirror the capture if the video was mirrored
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Stop stream
+            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
+
+            // Update UI
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            const imgElem = document.getElementById('evidence-img-' + uniqueId);
+            const dataInput = document.getElementById('evidence-data-' + uniqueId);
+            const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+
+            if (imgElem) imgElem.src = dataUrl;
+            if (previewDiv) previewDiv.style.display = 'block';
+            if (dataInput) dataInput.value = 'attached';
+            if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+
+            // Close modal
+            if (window.closeModal) window.closeModal();
+        } catch (e) {
+            console.error("Capture failed:", e);
+            window.showNotification("Failed to capture image", "error");
         }
-    } catch (err) {
-        const errDiv = document.getElementById('webcam-error');
-        const loading = document.getElementById('webcam-loading');
-        if (loading) loading.style.display = 'none';
+    };
 
-        if (errDiv) {
-            errDiv.style.display = 'block';
-            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
-        }
-        console.error("Webcam error:", err);
-    }
-};
+    // Global event delegation for section checkboxes (works with dynamically rendered content)
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('section-checkbox')) {
+            e.stopPropagation();
+            const sectionId = e.target.getAttribute('data-section-id');
+            const isChecked = e.target.checked;
+            console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
 
-window.captureWebcam = function (uniqueId) {
-    const video = document.getElementById('webcam-video');
-    if (!video || !window.activeWebcamStream) return;
-
-    try {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const ctx = canvas.getContext('2d');
-        // Mirror the capture if the video was mirrored
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-
-        // Stop stream
-        window.activeWebcamStream.getTracks().forEach(track => track.stop());
-        window.activeWebcamStream = null;
-
-        // Update UI
-        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-        const imgElem = document.getElementById('evidence-img-' + uniqueId);
-        const dataInput = document.getElementById('evidence-data-' + uniqueId);
-        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
-
-        if (imgElem) imgElem.src = dataUrl;
-        if (previewDiv) previewDiv.style.display = 'block';
-        if (dataInput) dataInput.value = 'attached';
-        if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
-
-        // Close modal
-        if (window.closeModal) window.closeModal();
-    } catch (e) {
-        console.error("Capture failed:", e);
-        window.showNotification("Failed to capture image", "error");
-    }
-};
-
-// Global event delegation for section checkboxes (works with dynamically rendered content)
-document.addEventListener('click', function (e) {
-    if (e.target.classList.contains('section-checkbox')) {
-        e.stopPropagation();
-        const sectionId = e.target.getAttribute('data-section-id');
-        const isChecked = e.target.checked;
-        console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
-
-        // Find all items in this section and toggle selection
-        const section = document.getElementById(sectionId);
-        if (!section) {
-            console.error('Section not found:', sectionId);
-            return;
-        }
-
-        const items = section.querySelectorAll('.checklist-item');
-        console.log('Found', items.length, 'items in section');
-
-        items.forEach((item, idx) => {
-            // Toggle the individual checkbox too
-            const itemCheckbox = item.querySelector('.item-checkbox');
-            if (itemCheckbox) {
-                itemCheckbox.checked = isChecked;
+            // Find all items in this section and toggle selection
+            const section = document.getElementById(sectionId);
+            if (!section) {
+                console.error('Section not found:', sectionId);
+                return;
             }
 
-            if (isChecked) {
-                item.classList.add('selected-item');
-                item.style.background = '#eff6ff';
-                item.style.borderLeft = '4px solid var(--primary-color)';
-            } else {
-                item.classList.remove('selected-item');
-                item.style.background = '';
-                item.style.borderLeft = '4px solid #e2e8f0';
+            const items = section.querySelectorAll('.checklist-item');
+            console.log('Found', items.length, 'items in section');
+
+            items.forEach((item, idx) => {
+                // Toggle the individual checkbox too
+                const itemCheckbox = item.querySelector('.item-checkbox');
+                if (itemCheckbox) {
+                    itemCheckbox.checked = isChecked;
+                }
+
+                if (isChecked) {
+                    item.classList.add('selected-item');
+                    item.style.background = '#eff6ff';
+                    item.style.borderLeft = '4px solid var(--primary-color)';
+                } else {
+                    item.classList.remove('selected-item');
+                    item.style.background = '';
+                    item.style.borderLeft = '4px solid #e2e8f0';
+                }
+            });
+
+            console.log('Selection complete for', items.length, 'items');
+        }
+    });
+
+    // Global event delegation for individual item checkboxes
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('item-checkbox')) {
+            const checkbox = e.target;
+            const uniqueId = checkbox.getAttribute('data-unique-id');
+            const row = document.getElementById('row-' + uniqueId);
+
+            if (row) {
+                if (checkbox.checked) {
+                    row.classList.add('selected-item');
+                    row.style.background = '#eff6ff';
+                    row.style.borderLeft = '4px solid var(--primary-color)';
+                } else {
+                    row.classList.remove('selected-item');
+                    row.style.background = '';
+                    row.style.borderLeft = '4px solid #e2e8f0';
+                }
             }
-        });
+        }
+    });
 
-        console.log('Selection complete for', items.length, 'items');
-    }
-});
+    // Global event delegation for bulk action buttons
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.bulk-action-btn');
+        if (btn) {
+            const action = btn.getAttribute('data-action');
+            const reportId = btn.getAttribute('data-report-id');
+            console.log('Bulk action button clicked:', action, 'for report:', reportId);
 
-// Global event delegation for individual item checkboxes
-document.addEventListener('click', function (e) {
-    if (e.target.classList.contains('item-checkbox')) {
-        const checkbox = e.target;
-        const uniqueId = checkbox.getAttribute('data-unique-id');
-        const row = document.getElementById('row-' + uniqueId);
+            if (action && reportId) {
+                window.bulkUpdateStatus(parseInt(reportId), action);
 
-        if (row) {
-            if (checkbox.checked) {
-                row.classList.add('selected-item');
-                row.style.background = '#eff6ff';
-                row.style.borderLeft = '4px solid var(--primary-color)';
-            } else {
-                row.classList.remove('selected-item');
-                row.style.background = '';
-                row.style.borderLeft = '4px solid #e2e8f0';
+                // Close menu
+                const menu = document.getElementById('bulk-menu-' + reportId);
+                if (menu) menu.classList.add('hidden');
             }
         }
-    }
-});
+    });
 
-// Global event delegation for bulk action buttons
-document.addEventListener('click', function (e) {
-    const btn = e.target.closest('.bulk-action-btn');
-    if (btn) {
-        const action = btn.getAttribute('data-action');
-        const reportId = btn.getAttribute('data-report-id');
-        console.log('Bulk action button clicked:', action, 'for report:', reportId);
+    // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
+    document.addEventListener('click', function (e) {
+        // Check if clicked element or any parent has status-btn class
+        let btn = e.target;
 
-        if (action && reportId) {
-            window.bulkUpdateStatus(parseInt(reportId), action);
-
-            // Close menu
-            const menu = document.getElementById('bulk-menu-' + reportId);
-            if (menu) menu.classList.add('hidden');
+        // Log all clicks for debugging
+        if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+            console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
         }
-    }
-});
 
-// Global event delegation for status buttons (OK, NC, N/A) - using capture phase
-document.addEventListener('click', function (e) {
-    // Check if clicked element or any parent has status-btn class
-    let btn = e.target;
-
-    // Log all clicks for debugging
-    if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-        console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
-    }
-
-    while (btn && btn.classList && !btn.classList.contains('status-btn')) {
-        btn = btn.parentElement;
-        if (!btn || btn === document.body) {
-            btn = null;
-            break;
+        while (btn && btn.classList && !btn.classList.contains('status-btn')) {
+            btn = btn.parentElement;
+            if (!btn || btn === document.body) {
+                btn = null;
+                break;
+            }
         }
-    }
 
-    if (btn && btn.classList && btn.classList.contains('status-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
+        if (btn && btn.classList && btn.classList.contains('status-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
 
-        const uniqueId = btn.getAttribute('data-unique-id');
-        const status = btn.getAttribute('data-status');
-        console.log('Status button clicked:', status, 'for item:', uniqueId);
+            const uniqueId = btn.getAttribute('data-unique-id');
+            const status = btn.getAttribute('data-status');
+            console.log('Status button clicked:', status, 'for item:', uniqueId);
 
-        if (uniqueId && status) {
-            window.setChecklistStatus(uniqueId, status);
+            if (uniqueId && status) {
+                window.setChecklistStatus(uniqueId, status);
+            }
         }
-    }
-}, true); // true = capture phase
+    }, true); // true = capture phase
 
-// Helper to update meeting records (Opening/Closing)
-window.updateMeetingData = function (reportId, meetingType, field, value) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
+    // Helper to update meeting records (Opening/Closing)
+    window.updateMeetingData = function (reportId, meetingType, field, value) {
+        const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-    if (!report[meetingType + 'Meeting']) {
-        report[meetingType + 'Meeting'] = {};
-    }
+        if (!report[meetingType + 'Meeting']) {
+            report[meetingType + 'Meeting'] = {};
+        }
 
-    if (field === 'attendees') {
-        // Split by comma and clean up
-        report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
-    } else {
-        report[meetingType + 'Meeting'][field] = value;
-    }
+        if (field === 'attendees') {
+            // Split by comma and clean up
+            report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+        } else {
+            report[meetingType + 'Meeting'][field] = value;
+        }
 
-    window.saveData();
-    window.saveChecklist(reportId);
-};
+        window.saveData();
+        window.saveChecklist(reportId);
+    };
 
+}
