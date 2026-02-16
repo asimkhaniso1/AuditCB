@@ -116,13 +116,15 @@ ${kbContext}
 ` : ''}
 Instructions:
 1. Executive Summary: Write a professional paragraph summarizing the audit conclusion.
-2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "*** Effective implementation of Clause 5.1 Leadership was observed..."). Use professional reporting language with *** for emphasis.
-3. OFI: Write a list of general opportunities for improvement (not specific NCs).
+2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "Effective implementation of Clause 5.1 Leadership was observed..."). Use professional audit reporting language. Do NOT use markdown formatting (no asterisks, no bold markers, no bullet symbols).
+3. OFI: Write a list of general opportunities for improvement (not specific NCs). Use plain text without markdown.
+
+IMPORTANT: Return plain text only. Do NOT use markdown formatting like **, ***, ##, or bullet symbols in any field values. Use numbered lists (1. 2. 3.) instead.
 
 Return raw JSON:
 {
   "executiveSummary": "...",
-  "positiveObservations": "...",  // Can be a single string with newlines or an array. Prefer a formatted string.
+  "positiveObservations": "...",
   "ofi": ["...", "..."]
 }
 `;
@@ -456,21 +458,39 @@ window.runFollowUpAIAnalysis = async function (reportId) {
     btn.disabled = true;
 
     try {
-        // Gather findings
+        // Gather findings with rich context
         const findings = [];
+        const plan = window.state.auditPlans?.find(p => String(p.id) === String(report.planId)) || {};
+        const checklists = (window.state.checklists || []);
+        const assignedChecklists = (plan.selectedChecklists || []).map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
+
         (report.checklistProgress || []).filter(p => p.status === 'nc').forEach((item, idx) => {
+            // Resolve clause and requirement text from checklist data
+            let clauseText = '';
+            let reqText = '';
+            if (item.checklistId && item.itemIdx !== undefined) {
+                const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
+                if (cl && cl.items && cl.items[item.itemIdx]) {
+                    clauseText = cl.items[item.itemIdx].clause || '';
+                    reqText = cl.items[item.itemIdx].requirement || '';
+                    if (!reqText && cl.items[item.itemIdx].items && cl.items[item.itemIdx].items[0]) {
+                        reqText = cl.items[item.itemIdx].items[0].requirement || '';
+                    }
+                }
+            }
             findings.push({
                 id: idx,
                 type: 'checklist',
-                description: item.ncrDescription || item.comment || 'Checklist finding',
-                remarks: item.comment || ''
+                clause: clauseText,
+                requirement: reqText,
+                description: item.ncrDescription || reqText || item.comment || 'Checklist finding',
+                remarks: item.comment || item.transcript || ''
             });
         });
 
         // Resolve standard name — try report directly, then fall back to linked plan/client
         let standardName = report.standard;
         if (!standardName && report.planId) {
-            const plan = window.state.auditPlans?.find(p => String(p.id) === String(report.planId));
             standardName = plan?.standard;
         }
         if (!standardName && report.client) {
@@ -562,20 +582,23 @@ window.runAutoSummary = async function (reportId) {
 
         const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas);
 
+        // Helper to strip any remaining markdown from AI response
+        const stripMd = (text) => text ? text.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '').trim() : '';
+
         if (result.executiveSummary) {
-            report.executiveSummary = result.executiveSummary;
+            report.executiveSummary = stripMd(result.executiveSummary);
             const execInput = document.getElementById('exec-summary-' + reportId) || document.getElementById('exec-summary');
-            if (execInput) execInput.value = result.executiveSummary;
+            if (execInput) execInput.value = report.executiveSummary;
         }
 
         if (result.positiveObservations) {
-            report.positiveObservations = Array.isArray(result.positiveObservations) ? result.positiveObservations.join('\n') : result.positiveObservations;
+            report.positiveObservations = stripMd(Array.isArray(result.positiveObservations) ? result.positiveObservations.join('\n') : result.positiveObservations);
             const posInput = document.getElementById('positive-observations');
             if (posInput) posInput.value = report.positiveObservations;
         }
 
         if (result.ofi && Array.isArray(result.ofi)) {
-            report.ofi = result.ofi.join('\n');
+            report.ofi = result.ofi.map(s => stripMd(s)).join('\n');
             const ofiInput = document.getElementById('ofi');
             if (ofiInput) ofiInput.value = report.ofi;
         }

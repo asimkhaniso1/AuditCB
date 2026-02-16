@@ -1249,6 +1249,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // UNIFIED DASHBOARD: MERGES REVIEW & SUMMARY
             // Auditor's Findings Review & Final Submission Screen
             const allFindings = [];
+            // Cache evidence images for viewing from Review tab
+            if (!window._evidenceCache) window._evidenceCache = {};
 
             // Destructure for lookup
             const { assignedChecklists = [] } = contextData;
@@ -1279,7 +1281,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     id: `checklist-${idx}`,
                     source: 'Checklist',
                     type: item.ncrType || 'observation',
-                    description: item.ncrDescription || 'Non-conformity identified',
+                    description: item.ncrDescription || reqText || item.comment || 'Non-conformity identified',
                     remarks: item.comment || item.transcript || '',
                     designation: item.designation || '',
                     department: item.department || '',
@@ -1288,6 +1290,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     clause: clauseText,
                     requirement: reqText
                 });
+                if (item.evidenceImage) window._evidenceCache[`checklist-${idx}`] = item.evidenceImage;
             });
 
             // Collect manual NCRs
@@ -1303,6 +1306,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     hasEvidence: !!ncr.evidenceImage,
                     evidenceImage: ncr.evidenceImage
                 });
+                if (ncr.evidenceImage) window._evidenceCache[`ncr-${idx}`] = ncr.evidenceImage;
             });
 
             const isReadyToSubmit = allFindings.length === 0 || allFindings.every(f => f.type !== 'pending');
@@ -1315,9 +1319,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 primaryActionBtn = `
                     <button class="btn btn-secondary" onclick="window.generateAuditReport('${report.id}')">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="window.generateAuditReport('${report.id}')">
-                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
                     </button>
                 `;
             } else if (canOneClickFinalize) {
@@ -1391,7 +1392,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                             <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
                                                 <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${f.source}</span>
                                                 <span style="font-weight: 700; color: #1e293b;">#${idx + 1}</span>
-                                                ${f.hasEvidence ? `<span onclick="window.viewEvidenceImage('${f.id.replace('checklist-', '').replace('ncr-', '')}')" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
+                                                ${f.hasEvidence ? `<span onclick="window.viewEvidenceImageDirect('${f.id}')" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
                                             </div>
                                             ${f.clause || f.requirement ? `
                                                 <div style="font-size: 0.85rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 0.75rem;">
@@ -2758,6 +2759,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         </div>
     `;
 
+        document.body.appendChild(overlay);
+    };
+
+    // View evidence image directly from cached data (used in Review tab)
+    window.viewEvidenceImageDirect = function (findingId) {
+        const src = window._evidenceCache && window._evidenceCache[findingId];
+        if (!src) {
+            window.showNotification('Evidence image not found. Please view from the Checklist tab.', 'warning');
+            return;
+        }
+        const overlay = document.createElement('div');
+        overlay.id = 'evidence-modal-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
+        overlay.onclick = function () { overlay.remove(); };
+        overlay.innerHTML = `
+            <div style="position: relative; max-width: 90%; max-height: 90%;">
+                <img src="${src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
+                <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+        `;
         document.body.appendChild(overlay);
     };
 
