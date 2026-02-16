@@ -534,9 +534,16 @@ function renderExecutionDetail(reportId) {
     // Fetch Data & Calculate Progress
     const plan = report.planId ? state.auditPlans.find(p => String(p.id) === String(report.planId)) : state.auditPlans.find(p => p.client === report.client);
 
-    // Fetch Client Departments/Sites
+    // Fetch Client Departments & Designations
     const clientData = state.clients.find(c => c.name === report.client);
-    const departments = clientData && clientData.sites ? clientData.sites.map(s => s.name) : ['Management', 'Production', 'Quality', 'Store', 'Maintenance', 'HR', 'Sales'];
+    const departments = clientData && clientData.departments && clientData.departments.length > 0
+        ? clientData.departments.map(d => d.name || d)
+        : ['Management', 'Production', 'Quality', 'Store', 'Maintenance', 'HR', 'Sales'];
+    // Collect designations from client designations + contact designations
+    const designations = Array.from(new Set([
+        ...((clientData && clientData.designations) || []).map(d => d.title || d),
+        ...((clientData && clientData.contacts) || []).map(c => c.designation).filter(Boolean)
+    ]));
 
     const planChecklists = plan?.selectedChecklists || [];
     const checklists = state.checklists || [];
@@ -688,11 +695,11 @@ function renderExecutionDetail(reportId) {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments, selectionMap, overridesMap });
+            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments, designations, selectionMap, overridesMap });
         });
     });
 
-    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments, selectionMap, overridesMap });
+    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments, designations, selectionMap, overridesMap });
 }
 
 function renderExecutionTab(report, tabName, contextData = {}) {
@@ -700,7 +707,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     switch (tabName) {
         case 'checklist':
-            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], selectionMap = {}, overridesMap = {} } = contextData;
+            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], designations = [], selectionMap = {}, overridesMap = {} } = contextData;
 
 
             // Helper to render row
@@ -792,14 +799,18 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
                                  <div>
                                      <label style="font-size: 0.8rem;">Interviewee Designation</label>
-                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" placeholder="e.g., Quality Manager" value="${saved.designation || ''}">
+                                     <select id="ncr-designation-${uniqueId}" class="form-control form-control-sm">
+                                        <option value="">-- Select --</option>
+                                        ${designations.map(d => `<option value="${window.UTILS.escapeHtml(d)}" ${saved.designation === d ? 'selected' : ''}>${window.UTILS.escapeHtml(d)}</option>`).join('')}
+                                        ${saved.designation && !designations.includes(saved.designation) ? `<option value="${window.UTILS.escapeHtml(saved.designation)}" selected>${window.UTILS.escapeHtml(saved.designation)}</option>` : ''}
+                                     </select>
                                  </div>
                                  <div>
                                      <label style="font-size: 0.8rem;">Department</label>
                                      <select id="ncr-department-${uniqueId}" class="form-control form-control-sm">
                                         <option value="">-- Select --</option>
-                                        ${departments.map(d => `<option value="${d}" ${saved.department === d ? 'selected' : ''}>${d}</option>`).join('')}
-                                        ${saved.department && !departments.includes(saved.department) ? `<option value="${saved.department}" selected>${saved.department}</option>` : ''}
+                                        ${departments.map(d => `<option value="${window.UTILS.escapeHtml(d)}" ${saved.department === d ? 'selected' : ''}>${window.UTILS.escapeHtml(d)}</option>`).join('')}
+                                        ${saved.department && !departments.includes(saved.department) ? `<option value="${window.UTILS.escapeHtml(saved.department)}" selected>${window.UTILS.escapeHtml(saved.department)}</option>` : ''}
                                      </select>
                                  </div>
                              </div>
