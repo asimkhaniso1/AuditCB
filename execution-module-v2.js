@@ -2,70 +2,10 @@
 // AUDIT EXECUTION MODULE - Enhanced with Tabs
 // ============================================
 
-// ---------- Shared KB Requirement Lookup ----------
-// Searches the Knowledge Base for the ISO standard requirement text
-// matching a given clause number and standard name.
-function _normalizeStdName(name) {
-    return (name || '').toLowerCase()
-        .replace(/iso\/iec/g, 'iso')
-        .replace(/iso\s*/g, '')
-        .replace(/[:\-–]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-function _extractClauseNum(clauseText) {
-    if (!clauseText) return '';
-    // Remove common prefixes like "Clause " or "Section "
-    let t = clauseText.replace(/^(clause|section|annex)\s+/i, '').trim();
-    // Extract leading number like "4.2" from "4.2 Understanding the needs..."
-    const m = t.match(/^([\d]+(?:\.[\d]+)*)/);
-    return m ? m[1] : t.split(' ')[0].replace(/\.$/, '');
-}
-function _lookupKBRequirement(clauseText, standardName) {
-    if (!clauseText || !standardName) return '';
-    const kb = window.state?.knowledgeBase;
-    if (!kb?.standards?.length) return '';
+// ---------- KB Helpers loaded from ai-service.js (window.KB_HELPERS) ----------
+// normalizeStdName, extractClauseNum, lookupKBRequirement, resolveChecklistClause,
+// resolveStandardName are all available via window.KB_HELPERS.*
 
-    const normStd = _normalizeStdName(standardName);
-    const stdDoc = kb.standards.find(s =>
-        s.status === 'ready' && s.clauses?.length > 0 &&
-        _normalizeStdName(s.name).includes(normStd)
-    ) || kb.standards.find(s =>
-        s.status === 'ready' && s.clauses?.length > 0 &&
-        normStd.includes(_normalizeStdName(s.name))
-    );
-    if (!stdDoc) {
-        console.log(`[KB Lookup] No standard for "${standardName}". Available:`, kb.standards.map(s => `${s.name}(${s.status})`).join(', '));
-        return '';
-    }
-
-    const clauseNum = _extractClauseNum(clauseText);
-    if (!clauseNum) return '';
-
-    // Strategy 1: Exact match
-    let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
-    // Strategy 2: Parent clause (e.g. "7.1" for "7.1.2")
-    if (!kbClause) {
-        const parent = clauseNum.split('.').slice(0, 2).join('.');
-        kbClause = stdDoc.clauses.find(c => c.clause === parent);
-    }
-    // Strategy 3: startsWith (e.g. "4.2" matches "4.2.1" or vice versa)
-    if (!kbClause) {
-        kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
-    }
-    // Strategy 4: Top-level clause (e.g. "4" for "4.2")
-    if (!kbClause) {
-        const topLevel = clauseNum.split('.')[0];
-        kbClause = stdDoc.clauses.find(c => c.clause === topLevel);
-    }
-
-    if (kbClause) {
-        console.log(`[KB Lookup] MATCH ${clauseNum} → ${kbClause.clause}: "${(kbClause.requirement || '').substring(0, 120)}..."`);
-        return kbClause.requirement || '';
-    }
-    console.log(`[KB Lookup] NO MATCH for "${clauseNum}". KB clauses: ${stdDoc.clauses.map(c => c.clause).join(', ')}`);
-    return '';
-}
 
 // Navigation Helper: Back to Execution List
 window.handleBackToExecutionList = function () {
@@ -1327,35 +1267,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Collect checklist NCs — use original index into checklistProgress
             (report.checklistProgress || []).forEach((item, originalIdx) => {
                 if (item.status !== 'nc') return;
-                // Lookup Requirement
-                let clauseText = '';
-                let reqText = '';
-                const cl = assignedChecklists.find(c => c.id == item.checklistId);
-                console.log(`[Review Findings] Item ${originalIdx}: checklistId=${item.checklistId}, itemIdx=${item.itemIdx}, found checklist:`, !!cl);
-                if (cl) {
-                    if (cl.clauses) {
-                        const parts = String(item.itemIdx).split('-');
-                        console.log(`[Review Findings] Clause mode: parts=${JSON.stringify(parts)}, clauses count=${cl.clauses.length}`);
-                        if (parts.length === 2) {
-                            const main = cl.clauses.find(c => c.mainClause == parts[0]);
-                            console.log(`[Review Findings] Main clause ${parts[0]} found:`, !!main, main ? `subClauses count: ${main.subClauses?.length}` : '');
-                            if (main && main.subClauses && main.subClauses[parts[1]]) {
-                                const sub = main.subClauses[parts[1]];
-                                clauseText = sub.clause || '';
-                                // Check for nested items structure (KB-generated checklists)
-                                if (sub.items && sub.items.length > 0) {
-                                    reqText = sub.items[0].requirement || sub.requirement || '';
-                                } else {
-                                    reqText = sub.requirement || '';
-                                }
-                                console.log(`[Review Findings] Found clause: ${clauseText}, req: ${reqText?.substring(0, 60)}`);
-                            }
-                        }
-                    } else if (cl.items && cl.items[item.itemIdx]) {
-                        clauseText = cl.items[item.itemIdx].clause;
-                        reqText = cl.items[item.itemIdx].requirement;
-                    }
-                }
+                // Use shared helper for clause/requirement resolution
+                let { clauseText, reqText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
+                console.log(`[Review Findings] Item ${originalIdx}: checklistId=${item.checklistId}, itemIdx=${item.itemIdx}, clause=${clauseText}, req=${reqText?.substring(0, 60)}`);
 
                 // Fallback: use clause/requirement saved directly on the progress item
                 // BUT only if the saved values are not corrupted (from old DOM scraping)
@@ -1363,7 +1277,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (!reqText && item.requirement && !isBadValue(item.requirement)) reqText = item.requirement;
 
                 // KB Lookup: Get actual ISO Standard requirement text from Knowledge Base
-                const kbRequirement = _lookupKBRequirement(clauseText, report.standard);
+                const kbMatch = window.KB_HELPERS.lookupKBRequirement(clauseText, report.standard);
 
                 allFindings.push({
                     id: `checklist-${originalIdx}`,
@@ -1378,7 +1292,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     evidenceImage: item.evidenceImage,
                     clause: clauseText,
                     requirement: reqText && !isBadValue(reqText) ? reqText : '',
-                    kbRequirement: kbRequirement
+                    kbMatch: kbMatch
                 });
                 if (item.evidenceImage) window._evidenceCache[`checklist-${originalIdx}`] = item.evidenceImage;
             });
@@ -1490,10 +1404,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                     <span style="color: #334155;">${f.requirement || ''}</span>
                                                 </div>
                                             ` : ''}
-                                            ${f.kbRequirement ? `
+                                            ${f.kbMatch ? `
                                                 <div style="font-size: 0.8rem; padding: 0.5rem 0.75rem; background: linear-gradient(135deg, #eff6ff, #f0f9ff); border-radius: 6px; border-left: 3px solid #3b82f6; margin-bottom: 0.75rem; color: #1e40af;">
-                                                    <strong><i class="fa-solid fa-book" style="margin-right: 4px;"></i>ISO Standard Requirement:</strong>
-                                                    <div style="margin-top: 4px; color: #334155; font-style: italic; line-height: 1.5;">${f.kbRequirement}</div>
+                                                    <strong><i class="fa-solid fa-book" style="margin-right: 4px;"></i>${f.kbMatch.standardName || 'ISO Standard'} — Clause ${f.kbMatch.clause}${f.kbMatch.title ? ': ' + f.kbMatch.title : ''}</strong>
+                                                    <div style="margin-top: 4px; color: #334155; font-style: italic; line-height: 1.5;">${f.kbMatch.requirement}</div>
                                                 </div>
                                             ` : ''}
                                             <div style="font-weight: 500; color: #334155; line-height: 1.5; margin-bottom: 0.5rem;">${f.description}</div>
@@ -1504,7 +1418,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 </div>
                                             ` : ''}
                                         </div>
-                                        <!-- Severity Column -->
+                                        < !--Severity Column-- >
                                         <div>
                                             <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Severity Classification</label>
                                             <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.9rem; padding: 0.4rem;">
@@ -1513,14 +1427,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 <option value="major" ${f.type === 'major' ? 'selected' : ''}>Major NC</option>
                                             </select>
                                         </div>
-                                        <!-- Remarks Column -->
-                                        <div>
-                                            <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
-                                            <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
+                                        <!--Remarks Column-- >
+            <div>
+                <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
+                <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
+            </div>
+                                    </div >
+                                </div >
+                `).join('')}
                         </div>
                     ` : `
                         <div style="text-align: center; padding: 4rem 2rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
@@ -2894,84 +2808,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             return;
         }
 
-        // 1. Hydrate Checklist Data (Clause & Requirements) - ENHANCED
+        // 1. Hydrate Checklist Data (Clause & Requirements) - using shared helper
         const hydratedProgress = (report.checklistProgress || []).map(item => {
             let clause = item.clause;
             let requirement = item.requirement;
-            let text = item.text;
 
-            // Try to lookup from source checklist if text is missing
+            // Use shared helper for clause/requirement resolution if data is missing
             if ((!requirement || !clause) && item.checklistId) {
-                const checklist = window.state.checklists.find(c => String(c.id) === String(item.checklistId));
-                if (checklist) {
-                    // Support both data structures: sections[] and clauses[]
-                    const sections = checklist.sections || [];
-                    const clauseGroups = checklist.clauses || [];
-
-                    if (sections.length > 0) {
-                        // Old structure: sections with items
-                        let cumulativeIdx = 0;
-                        let found = false;
-                        for (const section of sections) {
-                            if (found) break;
-                            for (const q of (section.items || [])) {
-                                if (String(cumulativeIdx) === String(item.itemIdx)) {
-                                    clause = section.clauseNumber
-                                        ? `${section.clauseNumber} ${section.title || ''}`.trim()
-                                        : (section.title || section.clause || `Section ${section.id || ''}`);
-                                    requirement = q.text || q.requirement || q.description || '';
-                                    found = true;
-                                    break;
-                                }
-                                cumulativeIdx++;
-                            }
-                        }
-                    } else if (clauseGroups.length > 0) {
-                        // New structure: clauses with subClauses
-                        // itemIdx can be "mainClause-subIdx" format (e.g. "4-2") or cumulative index
-                        const parts = String(item.itemIdx).split('-');
-                        let found = false;
-
-                        // Strategy 1: Direct mainClause-subIdx lookup
-                        if (parts.length === 2) {
-                            const mainClause = parts[0];
-                            const subIdx = parseInt(parts[1]);
-                            const group = clauseGroups.find(g => String(g.mainClause) === mainClause);
-                            if (group && group.subClauses && group.subClauses[subIdx]) {
-                                clause = group.subClauses[subIdx].clause || `${group.mainClause} ${group.title || ''}`.trim();
-                                requirement = group.subClauses[subIdx].requirement || group.subClauses[subIdx].text || '';
-                                found = true;
-                            }
-                        }
-
-                        // Strategy 2: Cumulative index fallback
-                        if (!found) {
-                            let cumulativeIdx = 0;
-                            for (const group of clauseGroups) {
-                                if (found) break;
-                                for (const sub of (group.subClauses || [])) {
-                                    if (String(cumulativeIdx) === String(item.itemIdx)) {
-                                        clause = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
-                                        requirement = sub.requirement || sub.text || '';
-                                        found = true;
-                                        break;
-                                    }
-                                    cumulativeIdx++;
-                                }
-                            }
-                        }
-                    }
-                }
+                const resolved = window.KB_HELPERS.resolveChecklistClause(item, window.state.checklists || []);
+                if (resolved.clauseText) clause = resolved.clauseText;
+                if (resolved.reqText) requirement = resolved.reqText;
             }
 
             // ALWAYS look up KB standard requirement (not just as fallback)
-            const kbRequirement = _lookupKBRequirement(clause, report.standard);
+            const kbMatch = window.KB_HELPERS.lookupKBRequirement(clause, report.standard);
 
             return {
                 ...item,
                 clause: clause || item.clause || item.sectionName || 'General Requirement',
                 requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available',
-                kbRequirement: kbRequirement,
+                kbMatch: kbMatch,
                 comment: item.comment || ''
             };
         });
@@ -3326,9 +3182,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <tr>
                             <td><strong>${item.clause}</strong></td>
                             <td>
-                                <div style="color: #475569; margin-bottom: ${item.kbRequirement ? '8px' : '0'};">${item.requirement}</div>
-                                ${item.kbRequirement ? `<div style="font-size: 0.85em; padding: 6px 8px; background: #eff6ff; border-left: 3px solid #3b82f6; color: #1e40af; border-radius: 4px;">
-                                    <strong>ISO Standard:</strong> <em>${item.kbRequirement}</em>
+                                <div style="color: #475569; margin-bottom: ${item.kbMatch ? '8px' : '0'};">${item.requirement}</div>
+                                ${item.kbMatch ? `<div style="font-size: 0.85em; padding: 6px 8px; background: #eff6ff; border-left: 3px solid #3b82f6; color: #1e40af; border-radius: 4px;">
+                                    <strong>${item.kbMatch.standardName || 'ISO Standard'} — Clause ${item.kbMatch.clause}${item.kbMatch.title ? ': ' + item.kbMatch.title : ''}:</strong> <em>${item.kbMatch.requirement}</em>
                                 </div>` : ''}
                             </td>
                             <td>

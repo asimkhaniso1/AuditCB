@@ -2,6 +2,184 @@
 // AI SERVICE MODULE (GEMINI INTEGRATION)
 // ============================================
 
+// ============================================
+// SHARED KB HELPERS (used by ai-service.js & execution-module-v2.js)
+// ============================================
+window.KB_HELPERS = {
+    /**
+     * Normalize standard name for matching (handles ISO, ISO/IEC, colons, dashes).
+     * Unified version — replaces the simpler inline normalization that missed ISO/IEC patterns.
+     */
+    normalizeStdName: (name) => {
+        return (name || '').toLowerCase()
+            .replace(/iso\/iec/g, 'iso')
+            .replace(/iso\s*/g, '')
+            .replace(/[:\-–]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    },
+
+    /**
+     * Extract leading clause number from text like "4.2 Understanding the needs..."
+     */
+    extractClauseNum: (clauseText) => {
+        if (!clauseText) return '';
+        let t = clauseText.replace(/^(clause|section|annex)\s+/i, '').trim();
+        const m = t.match(/^([\d]+(?:\.[\d]+)*)/);
+        return m ? m[1] : t.split(' ')[0].replace(/\.$/, '');
+    },
+
+    /**
+     * Resolve standard name from a report, with fallback to plan → client.
+     * Eliminates duplicated fallback chains across runFollowUpAIAnalysis & runAutoSummary.
+     */
+    resolveStandardName: (report) => {
+        if (report.standard) return report.standard;
+        // Fallback 1: linked audit plan
+        if (report.planId) {
+            const plan = window.state.auditPlans?.find(p => String(p.id) === String(report.planId));
+            if (plan?.standard) return plan.standard;
+        }
+        // Fallback 2: client record
+        if (report.client) {
+            const client = window.state.clients?.find(c => c.name === report.client);
+            if (client?.standard) return client.standard;
+        }
+        return '';
+    },
+
+    /**
+     * Lookup a single clause from the Knowledge Base.
+     * Uses 4 progressive matching strategies (exact → parent → prefix → top-level)
+     * to support up to 4 levels of ISO clause hierarchy.
+     * Returns { clause, title, requirement } or null if no match.
+     */
+    lookupKBRequirement: (clauseText, standardName) => {
+        if (!clauseText || !standardName) return null;
+        const kb = window.state?.knowledgeBase;
+        if (!kb?.standards?.length) return null;
+
+        const normStd = window.KB_HELPERS.normalizeStdName(standardName);
+        const stdDoc = kb.standards.find(s =>
+            s.status === 'ready' && s.clauses?.length > 0 &&
+            window.KB_HELPERS.normalizeStdName(s.name).includes(normStd)
+        ) || kb.standards.find(s =>
+            s.status === 'ready' && s.clauses?.length > 0 &&
+            normStd.includes(window.KB_HELPERS.normalizeStdName(s.name))
+        );
+        if (!stdDoc) {
+            console.log(`[KB Lookup] No standard for "${standardName}". Available:`, kb.standards.map(s => `${s.name}(${s.status})`).join(', '));
+            return null;
+        }
+
+        const clauseNum = window.KB_HELPERS.extractClauseNum(clauseText);
+        if (!clauseNum) return null;
+
+        // Strategy 1: Exact match
+        let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+        // Strategy 2: Parent clause (e.g. "7.1" for "7.1.2")
+        if (!kbClause) {
+            const parent = clauseNum.split('.').slice(0, 2).join('.');
+            kbClause = stdDoc.clauses.find(c => c.clause === parent);
+        }
+        // Strategy 3: startsWith (e.g. "4.2" matches "4.2.1" or vice versa)
+        if (!kbClause) {
+            kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
+        }
+        // Strategy 4: Top-level clause (e.g. "4" for "4.2")
+        if (!kbClause) {
+            const topLevel = clauseNum.split('.')[0];
+            kbClause = stdDoc.clauses.find(c => c.clause === topLevel);
+        }
+
+        if (kbClause) {
+            console.log(`[KB Lookup] MATCH ${clauseNum} → ${kbClause.clause}: "${(kbClause.requirement || '').substring(0, 120)}..."`);
+            return {
+                clause: kbClause.clause || '',
+                title: kbClause.title || '',
+                requirement: kbClause.requirement || '',
+                standardName: stdDoc.name || standardName
+            };
+        }
+        console.log(`[KB Lookup] NO MATCH for "${clauseNum}". KB clauses: ${stdDoc.clauses.map(c => c.clause).join(', ')}`);
+        return null;
+    },
+
+    /**
+     * Resolve clause text and requirement text from checklist data for a progress item.
+     * Handles both clauses[] (new) and sections[]/items[] (old) structures.
+     * Returns { clauseText, reqText }.
+     */
+    resolveChecklistClause: (item, checklists) => {
+        let clauseText = '';
+        let reqText = '';
+
+        if (!item || !checklists) return { clauseText, reqText };
+
+        const cl = checklists.find(c => String(c.id) === String(item.checklistId));
+        if (!cl) return { clauseText, reqText };
+
+        if (cl.clauses) {
+            // New structure: clauses with subClauses (mainClause-subIdx format)
+            const parts = String(item.itemIdx).split('-');
+            if (parts.length === 2) {
+                const main = cl.clauses.find(c => String(c.mainClause) === parts[0]);
+                if (main && main.subClauses && main.subClauses[parts[1]]) {
+                    const sub = main.subClauses[parts[1]];
+                    clauseText = sub.clause || '';
+                    // Check for nested items structure (KB-generated checklists)
+                    if (sub.items && sub.items.length > 0) {
+                        reqText = sub.items[0].requirement || sub.requirement || '';
+                    } else {
+                        reqText = sub.requirement || sub.text || '';
+                    }
+                }
+            }
+            // Cumulative index fallback
+            if (!clauseText) {
+                let cumulativeIdx = 0;
+                for (const group of cl.clauses) {
+                    let found = false;
+                    for (const sub of (group.subClauses || [])) {
+                        if (String(cumulativeIdx) === String(item.itemIdx)) {
+                            clauseText = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
+                            reqText = sub.requirement || sub.text || '';
+                            found = true;
+                            break;
+                        }
+                        cumulativeIdx++;
+                    }
+                    if (found) break;
+                }
+            }
+        } else if (cl.sections) {
+            // Old structure: sections with items
+            let cumulativeIdx = 0;
+            for (const section of cl.sections) {
+                let found = false;
+                for (const q of (section.items || [])) {
+                    if (String(cumulativeIdx) === String(item.itemIdx)) {
+                        clauseText = section.clauseNumber
+                            ? `${section.clauseNumber} ${section.title || ''}`.trim()
+                            : (section.title || section.clause || `Section ${section.id || ''}`);
+                        reqText = q.text || q.requirement || q.description || '';
+                        found = true;
+                        break;
+                    }
+                    cumulativeIdx++;
+                }
+                if (found) break;
+            }
+        } else if (cl.items && cl.items[item.itemIdx]) {
+            // Flat items array structure
+            clauseText = cl.items[item.itemIdx].clause || cl.items[item.itemIdx].category || '';
+            reqText = cl.items[item.itemIdx].requirement || cl.items[item.itemIdx].text || '';
+        }
+
+        return { clauseText, reqText };
+    }
+};
+
 const AI_SERVICE = {
 
     // Main function to generate agenda
@@ -21,7 +199,7 @@ const AI_SERVICE = {
     },
 
     // ------------------------------------------------------------------
-    // NEW: Smart Analysis Features
+    // Smart Analysis Features
     // ------------------------------------------------------------------
 
     // Helper: Get KB clauses for token-efficient context
@@ -29,11 +207,12 @@ const AI_SERVICE = {
         const kb = window.state.knowledgeBase;
         if (!kb?.standards?.length) return '';
 
-        // Match standard by name (normalize by removing "ISO " prefix)
-        const normalizedName = standardName ? standardName.toLowerCase().replace('iso ', '').trim() : '';
+        // Match standard by name using unified normalization (handles ISO/IEC)
+        const normalizedName = window.KB_HELPERS.normalizeStdName(standardName);
+        if (!normalizedName) return '';
         const stdDoc = kb.standards.find(s =>
             s.status === 'ready' && s.clauses?.length > 0 &&
-            normalizedName && s.name.toLowerCase().replace('iso ', '').includes(normalizedName)
+            window.KB_HELPERS.normalizeStdName(s.name).includes(normalizedName)
         );
 
         if (!stdDoc) {
@@ -485,7 +664,7 @@ window.runFollowUpAIAnalysis = async function (reportId) {
     btn.disabled = true;
 
     try {
-        // Gather findings with rich context
+        // Gather findings with rich context using shared helper
         const findings = [];
         const plan = window.state.auditPlans?.find(p => String(p.id) === String(report.planId)) || {};
         const checklists = (window.state.checklists || []);
@@ -494,19 +673,8 @@ window.runFollowUpAIAnalysis = async function (reportId) {
         // IMPORTANT: Track original index in checklistProgress array
         (report.checklistProgress || []).forEach((item, originalIdx) => {
             if (item.status !== 'nc') return;
-            // Resolve clause and requirement text from checklist data
-            let clauseText = '';
-            let reqText = '';
-            if (item.checklistId && item.itemIdx !== undefined) {
-                const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
-                if (cl && cl.items && cl.items[item.itemIdx]) {
-                    clauseText = cl.items[item.itemIdx].clause || '';
-                    reqText = cl.items[item.itemIdx].requirement || '';
-                    if (!reqText && cl.items[item.itemIdx].items && cl.items[item.itemIdx].items[0]) {
-                        reqText = cl.items[item.itemIdx].items[0].requirement || '';
-                    }
-                }
-            }
+            // Use shared helper for clause/requirement resolution
+            const { clauseText, reqText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
             findings.push({
                 id: findings.length,
                 originalIdx: originalIdx,
@@ -518,15 +686,8 @@ window.runFollowUpAIAnalysis = async function (reportId) {
             });
         });
 
-        // Resolve standard name — try report directly, then fall back to linked plan/client
-        let standardName = report.standard;
-        if (!standardName && report.planId) {
-            standardName = plan?.standard;
-        }
-        if (!standardName && report.client) {
-            const client = window.state.clients?.find(c => c.name === report.client);
-            standardName = client?.standard;
-        }
+        // Resolve standard name using shared helper
+        const standardName = window.KB_HELPERS.resolveStandardName(report);
 
         // Call AI Service with standard name for KB lookup
         const suggestions = await window.AI_SERVICE.analyzeFindings(findings, standardName);
@@ -591,40 +752,22 @@ window.runAutoSummary = async function (reportId) {
     btn.disabled = true;
 
     try {
-        // Gather compliant items for Positive Observations
+        // Gather compliant items for Positive Observations using shared helper
         const compliantItems = [];
         const plan = window.state.auditPlans.find(p => p.id == report.planId) || {};
         const assignedChecklists = (window.state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
 
         if (report.checklistProgress) {
             report.checklistProgress.filter(p => p.status === 'compliant' || p.status === 'conform').forEach(item => {
-                let clauseTitle = '';
-                const cl = assignedChecklists.find(c => c.id == item.checklistId);
-                if (cl) {
-                    if (cl.clauses) {
-                        const parts = String(item.itemIdx).split('-');
-                        if (parts.length === 2) {
-                            const main = cl.clauses.find(c => c.mainClause == parts[0]);
-                            if (main) clauseTitle = `${main.mainClause} ${main.title}`;
-                        }
-                    } else if (cl.items && cl.items[item.itemIdx]) {
-                        clauseTitle = cl.items[item.itemIdx].category || 'General';
-                    }
-                }
-                if (clauseTitle) compliantItems.push(clauseTitle);
+                const { clauseText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
+                if (clauseText) compliantItems.push(clauseText);
             });
         }
 
         const uniqueCompliantAreas = [...new Set(compliantItems)];
 
-        // Ensure report.standard is resolved for KB context
-        if (!report.standard) {
-            report.standard = plan?.standard;
-        }
-        if (!report.standard && report.client) {
-            const client = window.state.clients?.find(c => c.name === report.client);
-            report.standard = client?.standard;
-        }
+        // Resolve standard name using shared helper
+        report.standard = window.KB_HELPERS.resolveStandardName(report) || report.standard;
 
         const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas);
 
