@@ -1000,7 +1000,7 @@ function viewAuditPlan(id) {
             </div>
 
             <!--Workflow Stages Grid(Row 2)-->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5rem;">
 
                     <!-- 1. Configuration -->
                     <div class="card" style="margin: 0; display: flex; flex-direction: column;">
@@ -1015,7 +1015,24 @@ function viewAuditPlan(id) {
                         </div>
                     </div>
 
-                    <!-- 2. Execution -->
+                    <!-- 2. Pre-Audit Review (Stage 1) -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid #8b5cf6;">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-magnifying-glass" style="margin-right: 0.5rem; color: #8b5cf6;"></i> Pre-Audit</h3>
+                        <div style="flex: 1; margin-bottom: 1rem;">
+                            <p style="font-size: 0.9rem; color: var(--text-secondary);">Stage 1 document review & readiness.</p>
+                            <div style="margin-top: 0.75rem;">
+                                <span class="status-badge status-${(plan.preAudit?.status || 'not-started').toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem;">
+                                    ${plan.preAudit?.status || 'Not Started'}
+                                </span>
+                                ${plan.preAudit?.completedDate ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;"><i class="fa-solid fa-calendar-check"></i> ${plan.preAudit.completedDate}</div>` : ''}
+                            </div>
+                        </div>
+                        <button class="btn ${plan.preAudit?.status === 'Complete' ? 'btn-secondary' : 'btn-primary'}" style="width: 100%;" onclick="window.renderPreAuditReview('${plan.id}')">
+                            ${plan.preAudit?.status === 'Complete' ? '<i class="fa-solid fa-eye"></i> View Review' : '<i class="fa-solid fa-play"></i> Start Review'}
+                        </button>
+                    </div>
+
+                    <!-- 3. Execution -->
                     <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid var(--success-color);">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-play" style="margin-right: 0.5rem; color: var(--success-color);"></i> Execution</h3>
                         <div style="flex: 1; margin-bottom: 1rem;">
@@ -1036,7 +1053,7 @@ function viewAuditPlan(id) {
                         </button>
                     </div>
 
-                    <!-- 3. Reporting -->
+                    <!-- 4. Reporting -->
                     <div class="card" style="margin: 0; display: flex; flex-direction: column; border-top: 3px solid orange;">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-file-edit" style="margin-right: 0.5rem; color: orange;"></i> Reporting</h3>
                         <div style="flex: 1; margin-bottom: 1rem;">
@@ -1060,7 +1077,7 @@ function viewAuditPlan(id) {
                     ` : '<div style="text-align:center; font-size:0.8rem; color:#aaa;">Pending Execution</div>'}
                     </div>
 
-                    <!-- 4. Closing -->
+                    <!-- 5. Closing -->
                     <div class="card" style="margin: 0; display: flex; flex-direction: column;">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-flag-checkered" style="margin-right: 0.5rem; color: #64748b;"></i> Closing</h3>
                         <div style="flex: 1; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
@@ -1075,6 +1092,7 @@ function viewAuditPlan(id) {
                     </div>
 
                 </div>
+
     </div>
                 `;
     window.contentArea.innerHTML = html;
@@ -2297,4 +2315,489 @@ window.calculateSampling = function () {
 };
 
 window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
+
+// ============================================
+// PRE-AUDIT REVIEW (STAGE 1 - ISO 17021-1)
+// ============================================
+
+/**
+ * Render Pre-Audit Review Form
+ * ISO 17021-1 Stage 1: Document Review & Readiness Assessment
+ */
+window.renderPreAuditReview = function (planId) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan) {
+        window.showNotification('Audit plan not found', 'error');
+        return;
+    }
+
+    const client = window.state.clients.find(c => c.name === plan.client);
+
+    // Initialize preAudit object if not exists
+    if (!plan.preAudit) {
+        plan.preAudit = {
+            status: 'Not Started',
+            completedDate: null,
+            completedBy: null,
+            findings: [],
+            documentReview: {},
+            readinessDecision: null,
+            notes: ''
+        };
+    }
+
+    // ISO 17021-1 Stage 1 Checklist Items
+    const checklistItems = [
+        { id: 'scope', label: 'Management System Scope', category: 'Documentation' },
+        { id: 'processes', label: 'Process Identification & Interaction', category: 'Documentation' },
+        { id: 'legal', label: 'Legal & Statutory Requirements', category: 'Compliance' },
+        { id: 'objectives', label: 'Quality Objectives & Planning', category: 'Documentation' },
+        { id: 'resources', label: 'Resource Availability (Personnel, Infrastructure)', category: 'Readiness' },
+        { id: 'competence', label: 'Competence & Training Records', category: 'Compliance' },
+        { id: 'documented_info', label: 'Documented Information Control', category: 'Documentation' },
+        { id: 'internal_audit', label: 'Internal Audit Program', category: 'Compliance' },
+        { id: 'management_review', label: 'Management Review Evidence', category: 'Compliance' },
+        { id: 'corrective_action', label: 'Corrective Action Process', category: 'Compliance' },
+        { id: 'risks_opportunities', label: 'Risk & Opportunity Management', category: 'Documentation' },
+        { id: 'monitoring', label: 'Monitoring & Measurement Methods', category: 'Compliance' },
+        { id: 'context', label: 'Organizational Context & Interested Parties', category: 'Documentation' },
+        { id: 'leadership', label: 'Leadership & Commitment Evidence', category: 'Documentation' },
+        { id: 'communication', label: 'Internal & External Communication', category: 'Documentation' },
+        { id: 'site_readiness', label: 'Site Readiness for Stage 2 Audit', category: 'Readiness' }
+    ];
+
+    // Group by category
+    const categories = {
+        'Documentation': checklistItems.filter(i => i.category === 'Documentation'),
+        'Compliance': checklistItems.filter(i => i.category === 'Compliance'),
+        'Readiness': checklistItems.filter(i => i.category === 'Readiness')
+    };
+
+    // Calculate completion stats
+    const totalItems = checklistItems.length;
+    const reviewedItems = checklistItems.filter(i => plan.preAudit.documentReview[i.id]?.status).length;
+    const okItems = checklistItems.filter(i => plan.preAudit.documentReview[i.id]?.status === 'ok').length;
+    const minorItems = checklistItems.filter(i => plan.preAudit.documentReview[i.id]?.status === 'minor').length;
+    const majorItems = checklistItems.filter(i => plan.preAudit.documentReview[i.id]?.status === 'major').length;
+    const completionPct = Math.round((reviewedItems / totalItems) * 100);
+
+    const html = `
+        <div class="fade-in">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
+                <div>
+                    <button class="btn btn-secondary" onclick="viewAuditPlan('${plan.id}')">
+                        <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Audit Plan
+                    </button>
+                    <h2 style="margin: 1rem 0 0.5rem 0;">Pre-Audit Review (Stage 1)</h2>
+                    <p style="color: var(--text-secondary); margin: 0;">
+                        <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>${client?.name || plan.client}
+                        <span style="margin: 0 0.75rem;">•</span>
+                        <i class="fa-solid fa-calendar" style="margin-right: 0.5rem;"></i>${plan.date}
+                        <span style="margin: 0 0.75rem;">•</span>
+                        ${plan.standard}
+                    </p>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-outline-primary" onclick="window.exportPreAuditPDF('${plan.id}')">
+                        <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export PDF
+                    </button>
+                    <button class="btn btn-primary" onclick="window.savePreAuditReview('${plan.id}')">
+                        <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress Summary -->
+            <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem;">
+                    <div style="text-align: center; color: white;">
+                        <div style="font-size: 2rem; font-weight: bold;">${reviewedItems}/${totalItems}</div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">Items Reviewed</div>
+                    </div>
+                    <div style="text-align: center; color: white;">
+                        <div style="font-size: 2rem; font-weight: bold;">${okItems}</div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">✓ Conforming</div>
+                    </div>
+                    <div style="text-align: center; color: white;">
+                        <div style="font-size: 2rem; font-weight: bold;">${minorItems}</div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">⚠ Minor Findings</div>
+                    </div>
+                    <div style="text-align: center; color: white;">
+                        <div style="font-size: 2rem; font-weight: bold;">${majorItems}</div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">❌ Major Findings</div>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: white; opacity: 0.9; margin-bottom: 4px;">
+                        <span>Overall Progress</span>
+                        <span>${completionPct}%</span>
+                    </div>
+                    <div style="height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px;">
+                        <div style="width: ${completionPct}%; background: white; height: 100%; border-radius: 4px; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checklist by Category -->
+            ${Object.keys(categories).map(categoryName => `
+                <div class="card" style="margin-bottom: 2rem;">
+                    <h3 style="margin-top: 0; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e2e8f0;">
+                        <i class="fa-solid fa-${categoryName === 'Documentation' ? 'file-lines' : categoryName === 'Compliance' ? 'shield-halved' : 'clipboard-check'}" style="margin-right: 0.5rem; color: ${categoryName === 'Documentation' ? '#3b82f6' : categoryName === 'Compliance' ? '#059669' : '#f59e0b'};"></i>
+                        ${categoryName}
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        ${categories[categoryName].map(item => {
+        const review = plan.preAudit.documentReview[item.id] || {};
+        return `
+                                <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-md); border-left: 4px solid ${review.status === 'ok' ? '#10b981' : review.status === 'minor' ? '#f59e0b' : review.status === 'major' ? '#ef4444' : '#cbd5e1'};">
+                                    <div style="display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 1rem; align-items: start;">
+                                        <div>
+                                            <label style="font-weight: 600; color: #1e293b; display: block; margin-bottom: 0.5rem;">
+                                                ${item.label}
+                                            </label>
+                                        </div>
+                                        <div>
+                                            <select 
+                                                id="review-${item.id}" 
+                                                class="pre-audit-status"
+                                                style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: var(--radius-sm);"
+                                                onchange="window.updatePreAuditItem('${planId}', '${item.id}', this.value)">
+                                                <option value="">Not Reviewed</option>
+                                                <option value="ok" ${review.status === 'ok' ? 'selected' : ''}>✓ OK</option>
+                                                <option value="minor" ${review.status === 'minor' ? 'selected' : ''}>⚠ Minor</option>
+                                                <option value="major" ${review.status === 'major' ? 'selected' : ''}>❌ Major</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <textarea 
+                                                id="notes-${item.id}"
+                                                placeholder="Notes, findings, or recommendations..."
+                                                style="width: 100%; min-height: 60px; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); resize: vertical; font-size: 0.9rem;"
+                                                onchange="window.updatePreAuditNotes('${planId}', '${item.id}', this.value)"
+                                            >${review.notes || ''}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+    }).join('')}
+                    </div>
+                </div>
+            `).join('')}
+
+            <!-- Readiness Decision -->
+            <div class="card" style="margin-bottom: 2rem; border: 2px solid #8b5cf6;">
+                <h3 style="margin-top: 0; margin-bottom: 1.5rem; color: #8b5cf6;">
+                    <i class="fa-solid fa-gavel" style="margin-right: 0.5rem;"></i>
+                    Readiness Decision
+                </h3>
+                <div style="display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; align-items: start;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Decision</label>
+                        <select 
+                            id="readiness-decision"
+                            style="width: 100%; padding: 0.75rem; border: 2px solid #cbd5e1; border-radius: var(--radius-md); font-weight: 600; font-size: 1rem;"
+                            onchange="window.updateReadinessDecision('${planId}', this.value)">
+                            <option value="">-- Select --</option>
+                            <option value="Ready" ${plan.preAudit.readinessDecision === 'Ready' ? 'selected' : ''} style="color: #059669;">✓ Ready for Stage 2</option>
+                            <option value="Conditional" ${plan.preAudit.readinessDecision === 'Conditional' ? 'selected' : ''} style="color: #f59e0b;">⚠ Conditionally Ready</option>
+                            <option value="Not Ready" ${plan.preAudit.readinessDecision === 'Not Ready' ? 'selected' : ''} style="color: #dc2626;">❌ Not Ready</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Summary & Recommendations</label>
+                        <textarea 
+                            id="readiness-notes"
+                            placeholder="Overall assessment, key findings, and recommendations for the client..."
+                            style="width: 100%; min-height: 120px; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: var(--radius-md); resize: vertical;"
+                            onchange="window.updateReadinessNotes('${planId}', this.value)"
+                        >${plan.preAudit.notes || ''}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                <button class="btn btn-secondary" onclick="viewAuditPlan('${plan.id}')">
+                    Cancel
+                </button>
+                <button class="btn btn-outline-primary" onclick="window.exportPreAuditPDF('${plan.id}')">
+                    <i class="fa-solid fa-file-pdf"></i> Export PDF
+                </button>
+                <button class="btn btn-success" onclick="window.completePreAuditReview('${plan.id}')">
+                    <i class="fa-solid fa-check-circle"></i> Complete Review
+                </button>
+            </div>
+        </div>
+    `;
+
+    window.contentArea.innerHTML = html;
+};
+
+/**
+ * Update Pre-Audit item status
+ */
+window.updatePreAuditItem = function (planId, itemId, status) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) return;
+
+    if (!plan.preAudit.documentReview[itemId]) {
+        plan.preAudit.documentReview[itemId] = {};
+    }
+    plan.preAudit.documentReview[itemId].status = status;
+
+    // Auto-save
+    window.saveState();
+};
+
+/**
+ * Update Pre-Audit item notes
+ */
+window.updatePreAuditNotes = function (planId, itemId, notes) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) return;
+
+    if (!plan.preAudit.documentReview[itemId]) {
+        plan.preAudit.documentReview[itemId] = {};
+    }
+    plan.preAudit.documentReview[itemId].notes = notes;
+
+    // Auto-save
+    window.saveState();
+};
+
+/**
+ * Update readiness decision
+ */
+window.updateReadinessDecision = function (planId, decision) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) return;
+
+    plan.preAudit.readinessDecision = decision;
+    window.saveState();
+};
+
+/**
+ * Update readiness notes
+ */
+window.updateReadinessNotes = function (planId, notes) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) return;
+
+    plan.preAudit.notes = notes;
+    window.saveState();
+};
+
+/**
+ * Save Pre-Audit review progress
+ */
+window.savePreAuditReview = function (planId) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) return;
+
+    plan.preAudit.status = 'In Progress';
+    window.saveState();
+    window.showNotification('Pre-Audit review saved successfully', 'success');
+};
+
+/**
+ * Complete Pre-Audit review
+ */
+window.completePreAuditReview = function (planId) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) return;
+
+    // Validation
+    if (!plan.preAudit.readinessDecision) {
+        window.showNotification('Please select a readiness decision before completing', 'warning');
+        return;
+    }
+
+    // Mark as complete
+    plan.preAudit.status = 'Complete';
+    plan.preAudit.completedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    plan.preAudit.completedBy = window.state.currentUser?.name || 'Auditor';
+
+    window.saveState();
+    window.showNotification('Pre-Audit review completed successfully', 'success');
+
+    // Return to audit plan view
+    setTimeout(() => viewAuditPlan(planId), 1000);
+};
+
+/**
+ * Export Pre-Audit PDF Report
+ */
+window.exportPreAuditPDF = function (planId) {
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan || !plan.preAudit) {
+        window.showNotification('Pre-Audit data not found', 'error');
+        return;
+    }
+
+    const client = window.state.clients.find(c => c.name === plan.client);
+    const cbSettings = window.state.cbSettings || {};
+
+    // Checklist items (same as in renderPreAuditReview)
+    const checklistItems = [
+        { id: 'scope', label: 'Management System Scope', category: 'Documentation' },
+        { id: 'processes', label: 'Process Identification & Interaction', category: 'Documentation' },
+        { id: 'legal', label: 'Legal & Statutory Requirements', category: 'Compliance' },
+        { id: 'objectives', label: 'Quality Objectives & Planning', category: 'Documentation' },
+        { id: 'resources', label: 'Resource Availability (Personnel, Infrastructure)', category: 'Readiness' },
+        { id: 'competence', label: 'Competence & Training Records', category: 'Compliance' },
+        { id: 'documented_info', label: 'Documented Information Control', category: 'Documentation' },
+        { id: 'internal_audit', label: 'Internal Audit Program', category: 'Compliance' },
+        { id: 'management_review', label: 'Management Review Evidence', category: 'Compliance' },
+        { id: 'corrective_action', label: 'Corrective Action Process', category: 'Compliance' },
+        { id: 'risks_opportunities', label: 'Risk & Opportunity Management', category: 'Documentation' },
+        { id: 'monitoring', label: 'Monitoring & Measurement Methods', category: 'Compliance' },
+        { id: 'context', label: 'Organizational Context & Interested Parties', category: 'Documentation' },
+        { id: 'leadership', label: 'Leadership & Commitment Evidence', category: 'Documentation' },
+        { id: 'communication', label: 'Internal & External Communication', category: 'Documentation' },
+        { id: 'site_readiness', label: 'Site Readiness for Stage 2 Audit', category: 'Readiness' }
+    ];
+
+    // Group by category
+    const categories = {
+        'Documentation': checklistItems.filter(i => i.category === 'Documentation'),
+        'Compliance': checklistItems.filter(i => i.category === 'Compliance'),
+        'Readiness': checklistItems.filter(i => i.category === 'Readiness')
+    };
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        window.showNotification('Pop-up blocked. Please allow pop-ups.', 'warning');
+        return;
+    }
+
+    const reportHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Pre-Audit Review Report — ${plan.client}</title>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1e293b; }
+                .page { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+                
+                /* Cover Page */
+                .cover { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; page-break-after: always; }
+                .cover h1 { font-size: 3rem; margin-bottom: 1rem; }
+                .cover .subtitle { font-size: 1.25rem; opacity: 0.9; margin-bottom: 3rem; }
+                .cover .meta { font-size: 1.1rem; line-height: 2; }
+                
+                /* Content */
+                h2 { color: #8b5cf6; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
+                h3 { color: #475569; margin: 1.5rem 0 1rem; }
+                
+                table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+                th, td { padding: 0.75rem; text-align: left; border: 1px solid #e2e8f0; }
+                th { background: #f8fafc; font-weight: 600; color: #475569; }
+                tr:nth-child(even) { background: #f8fafc; }
+                
+                .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; }
+                .badge-ok { background: #dcfce7; color: #166534; }
+                .badge-minor { background: #fef3c7; color: #92400e; }
+                .badge-major { background: #fee2e2; color: #991b1b; }
+                .badge-not-reviewed { background: #f1f5f9; color: #64748b; }
+                
+                .decision-box { padding: 1.5rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid; }
+                .decision-ready { background: #f0fdf4; border-color: #22c55e; }
+                .decision-conditional { background: #fffbeb; border-color: #f59e0b; }
+                .decision-not-ready { background: #fef2f2; border-color: #ef4444; }
+                
+                .footer { text-align: center; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 0.9rem; }
+                
+                @media print {
+                    .page { page-break-inside: avoid; }
+                    @page { margin: 1cm; }
+                }
+            </style>
+        </head>
+        <body>
+            <!-- Cover Page -->
+            <div class="cover">
+                ${cbSettings.logoUrl ? `<img src="${cbSettings.logoUrl}" style="max-height: 80px; margin-bottom: 2rem;" alt="CB Logo">` : ''}
+                <h1>Pre-Audit Review Report</h1>
+                <div class="subtitle">ISO 17021-1 Stage 1 Assessment</div>
+                <div class="meta">
+                    <div><strong>Client:</strong> ${client?.name || plan.client}</div>
+                    <div><strong>Standard:</strong> ${plan.standard}</div>
+                    <div><strong>Audit Date:</strong> ${plan.date}</div>
+                    <div><strong>Review Completed:</strong> ${plan.preAudit.completedDate || 'In Progress'}</div>
+                    <div><strong>Reviewed By:</strong> ${plan.preAudit.completedBy || 'Auditor'}</div>
+                </div>
+            </div>
+
+            <!-- Content Pages -->
+            <div class="page">
+                <h2><i class="fa-solid fa-clipboard-check"></i> Assessment Summary</h2>
+                <p style="margin: 1rem 0;">
+                    This report documents the Pre-Audit (Stage 1) assessment conducted per ISO 17021-1 requirements. 
+                    The purpose of this assessment is to review the organization's management system documentation and 
+                    determine readiness for the Stage 2 on-site audit.
+                </p>
+
+                <!-- Readiness Decision -->
+                <div class="decision-box decision-${plan.preAudit.readinessDecision?.toLowerCase().replace(' ', '-')}">
+                    <h3 style="margin-top: 0; color: ${plan.preAudit.readinessDecision === 'Ready' ? '#166534' : plan.preAudit.readinessDecision === 'Conditional' ? '#92400e' : '#991b1b'};">
+                        <i class="fa-solid fa-${plan.preAudit.readinessDecision === 'Ready' ? 'check-circle' : plan.preAudit.readinessDecision === 'Conditional' ? 'exclamation-triangle' : 'times-circle'}"></i>
+                        Decision: ${plan.preAudit.readinessDecision || 'Pending'}
+                    </h3>
+                    <p style="white-space: pre-wrap; margin-top: 0.5rem;">${plan.preAudit.notes || 'No summary provided.'}</p>
+                </div>
+
+                <!-- Checklist Assessment -->
+                <h2><i class="fa-solid fa-list-check"></i> Checklist Assessment Results</h2>
+                ${Object.keys(categories).map(categoryName => `
+                    <h3>${categoryName}</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40%;">Item</th>
+                                <th style="width: 15%;">Status</th>
+                                <th style="width: 45%;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    ${categories[categoryName].map(item => {
+        const review = plan.preAudit.documentReview[item.id] || {};
+        const statusBadge = review.status === 'ok' ? '<span class="badge badge-ok">✓ OK</span>' :
+            review.status === 'minor' ? '<span class="badge badge-minor">⚠ Minor</span>' :
+                review.status === 'major' ? '<span class="badge badge-major">❌ Major</span>' :
+                    '<span class="badge badge-not-reviewed">Not Reviewed</span>';
+        return `
+                            <tr>
+                                <td>${item.label}</td>
+                                <td>${statusBadge}</td>
+                                <td style="font-size: 0.9rem; color: #475569;">${review.notes || '—'}</td>
+                            </tr>
+                        `;
+    }).join('')}
+                        </tbody>
+                    </table>
+                `).join('')}
+
+                <!-- Footer -->
+                <div class="footer">
+                    <p><strong>${cbSettings.cbName || 'Certification Body'}</strong></p>
+                    <p>${cbSettings.cbEmail || ''}</p>
+                    <p>Report Generated: ${new Date().toLocaleDateString()}</p>
+                </div>
+            </div>
+
+            <script>
+                window.onload = () => {
+                    setTimeout(() => window.print(), 500);
+                };
+            </script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(reportHTML);
+    printWindow.document.close();
+};
 
