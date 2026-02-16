@@ -629,7 +629,7 @@ function renderClientOverview(client) {
                 <div class="card">
                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Client Contacts</h3>
-                        <button class="btn btn-sm btn-primary" onclick="window.addContactPerson(${client.id})"><i class="fa-solid fa-plus"></i> Add Contact</button>
+                        <button class="btn btn-sm btn-primary" onclick="window.addContactPerson('${client.id}')"><i class="fa-solid fa-plus"></i> Add Contact</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -664,7 +664,7 @@ function renderClientOverview(client) {
                     <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Departments</h3>
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.addDepartment(${client.id})"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.addDepartment('${client.id}')"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${departments.map(dept => `
@@ -678,7 +678,7 @@ function renderClientOverview(client) {
                      <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Designations</h3>
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.addClientDesignation(${client.id})"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.addClientDesignation('${client.id}')"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${designations.map(desig => `
@@ -1058,7 +1058,7 @@ function renderClientPlans(client) {
                                     <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
                                     <td>${p.lead || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan(${p.id})"><i class="fa-solid fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan('${p.id}')"><i class="fa-solid fa-eye"></i></button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1156,7 +1156,7 @@ function renderClientExecution(client) {
                                         <td>${p.standard}</td>
                                         <td>${p.type}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-success" onclick="window.navigateToAuditExecution(${p.id})">
+                                            <button class="btn btn-sm btn-success" onclick="window.navigateToAuditExecution('${p.id}')">
                                                 <i class="fa-solid fa-play" style="margin-right: 0.25rem;"></i> Start Audit
                                             </button>
                                         </td>
@@ -1197,13 +1197,13 @@ function renderClientExecution(client) {
                                     </td>
                                     <td>${r.recommendation || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${r.id})" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;">
+                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail('${r.id}')" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;">
                                             <i class="fa-solid fa-eye"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" onclick="window.openEditReportModal && window.openEditReportModal(${r.id})" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;">
+                                        <button class="btn btn-sm btn-icon" onclick="window.openEditReportModal && window.openEditReportModal('${r.id}')" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;">
                                             <i class="fa-solid fa-edit"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" onclick="window.deleteAuditReport && window.deleteAuditReport(${r.id})" title="Delete Report" style="color: var(--danger-color);">
+                                        <button class="btn btn-sm btn-icon" onclick="window.deleteAuditReport && window.deleteAuditReport('${r.id}')" title="Delete Report" style="color: var(--danger-color);">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>
@@ -1284,7 +1284,7 @@ function renderClientFindings(client) {
                                     <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.description || f.finding || '-'}</td>
                                     <td><span class="status-badge status-${(f.status || 'open').toLowerCase()}">${f.status || 'Open'}</span></td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail(${f.reportId})" title="View Report">
+                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail('${f.reportId}')" title="View Report">
                                             <i class="fa-solid fa-eye"></i>
                                         </button>
                                     </td>
