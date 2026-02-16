@@ -2597,29 +2597,36 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     let isCloud = false;
 
                     // 2. Upload to Supabase (if online)
+                    console.log('[Evidence Upload] Online:', window.navigator.onLine, 'SupabaseClient:', !!window.SupabaseClient, 'Initialized:', window.SupabaseClient?.isInitialized);
                     if (window.navigator.onLine && window.SupabaseClient) {
                         try {
-                            // Check if Supabase is initialized
                             if (!window.SupabaseClient.isInitialized) {
-                                console.warn('Supabase not initialized - image saved locally only');
-                            } else {
+                                console.warn('[Evidence Upload] Supabase not initialized - trying to wait...');
+                                // Give it a moment in case it's still initializing
+                                await new Promise(r => setTimeout(r, 1000));
+                            }
+                            if (window.SupabaseClient.isInitialized) {
                                 // Convert DataURL to Blob
                                 const res = await fetch(compressedDataUrl);
                                 const blob = await res.blob();
                                 const uploadFile = new File([blob], file.name, { type: file.type });
 
+                                console.log('[Evidence Upload] Uploading file:', file.name, 'Size:', blob.size, 'bytes');
                                 const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
+                                console.log('[Evidence Upload] Result:', result);
                                 if (result && result.url) {
                                     finalUrl = result.url;
                                     isCloud = true;
-                                    console.log('Image uploaded to cloud:', result.path);
+                                    console.log('[Evidence Upload] Success! Cloud URL:', result.url.substring(0, 80));
                                 } else {
-                                    console.warn('Upload returned no URL - check if audit-images bucket exists');
+                                    console.warn('[Evidence Upload] No URL returned - result was:', JSON.stringify(result));
                                 }
+                            } else {
+                                console.warn('[Evidence Upload] Supabase still not initialized after wait');
                             }
                         } catch (uploadErr) {
-                            console.error('Image upload failed:', uploadErr);
-                            console.warn('Falling back to local base64 storage');
+                            console.error('[Evidence Upload] Failed:', uploadErr.message || uploadErr);
+                            console.warn('[Evidence Upload] Falling back to local base64');
                         }
                     }
 
