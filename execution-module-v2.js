@@ -3391,6 +3391,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
                 <div style="display:flex;gap:10px;">
                     <button onclick="document.getElementById('report-preview-overlay').remove()" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
+                    <button id="ai-polish-btn" onclick="window.polishNotesWithAI()" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
                     <button onclick="window.exportReportPDF()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
             </div>
@@ -3413,6 +3414,94 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             pill.classList.add('active');
             pill.style.background = color; pill.style.color = 'white'; pill.style.borderColor = color;
             if (sec) sec.style.display = '';
+        }
+    };
+
+    // ============================================
+    // POLISH NOTES WITH AI (Refine raw notes into professional audit language)
+    // ============================================
+    window.polishNotesWithAI = async function () {
+        const d = window._reportPreviewData;
+        if (!d) return;
+        const btn = document.getElementById('ai-polish-btn');
+        if (!btn) return;
+
+        // Check if AI service is available
+        if (!window.AI_SERVICE?.refineAuditNotes) {
+            window.showNotification('AI Service not available. Please check your API configuration.', 'warning');
+            return;
+        }
+
+        // Show loading state
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Polishing Notes...';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+
+        try {
+            const standardName = d.report.standard || d.auditPlan?.standard || '';
+
+            // Refine checklist progress notes
+            if (d.hydratedProgress && d.hydratedProgress.length > 0) {
+                const refined = await window.AI_SERVICE.refineAuditNotes(d.hydratedProgress, standardName);
+                d.hydratedProgress = refined;
+            }
+
+            // Refine NCR descriptions
+            if (d.report.ncrs && d.report.ncrs.length > 0) {
+                const ncrFindings = d.report.ncrs.map(n => ({
+                    clause: n.clause,
+                    status: 'nc',
+                    type: n.type,
+                    comment: n.description || '',
+                    remarks: n.description || ''
+                }));
+                const refinedNCRs = await window.AI_SERVICE.refineAuditNotes(ncrFindings, standardName);
+                d.report.ncrs = d.report.ncrs.map((ncr, i) => ({
+                    ...ncr,
+                    description: refinedNCRs[i]?.comment || ncr.description,
+                    _originalDescription: ncr.description
+                }));
+            }
+
+            // Update the findings table in the preview if visible
+            const findingsBody = document.getElementById('findings-table-body');
+            if (findingsBody && d.hydratedProgress) {
+                const items = d.hydratedProgress.filter(i => i.status !== 'pending');
+                findingsBody.innerHTML = items.map((item, idx) => {
+                    const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+                    const sev = item.status === 'nc' ? (item.ncrType || 'NC') : item.status === 'observation' ? 'OBS' : 'OK';
+                    const sevColor = sev === 'Major' ? '#dc2626' : sev === 'Minor' ? '#f59e0b' : sev === 'OBS' ? '#3b82f6' : '#10b981';
+                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:8px 12px;font-weight:600;">' + clause + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;color:' + sevColor + ';">' + sev + '</span></td><td style="padding:8px 12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (item.comment || '-') + '</td></tr>';
+                }).join('');
+            }
+
+            // Success state
+            btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right:6px;"></i>Notes Polished!';
+            btn.style.background = 'linear-gradient(135deg,#f0fdf4,#dcfce7)';
+            btn.style.borderColor = '#10b981';
+            btn.style.color = '#166534';
+            btn.style.opacity = '1';
+
+            const totalRefined = (d.hydratedProgress?.filter(i => i._originalComment)?.length || 0) + (d.report.ncrs?.filter(n => n._originalDescription)?.length || 0);
+            window.showNotification(`AI polished ${totalRefined} auditor notes into professional language!`, 'success');
+
+            // Allow re-polish after 3 seconds
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.background = 'linear-gradient(135deg,#f0f9ff,#e0f2fe)';
+                btn.style.borderColor = '#0ea5e9';
+                btn.style.color = '#0369a1';
+            }, 3000);
+
+        } catch (error) {
+            console.error('AI Polish Error:', error);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            window.showNotification('AI polish failed: ' + error.message, 'error');
         }
     };
 

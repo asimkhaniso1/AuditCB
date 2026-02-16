@@ -268,6 +268,70 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
         }
     },
 
+    // 1b. Refine raw auditor notes/transcript into professional audit language
+    refineAuditNotes: async (findings, standardName = null) => {
+        if (!findings || findings.length === 0) return [];
+
+        // Only refine items that have remarks/comments
+        const itemsToRefine = findings
+            .map((f, idx) => ({
+                idx,
+                clause: f.clause || f.clauseRef || '',
+                status: f.status || f.type || '',
+                raw: (f.comment || f.remarks || f.transcript || f.description || '').trim()
+            }))
+            .filter(f => f.raw.length > 5); // Skip empty or very short entries
+
+        if (itemsToRefine.length === 0) return findings;
+
+        // Get KB context for more accurate rephrasing
+        const kbContext = standardName ? AI_SERVICE.getRelevantKBClauses(standardName) : '';
+
+        const prompt = `
+You are a professional ISO Lead Auditor writing an audit report. Convert the following raw auditor notes and voice transcripts into professional audit report language.
+
+Rules:
+1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...")
+2. Reference clause numbers where provided
+3. Keep the same meaning — do NOT change findings or add interpretations
+4. Each remark should be 1-3 clear, complete sentences
+5. Use ISO audit terminology (conformity, non-conformity, objective evidence, etc.)
+6. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
+7. Return plain text only
+
+${kbContext ? `Standard Requirements (from Knowledge Base):
+${kbContext.substring(0, 3000)}
+
+` : ''}Raw Auditor Notes:
+${JSON.stringify(itemsToRefine.map(f => ({ id: f.idx, clause: f.clause, status: f.status, notes: f.raw })), null, 2)}
+
+Return a raw JSON array with 'id' and 'refined' fields only:
+[{"id": 0, "refined": "Professional version of the notes..."}, ...]
+`;
+        try {
+            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
+            const cleaned = apiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const refined = JSON.parse(cleaned);
+
+            // Merge refined text back into findings
+            const result = [...findings];
+            refined.forEach(r => {
+                if (r.id !== undefined && r.refined && result[r.id]) {
+                    result[r.id] = {
+                        ...result[r.id],
+                        comment: r.refined,
+                        _originalComment: result[r.id].comment || result[r.id].remarks || result[r.id].transcript || ''
+                    };
+                }
+            });
+            console.log(`[AI] Refined ${refined.length} audit notes into professional language`);
+            return result;
+        } catch (error) {
+            console.error("AI Note Refinement Error:", error);
+            return findings; // Return original on failure
+        }
+    },
+
     // 2. Draft Executive Summary (with KB context)
     draftExecutiveSummary: async (reportData, compliantAreas = []) => {
         const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc').length;
