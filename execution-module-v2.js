@@ -1418,7 +1418,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 </div>
                                             ` : ''}
                                         </div>
-                                        < !--Severity Column-- >
+                                        <!--Severity Column-->
                                         <div>
                                             <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Severity Classification</label>
                                             <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.9rem; padding: 0.4rem;">
@@ -1427,7 +1427,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 <option value="major" ${f.type === 'major' ? 'selected' : ''}>Major NC</option>
                                             </select>
                                         </div>
-                                        <!--Remarks Column-- >
+                                        <!--Remarks Column-->
             <div>
                 <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
                 <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
