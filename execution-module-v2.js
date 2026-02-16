@@ -1297,6 +1297,33 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (!clauseText && item.clause && !isBadValue(item.clause)) clauseText = item.clause;
                 if (!reqText && item.requirement && !isBadValue(item.requirement)) reqText = item.requirement;
 
+                // KB Lookup: Get actual ISO Standard requirement text from Knowledge Base
+                let kbRequirement = '';
+                if (clauseText && report.standard) {
+                    const kb = window.state.knowledgeBase;
+                    if (kb?.standards?.length > 0) {
+                        const normalizedStd = report.standard.toLowerCase().replace('iso ', '').trim();
+                        const stdDoc = kb.standards.find(s =>
+                            s.status === 'ready' && s.clauses?.length > 0 &&
+                            s.name.toLowerCase().replace('iso ', '').includes(normalizedStd)
+                        );
+                        if (stdDoc) {
+                            const clauseNum = clauseText.split(' ')[0].trim();
+                            // Try exact match first, then parent clause
+                            let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+                            if (!kbClause) {
+                                // Try parent clause (e.g. "7.1" for "7.1.2")
+                                const parentClause = clauseNum.split('.').slice(0, 2).join('.');
+                                kbClause = stdDoc.clauses.find(c => c.clause === parentClause);
+                            }
+                            if (kbClause) {
+                                kbRequirement = kbClause.requirement || '';
+                                console.log(`[KB Lookup] ${clauseNum} → ${kbClause.clause}: ${kbRequirement.substring(0, 80)}...`);
+                            }
+                        }
+                    }
+                }
+
                 allFindings.push({
                     id: `checklist-${originalIdx}`,
                     source: 'Checklist',
@@ -1308,7 +1335,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     hasEvidence: !!item.evidenceImage,
                     evidenceImage: item.evidenceImage,
                     clause: clauseText,
-                    requirement: reqText && !isBadValue(reqText) ? reqText : ''
+                    requirement: reqText && !isBadValue(reqText) ? reqText : '',
+                    kbRequirement: kbRequirement
                 });
                 if (item.evidenceImage) window._evidenceCache[`checklist-${originalIdx}`] = item.evidenceImage;
             });
@@ -1418,6 +1446,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 <div style="font-size: 0.85rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 0.75rem;">
                                                     <strong style="color: var(--primary-color);">${f.clause ? `${f.clause}` : 'Requirement'}:</strong> 
                                                     <span style="color: #334155;">${f.requirement || ''}</span>
+                                                </div>
+                                            ` : ''}
+                                            ${f.kbRequirement ? `
+                                                <div style="font-size: 0.8rem; padding: 0.5rem 0.75rem; background: linear-gradient(135deg, #eff6ff, #f0f9ff); border-radius: 6px; border-left: 3px solid #3b82f6; margin-bottom: 0.75rem; color: #1e40af;">
+                                                    <strong><i class="fa-solid fa-book" style="margin-right: 4px;"></i>ISO Standard Requirement:</strong>
+                                                    <div style="margin-top: 4px; color: #334155; font-style: italic; line-height: 1.5;">${f.kbRequirement}</div>
                                                 </div>
                                             ` : ''}
                                             <div style="font-weight: 500; color: #334155; line-height: 1.5; margin-bottom: 0.5rem;">${f.description}</div>
@@ -2899,7 +2933,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     if (stdDoc) {
                         // Try to match clause number
                         const clauseNum = clause.split(' ')[0]; // e.g. "5.1" from "5.1 Leadership"
-                        const kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+                        let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+                        if (!kbClause) {
+                            // Try parent clause (e.g. "7.1" for "7.1.2")
+                            const parentClause = clauseNum.split('.').slice(0, 2).join('.');
+                            kbClause = stdDoc.clauses.find(c => c.clause === parentClause);
+                        }
                         if (kbClause) {
                             requirement = kbClause.requirement || requirement;
                             if (!clause || clause === 'General Requirement') {
