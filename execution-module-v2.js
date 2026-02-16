@@ -2839,509 +2839,406 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // Get audit plan reference
         const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
 
-        // QR Code for Report Verification (using report ID)
-        // QR Code for Report Verification (using report ID)
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
+        // QR Code for Report Verification
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
 
-        // Create a new window for printing
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            window.showNotification('Pop-up blocked. Please allow pop-ups to print.', 'warning');
-            return;
-        }
+        // CB Settings (real data, no fake info)
+        const cbSettings = window.state.cbSettings || {};
+        const cbSite = (cbSettings.cbSites || [])[0] || {};
 
-        const today = new Date().toLocaleDateString();
-
-        // Helper function to format text (markdown + newlines)
-        const formatText = (text) => {
-            if (!text) return '';
-            return text
-                .replace(/\\n/g, '<br>')  // Handle escaped newlines
-                .replace(/\n/g, '<br>')   // Handle actual newlines
-                .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>')  // ***bold***
-                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')      // **bold**
-                .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size: 0.9em; color: #059669;">(Clause $1)</em>');
-        };
-
-        // Calculate stats from Hydrated Data
+        // Calculate stats
         const totalItems = hydratedProgress.length;
         const ncItems = hydratedProgress.filter(i => i.status === 'nc');
         const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
+        const naItems = hydratedProgress.filter(i => i.status === 'na');
         const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
         const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
-        const observationCount = hydratedProgress.filter(i => i.status === 'nc' && i.ncrType === 'Observation').length;
+        const observationCount = ncItems.filter(i => i.ncrType === 'Observation').length;
 
-        const reportHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Audit Findings Report - ${report.client}</title>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-                
-                :root {
-                    --primary: #2563eb;
-                    --secondary: #475569;
-                    --danger: #ef4444;
-                    --success: #22c55e;
-                    --warning: #f59e0b;
-                    --bg-gray: #f8fafc;
-                }
+        // NC breakdown by clause group (for bar chart)
+        const ncByClause = {};
+        ncItems.forEach(item => {
+            const g = (item.clause || '').split('.')[0] || '?';
+            ncByClause[g] = (ncByClause[g] || 0) + 1;
+        });
 
-                body { 
-                    font-family: 'Outfit', sans-serif; 
-                    line-height: 1.5; 
-                    color: #1e293b; 
-                    max-width: 1100px; 
-                    margin: 0 auto; 
-                    padding: 0;
-                    background: white;
-                }
+        // Store data for preview & export
+        window._reportPreviewData = {
+            report, hydratedProgress, client, auditPlan, cbSettings, cbSite,
+            clientLogo: client.logoUrl || '',
+            cbLogo: cbSettings.logoUrl || '',
+            qrCodeUrl,
+            stats: { totalItems, ncCount: ncItems.length, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ncByClause },
+            today: new Date().toLocaleDateString()
+        };
 
-                /* Print optimizations */
-                @media print {
-                    body { -webkit-print-color-adjust: exact; padding: 0; }
-                    .page-break { page-break-before: always; }
-                    .no-print { display: none; }
-                    .card, .content-box, tr { break-inside: avoid; }
-                }
+        // Show Report Preview & Edit modal
+        window.showReportPreviewModal();
 
-                /* Header */
-                header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 40px 50px;
-                    border-bottom: 4px solid var(--primary);
-                    margin-bottom: 40px;
-                }
-                .logo-section img { height: 60px; object-fit: contain; }
-                .report-title h1 { font-size: 2.5rem; font-weight: 800; color: #0f172a; margin: 0; line-height: 1; }
-                .report-title p { color: var(--secondary); font-size: 1.1rem; margin: 5px 0 0 0; }
+    };
 
-                /* Premium Grid Layout */
-                .dashboard-grid {
-                    display: grid;
-                    grid-template-columns: 2fr 1fr;
-                    gap: 30px;
-                    padding: 0 50px;
-                    margin-bottom: 40px;
-                }
+    // ============================================
+    // REPORT PREVIEW & EDIT MODAL
+    // ============================================
+    window.showReportPreviewModal = function () {
+        const d = window._reportPreviewData;
+        if (!d) return;
 
-                .card {
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 12px;
-                    padding: 25px;
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-                }
-                .card-title { font-size: 1.1rem; font-weight: 700; color: #334155; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+        // Remove existing overlay
+        const existing = document.getElementById('report-preview-overlay');
+        if (existing) existing.remove();
 
-                /* Stats Row */
-                .stats-row {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 20px;
-                    padding: 0 50px;
-                    margin-bottom: 40px;
-                }
-                .stat-card {
-                    background: var(--bg-gray);
-                    padding: 20px;
-                    border-radius: 12px;
-                    text-align: center;
-                    border-bottom: 3px solid transparent;
-                }
-                .stat-value { font-size: 2.5rem; font-weight: 800; line-height: 1; margin-bottom: 5px; }
-                .stat-label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        const sections = [
+            { id: 'audit-info', label: 'Audit Info', icon: 'fa-clipboard-list', color: '#2563eb' },
+            { id: 'summary', label: 'Summary', icon: 'fa-file-lines', color: '#059669' },
+            { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
+            { id: 'findings', label: 'Findings', icon: 'fa-triangle-exclamation', color: '#dc2626' },
+            { id: 'ncrs', label: 'NCRs', icon: 'fa-clipboard-check', color: '#ea580c', hide: !(d.report.ncrs || []).length },
+            { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
+            { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' }
+        ];
 
-                /* Tables */
-                .table-container { padding: 0 50px; margin-bottom: 40px; }
-                table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-                th { background: #f1f5f9; color: #475569; font-weight: 700; text-align: left; padding: 12px 15px; border-bottom: 2px solid #e2e8f0; }
-                td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-                tbody tr:nth-child(even) { background: #f8fafc; }
-                tbody tr:hover { background: #f1f5f9; }
-                tr:last-child td { border-bottom: none; }
+        window._reportSectionState = {};
+        sections.forEach(s => { window._reportSectionState[s.id] = !s.hide; });
 
-                .badge {
-                    display: inline-block;
-                    padding: 4px 10px;
-                    border-radius: 99px;
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                }
-                .status-conform { background: #dcfce7; color: #166534; }
-                .status-nc { background: #fee2e2; color: #991b1b; }
-                .status-na { background: #f1f5f9; color: #475569; }
+        const pill = (s) => `<label class="rp-pill ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="${s.hide ? 'background:white;color:#94a3b8;border-color:#cbd5e1;' : 'background:' + s.color + ';border-color:' + s.color + ';color:white;'}" onclick="window.toggleReportSection('${s.id}','${s.color}')"><i class="fa-solid ${s.icon}"></i> ${s.label}</label>`;
 
-                /* Footer */
-                footer {
-                    margin-top: 50px;
-                    background: #1e293b;
-                    color: white;
-                    padding: 40px 50px;
-                    font-size: 0.9rem;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 1000; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-                <button onclick="window.print()" style="background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);">
-                    <i class="fa fa-print"></i> Download PDF
-                </button>
-                <button onclick="window.close()" style="background: var(--secondary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 10px;">
-                    Close
-                </button>
+        const ncRows = d.hydratedProgress.filter(i => i.status === 'nc').map((item, idx) => {
+            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const title = item.kbMatch ? item.kbMatch.title : '';
+            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            const sev = item.ncrType || 'NC';
+            const sevStyle = sev === 'Major' ? 'background:#fee2e2;color:#991b1b' : sev === 'Minor' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
+            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${item.evidenceImage ? '<div style="margin-top:6px;"><img src="' + item.evidenceImage + '" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;"></div>' : ''}</td></tr>`;
+        }).join('');
+
+        const overlay = document.createElement('div');
+        overlay.id = 'report-preview-overlay';
+        overlay.innerHTML = `
+        <style>
+            #report-preview-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(15,23,42,0.7);display:flex;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+            .rp-modal{background:#f8fafc;border-radius:16px;width:100%;max-width:1100px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.3);}
+            .rp-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;padding:20px 28px;}
+            .rp-pills{padding:12px 28px;background:white;border-bottom:1px solid #e2e8f0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+            .rp-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:600;cursor:pointer;border:2px solid;transition:all 0.2s;user-select:none;}
+            .rp-content{flex:1;overflow-y:auto;padding:16px 28px;}
+            .rp-sec{background:white;border-radius:10px;margin-bottom:14px;border:1px solid #e2e8f0;overflow:hidden;}
+            .rp-sec-hdr{display:flex;align-items:center;padding:11px 16px;cursor:pointer;gap:10px;font-weight:600;color:white;font-size:0.92rem;}
+            .rp-sec-body{padding:14px 16px;border-top:1px solid #e2e8f0;}
+            .rp-sec-body.collapsed{display:none;}
+            .rp-footer{padding:14px 28px;background:white;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;}
+            .rp-edit{min-height:60px;line-height:1.7;color:#334155;outline:none;padding:8px;border:1px dashed transparent;border-radius:6px;}
+            .rp-edit:focus{border-color:#2563eb;background:#f8fafc;}
+        </style>
+        <div class="rp-modal">
+            <div class="rp-header">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h2 style="margin:0 0 4px;font-size:1.25rem;"><i class="fa-solid fa-file-pdf" style="margin-right:8px;"></i>Report Preview & Edit</h2>
+                        <div style="opacity:0.8;font-size:0.88rem;">${d.report.client} — ${d.report.standard || 'ISO Standard'}</div>
+                    </div>
+                    <button onclick="document.getElementById('report-preview-overlay').remove()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;"><i class="fa-solid fa-times"></i></button>
+                </div>
             </div>
-
-            <!-- Header -->
-            <header>
-                <div class="report-title">
-                    <h1>AUDIT REPORT</h1>
-                    <p>${report.client}</p>
-                    <div style="font-size: 0.9rem; color: #64748b; margin-top: 10px;">
-                        Report ID: #${report.id.substring(0, 8)} | Date: ${report.date}
+            <div class="rp-pills">
+                <span style="font-size:0.78rem;color:#64748b;font-weight:600;margin-right:4px;">INCLUDE:</span>
+                ${sections.map(s => pill(s)).join('')}
+                <div style="flex:1;"></div>
+                <button onclick="document.querySelectorAll('.rp-sec-body').forEach(b=>b.classList.remove('collapsed'))" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Expand All</button>
+                <button onclick="document.querySelectorAll('.rp-sec-body').forEach(b=>b.classList.add('collapsed'))" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Collapse All</button>
+            </div>
+            <div class="rp-content">
+                <!-- 1: Audit Info -->
+                <div class="rp-sec" id="sec-audit-info">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">1</span>AUDIT INFORMATION<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <table style="width:100%;font-size:0.86rem;border-collapse:collapse;">
+                            <tr><td style="padding:7px 12px;width:35%;color:#64748b;font-weight:600;">Client</td><td style="padding:7px 12px;">${d.report.client}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Industry</td><td style="padding:7px 12px;">${d.client.industry || 'N/A'}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Certification Scope</td><td style="padding:7px 12px;">${d.client.certificationScope || 'N/A'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Standard</td><td style="padding:7px 12px;">${d.report.standard || d.auditPlan?.standard || 'N/A'}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${d.auditPlan?.auditType || 'Initial'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || 'N/A'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || 'N/A'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${d.client.city || ''} ${d.client.province || ''} ${d.client.country || ''}</td></tr>
+                        </table>
                     </div>
                 </div>
-                <div class="logo-section">
-                    <img src="${clientLogo}" alt="Client Logo" onerror="this.src='https://via.placeholder.com/150?text=Client+Logo'">
-                    <img src="${qrCodeUrl}" alt="QR" style="height: 80px; margin-left: 20px;">
-                </div>
-            </header>
-
-            <!-- Stats -->
-            <div class="stats-row">
-                <div class="stat-card" style="border-color: var(--primary);">
-                    <div class="stat-value" style="color: var(--primary);">${Math.round((conformityItems.length / (totalItems || 1)) * 100)}%</div>
-                    <div class="stat-label">Compliance Score</div>
-                </div>
-                <div class="stat-card" style="border-color: var(--danger);">
-                    <div class="stat-value" style="color: var(--danger);">${ncItems.length}</div>
-                    <div class="stat-label">Non-Conformities</div>
-                </div>
-                <div class="stat-card" style="border-color: var(--warning);">
-                    <div class="stat-value" style="color: var(--warning);">${observationCount}</div>
-                    <div class="stat-label">Observations</div>
-                </div>
-                <div class="stat-card" style="border-color: var(--success);">
-                    <div class="stat-value" style="color: var(--success);">${totalItems}</div>
-                    <div class="stat-label">Total Checks</div>
-                </div>
-            </div>
-
-            <!-- Table of Contents -->
-            <div class="table-container">
-                <div class="card">
-                    <div class="card-title">Table of Contents</div>
-                    <ul style="list-style: none; padding: 0; margin: 0; columns: 2;">
-                        <li style="margin-bottom: 10px;"><a href="#section-org-context" style="text-decoration: none; color: var(--primary); font-weight: 500;">1. Organization Context</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-overview" style="text-decoration: none; color: var(--primary); font-weight: 500;">2. Audit Details & Location</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-exec-summary" style="text-decoration: none; color: var(---primary); font-weight: 500;">3. Executive Summary</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-findings" style="text-decoration: none; color: var(--primary); font-weight: 500;">4. Non-Conformities Found</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-ncrs" style="text-decoration: none; color: var(--primary); font-weight: 500;">5. NCR Details</a></li>
-                        <li style="margin-bottom: 10px;"><a href="#section-meetings" style="text-decoration: none; color: var(--primary); font-weight: 500;">6. Meeting Records</a></li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Charts & Exec Summary -->
-            <div id="section-exec-summary" class="dashboard-grid">
-                <div class="card">
-                    <div class="card-title">Executive Summary</div>
-                    <div style="color: var(--secondary); font-size: 1rem; line-height: 1.7;">
-                        ${formatText(report.executiveSummary) || '<em>No executive summary recorded.</em>'}
+                <!-- 2: Exec Summary -->
+                <div class="rp-sec" id="sec-summary">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#047857,#059669);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>EXECUTIVE SUMMARY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div id="rp-exec-summary" class="rp-edit" contenteditable="true">${d.report.executiveSummary || '<em style="color:#94a3b8;">Click to add executive summary...</em>'}</div>
+                        ${d.report.positiveObservations ? '<div style="margin-top:12px;padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #22c55e;font-size:0.88rem;"><strong style="color:#166534;">Positive Observations:</strong><div style="color:#15803d;margin-top:4px;">' + d.report.positiveObservations + '</div></div>' : ''}
+                        ${d.report.ofi ? '<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;font-size:0.88rem;"><strong style="color:#854d0e;">Opportunities for Improvement:</strong><div style="color:#a16207;margin-top:4px;">' + d.report.ofi + '</div></div>' : ''}
                     </div>
-                    
-                    ${report.positiveObservations ? `
-                    <div style="margin-top: 20px; padding: 15px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid var(--success);">
-                        <strong style="color: #166534; display: block; margin-bottom: 5px;">Positive Observations</strong>
-                        <div style="color: #15803d; line-height: 1.8;">${formatText(report.positiveObservations)}</div>
-                    </div>` : ''}
-
-                    ${report.ofi ? `
-                    <div style="margin-top: 20px; padding: 15px; background: #fefce8; border-radius: 8px; border-left: 4px solid var(--warning);">
-                        <strong style="color: #854d0e; display: block; margin-bottom: 5px;">Opportunities for Improvement</strong>
-                        <div style="color: #a16207; line-height: 1.8;">${formatText(report.ofi)}</div>
-                    </div>` : ''}
                 </div>
-                <div class="card" style="text-align: center;">
-                    <div class="card-title">Compliance Breakdown</div>
-                    <canvas id="complianceChart"></canvas>
-                </div>
-            </div>
-
-
-
-            <!-- 1. Organization Context -->
-            <div id="section-org-context" class="page-break table-container">
-                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">1. Organization Context</div>
-                <div class="card" style="margin-top: 20px;">
-                    <table style="width: 100%;">
-                        <tr>
-                            <td style="width: 30%;"><strong>Client Name:</strong></td>
-                            <td>${report.client}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Industry:</strong></td>
-                            <td>${client.industry || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Certification Scope:</strong></td>
-                            <td>${client.certificationScope || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Number of Employees:</strong></td>
-                            <td>${client.numberOfEmployees || 'N/A'}</td>
-                        </tr>
-                    </table>
-                    
-                    ${client.goodsServices && client.goodsServices.length > 0 ? `
-                    <div style="margin-top: 20px;">
-                        <strong style="display: block; margin-bottom: 10px; color: #334155;">Goods & Services:</strong>
-                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                            ${client.goodsServices.map(g => `<span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde047;">${g.name} ${g.category ? `(${g.category})` : ''}</span>`).join('')}
+                <!-- 3: Compliance Overview -->
+                <div class="rp-sec" id="sec-charts">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">3</span>COMPLIANCE OVERVIEW<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+                            <div style="text-align:center;padding:14px 8px;background:#f0fdf4;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#16a34a;">${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">COMPLIANCE</div></div>
+                            <div style="text-align:center;padding:14px 8px;background:#fef2f2;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#dc2626;">${d.stats.ncCount}</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">NON-CONFORMITIES</div></div>
+                            <div style="text-align:center;padding:14px 8px;background:#fffbeb;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#d97706;">${d.stats.observationCount}</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">OBSERVATIONS</div></div>
+                            <div style="text-align:center;padding:14px 8px;background:#eff6ff;border-radius:8px;"><div style="font-size:1.8rem;font-weight:800;color:#2563eb;">${d.stats.totalItems}</div><div style="font-size:0.75rem;color:#64748b;font-weight:600;">TOTAL CHECKS</div></div>
                         </div>
-                    </div>` : ''}
-                    
-                    ${client.keyProcesses && client.keyProcesses.length > 0 ? `
-                    <div style="margin-top: 20px;">
-                        <strong style="display: block; margin-bottom: 10px; color: #334155;">Key Processes:</strong>
-                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                            ${client.keyProcesses.map(p => `<span class="badge" style="background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;">${p.name || p}</span>`).join('')}
+                        <div style="color:#64748b;font-size:0.82rem;text-align:center;margin-top:10px;"><i class="fa-solid fa-chart-pie" style="margin-right:4px;"></i>3 interactive charts will render in the exported PDF</div>
+                    </div>
+                </div>
+                <!-- 4: Findings -->
+                <div class="rp-sec" id="sec-findings">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#991b1b,#dc2626);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">4</span>NON-CONFORMITY DETAILS (${d.stats.ncCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body" style="padding:0;">
+                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
+                            <tbody>${ncRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+                ${(d.report.ncrs || []).length > 0 ? `
+                <!-- 5: NCRs -->
+                <div class="rp-sec" id="sec-ncrs">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#9a3412,#ea580c);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">5</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.85rem;"><strong>' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.8rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
+                </div>` : ''}
+                <!-- 6: Meetings -->
+                <div class="rp-sec" id="sec-meetings">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#155e75,#0891b2);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">6</span>MEETING RECORDS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div style="padding:12px;background:#f0fdf4;border-radius:8px;"><strong style="color:#166534;">Opening Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.openingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${d.report.openingMeeting?.attendees || 'N/A'}</div></div>
+                            <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;">Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Summary: ${d.report.closingMeeting?.summary || 'N/A'}</div></div>
                         </div>
-                    </div>` : ''}
-                    
-                    ${client.sites && client.sites.length > 0 ? `
-                    <div style="margin-top: 20px;">
-                        <strong style="display: block; margin-bottom: 10px; color: #334155;">Sites/Locations:</strong>
-                        <ul style="margin: 0; padding-left: 20px;">
-                            ${client.sites.map(site => `<li>${site.name || site.address} - ${site.city || ''}, ${site.country || ''}</li>`).join('')}
-                        </ul>
-                    </div>` : ''}
-                </div>
-            </div>
-
-            <!-- 2. Audit Details & Geolocation -->
-            <div id="section-overview" class="page-break table-container">
-                <div class="card-title" style="margin-top: 0; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">2. Audit Details & Location</div>
-                <div class="card" style="margin-top: 20px;">
-                    <table style="width: 100%;">
-                        <tr>
-                            <td style="width: 30%;"><strong>Client Address:</strong></td>
-                            <td>${client.address || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Audit Location:</strong></td>
-                            <td>${client.city || 'N/A'}, ${client.province || ''} ${client.country || ''}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Geo-Coordinates:</strong></td>
-                            <td>${client.latitude ? `<a href="https://www.openstreetmap.org/?mlat=${client.latitude}&mlon=${client.longitude}#map=15/${client.latitude}/${client.longitude}" target="_blank" style="color: var(--primary); text-decoration: none;">${client.latitude}, ${client.longitude} <i class="fa-solid fa-external-link" style="font-size: 0.75rem;"></i></a>` : 'Not Recorded (On-site verified)'}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Audit Plan Reference:</strong></td>
-                            <td>${auditPlan ? `#${auditPlan.id.substring(0, 8)} - ${auditPlan.auditType || 'N/A'}` : 'Not Linked'}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Audit Standard:</strong></td>
-                            <td>${report.standard || auditPlan?.standard || 'ISO 9001:2015'}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Audit Dates:</strong></td>
-                            <td>${report.date || 'N/A'} ${report.endDate ? `to ${report.endDate}` : ''}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Lead Auditor:</strong></td>
-                            <td>${report.leadAuditor || 'Assigned Auditor'}</td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 3. Detailed Findings -->
-            <div id="section-findings" class="page-break table-container">
-                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">3. Non-Conformities Found</div>
-                <table style="margin-top: 20px;">
-                    <thead>
-                        <tr>
-                            <th style="width: 15%">Clause</th>
-                            <th style="width: 35%">Requirement</th>
-                            <th style="width: 15%">Status</th>
-                            <th style="width: 35%">Evidence & Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${hydratedProgress.filter(item => item.status === 'nc').map((item, idx) => `
-                        <tr>
-                            <td><strong>${item.clause}</strong></td>
-                            <td>
-                                <div style="color: #475569; margin-bottom: ${item.kbMatch ? '8px' : '0'};">${item.requirement}</div>
-                                ${item.kbMatch ? `<div style="font-size: 0.85em; padding: 6px 8px; background: #eff6ff; border-left: 3px solid #3b82f6; color: #1e40af; border-radius: 4px;">
-                                    <strong>${item.kbMatch.standardName || 'ISO Standard'} — Clause ${item.kbMatch.clause}${item.kbMatch.title ? ': ' + item.kbMatch.title : ''}:</strong> <em>${item.kbMatch.requirement}</em>
-                                </div>` : ''}
-                            </td>
-                            <td>
-                                <span class="badge ${item.status === 'conform' ? 'status-conform' : (item.status === 'nc' ? 'status-nc' : 'status-na')}">
-                                    ${item.status === 'nc' ? (item.ncrType || 'NC') : (item.status === 'conform' ? 'Conform' : 'N/A')}
-                                </span>
-                            </td>
-                            <td>
-                                ${item.comment ? `<div><strong>Auditor Remarks:</strong> ${item.comment}</div>` : '<div style="color: #94a3b8;">No remarks recorded</div>'}
-                                ${item.evidenceImage ? `
-                                <div style="margin-top: 10px;">
-                                    <a href="${item.evidenceImage}" target="_blank">
-                                        <img src="${item.evidenceImage}" style="height: 60px; border-radius: 4px; border: 1px solid #e2e8f0;">
-                                    </a>
-                                </div>` : ''}
-                            </td>
-                        </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-
-            <!--3. NCRs-- >
-    ${report.ncrs && report.ncrs.length > 0 ? `
-            <div id="section-ncrs" class="page-break table-container">
-                <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">4. NCR Details</div>
-                ${report.ncrs.map(ncr => `
-                <div class="card" style="margin-top: 20px; border-left: 5px solid ${ncr.type === 'Major' ? 'var(--danger)' : 'var(--warning)'};">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <strong>${ncr.type} - Clause ${ncr.clause}</strong>
-                        <span style="color: #64748b;">${new Date(ncr.createdAt).toLocaleDateString()}</span>
                     </div>
-                    <p>${ncr.description}</p>
-                    ${ncr.evidenceImage ? `<img src="${ncr.evidenceImage}" style="max-height: 150px; border-radius: 6px; margin-top: 10px;">` : ''}
                 </div>
-                `).join('')}
-            </div>` : ''
-            }
-
-    < !--4. Meetings-- >
-            <div id="section-meetings" class="page-break table-container">
-                 <div class="card-title" style="border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">5. Meeting Records</div>
-                 <div class="dashboard-grid" style="padding: 0; margin-top: 20px;">
-                    <div class="card">
-                        <strong>Opening Meeting</strong>
-                        <p>Date: ${report.openingMeeting?.date || '-'}</p>
-                        <p>Attendees: ${report.openingMeeting?.attendees || '-'}</p>
+                <!-- 7: Conclusion -->
+                <div class="rp-sec" id="sec-conclusion">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#312e81,#4338ca);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>AUDIT CONCLUSION<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="margin-bottom:10px;"><strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;${d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;'}">${d.report.recommendation || 'Pending'}</span></div>
+                        <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || 'Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. Click to edit this conclusion.'}</div>
                     </div>
-                    <div class="card">
-                        <strong>Closing Meeting</strong>
-                        <p>Date: ${report.closingMeeting?.date || '-'}</p>
-                        <p>Summary: ${report.closingMeeting?.summary || '-'}</p>
-                    </div>
-                 </div>
+                </div>
             </div>
-
-            <footer class="page-break">
-                <div>
-                    <strong>AuditCB Certification Body</strong><br>
-                    123 Audit Street, Quality City
+            <div class="rp-footer">
+                <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
+                <div style="display:flex;gap:10px;">
+                    <button onclick="document.getElementById('report-preview-overlay').remove()" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
+                    <button onclick="window.exportReportPDF()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
-                <div style="text-align: right;">
-                    Generated on ${today}<br>
-                    ID: ${report.id}
-                </div>
-            </footer>
+            </div>
+        </div>`;
 
-            <script>
-                // Render Chart and convert to static image for PDF
-                const ctx = document.getElementById('complianceChart');
-                if (ctx) {
-                    const chart = new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Conformity', 'Minor NC', 'Major NC', 'Observations'],
-                            datasets: [{
-                                data: [${conformityItems.length}, ${minorNC}, ${majorNC}, ${observationCount}],
-                                backgroundColor: ['#22c55e', '#f59e0b', '#ef4444', '#3b82f6'],
-                                borderWidth: 0
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            animation: {
-                                onComplete: function() {
-                                    // Convert canvas to static image for PDF
-                                    const canvas = document.getElementById('complianceChart');
-                                    const imgData = canvas.toDataURL('image/png');
-                                    const img = document.createElement('img');
-                                    img.src = imgData;
-                                    img.style.maxWidth = '100%';
-                                    img.style.height = 'auto';
-                                    
-                                    // Replace canvas with image
-                                    canvas.parentNode.replaceChild(img, canvas);
-                                }
-                            },
-                            plugins: {
-                                legend: { position: 'bottom' }
-                            }
-                        }
-                    });
-                }
-            </script>
-        </body >
-        </html >
-    `;
+        document.body.appendChild(overlay);
+    };
+
+    window.toggleReportSection = function (id, color) {
+        const pill = document.getElementById('pill-' + id);
+        const sec = document.getElementById('sec-' + id);
+        if (!pill) return;
+        const wasActive = pill.classList.contains('active');
+        window._reportSectionState[id] = !wasActive;
+        if (wasActive) {
+            pill.classList.remove('active');
+            pill.style.background = 'white'; pill.style.color = '#94a3b8'; pill.style.borderColor = '#cbd5e1';
+            if (sec) sec.style.display = 'none';
+        } else {
+            pill.classList.add('active');
+            pill.style.background = color; pill.style.color = 'white'; pill.style.borderColor = color;
+            if (sec) sec.style.display = '';
+        }
+    };
+
+    // ============================================
+    // EXPORT REPORT PDF (Premium ISO-Compliant)
+    // ============================================
+    window.exportReportPDF = function () {
+        const d = window._reportPreviewData;
+        if (!d) return;
+        const en = window._reportSectionState || {};
+        const editedSummary = document.getElementById('rp-exec-summary')?.innerHTML || d.report.executiveSummary || '';
+        const editedConclusion = document.getElementById('rp-conclusion')?.innerHTML || d.report.conclusion || '';
+        const formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
+        const fmtRemark = (t) => { if (!t) return ''; let s = t.trim(); if (!s) return ''; s = s.charAt(0).toUpperCase() + s.slice(1); if (!/[.!?]$/.test(s)) s += '.'; return s; };
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) { window.showNotification('Pop-up blocked. Please allow pop-ups.', 'warning'); return; }
+        const clauseLabels = Object.keys(d.stats.ncByClause).sort((a, b) => parseInt(a) - parseInt(b));
+        const clauseValues = clauseLabels.map(k => d.stats.ncByClause[k]);
+        const standard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
+        const cbName = d.cbSettings.cbName || '';
+        const cbEmail = d.cbSettings.cbEmail || '';
+        const cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
+        const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc').map((item, idx) => {
+            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const title = item.kbMatch ? item.kbMatch.title : '';
+            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            const sev = item.ncrType || 'NC';
+            const sevBg = sev === 'Major' ? '#fee2e2' : sev === 'Minor' ? '#fef3c7' : '#dbeafe';
+            const sevFg = sev === 'Major' ? '#991b1b' : sev === 'Minor' ? '#92400e' : '#1e40af';
+            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + (item.evidenceImage ? '<div style="margin-top:8px;"><a href="' + item.evidenceImage + '" target="_blank"><img src="' + item.evidenceImage + '" style="height:80px;border-radius:6px;border:1px solid #e2e8f0;"></a></div>' : '') + '</td></tr>';
+        }).join('');
+
+        const reportHtml = '<!DOCTYPE html><html><head>'
+            + '<title>Audit Report — ' + d.report.client + '</title>'
+            + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
+            + '<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>'
+            + '<style>'
+            + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
+            + '*{margin:0;padding:0;box-sizing:border-box;}'
+            + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;}"
+            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}}'
+            + '.cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(180deg,#f8fafc 0%,#e0e7ff 50%,#f8fafc 100%);padding:80px 50px;position:relative;}'
+            + '.cover-line{width:80px;height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin:0 auto 30px;}'
+            + '.sh{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;padding:14px 24px;font-weight:700;font-size:1rem;letter-spacing:0.5px;display:flex;align-items:center;gap:12px;border-radius:6px 6px 0 0;margin-top:35px;}'
+            + '.sn{background:rgba(255,255,255,0.2);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;}'
+            + '.sb{padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;}'
+            + '.info-tbl{width:100%;border-collapse:collapse;}.info-tbl td{padding:10px 16px;border-bottom:1px solid #f1f5f9;font-size:0.92rem;}.info-tbl td:first-child{width:35%;color:#64748b;font-weight:600;}.info-tbl tr:nth-child(even){background:#f8fafc;}'
+            + '.f-tbl{width:100%;border-collapse:collapse;font-size:0.88rem;}.f-tbl th{background:#f1f5f9;color:#475569;font-weight:700;text-align:left;padding:12px 14px;border-bottom:2px solid #e2e8f0;}.f-tbl td{padding:12px 14px;border-bottom:1px solid #e2e8f0;vertical-align:top;}.f-tbl tbody tr:nth-child(even){background:#f8fafc;}'
+            + '.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:30px;}'
+            + '.stat-box{text-align:center;padding:20px 12px;border-radius:10px;border-bottom:3px solid transparent;}'
+            + '.stat-val{font-size:2.2rem;font-weight:800;line-height:1;margin-bottom:4px;}'
+            + '.stat-lbl{font-size:0.8rem;color:#64748b;font-weight:600;text-transform:uppercase;}'
+            + '.chart-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}'
+            + '.chart-box{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:20px;text-align:center;}'
+            + '.chart-box canvas{max-height:220px;}'
+            + '.chart-title{font-size:0.85rem;font-weight:700;color:#334155;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.3px;}'
+            + 'footer{margin-top:50px;background:#0f172a;color:white;padding:30px 40px;font-size:0.85rem;display:flex;justify-content:space-between;align-items:center;border-radius:8px;}'
+            + '.content{padding:0 40px;}'
+            + '.callout{padding:14px 18px;border-radius:8px;margin-top:16px;font-size:0.92rem;line-height:1.7;}'
+            + '</style></head><body>'
+            + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
+            + '<button onclick="window.print()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
+            + '<button onclick="window.close()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
+            // COVER PAGE
+            + '<div class="cover">'
+            + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:70px;object-fit:contain;margin-bottom:30px;" alt="CB Logo">' : '')
+            + '<div class="cover-line"></div>'
+            + '<h1 style="font-size:2.8rem;font-weight:800;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
+            + '<p style="font-size:1.15rem;color:#64748b;margin-top:8px;">' + standard + '</p>'
+            + '<div style="margin-top:50px;"><div style="font-size:2rem;font-weight:700;color:#2563eb;">' + d.report.client + '</div>'
+            + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || 'N/A') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || 'N/A') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div></div>'
+            + '<div style="position:absolute;bottom:40px;display:flex;align-items:center;gap:16px;">'
+            + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:40px;object-fit:contain;opacity:0.6;" alt="Client">' : '')
+            + '<img src="' + d.qrCodeUrl + '" style="height:60px;" alt="QR"></div></div>'
+            + '<div class="content">'
+            // SECTION 1
+            + (en['audit-info'] !== false ? '<div class="sh page-break"><span class="sn">1</span>AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
+                + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
+                + '<tr><td>Industry</td><td>' + (d.client.industry || 'N/A') + '</td></tr>'
+                + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || 'N/A') + '</td></tr>'
+                + '<tr><td>Number of Employees</td><td>' + (d.client.numberOfEmployees || 'N/A') + '</td></tr>'
+                + '<tr><td>Audit Standard</td><td>' + standard + '</td></tr>'
+                + '<tr><td>Audit Type</td><td>' + (d.auditPlan?.auditType || 'Initial') + '</td></tr>'
+                + '<tr><td>Audit Dates</td><td>' + (d.report.date || 'N/A') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
+                + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || 'N/A') + '</td></tr>'
+                + '<tr><td>Audit Location</td><td>' + ([d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || 'N/A') + '</td></tr>'
+                + (d.client.latitude ? '<tr><td>Geo-Coordinates</td><td><a href="https://www.openstreetmap.org/?mlat=' + d.client.latitude + '&mlon=' + d.client.longitude + '#map=15/' + d.client.latitude + '/' + d.client.longitude + '" target="_blank" style="color:#2563eb;text-decoration:none;">' + d.client.latitude + ', ' + d.client.longitude + ' ↗</a></td></tr>' : '')
+                + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? '#' + d.auditPlan.id.substring(0, 8) : 'Not Linked') + '</td></tr>'
+                + '</table>'
+                + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:16px;"><strong style="font-size:0.88rem;color:#334155;">Goods & Services:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.goodsServices.map(g => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#fef3c7;color:#92400e;border:1px solid #fde047;">' + g.name + (g.category ? ' (' + g.category + ')' : '') + '</span>').join('') + '</div></div>' : '')
+                + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:12px;"><strong style="font-size:0.88rem;color:#334155;">Key Processes:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.keyProcesses.map(p => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;">' + (p.name || p) + '</span>').join('') + '</div></div>' : '')
+                + '</div>' : '')
+            // SECTION 2
+            + (en['summary'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#047857,#059669);"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
+                + (d.report.positiveObservations ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + formatText(d.report.positiveObservations) + '</div></div>' : '')
+                + (d.report.ofi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + formatText(d.report.ofi) + '</div></div>' : '')
+                + '</div>' : '')
+            // SECTION 3
+            + (en['charts'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
+                + '<div class="stat-grid">'
+                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
+                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.ncCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
+                + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
+                + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
+                + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
+                + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
+                + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
+            // SECTION 4
+            + (en['findings'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">4</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Severity</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
+            // SECTION 5
+            + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">5</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            // SECTION 6
+            + (en['meetings'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">6</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
+                + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (d.report.openingMeeting?.attendees || 'N/A') + '</td></tr></table></div>'
+                + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Summary</td><td>' + (d.report.closingMeeting?.summary || 'N/A') + '</td></tr></table></div>'
+                + '</div></div>' : '')
+            // SECTION 7
+            + (en['conclusion'] !== false ? '<div class="sh" style="background:linear-gradient(135deg,#312e81,#4338ca);"><span class="sn">7</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
+                + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
+                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatText(editedConclusion) + '</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
+            + '</div>'
+            // FOOTER
+            + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong><br>' : '') + cbSiteAddr + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
+            + '<div style="text-align:right;">Generated: ' + d.today + '<br>Report ID: ' + d.report.id + '</div></footer>'
+            // CHARTS SCRIPT
+            + '<script>'
+            + 'function rc(){'
+            + 'var c1=document.getElementById("chart-doughnut");'
+            + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#22c55e","#f59e0b","#ef4444","#3b82f6"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'var c2=document.getElementById("chart-clause");'
+            + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#2563eb",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
+            + 'var c3=document.getElementById("chart-findings");'
+            + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.ncCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.height="auto";cv.parentNode.replaceChild(im,cv);}catch(e){}});},1200);'
+            + '}rc();'
+            + '<\/script></body></html>';
 
         printWindow.document.write(reportHtml);
         printWindow.document.close();
-
-        // Auto-print after delay to allow styles to load
-        setTimeout(() => {
-            printWindow.print();
-        }, 1000);
+        setTimeout(function () { printWindow.print(); }, 1800);
+        var overlay = document.getElementById('report-preview-overlay');
+        if (overlay) overlay.remove();
     };
 
-    window.openCreateReportModal = openCreateReportModal;
-    window.openEditReportModal = openEditReportModal;
+            window.openCreateReportModal = openCreateReportModal;
+            window.openEditReportModal = openEditReportModal;
 
-    // Persistent stream for remote audits
-    window.activeAuditScreenStream = null;
+            // Persistent stream for remote audits
+            window.activeAuditScreenStream = null;
 
-    window.captureScreenEvidence = async function (uniqueId) {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+            window.captureScreenEvidence = async function (uniqueId) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
             return;
-        }
+    }
 
-        try {
-            let stream = window.activeAuditScreenStream;
+            try {
+                let stream = window.activeAuditScreenStream;
             let isNew = false;
 
             // Check active stream
             if (!stream || !stream.active) {
                 window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
-                stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
-                    audio: false
-                });
-                window.activeAuditScreenStream = stream;
-                isNew = true;
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {cursor: "always" },
+            audio: false
+            });
+            window.activeAuditScreenStream = stream;
+            isNew = true;
 
-                // Handle stop sharing
-                stream.getVideoTracks()[0].onended = () => {
-                    window.activeAuditScreenStream = null;
-                    window.showNotification('Screen sharing session ended.', 'info');
-                };
-            }
+            // Handle stop sharing
+            stream.getVideoTracks()[0].onended = () => {
+                window.activeAuditScreenStream = null;
+            window.showNotification('Screen sharing session ended.', 'info');
+            };
+        }
 
             const video = document.createElement('video');
             video.srcObject = stream;
             video.muted = true;
             video.play();
 
-            // Wait for buffer
-            await new Promise(r => setTimeout(r, isNew ? 500 : 200));
+        // Wait for buffer
+        await new Promise(r => setTimeout(r, isNew ? 500 : 200));
 
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -3370,70 +3267,70 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             video.srcObject = null;
             video.remove();
 
-        } catch (err) {
-            if (err.name !== 'NotAllowedError') {
+    } catch (err) {
+        if (err.name !== 'NotAllowedError') {
                 console.error(err);
-                window.showNotification('Capture failed: ' + err.message, 'error');
-            }
+            window.showNotification('Capture failed: ' + err.message, 'error');
         }
-    };
-    window.renderExecutionDetail = renderExecutionDetail;
+    }
+};
+            window.renderExecutionDetail = renderExecutionDetail;
 
-    // Toggle selection of all items in a section
-    // toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
+            // Toggle selection of all items in a section
+            // toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
 
-    // ============================================
-    // Webcam Handling for Desktop 'Camera' Button
-    // ============================================
-    window.activeWebcamStream = null;
-
-    window.handleCameraButton = function (uniqueId) {
-        // Check if mobile device (simple check)
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        if (isMobile) {
-            // Use the native input for mobile (file picker / camera app)
-            const inp = document.getElementById('cam-' + uniqueId);
-            if (inp) inp.click();
-        } else {
-            // Use Webcam Modal for desktop
-            window.openWebcamModal(uniqueId);
-        }
-    };
-
-    window.openWebcamModal = async function (uniqueId) {
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        // Cleanup any existing stream first
-        if (window.activeWebcamStream) {
-            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            // ============================================
+            // Webcam Handling for Desktop 'Camera' Button
+            // ============================================
             window.activeWebcamStream = null;
-        }
 
-        modalTitle.textContent = 'Capture from Webcam';
+            window.handleCameraButton = function (uniqueId) {
+    // Check if mobile device (simple check)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        modalBody.innerHTML = `
-    < div style = "display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
-            <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
-                <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
-            </div>
-            <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
-        </div >
-    `;
+            if (isMobile) {
+        // Use the native input for mobile (file picker / camera app)
+        const inp = document.getElementById('cam-' + uniqueId);
+            if (inp) inp.click();
+    } else {
+                // Use Webcam Modal for desktop
+                window.openWebcamModal(uniqueId);
+    }
+};
 
-        // Configure "Capture" button
-        modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
-        modalSave.onclick = () => window.captureWebcam(uniqueId);
+            window.openWebcamModal = async function (uniqueId) {
+    const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalSave = document.getElementById('modal-save');
 
-        // Show modal BEFORE requesting media
-        if (window.openModal) window.openModal();
+            // Cleanup any existing stream first
+            if (window.activeWebcamStream) {
+                window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
+    }
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            modalTitle.textContent = 'Capture from Webcam';
+
+            modalBody.innerHTML = `
+            < div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
+                <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
+                </div>
+                <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
+            </div >
+            `;
+
+            // Configure "Capture" button
+            modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+    modalSave.onclick = () => window.captureWebcam(uniqueId);
+
+            // Show modal BEFORE requesting media
+            if (window.openModal) window.openModal();
+
+            try {
+        const stream = await navigator.mediaDevices.getUserMedia({video: true });
             window.activeWebcamStream = stream;
 
             const video = document.getElementById('webcam-video');
@@ -3441,29 +3338,29 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             if (video) {
                 video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    if (loading) loading.style.display = 'none';
-                };
-            }
-        } catch (err) {
-            const errDiv = document.getElementById('webcam-error');
+            video.onloadedmetadata = () => {
+                if (loading) loading.style.display = 'none';
+            };
+        }
+    } catch (err) {
+        const errDiv = document.getElementById('webcam-error');
             const loading = document.getElementById('webcam-loading');
             if (loading) loading.style.display = 'none';
 
             if (errDiv) {
                 errDiv.style.display = 'block';
-                errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
-            }
-            console.error("Webcam error:", err);
+            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
         }
-    };
+            console.error("Webcam error:", err);
+    }
+};
 
-    window.captureWebcam = function (uniqueId) {
-        const video = document.getElementById('webcam-video');
-        if (!video || !window.activeWebcamStream) return;
+            window.captureWebcam = function (uniqueId) {
+    const video = document.getElementById('webcam-video');
+            if (!video || !window.activeWebcamStream) return;
 
-        try {
-            const canvas = document.createElement('canvas');
+            try {
+        const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
@@ -3475,8 +3372,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
-            // Stop stream
-            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+        // Stop stream
+        window.activeWebcamStream.getTracks().forEach(track => track.stop());
             window.activeWebcamStream = null;
 
             // Update UI
@@ -3492,16 +3389,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             // Close modal
             if (window.closeModal) window.closeModal();
-        } catch (e) {
-            console.error("Capture failed:", e);
+    } catch (e) {
+                console.error("Capture failed:", e);
             window.showNotification("Failed to capture image", "error");
-        }
-    };
+    }
+};
 
-    // Global event delegation for section checkboxes (works with dynamically rendered content)
-    document.addEventListener('click', function (e) {
-        if (e.target.classList.contains('section-checkbox')) {
-            e.stopPropagation();
+            // Global event delegation for section checkboxes (works with dynamically rendered content)
+            document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('section-checkbox')) {
+                e.stopPropagation();
             const sectionId = e.target.getAttribute('data-section-id');
             const isChecked = e.target.checked;
             console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
@@ -3510,93 +3407,93 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const section = document.getElementById(sectionId);
             if (!section) {
                 console.error('Section not found:', sectionId);
-                return;
-            }
+            return;
+        }
 
             const items = section.querySelectorAll('.checklist-item');
             console.log('Found', items.length, 'items in section');
 
-            items.forEach((item, idx) => {
-                // Toggle the individual checkbox too
-                const itemCheckbox = item.querySelector('.item-checkbox');
-                if (itemCheckbox) {
-                    itemCheckbox.checked = isChecked;
-                }
+        items.forEach((item, idx) => {
+            // Toggle the individual checkbox too
+            const itemCheckbox = item.querySelector('.item-checkbox');
+            if (itemCheckbox) {
+                itemCheckbox.checked = isChecked;
+            }
 
-                if (isChecked) {
-                    item.classList.add('selected-item');
-                    item.style.background = '#eff6ff';
-                    item.style.borderLeft = '4px solid var(--primary-color)';
-                } else {
-                    item.classList.remove('selected-item');
-                    item.style.background = '';
-                    item.style.borderLeft = '4px solid #e2e8f0';
-                }
-            });
+            if (isChecked) {
+                item.classList.add('selected-item');
+            item.style.background = '#eff6ff';
+            item.style.borderLeft = '4px solid var(--primary-color)';
+            } else {
+                item.classList.remove('selected-item');
+            item.style.background = '';
+            item.style.borderLeft = '4px solid #e2e8f0';
+            }
+        });
 
             console.log('Selection complete for', items.length, 'items');
-        }
-    });
+    }
+});
 
-    // Global event delegation for individual item checkboxes
-    document.addEventListener('click', function (e) {
-        if (e.target.classList.contains('item-checkbox')) {
-            const checkbox = e.target;
+            // Global event delegation for individual item checkboxes
+            document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('item-checkbox')) {
+        const checkbox = e.target;
             const uniqueId = checkbox.getAttribute('data-unique-id');
             const row = document.getElementById('row-' + uniqueId);
 
             if (row) {
-                if (checkbox.checked) {
-                    row.classList.add('selected-item');
-                    row.style.background = '#eff6ff';
-                    row.style.borderLeft = '4px solid var(--primary-color)';
-                } else {
-                    row.classList.remove('selected-item');
-                    row.style.background = '';
-                    row.style.borderLeft = '4px solid #e2e8f0';
-                }
+            if (checkbox.checked) {
+                row.classList.add('selected-item');
+            row.style.background = '#eff6ff';
+            row.style.borderLeft = '4px solid var(--primary-color)';
+            } else {
+                row.classList.remove('selected-item');
+            row.style.background = '';
+            row.style.borderLeft = '4px solid #e2e8f0';
             }
         }
-    });
+    }
+});
 
-    // Global event delegation for bulk action buttons
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.bulk-action-btn');
-        if (btn) {
-            const action = btn.getAttribute('data-action');
+            // Global event delegation for bulk action buttons
+            document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.bulk-action-btn');
+            if (btn) {
+        const action = btn.getAttribute('data-action');
             const reportId = btn.getAttribute('data-report-id');
             console.log('Bulk action button clicked:', action, 'for report:', reportId);
 
             if (action && reportId) {
                 window.bulkUpdateStatus(parseInt(reportId), action);
 
-                // Close menu
-                const menu = document.getElementById('bulk-menu-' + reportId);
-                if (menu) menu.classList.add('hidden');
-            }
+            // Close menu
+            const menu = document.getElementById('bulk-menu-' + reportId);
+            if (menu) menu.classList.add('hidden');
         }
-    });
+    }
+});
 
-    // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
-    document.addEventListener('click', function (e) {
-        // Check if clicked element or any parent has status-btn class
-        let btn = e.target;
+            // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
+            document.addEventListener('click', function (e) {
+                // Check if clicked element or any parent has status-btn class
+                let btn = e.target;
 
-        // Log all clicks for debugging
-        if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-            console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
-        }
+            // Log all clicks for debugging
+            if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+                console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
+    }
 
-        while (btn && btn.classList && !btn.classList.contains('status-btn')) {
-            btn = btn.parentElement;
+            while (btn && btn.classList && !btn.classList.contains('status-btn')) {
+                btn = btn.parentElement;
             if (!btn || btn === document.body) {
                 btn = null;
-                break;
-            }
+            break;
         }
+    }
 
-        if (btn && btn.classList && btn.classList.contains('status-btn')) {
-            e.preventDefault();
+            if (btn && btn.classList && btn.classList.contains('status-btn')) {
+                e.preventDefault();
             e.stopPropagation();
 
             const uniqueId = btn.getAttribute('data-unique-id');
@@ -3605,28 +3502,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             if (uniqueId && status) {
                 window.setChecklistStatus(uniqueId, status);
-            }
         }
-    }, true); // true = capture phase
+    }
+}, true); // true = capture phase
 
-    // Helper to update meeting records (Opening/Closing)
-    window.updateMeetingData = function (reportId, meetingType, field, value) {
-        const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-        if (!report) return;
+            // Helper to update meeting records (Opening/Closing)
+            window.updateMeetingData = function (reportId, meetingType, field, value) {
+    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+            if (!report) return;
 
-        if (!report[meetingType + 'Meeting']) {
-            report[meetingType + 'Meeting'] = {};
-        }
+            if (!report[meetingType + 'Meeting']) {
+                report[meetingType + 'Meeting'] = {};
+    }
 
-        if (field === 'attendees') {
-            // Split by comma and clean up
-            report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
-        } else {
-            report[meetingType + 'Meeting'][field] = value;
-        }
+            if (field === 'attendees') {
+                // Split by comma and clean up
+                report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+    } else {
+                report[meetingType + 'Meeting'][field] = value;
+    }
 
-        window.saveData();
-        window.saveChecklist(reportId);
-    };
+            window.saveData();
+            window.saveChecklist(reportId);
+};
 
 }
