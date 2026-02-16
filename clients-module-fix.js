@@ -294,7 +294,7 @@ window._orgViewItem = function (type, data) {
     const details = Object.entries(data).map(function (e) {
         return '<div style="padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9;"><span style="font-weight: 600; color: #64748b; font-size: 0.8rem; text-transform: uppercase;">' + e[0] + '</span><div style="color: #1e293b; margin-top: 2px;">' + (e[1] || '-') + '</div></div>';
     }).join('');
-    window.showModal('View ' + type, '<div style="padding: 0.5rem;">' + details + '</div>');
+    window.openModal('View ' + type, '<div style="padding: 0.5rem;">' + details + '</div>');
 };
 
 // Print single item helper
