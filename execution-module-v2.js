@@ -766,7 +766,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                          </div>
                          
                          <!-- Hidden status input -->
-                         <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" id="status-${uniqueId}" value="${s}">
+                         <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" data-clause="${window.UTILS.escapeHtml(item.clause || '')}" data-requirement="${window.UTILS.escapeHtml(requirementText || '')}" id="status-${uniqueId}" value="${s}">
                          
                          <!-- NCR Panel (Conditional) -->
                          <div id="ncr-panel-${uniqueId}" class="ncr-panel" style="display: ${s === 'nc' ? 'block' : 'none'}; background: #fff1f2; border: 1px solid #fecaca; padding: 1rem; margin-top: 1rem; border-radius: 6px;">
@@ -1262,14 +1262,18 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 let clauseText = '';
                 let reqText = '';
                 const cl = assignedChecklists.find(c => c.id == item.checklistId);
+                console.log(`[Review Findings] Item ${originalIdx}: checklistId=${item.checklistId}, itemIdx=${item.itemIdx}, found checklist:`, !!cl);
                 if (cl) {
                     if (cl.clauses) {
                         const parts = String(item.itemIdx).split('-');
+                        console.log(`[Review Findings] Clause mode: parts=${JSON.stringify(parts)}, clauses count=${cl.clauses.length}`);
                         if (parts.length === 2) {
                             const main = cl.clauses.find(c => c.mainClause == parts[0]);
-                            if (main && main.subClauses[parts[1]]) {
+                            console.log(`[Review Findings] Main clause ${parts[0]} found:`, !!main, main ? `subClauses count: ${main.subClauses?.length}` : '');
+                            if (main && main.subClauses && main.subClauses[parts[1]]) {
                                 clauseText = main.subClauses[parts[1]].clause;
                                 reqText = main.subClauses[parts[1]].requirement;
+                                console.log(`[Review Findings] Found clause: ${clauseText}, req: ${reqText?.substring(0, 60)}`);
                             }
                         }
                     } else if (cl.items && cl.items[item.itemIdx]) {
@@ -1277,6 +1281,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         reqText = cl.items[item.itemIdx].requirement;
                     }
                 }
+
+                // Fallback: use clause/requirement saved directly on the progress item by saveChecklist
+                if (!clauseText && item.clause) clauseText = item.clause;
+                if (!reqText && item.requirement) reqText = item.requirement;
 
                 allFindings.push({
                     id: `checklist-${originalIdx}`,
@@ -1860,24 +1868,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
                 const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
 
-                // Extract clause and requirement text from the DOM for report display
-                const itemContainer = input.closest('.checklist-item-card') || input.closest('.checklist-item');
-                let clauseText = '';
-                let requirementText = '';
-
-                if (itemContainer) {
-                    // Try to find the clause/section title (usually in a heading or strong tag above the input)
-                    const sectionHeader = itemContainer.querySelector('.section-title, .clause-title, strong, h5, h6');
-                    if (sectionHeader) {
-                        clauseText = sectionHeader.textContent?.trim() || '';
-                    }
-
-                    // Try to find the requirement text (usually the question text)
-                    const questionText = itemContainer.querySelector('.item-text, .question-text, p, label');
-                    if (questionText) {
-                        requirementText = questionText.textContent?.trim() || '';
-                    }
-                }
+                // Get clause and requirement from data attributes (reliable) instead of DOM scraping
+                const clauseText = input.dataset.clause || '';
+                const requirementText = input.dataset.requirement || '';
 
                 // Save ALL items (not just ones with status/comment)
                 // This ensures Conform/NC/NA selections persist even without comments
@@ -2848,18 +2841,36 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         }
                     } else if (clauseGroups.length > 0) {
                         // New structure: clauses with subClauses
-                        let cumulativeIdx = 0;
+                        // itemIdx can be "mainClause-subIdx" format (e.g. "4-2") or cumulative index
+                        const parts = String(item.itemIdx).split('-');
                         let found = false;
-                        for (const group of clauseGroups) {
-                            if (found) break;
-                            for (const sub of (group.subClauses || [])) {
-                                if (String(cumulativeIdx) === String(item.itemIdx)) {
-                                    clause = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
-                                    requirement = sub.requirement || sub.text || '';
-                                    found = true;
-                                    break;
+
+                        // Strategy 1: Direct mainClause-subIdx lookup
+                        if (parts.length === 2) {
+                            const mainClause = parts[0];
+                            const subIdx = parseInt(parts[1]);
+                            const group = clauseGroups.find(g => String(g.mainClause) === mainClause);
+                            if (group && group.subClauses && group.subClauses[subIdx]) {
+                                clause = group.subClauses[subIdx].clause || `${group.mainClause} ${group.title || ''}`.trim();
+                                requirement = group.subClauses[subIdx].requirement || group.subClauses[subIdx].text || '';
+                                found = true;
+                            }
+                        }
+
+                        // Strategy 2: Cumulative index fallback
+                        if (!found) {
+                            let cumulativeIdx = 0;
+                            for (const group of clauseGroups) {
+                                if (found) break;
+                                for (const sub of (group.subClauses || [])) {
+                                    if (String(cumulativeIdx) === String(item.itemIdx)) {
+                                        clause = sub.clause || `${group.mainClause} ${group.title || ''}`.trim();
+                                        requirement = sub.requirement || sub.text || '';
+                                        found = true;
+                                        break;
+                                    }
+                                    cumulativeIdx++;
                                 }
-                                cumulativeIdx++;
                             }
                         }
                     }

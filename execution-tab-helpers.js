@@ -42,7 +42,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
              </div>
              
              <!-- Hidden status input -->
-             <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" id="status-${uniqueId}" value="${s}">
+             <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" data-clause="${window.UTILS.escapeHtml(item.clause || '')}" data-requirement="${window.UTILS.escapeHtml(item.requirement || '')}" id="status-${uniqueId}" value="${s}">
              
              <!-- NCR Panel (Conditional) -->
              <div id="ncr-panel-${uniqueId}" class="ncr-panel" style="display: ${s === 'nc' ? 'block' : 'none'}; background: #fff1f2; border: 1px solid #fecaca; padding: 1rem; margin-top: 1rem; border-radius: 6px;">
