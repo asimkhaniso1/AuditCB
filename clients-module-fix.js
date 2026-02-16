@@ -375,7 +375,7 @@ window.getClientContactsHTML = function (client) {
                 <td>${window.UTILS.escapeHtml(c.phone || '-')}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Contact',{Name:'${_esc(c.name)}',Email:'${_esc(c.email)}',Phone:'${_esc(c.phone)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.showNotification('Edit contact coming soon','info')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" onclick="window.editContact('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Contact',{Name:'${_esc(c.name)}',Email:'${_esc(c.email)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteContact('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
@@ -406,7 +406,7 @@ window.getClientDepartmentsHTML = function (client) {
                 <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(dept.head)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.showNotification('Edit department coming soon','info')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" onclick="window.editDepartment('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(dept.head)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteDepartment('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
@@ -437,7 +437,7 @@ window.getClientGoodsServicesHTML = function (client) {
                 <td><span class="badge-tag badge-green">${window.UTILS.escapeHtml(item.category || '-')}</span></td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.showNotification('Edit coming soon','info')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" onclick="window.editGoodsService('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteGoodsService('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
@@ -468,7 +468,7 @@ window.getClientKeyProcessesHTML = function (client) {
                 <td><span class="badge-tag badge-amber">${window.UTILS.escapeHtml(proc.category || '-')}</span></td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.showNotification('Edit coming soon','info')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" onclick="window.editKeyProcess('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteKeyProcess('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
@@ -499,7 +499,7 @@ window.getClientDesignationsHTML = function (client) {
                 <td>${des.department ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(des.department) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Designation',{Title:'${_esc(des.title || des.name)}',Department:'${_esc(des.department)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.showNotification('Edit coming soon','info')"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" onclick="window.editClientDesignation('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Designation',{Title:'${_esc(des.title || des.name)}',Department:'${_esc(des.department)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteClientDesignation('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
@@ -637,6 +637,25 @@ window.deleteDepartment = function (clientId, index) {
         window.showNotification('Department deleted');
     }
 };
+window.editDepartment = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.departments || !client.departments[index]) return;
+    const dept = client.departments[index];
+    window.openModal('Edit Department', `
+        <form><div class="form-group"><label>Name *</label><input type="text" id="dept-name" class="form-control" value="${(dept.name || '').replace(/"/g, '&quot;')}"></div>
+        <div class="form-group"><label>Head</label><input type="text" id="dept-head" class="form-control" value="${(dept.head || '').replace(/"/g, '&quot;')}"></div></form>`, () => {
+        const name = document.getElementById('dept-name').value;
+        if (name) {
+            client.departments[index] = { name, head: document.getElementById('dept-head').value };
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 3);
+            else renderClientDetail(clientId);
+            window.showNotification('Department updated');
+        }
+    });
+};
 window.bulkUploadDepartments = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
@@ -679,6 +698,26 @@ window.deleteContact = function (clientId, index) {
         renderClientDetail(clientId);
     }
 };
+window.editContact = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.contacts || !client.contacts[index]) return;
+    const ct = client.contacts[index];
+    window.openModal('Edit Contact', `
+        <form><div class="form-group"><label>Name *</label><input id="contact-name" class="form-control" value="${(ct.name || '').replace(/"/g, '&quot;')}"></div>
+        <div class="form-group"><label>Email</label><input id="contact-email" class="form-control" value="${(ct.email || '').replace(/"/g, '&quot;')}"></div>
+        <div class="form-group"><label>Phone</label><input id="contact-phone" class="form-control" value="${(ct.phone || '').replace(/"/g, '&quot;')}"></div></form>`, () => {
+        const name = document.getElementById('contact-name').value;
+        if (name) {
+            client.contacts[index] = { name, email: document.getElementById('contact-email').value, phone: document.getElementById('contact-phone').value };
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 5);
+            else renderClientDetail(clientId);
+            window.showNotification('Contact updated');
+        }
+    });
+};
 window.bulkUploadContacts = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
@@ -720,6 +759,23 @@ window.deleteClientDesignation = function (clientId, index) {
         window.setSetupWizardStep(clientId, 4);
     }
 };
+window.editClientDesignation = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.designations || !client.designations[index]) return;
+    const des = client.designations[index];
+    window.openModal('Edit Designation', `
+        <form><div class="form-group"><label>Title *</label><input id="des-title" class="form-control" value="${(des.title || des.name || '').replace(/"/g, '&quot;')}"></div></form>`, () => {
+        const title = document.getElementById('des-title').value;
+        if (title) {
+            client.designations[index] = { title };
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 4);
+            window.showNotification('Designation updated');
+        }
+    });
+};
 window.bulkUploadDesignations = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
@@ -760,6 +816,24 @@ window.deleteGoodsService = function (clientId, index) {
         window.setSetupWizardStep(clientId, 6);
     }
 };
+window.editGoodsService = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.goodsServices || !client.goodsServices[index]) return;
+    const item = client.goodsServices[index];
+    window.openModal('Edit Goods/Service', `
+        <form><div class="form-group"><label>Name *</label><input id="goods-name" class="form-control" value="${(item.name || '').replace(/"/g, '&quot;')}"></div>
+        <div class="form-group"><label>Category</label><select id="goods-cat" class="form-control"><option ${item.category === 'Product' ? 'selected' : ''}>Product</option><option ${item.category === 'Service' ? 'selected' : ''}>Service</option></select></div></form>`, () => {
+        const name = document.getElementById('goods-name').value;
+        if (name) {
+            client.goodsServices[index] = { name, category: document.getElementById('goods-cat').value };
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 6);
+            window.showNotification('Updated');
+        }
+    });
+};
 window.bulkUploadGoodsServices = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
@@ -796,6 +870,24 @@ window.deleteKeyProcess = function (clientId, index) {
         if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
         window.setSetupWizardStep(clientId, 7);
     }
+};
+window.editKeyProcess = function (clientId, index) {
+    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
+    const proc = client.keyProcesses[index];
+    window.openModal('Edit Process', `
+        <form><div class="form-group"><label>Name *</label><input id="proc-name" class="form-control" value="${(proc.name || '').replace(/"/g, '&quot;')}"></div>
+        <div class="form-group"><label>Category</label><select id="proc-cat" class="form-control"><option ${proc.category === 'Core' ? 'selected' : ''}>Core</option><option ${proc.category === 'Support' ? 'selected' : ''}>Support</option></select></div></form>`, () => {
+        const name = document.getElementById('proc-name').value;
+        if (name) {
+            client.keyProcesses[index] = { name, category: document.getElementById('proc-cat').value };
+            window.saveData();
+            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.closeModal();
+            window.setSetupWizardStep(clientId, 7);
+            window.showNotification('Updated');
+        }
+    });
 };
 window.bulkUploadKeyProcesses = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
