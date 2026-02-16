@@ -409,7 +409,7 @@ function getClientInfoHTML(client) {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Company Information</h3>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-outline-primary" onclick="window.openImportAccountSetupModal(${client.id})">
+                <button class="btn btn-sm btn-outline-primary" onclick="window.openImportAccountSetupModal('${client.id}')">
                     <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Bulk Import Setup
                 </button>
                 ` : ''}
@@ -505,10 +505,10 @@ function getClientSitesHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites(${client.id})">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites('${client.id}')">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="window.addSite(${client.id})">
+                    <button class="btn btn-sm btn-secondary" onclick="window.addSite('${client.id}')">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
                     </button>
                 </div>
@@ -549,10 +549,10 @@ function getClientSitesHTML(client) {
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
-                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite('${client.id}', ${index})">
                                                 <i class="fa-solid fa-pen"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite(${client.id}, ${index})">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite('${client.id}', ${index})">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </div>
@@ -568,7 +568,7 @@ function getClientSitesHTML(client) {
                     <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">No sites or branch locations added yet.</p>
                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" onclick="addSite(${client.id})">
+                    <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" onclick="addSite('${client.id}')">
                         <i class="fa-solid fa-plus"></i> Add First Site
                     </button>
                     ` : ''}
@@ -596,14 +596,14 @@ function getClientProfileHTML(client) {
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                         <label class="btn btn-sm btn-outline-primary" style="cursor: pointer; margin: 0;">
                             <i class="fa-solid fa-file-pdf" style="margin-right: 0.25rem;"></i> Upload PDF
-                            <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc(${client.id}, this.files[0])">
+                            <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc('${client.id}', this.files[0])">
                         </label>
                         ${client.website ? `
-                            <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
+                            <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile('${client.id}')">
                                 <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate
                             </button>
                         ` : ''}
-                        <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile(${client.id})">
+                        <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile('${client.id}')">
                             <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i> Edit Manually
                         </button>
                     ` : ''}
@@ -619,7 +619,7 @@ function getClientProfileHTML(client) {
                     <span style="font-size: 0.8rem; color: #22c55e; margin-left: 0.5rem;">(Uploaded ${new Date(client.profileDocument.uploadedAt).toLocaleDateString()})</span>
                 </div>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" onclick="window.removeProfileDocument(${client.id})" title="Remove document">
+                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" onclick="window.removeProfileDocument('${client.id}')" title="Remove document">
                     <i class="fa-solid fa-times"></i>
                 </button>
                 ` : ''}
@@ -642,14 +642,14 @@ function getClientProfileHTML(client) {
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                             <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
                                 <i class="fa-solid fa-upload"></i> Upload Document
-                                <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc(${client.id}, this.files[0])">
+                                <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc('${client.id}', this.files[0])">
                             </label>
                             ${client.website ? `
-                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile(${client.id})">
+                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile('${client.id}')">
                                     <i class="fa-solid fa-sparkles"></i> AI Generate
                                 </button>
                             ` : ''}
-                            <button class="btn btn-outline-secondary btn-sm" onclick="window.editCompanyProfile(${client.id})">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="window.editCompanyProfile('${client.id}')">
                                 <i class="fa-solid fa-pen"></i> Write Manually
                             </button>
                         ` : ''}
@@ -673,10 +673,10 @@ function getClientContactsHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-secondary" onclick="addContactPerson(${client.id})">
+                    <button class="btn btn-sm btn-secondary" onclick="addContactPerson('${client.id}')">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts(${client.id})">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts('${client.id}')">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
                 </div>
@@ -703,10 +703,10 @@ function getClientContactsHTML(client) {
                                     <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact(${client.id}, ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact('${client.id}', ${index})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact(${client.id}, ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact('${client.id}', ${index})">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                         ` : ''}
@@ -731,10 +731,10 @@ function getClientDepartmentsHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments('${client.id}')">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="window.addDepartment(${client.id})">
+                    <button class="btn btn-sm btn-secondary" onclick="window.addDepartment('${client.id}')">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Department
                     </button>
                     ` : ''}
@@ -757,10 +757,10 @@ function getClientDepartmentsHTML(client) {
                                     <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment(${client.id}, ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment('${client.id}', ${index})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment(${client.id}, ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment('${client.id}', ${index})">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                         ` : ''}
@@ -776,8 +776,8 @@ function getClientDepartmentsHTML(client) {
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                        <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment(${client.id})">Add Manually</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment('${client.id}')">Add Manually</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments('${client.id}')">Bulk Upload</button>
                         ` : ''}
                     </div>
                 </div>
@@ -800,10 +800,10 @@ function getClientGoodsServicesHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService('${client.id}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices(${client.id})">
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices('${client.id}')">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -828,8 +828,8 @@ function getClientGoodsServicesHTML(client) {
                                 <td style="font-size: 0.9rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.description || '-')}</td>
                                 <td>
                                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editGoodsService(${client.id}, ${index})"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editGoodsService('${client.id}', ${index})"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
                                 </td>
                             </tr>
@@ -860,10 +860,10 @@ function getClientKeyProcessesHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess('${client.id}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses(${client.id})">
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses('${client.id}')">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -888,8 +888,8 @@ function getClientKeyProcessesHTML(client) {
                                 <td>${window.UTILS.escapeHtml(proc.owner || '-')}</td>
                                 <td>
                                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editKeyProcess('${client.id}', ${index})"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
                                 </td>
                             </tr>
@@ -920,10 +920,10 @@ function getClientDesignationsHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation('${client.id}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations(${client.id})">
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations('${client.id}')">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -937,7 +937,7 @@ function getClientDesignationsHTML(client) {
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteClientDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteClientDesignation('${client.id}', ${index})"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
                 `).join('')}
@@ -974,7 +974,7 @@ function getClientAuditTeamHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">CB auditors assigned to audit this organization</p>
             </div>
             ${canManage ? `
-            <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal(${client.id}, '${window.UTILS.escapeHtml(client.name)}')">
+            <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal('${client.id}', '${window.UTILS.escapeHtml(client.name)}')">
                 <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
             </button>
             ` : ''}
@@ -1011,7 +1011,7 @@ function getClientAuditTeamHTML(client) {
                                 ${assignment?.assignedAt ? '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Assigned: ' + new Date(assignment.assignedAt).toLocaleDateString() + '</div>' : ''}
                             </div>
                         </div>
-                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment(${client.id}, ${auditor.id})" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
+                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment('${client.id}', ${auditor.id})" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
                     </div>
                     `;
     }).join('')}
@@ -1186,7 +1186,7 @@ function getClientDocumentsHTML(client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Documents</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">
+                <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal('${client.id}')">
                     <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                 </button>
                 ` : ''}
@@ -1215,7 +1215,7 @@ function getClientDocumentsHTML(client) {
                                     <td>
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument(${client.id}, '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument('${client.id}', '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
                                 </tr>
@@ -1228,7 +1228,7 @@ function getClientDocumentsHTML(client) {
                     <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal(${client.id})">Upload First Document</button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal('${client.id}')">Upload First Document</button>
                     ` : ''}
                 </div>
             `}
@@ -1265,7 +1265,7 @@ function getClientComplianceHTML(client) {
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
                         background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
                         color: ${appStatus === s ? 'white' : '#64748b'};"
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus(${client.id}, '${s}')"` : ''}>
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus('${client.id}', '${s}')"` : ''}>
                         ${s}
                     </span>
                 `).join('')}
@@ -1294,7 +1294,7 @@ function getClientComplianceHTML(client) {
                     </div>
                 `}
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="window.editClientContract(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.editClientContract('${client.id}')">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
                 </button>
                 ` : ''}
@@ -1320,7 +1320,7 @@ function getClientComplianceHTML(client) {
                     </div>
                 `}
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA('${client.id}')">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
                 </button>
                 ` : ''}
@@ -1335,7 +1335,7 @@ function getClientComplianceHTML(client) {
                     Client Changes Log (ISO 9.6)
                 </h4>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog(${client.id})">
+                <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog('${client.id}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
                 </button>
                 ` : ''}
@@ -4145,7 +4145,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <div style="position: absolute; top: 24px; left: 0; width: ${progressWidth}%; height: 3px; background: var(--primary-color); z-index: 2; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);"></div>
                     
                     ${steps.map(step => `
-                        <div style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="window.setSetupWizardStep(${client.id}, ${step.id})">
+                        <div style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="window.setSetupWizardStep('${client.id}', ${step.id})">
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: ${currentStep >= step.id ? 'var(--primary-color)' : '#fff'}; border: 3px solid ${currentStep >= step.id ? 'var(--primary-color)' : '#e2e8f0'}; color: ${currentStep >= step.id ? '#fff' : '#94a3b8'}; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: ${currentStep === step.id ? '0 0 0 4px rgba(79, 70, 229, 0.2)' : 'none'};">
                                 <i class="fa-solid ${step.icon}"></i>
                             </div>
@@ -4169,7 +4169,7 @@ CFO," style="font-family: monospace;"></textarea>
 
             <!-- Wizard Footer / Navigation -->
             <div style="padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary" onclick="window.setSetupWizardStep(${client.id}, ${currentStep - 1})" ${currentStep === 1 ? 'disabled' : ''}>
+                <button class="btn btn-secondary" onclick="window.setSetupWizardStep('${client.id}', ${currentStep - 1})" ${currentStep === 1 ? 'disabled' : ''}>
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Previous
                 </button>
                 
@@ -4178,11 +4178,11 @@ CFO," style="font-family: monospace;"></textarea>
                         ${currentStep === steps.length ? '<i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i> Setup Complete' : `Next: ${steps[currentStep]?.title || ''}`}
                     </span>
                     ${currentStep < steps.length ? `
-                        <button class="btn btn-primary" onclick="window.setSetupWizardStep(${client.id}, ${currentStep + 1})">
+                        <button class="btn btn-primary" onclick="window.setSetupWizardStep('${client.id}', ${currentStep + 1})">
                             Next Stage <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
                         </button>
                     ` : `
-                        <button class="btn btn-primary" onclick="window.showNotification('Organization setup finalized successfully!', 'success'); window.switchClientDetailTab(${client.id}, 'scopes');">
+                        <button class="btn btn-primary" onclick="window.showNotification('Organization setup finalized successfully!', 'success'); window.switchClientDetailTab('${client.id}', 'scopes');">
                             Finalize & View Scopes <i class="fa-solid fa-flag-checkered" style="margin-left: 0.5rem;"></i>
                         </button>
                     `}
@@ -4251,7 +4251,7 @@ CFO," style="font-family: monospace;"></textarea>
                     Detected standards: ${Array.from(allStandards).join(', ')}.<br>
                     Click below to generate certificate records for these standards to manage scopes and revisions.
                 </p>
-                <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards(${client.id})">
+                <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards('${client.id}')">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Records
                 </button>
             </div>
@@ -4264,7 +4264,7 @@ CFO," style="font-family: monospace;"></textarea>
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
                 </h3>
-                <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards(${client.id})">
+                <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards('${client.id}')">
                     <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Sync Standards
                 </button>
             </div>
@@ -4284,14 +4284,14 @@ CFO," style="font-family: monospace;"></textarea>
                             <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
                                 Cert #: <input type="text" value="${cert.certificateNo || ''}" 
                                     style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;"
-                                    onchange="window.updateCertField(${client.id}, ${index}, 'certificateNo', this.value)">
+                                    onchange="window.updateCertField('${client.id}', ${index}, 'certificateNo', this.value)">
                             </div>
                         </div>
                         <div style="text-align: right;">
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" onclick="window.viewCertRevisionHistory(${client.id}, ${index})" title="View revision history for this certification">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" onclick="window.viewCertRevisionHistory('${client.id}', ${index})" title="View revision history for this certification">
                                 <i class="fa-solid fa-history"></i> Revision History
                              </button>
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope(${client.id}, ${index})" title="Remove this certification scope">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope('${client.id}', ${index})" title="Remove this certification scope">
                                 <i class="fa-solid fa-trash"></i>
                              </button>
                              <div style="font-size: 0.85rem; color: var(--text-secondary);">
@@ -4305,7 +4305,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <div style="margin-bottom: 1.5rem;">
                         <label style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem;">Global / Main Scope Text (Fallback)</label>
                         <textarea class="form-control" rows="2" 
-                            onchange="window.updateCertField(${client.id}, ${index}, 'scope', this.value)"
+                            onchange="window.updateCertField('${client.id}', ${index}, 'scope', this.value)"
                             placeholder="Enter the main scope statement...">${cert.scope || ''}</textarea>
                     </div> 
                     -->
@@ -4337,7 +4337,7 @@ CFO," style="font-family: monospace;"></textarea>
                                         <td style="padding: 0.75rem 0.5rem;">
                                             <textarea class="form-control" rows="2" 
                                                 style="font-size: 0.9rem;"
-                                                onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)"
+                                                onchange="window.updateSiteScope('${client.id}', ${index}, '${site.name}', this.value)"
                                                 placeholder="Define specific scope for this site...">${siteScope}</textarea>
                                         </td>
                                     </tr>
@@ -4352,19 +4352,19 @@ CFO," style="font-family: monospace;"></textarea>
                          <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                             <div>
                                 <label style="font-size: 0.8rem;">Initial Date</label>
-                                <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'initialDate', this.value)">
+                                <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'initialDate', this.value)">
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Current Issue</label>
-                                <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'currentIssue', this.value)">
+                                <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value)">
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Expiry Date</label>
-                                <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'expiryDate', this.value)">
+                                <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
                             </div>
                          </div>
                          <div style="display: flex; align-items: flex-end;">
-                            <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">
+                            <button class="btn btn-primary" onclick="window.saveCertificateDetails('${client.id}')">
                                 <i class="fa-solid fa-save"></i> Save Changes
                             </button>
                          </div>

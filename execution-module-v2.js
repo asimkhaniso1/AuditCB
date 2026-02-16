@@ -2934,8 +2934,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }
             }
 
-            // Fallback: Try KB clause lookup if still missing
-            if ((!requirement || requirement === 'Requirement details not available') && clause && report.standard) {
+            // ALWAYS look up KB standard requirement (not just as fallback)
+            let kbRequirement = '';
+            if (clause && report.standard) {
                 const kb = window.state.knowledgeBase;
                 if (kb?.standards?.length > 0) {
                     const stdDoc = kb.standards.find(s =>
@@ -2943,19 +2944,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         s.name.toLowerCase().includes(report.standard.toLowerCase().replace('iso ', ''))
                     );
                     if (stdDoc) {
-                        // Try to match clause number
-                        const clauseNum = clause.split(' ')[0]; // e.g. "5.1" from "5.1 Leadership"
+                        const clauseNum = clause.split(' ')[0];
                         let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
                         if (!kbClause) {
-                            // Try parent clause (e.g. "7.1" for "7.1.2")
                             const parentClause = clauseNum.split('.').slice(0, 2).join('.');
                             kbClause = stdDoc.clauses.find(c => c.clause === parentClause);
                         }
+                        if (!kbClause) {
+                            kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
+                        }
                         if (kbClause) {
-                            requirement = kbClause.requirement || requirement;
-                            if (!clause || clause === 'General Requirement') {
-                                clause = `${kbClause.clause} ${kbClause.title}`;
-                            }
+                            kbRequirement = kbClause.requirement || '';
                         }
                     }
                 }
@@ -2965,6 +2964,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 ...item,
                 clause: clause || item.clause || item.sectionName || 'General Requirement',
                 requirement: requirement || item.text || item.requirement || item.description || 'Requirement details not available',
+                kbRequirement: kbRequirement,
                 comment: item.comment || ''
             };
         });
@@ -3318,7 +3318,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         ${hydratedProgress.filter(item => item.status === 'nc').map((item, idx) => `
                         <tr>
                             <td><strong>${item.clause}</strong></td>
-                            <td style="color: #475569;">${item.requirement}</td>
+                            <td>
+                                <div style="color: #475569; margin-bottom: ${item.kbRequirement ? '8px' : '0'};">${item.requirement}</div>
+                                ${item.kbRequirement ? `<div style="font-size: 0.85em; padding: 6px 8px; background: #eff6ff; border-left: 3px solid #3b82f6; color: #1e40af; border-radius: 4px;">
+                                    <strong>ISO Standard:</strong> <em>${item.kbRequirement}</em>
+                                </div>` : ''}
+                            </td>
                             <td>
                                 <span class="badge ${item.status === 'conform' ? 'status-conform' : (item.status === 'nc' ? 'status-nc' : 'status-na')}">
                                     ${item.status === 'nc' ? (item.ncrType || 'NC') : (item.status === 'conform' ? 'Conform' : 'N/A')}

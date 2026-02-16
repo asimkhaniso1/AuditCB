@@ -34,7 +34,7 @@ window.getClientOrgSetupHTML = function (client) {
             ${steps.map(step => `
                 <div class="wizard-step ${step.id <= currentStep ? 'active' : ''}" 
                      style="z-index: 3; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;"
-                     onclick="window.setSetupWizardStep(${client.id}, ${step.id})">
+                     onclick="window.setSetupWizardStep('${client.id}', ${step.id})">
                     <div style="width: 40px; height: 40px; border-radius: 50%; background: ${step.id <= currentStep ? step.color : '#fff'}; border: 2px solid ${step.id <= currentStep ? step.color : '#e2e8f0'}; color: ${step.id <= currentStep ? '#fff' : '#94a3b8'}; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; transition: all 0.2s; box-shadow: ${step.id === currentStep ? '0 0 0 4px rgba(99, 102, 241, 0.2)' : 'none'};">
                         <i class="fa-solid ${step.icon}"></i>
                     </div>
@@ -51,10 +51,10 @@ window.getClientOrgSetupHTML = function (client) {
         ${window.getClientOrgSetupHTML.renderWizardStep(client, currentStep)}
     </div>
     <div style="padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">
-        <button class="btn btn-secondary" ${currentStep === 1 ? 'disabled' : ''} onclick="window.setSetupWizardStep(${client.id}, ${currentStep - 1})">
+        <button class="btn btn-secondary" ${currentStep === 1 ? 'disabled' : ''} onclick="window.setSetupWizardStep('${client.id}', ${currentStep - 1})">
             <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Previous
         </button>
-        <button class="btn btn-primary" onclick="window.setSetupWizardStep(${client.id}, ${currentStep < 7 ? currentStep + 1 : 1})">
+        <button class="btn btn-primary" onclick="window.setSetupWizardStep('${client.id}', ${currentStep < 7 ? currentStep + 1 : 1})">
             ${currentStep < 7 ? 'Next Step <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>' : 'Finish <i class="fa-solid fa-check" style="margin-left: 0.5rem;"></i>'}
         </button>
     </div>
@@ -102,7 +102,7 @@ window.getClientCertificatesHTML = function (client) {
     <div class="fade-in" style="text-align: center; padding: 3rem;">
         <i class="fa-solid fa-certificate" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
         <h3>Initialize Certification Records</h3>
-        <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards(${client.id})">Generate Records</button>
+        <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards('${client.id}')">Generate Records</button>
     </div>`;
     }
 
@@ -110,7 +110,7 @@ window.getClientCertificatesHTML = function (client) {
 <div class="fade-in">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h3 style="color: var(--primary-color); margin: 0;"><i class="fa-solid fa-certificate"></i> Certification Scopes & History</h3>
-        <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards(${client.id})"><i class="fa-solid fa-sync"></i> Sync Standards</button>
+        <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards('${client.id}')"><i class="fa-solid fa-sync"></i> Sync Standards</button>
     </div>
     ${certs.map((cert, index) => {
         const relevantSites = (client.sites || []).filter(s => (s.standards && s.standards.includes(cert.standard)) || (!s.standards && client.standard && client.standard.includes(cert.standard)));
@@ -120,12 +120,12 @@ window.getClientCertificatesHTML = function (client) {
                 <div>
                     <span class="badge" style="background: var(--primary-color); color: white;">${cert.standard}</span>
                     <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
-                        Cert #: <input type="text" value="${cert.certificateNo || ''}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" onchange="window.updateCertField(${client.id}, ${index}, 'certificateNo', this.value)">
+                        Cert #: <input type="text" value="${cert.certificateNo || ''}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" onchange="window.updateCertField('${client.id}', ${index}, 'certificateNo', this.value)">
                     </div>
                 </div>
                 <div style="text-align: right;">
-                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;" onclick="window.viewCertRevisionHistory(${client.id}, ${index})">History</button>
-                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button>
+                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;" onclick="window.viewCertRevisionHistory('${client.id}', ${index})">History</button>
+                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
             <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
@@ -137,26 +137,26 @@ window.getClientCertificatesHTML = function (client) {
                 </div>
                 ${relevantSites.map(site => {
             const siteScope = (cert.siteScopes && cert.siteScopes[site.name]) ? cert.siteScopes[site.name] : (cert.scope || '');
-            return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" onchange="window.updateSiteScope(${client.id}, ${index}, '${site.name}', this.value)">${siteScope}</textarea></div>`;
+            return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" onchange="window.updateSiteScope('${client.id}', ${index}, '${site.name}', this.value)">${siteScope}</textarea></div>`;
         }).join('')}
             </div>
             <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
                  <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                     <div>
                         <label style="font-size: 0.8rem;">Initial Date</label>
-                        <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'initialDate', this.value)">
+                        <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'initialDate', this.value)">
                     </div>
                     <div>
                         <label style="font-size: 0.8rem;">Current Issue</label>
-                        <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'currentIssue', this.value)">
+                        <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value)">
                     </div>
                     <div>
                         <label style="font-size: 0.8rem;">Expiry Date</label>
-                        <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField(${client.id}, ${index}, 'expiryDate', this.value)">
+                        <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
                     </div>
                  </div>
                  <div style="display: flex; align-items: flex-end;">
-                    <button class="btn btn-primary" onclick="window.saveCertificateDetails(${client.id})">
+                    <button class="btn btn-primary" onclick="window.saveCertificateDetails('${client.id}')">
                         <i class="fa-solid fa-save"></i> Save Changes
                     </button>
                  </div>
@@ -241,10 +241,10 @@ window.getClientSitesHTML = function (client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites(${client.id})">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites('${client.id}')">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="window.addSite(${client.id})">
+                    <button class="btn btn-sm btn-secondary" onclick="window.addSite('${client.id}')">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
                     </button>
                 </div>
@@ -267,10 +267,10 @@ window.getClientSitesHTML = function (client) {
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
-                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite(${client.id}, ${index})">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite('${client.id}', ${index})">
                                                 <i class="fa-solid fa-pen"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite(${client.id}, ${index})">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite('${client.id}', ${index})">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </div>
@@ -348,8 +348,8 @@ window.getClientContactsHTML = function (client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addContactPerson(${client.id})">Add</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts(${client.id})">Bulk Upload</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.addContactPerson('${client.id}')">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts('${client.id}')">Bulk Upload</button>
             </div>
         </div>
         ${(client.contacts && client.contacts.length > 0) ? `
@@ -360,7 +360,7 @@ window.getClientContactsHTML = function (client) {
                         <tr>
                             <td>${window.UTILS.escapeHtml(c.name)}</td>
                             <td>${window.UTILS.escapeHtml(c.email || '-')}</td>
-                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
                         </tr>`).join('')}</tbody>
                 </table>
             </div>` : `<p style="text-align: center;">No contacts added.</p>`}
@@ -374,8 +374,8 @@ window.getClientDepartmentsHTML = function (client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
-                 <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments(${client.id})">Bulk Upload</button>
-                 <button class="btn btn-sm btn-secondary" onclick="window.addDepartment(${client.id})">Add Department</button>
+                 <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments('${client.id}')">Bulk Upload</button>
+                 <button class="btn btn-sm btn-secondary" onclick="window.addDepartment('${client.id}')">Add Department</button>
             </div>
         </div>
         ${departments.length > 0 ? `
@@ -386,7 +386,7 @@ window.getClientDepartmentsHTML = function (client) {
                         <tr>
                             <td>${window.UTILS.escapeHtml(dept.name)}</td>
                             <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
-                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
                         </tr>`).join('')}</tbody>
                 </table>
             </div>` : `<div style="text-align: center; padding: 2rem;">No departments.</div>`}
@@ -400,8 +400,8 @@ window.getClientGoodsServicesHTML = function (client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Goods & Services</h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService(${client.id})">Add</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices(${client.id})">Bulk Upload</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService('${client.id}')">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices('${client.id}')">Bulk Upload</button>
             </div>
         </div>
         ${items.length > 0 ? `
@@ -412,7 +412,7 @@ window.getClientGoodsServicesHTML = function (client) {
                         <tr>
                             <td>${window.UTILS.escapeHtml(item.name)}</td>
                             <td>${window.UTILS.escapeHtml(item.category)}</td>
-                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
                         </tr>`).join('')}</tbody>
                 </table>
             </div>` : `<div style="text-align: center;">No items.</div>`}
@@ -426,8 +426,8 @@ window.getClientKeyProcessesHTML = function (client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Key Processes</h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess(${client.id})">Add</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses(${client.id})">Bulk Upload</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess('${client.id}')">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses('${client.id}')">Bulk Upload</button>
             </div>
         </div>
         ${processes.length > 0 ? `
@@ -438,7 +438,7 @@ window.getClientKeyProcessesHTML = function (client) {
                         <tr>
                             <td>${window.UTILS.escapeHtml(proc.name)}</td>
                             <td>${window.UTILS.escapeHtml(proc.category)}</td>
-                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess(${client.id}, ${index})"><i class="fa-solid fa-trash"></i></button></td>
+                            <td><button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
                         </tr>`).join('')}</tbody>
                 </table>
             </div>` : `<div style="text-align: center;">No processes.</div>`}
@@ -452,8 +452,8 @@ window.getClientDesignationsHTML = function (client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">Designations</h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation(${client.id})">Add</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations(${client.id})">Bulk Upload</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation('${client.id}')">Add</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations('${client.id}')">Bulk Upload</button>
             </div>
         </div>
         ${designations.length > 0 ? `
@@ -461,7 +461,7 @@ window.getClientDesignationsHTML = function (client) {
                 ${designations.map((des, index) => `
                     <div style="padding: 0.5rem 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 20px;">
                         <span>${window.UTILS.escapeHtml(des.title)}</span>
-                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); margin-left: 0.5rem;" onclick="window.deleteClientDesignation(${client.id}, ${index})"><i class="fa-solid fa-times"></i></button>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); margin-left: 0.5rem;" onclick="window.deleteClientDesignation('${client.id}', ${index})"><i class="fa-solid fa-times"></i></button>
                     </div>`).join('')}
             </div>` : `<div style="text-align: center;">No designations.</div>`}
     </div>`;
@@ -479,7 +479,7 @@ window.getClientAuditTeamHTML = function (client) {
     <div class="card" id="client-audit-team-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-user-shield" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Audit Team</h3>
-             <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal(${client.id}, '${window.UTILS.escapeHtml(client.name)}')">
+             <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal('${client.id}', '${window.UTILS.escapeHtml(client.name)}')">
                 <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
             </button>
         </div>
@@ -491,7 +491,7 @@ window.getClientAuditTeamHTML = function (client) {
                             <div style="font-weight: 600;">${window.UTILS.escapeHtml(auditor.name)}</div>
                             <div style="font-size: 0.85rem; color: #64748b;">${window.UTILS.escapeHtml(auditor.role || 'Auditor')}</div>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment(${client.id}, ${auditor.id})"><i class="fa-solid fa-user-minus"></i> Remove</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment('${client.id}', ${auditor.id})"><i class="fa-solid fa-user-minus"></i> Remove</button>
                     </div>`).join('')}
             </div>` : `<div style="text-align: center; padding: 2rem;"><p>No auditors assigned.</p></div>`}
     </div>`;
