@@ -1309,17 +1309,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         );
                         if (stdDoc) {
                             const clauseNum = clauseText.split(' ')[0].trim();
-                            // Try exact match first, then parent clause
+                            console.log(`[KB Lookup] Looking for clause "${clauseNum}" in ${stdDoc.name} (${stdDoc.clauses.length} clauses)`);
+                            console.log(`[KB Lookup] Sample KB clauses:`, stdDoc.clauses.slice(0, 5).map(c => ({ clause: c.clause, title: c.title, reqLen: c.requirement?.length || 0 })));
+
+                            // Try exact match first
                             let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
                             if (!kbClause) {
                                 // Try parent clause (e.g. "7.1" for "7.1.2")
                                 const parentClause = clauseNum.split('.').slice(0, 2).join('.');
                                 kbClause = stdDoc.clauses.find(c => c.clause === parentClause);
                             }
+                            if (!kbClause) {
+                                // Try startsWith match (e.g. clause "4.2" matches KB "4.2.1")
+                                kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
+                            }
                             if (kbClause) {
                                 kbRequirement = kbClause.requirement || '';
-                                console.log(`[KB Lookup] ${clauseNum} → ${kbClause.clause}: ${kbRequirement.substring(0, 80)}...`);
+                                console.log(`[KB Lookup] MATCH ${clauseNum} → ${kbClause.clause}: "${kbRequirement.substring(0, 120)}..."`);
+                            } else {
+                                console.log(`[KB Lookup] NO MATCH for "${clauseNum}". Available:`, stdDoc.clauses.map(c => c.clause).join(', '));
                             }
+                        } else {
+                            console.log(`[KB Lookup] No standard found for "${normalizedStd}". Available:`, kb.standards.map(s => `${s.name}(${s.status})`).join(', '));
                         }
                     }
                 }
@@ -1328,7 +1339,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     id: `checklist-${originalIdx}`,
                     source: 'Checklist',
                     type: item.ncrType || 'observation',
-                    description: item.ncrDescription || (reqText && !isBadValue(reqText) ? reqText : '') || item.comment || 'Non-conformity identified',
+                    // Don't repeat reqText here — it's already shown in the requirement box above
+                    description: item.ncrDescription || item.comment || item.transcript || '',
                     remarks: item.comment || item.transcript || '',
                     designation: item.designation || '',
                     department: item.department || '',
