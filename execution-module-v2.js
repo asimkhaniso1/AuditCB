@@ -2949,6 +2949,78 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <button onclick="document.querySelectorAll('.rp-sec-body').forEach(b=>b.classList.add('collapsed'))" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Collapse All</button>
             </div>
             <div class="rp-content">
+                <!-- COVER PAGE -->
+                <div style="background:white;border-radius:12px;padding:3rem 2.5rem;margin-bottom:2rem;position:relative;min-height:600px;border:2px solid #e2e8f0;">
+                    <!-- CB Branding Header -->
+                    <div style="text-align:center;margin-bottom:3rem;">
+                        <div style="width:80px;height:80px;margin:0 auto 1rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(37,99,235,0.3);">
+                            <i class="fa-solid fa-certificate" style="color:white;font-size:2.5rem;"></i>
+                        </div>
+                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">Company Certification</h1>
+                        <div style="font-size:0.95rem;color:#64748b;font-weight:500;">ISO Certification Body</div>
+                        <div style="width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);margin:1.5rem auto;border-radius:2px;"></div>
+                    </div>
+                    
+                    <!-- Report Title -->
+                    <div style="text-align:center;margin-bottom:3rem;">
+                        <div style="font-size:0.85rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:0.75rem;">Audit Report</div>
+                        <h2 style="margin:0 0 1rem;font-size:2rem;color:#0f172a;font-weight:800;line-height:1.3;">${d.report.client}</h2>
+                        <div style="display:inline-block;padding:8px 20px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #3b82f6;border-radius:25px;color:#1e40af;font-weight:700;font-size:1rem;">
+                            ${d.report.standard || 'ISO Standard'}
+                        </div>
+                    </div>
+                    
+                    <!-- Client Logo Placeholder -->
+                    <div style="text-align:center;margin:2rem 0;">
+                        <div style="width:120px;height:120px;margin:0 auto;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
+                            <i class="fa-solid fa-building" style="font-size:2rem;color:#94a3b8;"></i>
+                            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;">Client Logo</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Audit Details Grid -->
+                    <div style="margin:3rem 0;background:#f8fafc;padding:2rem;border-radius:12px;border-left:4px solid #2563eb;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                            <div>
+                                <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Type</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.auditPlan?.type || 'Certification Audit'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Date</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.date || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Lead Auditor</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.leadAuditor || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Report ID</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;font-family:monospace;">#${d.report.id.substring(0, 10)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Document Control Footer -->
+                    <div style="position:absolute;bottom:2rem;left:2.5rem;right:2.5rem;border-top:2px solid #e2e8f0;padding-top:1.5rem;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;font-size:0.8rem;color:#64748b;">
+                            <div>
+                                <strong style="color:#1e293b;">Version:</strong> 1.0
+                            </div>
+                            <div style="text-align:center;">
+                                <strong style="color:#1e293b;">Status:</strong> ${d.report.recommendation || 'Draft'}
+                            </div>
+                            <div style="text-align:right;">
+                                <strong style="color:#1e293b;">Page:</strong> 1 of ${sections.filter(s => !s.hide).length + 1}
+                            </div>
+                        </div>
+                        <div style="margin-top:1rem;padding:0.75rem;background:#fef3c7;border-radius:6px;text-align:center;font-size:0.75rem;color:#92400e;">
+                            <i class="fa-solid fa-lock" style="margin-right:0.25rem;"></i>
+                            <strong>Confidential Document</strong> — For authorized use only
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Report Sections -->
                 <!-- 1: Audit Info -->
                 <div class="rp-sec" id="sec-audit-info">
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">1</span>AUDIT INFORMATION<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
