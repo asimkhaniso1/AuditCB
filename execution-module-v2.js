@@ -1255,6 +1255,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Destructure for lookup
             const { assignedChecklists = [] } = contextData;
 
+            // Known bad values from old DOM scraping — filter these out
+            const BAD_VALUES = ['severity', 'non-conformity details', 'interviewee designation', 'department', 'evidence image', 'upload', 'camera', 'screen'];
+            const isBadValue = (v) => !v || BAD_VALUES.includes(v.toLowerCase().trim());
+
             // Collect checklist NCs — use original index into checklistProgress
             (report.checklistProgress || []).forEach((item, originalIdx) => {
                 if (item.status !== 'nc') return;
@@ -1271,8 +1275,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             const main = cl.clauses.find(c => c.mainClause == parts[0]);
                             console.log(`[Review Findings] Main clause ${parts[0]} found:`, !!main, main ? `subClauses count: ${main.subClauses?.length}` : '');
                             if (main && main.subClauses && main.subClauses[parts[1]]) {
-                                clauseText = main.subClauses[parts[1]].clause;
-                                reqText = main.subClauses[parts[1]].requirement;
+                                const sub = main.subClauses[parts[1]];
+                                clauseText = sub.clause || '';
+                                // Check for nested items structure (KB-generated checklists)
+                                if (sub.items && sub.items.length > 0) {
+                                    reqText = sub.items[0].requirement || sub.requirement || '';
+                                } else {
+                                    reqText = sub.requirement || '';
+                                }
                                 console.log(`[Review Findings] Found clause: ${clauseText}, req: ${reqText?.substring(0, 60)}`);
                             }
                         }
@@ -1282,22 +1292,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 }
 
-                // Fallback: use clause/requirement saved directly on the progress item by saveChecklist
-                if (!clauseText && item.clause) clauseText = item.clause;
-                if (!reqText && item.requirement) reqText = item.requirement;
+                // Fallback: use clause/requirement saved directly on the progress item
+                // BUT only if the saved values are not corrupted (from old DOM scraping)
+                if (!clauseText && item.clause && !isBadValue(item.clause)) clauseText = item.clause;
+                if (!reqText && item.requirement && !isBadValue(item.requirement)) reqText = item.requirement;
 
                 allFindings.push({
                     id: `checklist-${originalIdx}`,
                     source: 'Checklist',
                     type: item.ncrType || 'observation',
-                    description: item.ncrDescription || reqText || item.comment || 'Non-conformity identified',
+                    description: item.ncrDescription || (reqText && !isBadValue(reqText) ? reqText : '') || item.comment || 'Non-conformity identified',
                     remarks: item.comment || item.transcript || '',
                     designation: item.designation || '',
                     department: item.department || '',
                     hasEvidence: !!item.evidenceImage,
                     evidenceImage: item.evidenceImage,
                     clause: clauseText,
-                    requirement: reqText
+                    requirement: reqText && !isBadValue(reqText) ? reqText : ''
                 });
                 if (item.evidenceImage) window._evidenceCache[`checklist-${originalIdx}`] = item.evidenceImage;
             });
