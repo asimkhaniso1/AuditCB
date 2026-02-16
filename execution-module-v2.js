@@ -1431,6 +1431,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             <div>
                 <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
                 <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
+                <button class="ai-polish-finding-btn" data-finding-id="${f.id}" onclick="window.polishSingleNote(this)" style="margin-top:6px;padding:4px 12px;border-radius:6px;border:1px solid #0ea5e9;background:#f0f9ff;color:#0369a1;font-size:0.75rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size:0.7rem;"></i>Polish with AI
+                </button>
             </div>
                                     </div >
                                 </div >
@@ -3503,6 +3506,86 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             btn.style.opacity = '1';
             window.showNotification('AI polish failed: ' + error.message, 'error');
         }
+    };
+
+    // ============================================
+    // POLISH SINGLE FINDING NOTE (Per-finding AI refinement)
+    // ============================================
+    window.polishSingleNote = async function (btn) {
+        if (!btn || btn.disabled) return;
+        const findingId = btn.getAttribute('data-finding-id');
+        if (!findingId) return;
+
+        // Find the textarea in the same parent
+        const textarea = btn.parentElement.querySelector('textarea.review-remarks');
+        if (!textarea || !textarea.value.trim()) {
+            window.showNotification('No remarks to polish. Write some notes first.', 'info');
+            return;
+        }
+
+        if (!window.AI_SERVICE?.refineAuditNotes) {
+            window.showNotification('AI Service not available.', 'warning');
+            return;
+        }
+
+        // Save original and show loading
+        const originalText = textarea.value;
+        const originalBtnHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:0.7rem;"></i> Polishing...';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+
+        try {
+            // Get clause context from the finding card
+            const card = btn.closest('.review-finding-card, [data-finding-id]') || btn.parentElement.parentElement;
+            const clauseEl = card?.querySelector('[style*="font-weight: 700"], [style*="font-weight:700"]');
+            const clause = clauseEl?.textContent?.trim() || '';
+
+            // Get standard name
+            const d = window._reportPreviewData || {};
+            const standardName = d?.report?.standard || d?.auditPlan?.standard || '';
+
+            // Build single finding for AI
+            const finding = [{
+                clause: clause,
+                status: 'finding',
+                comment: originalText,
+                remarks: originalText
+            }];
+
+            const refined = await window.AI_SERVICE.refineAuditNotes(finding, standardName);
+
+            if (refined[0]?.comment && refined[0].comment !== originalText) {
+                textarea.value = refined[0].comment;
+                textarea.style.transition = 'background 0.3s';
+                textarea.style.background = '#f0fdf4';
+                setTimeout(() => { textarea.style.background = ''; }, 2000);
+
+                // Success state
+                btn.innerHTML = '<i class="fa-solid fa-check" style="font-size:0.7rem;"></i> Polished!';
+                btn.style.background = '#dcfce7';
+                btn.style.borderColor = '#10b981';
+                btn.style.color = '#166534';
+            } else {
+                btn.innerHTML = originalBtnHtml;
+                window.showNotification('Notes already look professional!', 'info');
+            }
+        } catch (error) {
+            console.error('Single note polish error:', error);
+            textarea.value = originalText;
+            btn.innerHTML = originalBtnHtml;
+            window.showNotification('AI polish failed. Try again.', 'error');
+        }
+
+        // Reset button after 3s
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" style="font-size:0.7rem;"></i>Polish with AI';
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.background = '#f0f9ff';
+            btn.style.borderColor = '#0ea5e9';
+            btn.style.color = '#0369a1';
+        }, 3000);
     };
 
     // ============================================
