@@ -686,8 +686,18 @@
     // ============================================
     // 6. DATE PASTE HANDLER
     // Allows pasting dates into input[type=date] fields
-    // Parses common formats: dd/mm/yyyy, mm/dd/yyyy, yyyy-mm-dd, etc.
+    // Browsers often BLOCK paste events on date inputs, so we use
+    // both paste event AND Ctrl+V keydown with clipboard API fallback.
     // ============================================
+
+    const MONTH_MAP = {
+        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+        'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+        'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+        'january': '01', 'february': '02', 'march': '03', 'april': '04',
+        'june': '06', 'july': '07', 'august': '08', 'september': '09',
+        'october': '10', 'november': '11', 'december': '12'
+    };
 
     function parsePastedDate(text) {
         if (!text) return null;
@@ -696,20 +706,31 @@
         // Already ISO format: yyyy-mm-dd
         if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
 
+        // Browser display format: "16-Feb-2026" or "16 Feb 2026"
+        let m = text.match(/^(\d{1,2})[\-\s]([A-Za-z]+)[\-\s](\d{4})$/);
+        if (m) {
+            const mon = MONTH_MAP[m[2].toLowerCase()];
+            if (mon) return `${m[3]}-${mon}-${m[1].padStart(2, '0')}`;
+        }
+
+        // "Feb 16, 2026" or "February 16 2026"
+        m = text.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})$/);
+        if (m) {
+            const mon = MONTH_MAP[m[1].toLowerCase()];
+            if (mon) return `${m[3]}-${mon}-${m[2].padStart(2, '0')}`;
+        }
+
         // dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
-        let m = text.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+        m = text.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
         if (m) {
             const day = m[1].padStart(2, '0');
             const month = m[2].padStart(2, '0');
             const year = m[3];
-            // Heuristic: if first num > 12, it's dd/mm/yyyy; otherwise try mm/dd/yyyy
             if (parseInt(m[1]) > 12) {
                 return `${year}-${month}-${day}`;
             } else if (parseInt(m[2]) > 12) {
-                // mm/dd/yyyy format
                 return `${year}-${day}-${month}`;
             }
-            // Default: dd/mm/yyyy (international)
             return `${year}-${month}-${day}`;
         }
 
@@ -719,7 +740,7 @@
             return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
         }
 
-        // Try native Date parsing as last resort (handles "Feb 16, 2026", etc.)
+        // Try native Date parsing as last resort
         const d = new Date(text);
         if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
             return d.toISOString().split('T')[0];
@@ -728,23 +749,52 @@
         return null;
     }
 
-    // Delegated paste handler — works on dynamically created date inputs
+    function applyDateToInput(input, dateText) {
+        const isoDate = parsePastedDate(dateText);
+        if (isoDate) {
+            // Use the native value setter to bypass browser restrictions
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype, 'value'
+            ).set;
+            nativeInputValueSetter.call(input, isoDate);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log(`[Date Paste] "${dateText}" → ${isoDate}`);
+            return true;
+        }
+        return false;
+    }
+
+    // Method 1: Standard paste event
     document.addEventListener('paste', function (e) {
         const input = e.target;
         if (!input || input.tagName !== 'INPUT' || input.type !== 'date') return;
 
         const pastedText = (e.clipboardData || window.clipboardData)?.getData('text');
-        if (!pastedText) return;
-
-        const isoDate = parsePastedDate(pastedText);
-        if (isoDate) {
+        if (pastedText && applyDateToInput(input, pastedText)) {
             e.preventDefault();
-            input.value = isoDate;
-            // Fire change event so onchange handlers trigger
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log(`[Date Paste] "${pastedText}" → ${isoDate}`);
         }
-    });
+    }, true); // Use capture phase to fire before browser blocks it
+
+    // Method 2: Ctrl+V keydown fallback — reads clipboard via async API
+    document.addEventListener('keydown', function (e) {
+        if (!(e.ctrlKey && e.key === 'v') && !(e.metaKey && e.key === 'v')) return;
+
+        const input = e.target || document.activeElement;
+        if (!input || input.tagName !== 'INPUT' || input.type !== 'date') return;
+
+        // Use Clipboard API (async) to read text
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            e.preventDefault();
+            navigator.clipboard.readText().then(function (clipText) {
+                if (clipText) {
+                    applyDateToInput(input, clipText);
+                }
+            }).catch(function (err) {
+                console.log('[Date Paste] Clipboard read failed:', err.message);
+            });
+        }
+    }, true);
 
     console.log('✅ Enhancements module loaded: Lazy Load | Shortcuts | Analytics | PDF Export | Responsive | Date Paste');
 })();
