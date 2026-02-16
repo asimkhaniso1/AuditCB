@@ -2970,8 +2970,99 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#047857,#059669);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>EXECUTIVE SUMMARY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div id="rp-exec-summary" class="rp-edit" contenteditable="true">${d.report.executiveSummary || '<em style="color:#94a3b8;">Click to add executive summary...</em>'}</div>
-                        ${d.report.positiveObservations ? '<div style="margin-top:12px;padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #22c55e;font-size:0.88rem;"><strong style="color:#166534;">Positive Observations:</strong><div style="color:#15803d;margin-top:4px;">' + d.report.positiveObservations + '</div></div>' : ''}
-                        ${d.report.ofi ? '<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b;font-size:0.88rem;"><strong style="color:#854d0e;">Opportunities for Improvement:</strong><div style="color:#a16207;margin-top:4px;">' + d.report.ofi + '</div></div>' : ''}
+                        
+                        <!-- AI-Visual Insights Section -->
+                        ${(d.report.positiveObservations || d.report.ofi) ? `
+                        <div style="margin-top:2rem;padding:1.5rem;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:12px;border:2px solid #0ea5e9;">
+                            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
+                                <div style="width:48px;height:48px;background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                                    <i class="fa-solid fa-brain" style="color:white;font-size:1.5rem;"></i>
+                                </div>
+                                <div>
+                                    <h3 style="margin:0;color:#075985;font-size:1.1rem;">AI-Powered Audit Insights</h3>
+                                    <div style="color:#0c4a6e;font-size:0.85rem;opacity:0.8;">Analysis for ${d.report.client} — ${d.report.standard || 'ISO Audit'}</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Risk & Compliance Dashboard -->
+                            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+                                <!-- Overall Risk Score -->
+                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid ${d.stats.ncCount === 0 ? '#10b981' : d.stats.ncCount <= 2 ? '#f59e0b' : '#ef4444'};">
+                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Risk Level</div>
+                                    <div style="font-size:1.8rem;font-weight:800;color:${d.stats.ncCount === 0 ? '#10b981' : d.stats.ncCount <= 2 ? '#f59e0b' : '#ef4444'};">
+                                        ${d.stats.ncCount === 0 ? 'LOW' : d.stats.ncCount <= 2 ? 'MEDIUM' : 'HIGH'}
+                                    </div>
+                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${d.stats.ncCount} NC Found</div>
+                                </div>
+                                
+                                <!-- Compliance Score -->
+                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #3b82f6;">
+                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Compliance</div>
+                                    <div style="font-size:1.8rem;font-weight:800;color:#3b82f6;">
+                                        ${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%
+                                    </div>
+                                    <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;margin-top:0.5rem;overflow:hidden;">
+                                        <div style="width:${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%;height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:3px;"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Client Maturity -->
+                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #8b5cf6;">
+                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Maturity</div>
+                                    <div style="font-size:1.8rem;font-weight:800;color:#8b5cf6;">
+                                        ${d.stats.ncCount === 0 ? '⭐⭐⭐⭐⭐' : d.stats.ncCount <= 2 ? '⭐⭐⭐⭐' : d.stats.ncCount <= 5 ? '⭐⭐⭐' : '⭐⭐'}
+                                    </div>
+                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${d.stats.ncCount === 0 ? 'Excellent' : d.stats.ncCount <= 2 ? 'Good' : d.stats.ncCount <= 5 ? 'Developing' : 'Early Stage'}</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Positive Observations (Icon Cards) -->
+                            ${d.report.positiveObservations ? `
+                            <div style="background:white;padding:1.25rem;border-radius:10px;margin-bottom:1rem;border-left:4px solid #10b981;">
+                                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                                    <i class="fa-solid fa-circle-check" style="color:#10b981;font-size:1.25rem;"></i>
+                                    <h4 style="margin:0;color:#166534;font-size:1rem;">Strengths Identified</h4>
+                                </div>
+                                <div style="color:#15803d;font-size:0.9rem;line-height:1.7;">
+                                    ${d.report.positiveObservations.split(/\d+\./).filter(s => s.trim()).map((obs, idx) => `
+                                        <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
+                                            <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">${idx + 1}</div>
+                                            <div style="flex:1;padding-top:0.25rem;">${obs.trim()}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <!-- Opportunities for Improvement (Icon Cards) -->
+                            ${d.report.ofi ? `
+                            <div style="background:white;padding:1.25rem;border-radius:10px;border-left:4px solid #f59e0b;">
+                                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                                    <i class="fa-solid fa-lightbulb" style="color:#f59e0b;font-size:1.25rem;"></i>
+                                    <h4 style="margin:0;color:#854d0e;font-size:1rem;">Improvement Opportunities</h4>
+                                </div>
+                                <div style="color:#92400e;font-size:0.9rem;line-height:1.7;">
+                                    ${(Array.isArray(d.report.ofi) ? d.report.ofi : d.report.ofi.split(/\d+\./).filter(s => s.trim())).map((ofi, idx) => `
+                                        <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
+                                            <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">
+                                                <i class="fa-solid fa-arrow-up" style="font-size:0.75rem;"></i>
+                                            </div>
+                                            <div style="flex:1;padding-top:0.25rem;">${typeof ofi === 'string' ? ofi.trim() : ofi}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <!-- AI Confidence Footer -->
+                            <div style="margin-top:1rem;padding:0.75rem;background:rgba(255,255,255,0.6);border-radius:8px;text-align:center;">
+                                <div style="font-size:0.75rem;color:#64748b;">
+                                    <i class="fa-solid fa-robot" style="margin-right:0.25rem;"></i>
+                                    AI-Powered Analysis • Client Context: ${d.report.client} • Standard: ${d.report.standard || 'ISO'}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
                 <!-- 3: Analytics & Insights -->
