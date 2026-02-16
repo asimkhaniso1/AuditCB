@@ -491,7 +491,9 @@ window.runFollowUpAIAnalysis = async function (reportId) {
         const checklists = (window.state.checklists || []);
         const assignedChecklists = (plan.selectedChecklists || []).map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
 
-        (report.checklistProgress || []).filter(p => p.status === 'nc').forEach((item, idx) => {
+        // IMPORTANT: Track original index in checklistProgress array
+        (report.checklistProgress || []).forEach((item, originalIdx) => {
+            if (item.status !== 'nc') return;
             // Resolve clause and requirement text from checklist data
             let clauseText = '';
             let reqText = '';
@@ -506,7 +508,8 @@ window.runFollowUpAIAnalysis = async function (reportId) {
                 }
             }
             findings.push({
-                id: idx,
+                id: findings.length,
+                originalIdx: originalIdx,
                 type: 'checklist',
                 clause: clauseText,
                 requirement: reqText,
@@ -528,13 +531,15 @@ window.runFollowUpAIAnalysis = async function (reportId) {
         // Call AI Service with standard name for KB lookup
         const suggestions = await window.AI_SERVICE.analyzeFindings(findings, standardName);
 
-        // Apply suggestions
+        // Apply suggestions using originalIdx to update the right item
         let updateCount = 0;
+        console.log('[AI Classify] Suggestions:', suggestions);
         suggestions.forEach(s => {
             if (s.type && ['major', 'minor', 'observation'].includes(s.type.toLowerCase())) {
                 const finding = findings.find(f => f.id === s.id);
-                if (finding && report.checklistProgress[finding.id]) {
-                    report.checklistProgress[finding.id].ncrType = s.type.toLowerCase();
+                if (finding && report.checklistProgress[finding.originalIdx]) {
+                    console.log(`[AI Classify] Setting item ${finding.originalIdx} (${finding.clause}) to ${s.type}`);
+                    report.checklistProgress[finding.originalIdx].ncrType = s.type.toLowerCase();
                     updateCount++;
                 }
             }
