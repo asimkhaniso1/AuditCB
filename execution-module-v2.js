@@ -2,6 +2,71 @@
 // AUDIT EXECUTION MODULE - Enhanced with Tabs
 // ============================================
 
+// ---------- Shared KB Requirement Lookup ----------
+// Searches the Knowledge Base for the ISO standard requirement text
+// matching a given clause number and standard name.
+function _normalizeStdName(name) {
+    return (name || '').toLowerCase()
+        .replace(/iso\/iec/g, 'iso')
+        .replace(/iso\s*/g, '')
+        .replace(/[:\-–]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+function _extractClauseNum(clauseText) {
+    if (!clauseText) return '';
+    // Remove common prefixes like "Clause " or "Section "
+    let t = clauseText.replace(/^(clause|section|annex)\s+/i, '').trim();
+    // Extract leading number like "4.2" from "4.2 Understanding the needs..."
+    const m = t.match(/^([\d]+(?:\.[\d]+)*)/);
+    return m ? m[1] : t.split(' ')[0].replace(/\.$/, '');
+}
+function _lookupKBRequirement(clauseText, standardName) {
+    if (!clauseText || !standardName) return '';
+    const kb = window.state?.knowledgeBase;
+    if (!kb?.standards?.length) return '';
+
+    const normStd = _normalizeStdName(standardName);
+    const stdDoc = kb.standards.find(s =>
+        s.status === 'ready' && s.clauses?.length > 0 &&
+        _normalizeStdName(s.name).includes(normStd)
+    ) || kb.standards.find(s =>
+        s.status === 'ready' && s.clauses?.length > 0 &&
+        normStd.includes(_normalizeStdName(s.name))
+    );
+    if (!stdDoc) {
+        console.log(`[KB Lookup] No standard for "${standardName}". Available:`, kb.standards.map(s => `${s.name}(${s.status})`).join(', '));
+        return '';
+    }
+
+    const clauseNum = _extractClauseNum(clauseText);
+    if (!clauseNum) return '';
+
+    // Strategy 1: Exact match
+    let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
+    // Strategy 2: Parent clause (e.g. "7.1" for "7.1.2")
+    if (!kbClause) {
+        const parent = clauseNum.split('.').slice(0, 2).join('.');
+        kbClause = stdDoc.clauses.find(c => c.clause === parent);
+    }
+    // Strategy 3: startsWith (e.g. "4.2" matches "4.2.1" or vice versa)
+    if (!kbClause) {
+        kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
+    }
+    // Strategy 4: Top-level clause (e.g. "4" for "4.2")
+    if (!kbClause) {
+        const topLevel = clauseNum.split('.')[0];
+        kbClause = stdDoc.clauses.find(c => c.clause === topLevel);
+    }
+
+    if (kbClause) {
+        console.log(`[KB Lookup] MATCH ${clauseNum} → ${kbClause.clause}: "${(kbClause.requirement || '').substring(0, 120)}..."`);
+        return kbClause.requirement || '';
+    }
+    console.log(`[KB Lookup] NO MATCH for "${clauseNum}". KB clauses: ${stdDoc.clauses.map(c => c.clause).join(', ')}`);
+    return '';
+}
+
 // Navigation Helper: Back to Execution List
 window.handleBackToExecutionList = function () {
     if (window.state.activeClientId) {
@@ -1298,42 +1363,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (!reqText && item.requirement && !isBadValue(item.requirement)) reqText = item.requirement;
 
                 // KB Lookup: Get actual ISO Standard requirement text from Knowledge Base
-                let kbRequirement = '';
-                if (clauseText && report.standard) {
-                    const kb = window.state.knowledgeBase;
-                    if (kb?.standards?.length > 0) {
-                        const normalizedStd = report.standard.toLowerCase().replace('iso ', '').trim();
-                        const stdDoc = kb.standards.find(s =>
-                            s.status === 'ready' && s.clauses?.length > 0 &&
-                            s.name.toLowerCase().replace('iso ', '').includes(normalizedStd)
-                        );
-                        if (stdDoc) {
-                            const clauseNum = clauseText.split(' ')[0].trim();
-                            console.log(`[KB Lookup] Looking for clause "${clauseNum}" in ${stdDoc.name} (${stdDoc.clauses.length} clauses)`);
-                            console.log(`[KB Lookup] Sample KB clauses:`, stdDoc.clauses.slice(0, 5).map(c => ({ clause: c.clause, title: c.title, reqLen: c.requirement?.length || 0 })));
-
-                            // Try exact match first
-                            let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
-                            if (!kbClause) {
-                                // Try parent clause (e.g. "7.1" for "7.1.2")
-                                const parentClause = clauseNum.split('.').slice(0, 2).join('.');
-                                kbClause = stdDoc.clauses.find(c => c.clause === parentClause);
-                            }
-                            if (!kbClause) {
-                                // Try startsWith match (e.g. clause "4.2" matches KB "4.2.1")
-                                kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
-                            }
-                            if (kbClause) {
-                                kbRequirement = kbClause.requirement || '';
-                                console.log(`[KB Lookup] MATCH ${clauseNum} → ${kbClause.clause}: "${kbRequirement.substring(0, 120)}..."`);
-                            } else {
-                                console.log(`[KB Lookup] NO MATCH for "${clauseNum}". Available:`, stdDoc.clauses.map(c => c.clause).join(', '));
-                            }
-                        } else {
-                            console.log(`[KB Lookup] No standard found for "${normalizedStd}". Available:`, kb.standards.map(s => `${s.name}(${s.status})`).join(', '));
-                        }
-                    }
-                }
+                const kbRequirement = _lookupKBRequirement(clauseText, report.standard);
 
                 allFindings.push({
                     id: `checklist-${originalIdx}`,
@@ -2935,30 +2965,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
 
             // ALWAYS look up KB standard requirement (not just as fallback)
-            let kbRequirement = '';
-            if (clause && report.standard) {
-                const kb = window.state.knowledgeBase;
-                if (kb?.standards?.length > 0) {
-                    const stdDoc = kb.standards.find(s =>
-                        s.status === 'ready' && s.clauses?.length > 0 &&
-                        s.name.toLowerCase().includes(report.standard.toLowerCase().replace('iso ', ''))
-                    );
-                    if (stdDoc) {
-                        const clauseNum = clause.split(' ')[0];
-                        let kbClause = stdDoc.clauses.find(c => c.clause === clauseNum);
-                        if (!kbClause) {
-                            const parentClause = clauseNum.split('.').slice(0, 2).join('.');
-                            kbClause = stdDoc.clauses.find(c => c.clause === parentClause);
-                        }
-                        if (!kbClause) {
-                            kbClause = stdDoc.clauses.find(c => c.clause.startsWith(clauseNum + '.') || clauseNum.startsWith(c.clause + '.'));
-                        }
-                        if (kbClause) {
-                            kbRequirement = kbClause.requirement || '';
-                        }
-                    }
-                }
-            }
+            const kbRequirement = _lookupKBRequirement(clause, report.standard);
 
             return {
                 ...item,
