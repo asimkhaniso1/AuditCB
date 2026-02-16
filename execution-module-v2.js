@@ -3626,6 +3626,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;}"
             + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}}'
+            + '@media print{@page{margin:20mm 15mm 25mm 15mm;}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
+            + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:18mm;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;padding:4mm 15mm;align-items:center;justify-content:space-between;font-size:0.75rem;z-index:100;}'
+            + '.rpt-hdr-left{display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.85rem;}'
+            + '.rpt-hdr-logo{width:28px;height:28px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;}'
+            + '.rpt-hdr-right{text-align:right;font-size:0.72rem;opacity:0.85;}'
+            + '.rpt-ftr{display:none;position:fixed;bottom:0;left:0;right:0;height:14mm;border-top:2px solid #2563eb;padding:2mm 15mm;align-items:center;justify-content:space-between;font-size:0.7rem;color:#64748b;background:white;z-index:100;}'
+            + '.rpt-ftr-left{font-weight:600;color:#1e3a5f;}'
+            + '.rpt-ftr-right{font-style:italic;color:#94a3b8;}'
             + '.cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(180deg,#f8fafc 0%,#e0e7ff 50%,#f8fafc 100%);padding:80px 50px;position:relative;}'
             + '.cover-line{width:80px;height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin:0 auto 30px;}'
             + '.sh{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;padding:14px 24px;font-weight:700;font-size:1rem;letter-spacing:0.5px;display:flex;align-items:center;gap:12px;border-radius:6px 6px 0 0;margin-top:35px;}'
@@ -3641,10 +3649,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.chart-box{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:20px;text-align:center;}'
             + '.chart-box canvas{max-height:220px;}'
             + '.chart-title{font-size:0.85rem;font-weight:700;color:#334155;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.3px;}'
+            + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:180px;object-fit:cover;}.ev-cap{padding:10px 14px;font-size:0.82rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
             + 'footer{margin-top:50px;background:#0f172a;color:white;padding:30px 40px;font-size:0.85rem;display:flex;justify-content:space-between;align-items:center;border-radius:8px;}'
             + '.content{padding:0 40px;}'
             + '.callout{padding:14px 18px;border-radius:8px;margin-top:16px;font-size:0.92rem;line-height:1.7;}'
             + '</style></head><body>'
+            + '<div class="rpt-hdr"><div class="rpt-hdr-left"><div class="rpt-hdr-logo"><i class="fa-solid fa-certificate"></i></div>' + (cbName || 'Certification Body') + '</div><div class="rpt-hdr-right">' + standard + '<br>' + d.report.client + '</div></div>'
+            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Report ID: ' + d.report.id + ' | ' + (cbName || '') + '</div><div class="rpt-ftr-right">Confidential — ' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button onclick="window.print()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
             + '<button onclick="window.close()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
@@ -3706,6 +3717,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (d.report.openingMeeting?.attendees || 'N/A') + '</td></tr></table></div>'
                 + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Summary</td><td>' + (d.report.closingMeeting?.summary || 'N/A') + '</td></tr></table></div>'
                 + '</div></div>' : '')
+            // EVIDENCE GALLERY
+            + (function () {
+                var evidenceItems = [];
+                (d.hydratedProgress || []).forEach(function (item) {
+                    if (item.evidenceImage) {
+                        evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: item.evidenceImage, status: item.status });
+                    }
+                });
+                (d.report.ncrs || []).forEach(function (ncr) {
+                    if (ncr.evidenceImage) {
+                        evidenceItems.push({ clause: ncr.clause, title: ncr.type + ' Non-Conformity', img: ncr.evidenceImage, status: 'nc' });
+                    }
+                });
+                if (evidenceItems.length === 0) return '';
+                var cards = evidenceItems.map(function (ev) {
+                    var borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
+                    return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
+                }).join('');
+                return '<div class="sh page-break" style="background:linear-gradient(135deg,#7c2d12,#c2410c);"><span class="sn"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
+            })()
             // SECTION 7
             + (en['conclusion'] !== false ? '<div class="sh" style="background:linear-gradient(135deg,#312e81,#4338ca);"><span class="sn">7</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
