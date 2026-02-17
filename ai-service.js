@@ -455,6 +455,15 @@ Return raw JSON:
     },
     // Construct the prompt based on plan details
     buildPrompt: (ctx) => {
+        // Build personnel roster for auditee assignment
+        let personnelSection = '';
+        if (ctx.contacts && ctx.contacts.length > 0) {
+            const roster = ctx.contacts
+                .map(c => `  - ${c.name}${c.designation ? ' (' + c.designation + ')' : ''}${c.department ? ' — ' + c.department : ''}`)
+                .join('\n');
+            personnelSection = `\n- Personnel Roster:\n${roster}\n`;
+        }
+
         return `
 You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit Agenda/Itinerary (in valid JSON format) for the following audit plan.
 
@@ -465,8 +474,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 - Duration: ${ctx.manDays} Man-days (${ctx.onsiteDays} On-site Days)
 - Sites: ${ctx.sites.map(s => s.name).join(', ')}
 - Departments: ${(ctx.departments || []).join(', ')}
-- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}
-
+- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}
 **Requirements:**
 1. Create a day-by-day schedule covering ${ctx.onsiteDays} days.
 2. Include "Opening Meeting" (Day 1 AM) and "Closing Meeting" (Last Day PM).
@@ -476,13 +484,13 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 6. Ensure multiple sites are visited if applicable.
 7. In the "Activity / Clause" column, provide ONLY the Clause Number and Title (e.g., "5.1 Leadership"). Do NOT include the full requirement text or summaries. Keep it a single line.
 8. Times should be in "HH:MM - HH:MM" format.
-9. In the "Department / Auditee" column, use the provided Departments AND Designations. Be specific (e.g., "HR / HR Manager").
+9. In the "Department / Auditee" column, use ACTUAL personnel names from the roster above where available. Format as "Department / Person Name (Designation)" — e.g., "HR / Ahmed Khan (HR Manager)". If no matching person exists for a clause, use the department name with the relevant designation.
 
 **Output Format:**
 Return ONLY a raw JSON array of objects. Do not include markdown formatting (like \`\`\`json).
 Example:
 [
-  {"day": "Day 1", "time": "09:00 - 09:30", "item": "Opening Meeting", "dept": "Top Management", "auditor": "All Team"},
+  {"day": "Day 1", "time": "09:00 - 09:30", "item": "Opening Meeting", "dept": "Top Management / CEO Name", "auditor": "All Team"},
   {"day": "Day 1", "time": "09:30 - 10:30", "item": "Site Tour", "dept": "All", "auditor": "All Team"},
   ...
 ]
