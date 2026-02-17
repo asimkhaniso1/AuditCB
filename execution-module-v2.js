@@ -2840,6 +2840,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // Get audit plan reference
         const auditPlan = report.planId ? window.state.auditPlans.find(p => String(p.id) === String(report.planId)) : null;
 
+        // Enrich report with plan/client data if missing
+        if (auditPlan) {
+            if (!report.leadAuditor) {
+                // Try plan.lead first, then first team member
+                if (auditPlan.lead) {
+                    const leadAuditor = window.state.auditors?.find(a => String(a.id) === String(auditPlan.lead));
+                    report.leadAuditor = leadAuditor ? leadAuditor.name : auditPlan.lead;
+                } else if (auditPlan.teamIds?.length) {
+                    const leadAuditor = window.state.auditors?.find(a => String(a.id) === String(auditPlan.teamIds[0]));
+                    report.leadAuditor = leadAuditor ? leadAuditor.name : '';
+                } else if (auditPlan.team?.length) {
+                    report.leadAuditor = typeof auditPlan.team[0] === 'object' ? auditPlan.team[0].name : auditPlan.team[0];
+                }
+            }
+            if (!report.auditType) report.auditType = auditPlan.type || auditPlan.auditType || '';
+        }
+        if (!client.certificationScope) {
+            client.certificationScope = auditPlan?.scope || client.scope || '';
+        }
+        if (!client.city && !client.country) {
+            // Try to build location from client address
+            if (client.address) client.city = client.address;
+        }
+
         // QR Code for Report Verification
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
 
@@ -3374,7 +3398,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#155e75,#0891b2);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">6</span>MEETING RECORDS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                            <div style="padding:12px;background:#f0fdf4;border-radius:8px;"><strong style="color:#166534;">Opening Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.openingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${d.report.openingMeeting?.attendees || 'N/A'}</div></div>
+                            <div style="padding:12px;background:#f0fdf4;border-radius:8px;"><strong style="color:#166534;">Opening Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.openingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div></div>
                             <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;">Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Summary: ${d.report.closingMeeting?.summary || 'N/A'}</div></div>
                         </div>
                     </div>
@@ -3399,6 +3423,85 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         </div>`;
 
         document.body.appendChild(overlay);
+
+        // Charts: <script> inside innerHTML doesn't execute — init programmatically
+        window._initPreviewCharts = function () {
+            const d = window._reportPreviewData;
+            if (!d) return;
+
+            function renderCharts() {
+                // 1. Compliance Pie
+                const pieCtx = document.getElementById('compliance-pie-chart');
+                if (pieCtx) {
+                    new Chart(pieCtx.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Conforming', 'Non-Conformity', 'Observation'],
+                            datasets: [{ data: [d.stats.conformCount, d.stats.ncCount, d.stats.observationCount], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'], borderWidth: 0 }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } } }
+                    });
+                }
+                // 2. Severity Bar
+                const sevCtx = document.getElementById('severity-bar-chart');
+                if (sevCtx) {
+                    new Chart(sevCtx.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Major NC', 'Minor NC', 'Observations'],
+                            datasets: [{ label: 'Count', data: [d.stats.majorNC, d.stats.minorNC, d.stats.observationCount], backgroundColor: ['#dc2626', '#f59e0b', '#fbbf24'], borderWidth: 0 }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                    });
+                }
+                // 3. Findings by Clause
+                const clauseCtx = document.getElementById('clause-findings-chart');
+                if (clauseCtx) {
+                    const clauseData = {};
+                    d.hydratedProgress.forEach(item => {
+                        const clause = item.kbMatch?.clause || item.clause || 'N/A';
+                        const mainClause = clause.split('.')[0];
+                        if (!clauseData[mainClause]) clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ok: 0 };
+                        if (item.status === 'nc') {
+                            if (item.ncrType === 'Major') clauseData[mainClause].major++;
+                            else if (item.ncrType === 'Minor') clauseData[mainClause].minor++;
+                            else clauseData[mainClause].obs++;
+                        } else if (item.status === 'conform') {
+                            clauseData[mainClause].ok++;
+                        }
+                    });
+                    const sorted = Object.keys(clauseData).sort((a, b) => parseInt(a) - parseInt(b));
+                    if (sorted.length) {
+                        new Chart(clauseCtx.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: sorted.map(c => 'Clause ' + c),
+                                datasets: [
+                                    { label: 'Major NC', data: sorted.map(c => clauseData[c].major), backgroundColor: '#dc2626', stack: 'f' },
+                                    { label: 'Minor NC', data: sorted.map(c => clauseData[c].minor), backgroundColor: '#f59e0b', stack: 'f' },
+                                    { label: 'Observations', data: sorted.map(c => clauseData[c].obs), backgroundColor: '#fbbf24', stack: 'f' },
+                                    { label: 'Conforming', data: sorted.map(c => clauseData[c].ok), backgroundColor: '#10b981', stack: 'f' }
+                                ]
+                            },
+                            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } } }
+                        });
+                    }
+                }
+            }
+
+            // Load Chart.js if not already loaded
+            if (typeof Chart !== 'undefined') {
+                renderCharts();
+            } else {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+                s.onload = renderCharts;
+                document.head.appendChild(s);
+            }
+        };
+
+        // Init charts after DOM settles
+        setTimeout(() => window._initPreviewCharts(), 300);
     };
 
     window.toggleReportSection = function (id, color) {
@@ -3922,7 +4025,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">5</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
             // SECTION 6
             + (en['meetings'] !== false ? '<div id="sec-meetings" class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">6</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
-                + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (d.report.openingMeeting?.attendees || 'N/A') + '</td></tr></table></div>'
+                + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr></table></div>'
                 + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Summary</td><td>' + (d.report.closingMeeting?.summary || 'N/A') + '</td></tr></table></div>'
                 + '</div></div>' : '')
             // EVIDENCE GALLERY
