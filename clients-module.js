@@ -2466,8 +2466,7 @@ window.handleIndustryChange = function (select) {
     window.renderClientDetail = renderClientDetail;
 
 
-    window.addContactPerson = addContactPerson;
-    window.addSite = addSite;
+    // addContactPerson and addSite are defined in clients-module-fix.js
 
     // Edit Site Modal
     window.editSite = function (clientId, siteIndex) {

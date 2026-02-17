@@ -596,23 +596,50 @@ window.getClientAuditTeamHTML = function (client) {
 window.addSite = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
+    const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
+    const stdHtml = stdOptions.map(function (std) {
+        var sel = (client.standard || '').includes(std) ? 'selected' : '';
+        return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
+    }).join('');
     window.openModal('Add Site', `
         <form id="site-form">
-            <div class="form-group"><label>Site Name *</label><input type="text" id="site-name" class="form-control" required></div>
+            <div class="form-group"><label>Site Name <span style="color:var(--danger-color)">*</span></label><input type="text" id="site-name" class="form-control" required></div>
             <div class="form-group"><label>Address</label><input type="text" id="site-address" class="form-control"></div>
-            <div class="form-group"><label>City</label><input type="text" id="site-city" class="form-control"></div>
-            <div class="form-group"><label>Country</label><input type="text" id="site-country" class="form-control"></div>
-            <div class="form-group"><label>Employees</label><input type="number" id="site-employees" class="form-control"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div class="form-group"><label>City</label><input type="text" id="site-city" class="form-control"></div>
+                <div class="form-group"><label>Country</label><input type="text" id="site-country" class="form-control"></div>
+            </div>
+            <div style="border-top:1px solid var(--border-color);margin:1rem 0;padding-top:1rem">
+                <div class="form-group"><label>Applicable Standards</label>
+                    <select class="form-control" id="site-standards" multiple style="height:100px">${stdHtml}</select>
+                    <small style="color:var(--text-secondary)">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                    <div class="form-group"><label>Employees</label><input type="number" id="site-employees" class="form-control" min="0"></div>
+                    <div class="form-group"><label>Shift Work?</label><select class="form-control" id="site-shift">
+                        <option value="">-- Not specified --</option><option value="No">No</option><option value="Yes">Yes</option>
+                    </select></div>
+                </div>
+            </div>
         </form>`, () => {
         const name = document.getElementById('site-name').value;
         if (name) {
             if (!client.sites) client.sites = [];
+            const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
+            const employees = parseInt(document.getElementById('site-employees').value) || null;
+            const shift = document.getElementById('site-shift').value || null;
             client.sites.push({
                 name,
                 address: document.getElementById('site-address').value,
                 city: document.getElementById('site-city').value,
-                country: document.getElementById('site-country').value
+                country: document.getElementById('site-country').value,
+                employees,
+                shift,
+                standards
             });
+            // Auto-sync: update company-level employees from sum of site employees
+            const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees) || 0), 0);
+            if (siteTotal > 0) client.employees = siteTotal;
             window.saveData();
             if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
             window.closeModal();
