@@ -3710,18 +3710,31 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
 
     // ---- SURVEILLANCE AUDIT INSTRUCTION ----
     let auditTypeInstruction = '';
+    let survRequirements = '';
     if (auditType === 'surveillance') {
         auditTypeInstruction = `
-AUDIT TYPE: SURVEILLANCE AUDIT
-This checklist is for a surveillance audit (NOT initial/recertification). Focus on:
-- Continued conformity with the standard since last audit
-- Effectiveness of corrective actions from previous findings
-- Changes to the management system, processes, or organization
-- Internal audit results and management review outcomes
-- Complaints and customer feedback handling
-- Progress on objectives and targets
-- Use of marks and references to certification
-Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage — focus on risk areas and changes.
+AUDIT TYPE: SURVEILLANCE AUDIT (NOT initial/recertification)
+This is a SURVEILLANCE audit. The organization is ALREADY certified. Your questions must focus on:
+- CONTINUED CONFORMITY: Has the system been maintained since last audit?
+- CHANGES: Any changes to processes, personnel, facilities, or scope?
+- CORRECTIVE ACTIONS: Status and effectiveness of previous NCRs/CAPAs
+- INTERNAL AUDITS: Were they conducted? What were the findings?
+- MANAGEMENT REVIEW: Was it held? Were decisions implemented?
+- COMPLAINTS: How were customer complaints and feedback handled?
+- OBJECTIVES: Progress on quality/environmental/safety objectives and targets
+- CERTIFICATION MARK: Proper use of certification logo and references
+- RISK AREAS: Focus on high-risk processes and areas with previous findings
+
+DO NOT ask basic implementation questions like "Has the organization established..." or "Does the organization have..."
+INSTEAD ask verification questions like "What changes have been made to..." or "Show evidence of continued..." or "How were previous findings on X addressed?"
+`;
+        survRequirements = `
+SURVEILLANCE-SPECIFIC REQUIREMENTS:
+1. Questions must verify ONGOING EFFECTIVENESS, not initial implementation
+2. Frame questions as "What evidence shows continued..." or "What changes since last audit..."
+3. Include follow-up questions on corrective actions and previous findings
+4. Focus on performance data, trends, and KPIs rather than documented procedures
+5. Ask about management of change and how the system adapted
 `;
     }
 
@@ -3806,19 +3819,20 @@ Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage �
 
             const prompt = `You are an expert ISO Lead Auditor with 20+ years experience in ${systemTerm} certification audits.
 ${auditTypeInstruction}
-TASK: Extract EVERY auditable requirement from ${batch.range} of "${standardName}".
+TASK: Extract ${auditType === 'surveillance' ? 'key auditable requirements for surveillance review' : 'EVERY auditable requirement'} from ${batch.range} of "${standardName}".
 
 REQUIREMENTS:
-1. Include EVERY sub-clause at the deepest level. Do NOT summarize or skip any.
-2. "requirement" = FULL requirement text verbatim from the standard
-3. "subRequirements" = ALL lettered items (a, b, c...) exactly as stated
-4. "checklistQuestions" = Generate ${config.questionsInstruction}
+1. ${auditType === 'surveillance' ? 'Cover the main sub-clauses but focus on areas prone to drift or change. Skip purely informational clauses.' : 'Include EVERY sub-clause at the deepest level. Do NOT summarize or skip any.'}
+2. "requirement" = ${auditType === 'surveillance' ? 'Key requirement text relevant to ongoing conformity verification' : 'FULL requirement text verbatim from the standard'}
+3. "subRequirements" = ${auditType === 'surveillance' ? 'Only HIGH-PRIORITY lettered items that need surveillance verification' : 'ALL lettered items (a, b, c...) exactly as stated'}
+4. "checklistQuestions" = Generate ${config.questionsInstruction}${auditType === 'surveillance' ? ' — frame as verification/evidence questions, NOT implementation questions' : ''}
 5. Use "${abbr}" terminology throughout
 6. IMPORTANT: Skip clauses 1, 2, 3 (non-auditable informative sections)
+${survRequirements}
 ${clientContext}
 ${batchSource}
 Return valid JSON only. No markdown formatting. No code blocks. No introductory text.
-[{"clause":"X.Y","title":"...","requirement":"Full text...","subRequirements":["a) ..."],"checklistQuestions":["Q1?","Q2?"]}]`;
+[{"clause":"X.Y","title":"...","requirement":"${auditType === 'surveillance' ? 'Key requirement for surveillance...' : 'Full text...'}","subRequirements":["a) ..."],"checklistQuestions":["${auditType === 'surveillance' ? 'What evidence shows continued...?' : 'Q1?'}"]}]`;
 
             const text = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: config.maxTokens });
             console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars (first 200: ${text.substring(0, 200)}...)`);
