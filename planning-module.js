@@ -918,9 +918,9 @@ function viewAuditPlan(id) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                     ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan(${plan.id})"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
-                     <button class="btn btn-secondary" onclick="printAuditPlanDetails(${plan.id})"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
-                     <button class="btn btn-primary" onclick="editAuditPlan(${plan.id})"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
+                     ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan('${plan.id}')"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
+                     <button class="btn btn-secondary" onclick="printAuditPlanDetails('${plan.id}')"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
+                     <button class="btn btn-primary" onclick="editAuditPlan('${plan.id}')"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
                 </div>
             </div>
 
@@ -1077,7 +1077,7 @@ function viewAuditPlan(id) {
                             </div>
                         </div>
                         ${report ? `
-                    <button class="${report.status === 'Finalized' ? 'btn btn-secondary' : 'btn btn-primary'}" style="width: 100%;" onclick="window.navigateToReporting(${plan.id})">
+                    <button class="${report.status === 'Finalized' ? 'btn btn-secondary' : 'btn btn-primary'}" style="width: 100%;" onclick="window.navigateToReporting('${plan.id}')">
                         ${report.status === 'Finalized' ? 'View Final Report' :
                 report.status === 'Approved' ? 'Publish Report' :
                     report.status === 'In Review' ? 'Review / Approve' : 'Draft Report'}
@@ -1094,7 +1094,7 @@ function viewAuditPlan(id) {
             '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>'
         }
                         </div>
-                        <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} onclick="closeAuditPlan(${plan.id})" style="width: 100%;">
+                        <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} onclick="closeAuditPlan('${plan.id}')" style="width: 100%;">
                             ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
                         </button>
                     </div>
