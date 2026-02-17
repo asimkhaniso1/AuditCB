@@ -1347,7 +1347,6 @@ window.renderConfigureChecklist = async function (planId) {
     });
     const clientName = plan.client || '';
     const clientChecklists = matchingChecklists.filter(c => (c.type === 'custom' || !c.type) && (c.clientName === clientName || (client && String(c.clientId) === String(client.id))));
-    const otherCustomChecklists = matchingChecklists.filter(c => (c.type === 'custom' || !c.type) && !clientChecklists.includes(c));
 
     const getFlattenedItems = (cl) => {
         let items = [];
@@ -1487,15 +1486,14 @@ window.renderConfigureChecklist = async function (planId) {
                 ${clientChecklists.length > 0 ? renderGroup(`${plan.client} Checklists`, clientChecklists, 'fa-solid fa-building', '#7c3aed') : `
                     <div style="margin-bottom: 2rem; padding: 1.5rem; background: #faf5ff; border: 2px dashed #c4b5fd; border-radius: 12px; text-align: center;">
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
-                        <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${plan.client} — No Custom Checklists Yet</h4>
+                        <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${plan.client} &mdash; No Custom Checklists Yet</h4>
                         <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Create a tailored checklist from the Knowledge Base for this client</p>
-                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" onclick="window.location.hash='#settings'; setTimeout(() => { const kbTab = document.querySelector('[data-tab=\'knowledge-base\']'); if(kbTab) kbTab.click(); }, 300)">
+                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" onclick="window._goToKB()">
                             <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Create from Knowledge Base
                         </button>
                     </div>
                 `}
                 ${renderGroup('Global Checklists', globalChecklists, 'fa-solid fa-globe', '#0369a1')}
-                ${renderGroup('Other Custom Checklists', otherCustomChecklists, 'fa-solid fa-user-gear', '#059669')}
             </div>
             
             <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
@@ -2902,3 +2900,11 @@ window.exportPreAuditPDF = function (planId) {
     printWindow.document.close();
 };
 
+// Helper: navigate to Knowledge Base tab in Settings
+window._goToKB = function () {
+    window.location.hash = '#settings';
+    setTimeout(function () {
+        var kbTab = document.querySelector('[data-tab="knowledge-base"]');
+        if (kbTab) kbTab.click();
+    }, 400);
+};
