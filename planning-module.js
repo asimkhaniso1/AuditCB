@@ -1203,20 +1203,43 @@ window.printAuditChecklist = function (planId) {
                 // Hierarchical
                 cl.clauses.forEach(clause => {
                     content += `<tr class="main-clause"><td colspan="4">${clause.mainClause} ${clause.title || ''}</td></tr>`;
-                    clause.subClauses.forEach((item, subIdx) => {
-                        const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
-                        const prog = progressMap[key] || {};
-                        const s = prog.status || '';
-                        const c = prog.comment || '-';
+                    (clause.subClauses || []).forEach((sub, subIdx) => {
+                        // Check if this sub-clause has nested items
+                        if (sub.items && sub.items.length > 0) {
+                            sub.items.forEach((item, itemIdx) => {
+                                const key = `${cl.id}-${clause.mainClause}-${subIdx}-${itemIdx}`;
+                                const altKey = `${cl.id}-${item.clause || sub.clause || ''}-${itemIdx}`;
+                                const prog = progressMap[key] || progressMap[altKey] || progressMap[`${cl.id}-${clause.mainClause}-${subIdx}`] || {};
+                                const s = prog.status || '';
+                                const c = prog.comment || '-';
+                                const reqText = item.requirement || item.text || item.title || '';
 
-                        content += `
-                            <tr>
-                                <td>${item.clause || ''}</td>
-                                <td>${item.requirement || ''}</td>
-                                <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
-                                <td>${c}</td>
-                            </tr>
-                         `;
+                                content += `
+                                    <tr>
+                                        <td>${item.clause || sub.clause || ''}</td>
+                                        <td>${reqText}</td>
+                                        <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
+                                        <td>${c}</td>
+                                    </tr>
+                                 `;
+                            });
+                        } else {
+                            // Flat sub-clause
+                            const key = `${cl.id}-${clause.mainClause}-${subIdx}`;
+                            const prog = progressMap[key] || {};
+                            const s = prog.status || '';
+                            const c = prog.comment || '-';
+                            const reqText = sub.requirement || sub.text || sub.title || sub.requirement_text || '';
+
+                            content += `
+                                <tr>
+                                    <td>${sub.clause || ''}</td>
+                                    <td>${reqText}</td>
+                                    <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
+                                    <td>${c}</td>
+                                </tr>
+                             `;
+                        }
                     });
                 });
             } else if (cl.items) {
@@ -1230,7 +1253,7 @@ window.printAuditChecklist = function (planId) {
                     content += `
                         <tr>
                             <td>${item.clause || ''}</td>
-                            <td>${item.requirement || ''}</td>
+                            <td>${item.requirement || item.text || item.title || ''}</td>
                             <td style="color: ${statusColor[s]}; font-weight: bold;">${statusText[s]}</td>
                             <td>${c}</td>
                         </tr>
