@@ -573,6 +573,7 @@ async function renderModule(moduleName, syncHash = true) {
         'audit-programs': 'Audit Programs',
         'audit-planning': 'Audit Planning',
         'checklists': 'Checklist Library',
+        'knowledge-base': 'Knowledge Base',
         'manday-calculator': 'Man-Day Calculator',
         'multisite-sampling': 'Multi-Site Sampling Calculator',
         'audit-execution': 'Audit Execution',
@@ -756,6 +757,18 @@ async function renderModule(moduleName, syncHash = true) {
             case 'checklists':
                 if (typeof renderChecklistLibrary === 'function') {
                     renderChecklistLibrary();
+                } else {
+                    renderPlaceholder(moduleName);
+                }
+                break;
+            case 'knowledge-base':
+                // Render Settings and auto-select the Knowledge Base tab
+                if (typeof renderSettings === 'function') {
+                    renderSettings();
+                    setTimeout(() => {
+                        const kbTab = document.querySelector('[data-tab="knowledge-base"]');
+                        if (kbTab) kbTab.click();
+                    }, 150);
                 } else {
                     renderPlaceholder(moduleName);
                 }
