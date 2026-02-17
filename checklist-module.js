@@ -1054,7 +1054,13 @@ function viewChecklistDetail(id) {
             <div class="card">
                 <h3 style="margin-bottom: 1rem;">
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                    Checklist Items (${checklist.clauses ? checklist.clauses.reduce((s, c) => s + (c.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (checklist.items?.length || 0)})
+                    Checklist Items (${checklist.clauses ? checklist.clauses.reduce((total, c) => {
+        return total + (c.subClauses || []).reduce((subTotal, sub) => {
+            if (sub.items && sub.items.length > 0) return subTotal + sub.items.length;
+            if (sub.requirement) return subTotal + 1;
+            return subTotal;
+        }, 0);
+    }, 0) : (checklist.items?.length || 0)})
                 </h3>
                 
                 ${checklist.clauses ? checklist.clauses.map((mainClause, idx) => `
@@ -1063,7 +1069,7 @@ function viewChecklistDetail(id) {
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${mainClause.mainClause}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${mainClause.title}</span>
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">(${mainClause.subClauses?.length || 0} sub-clauses)</span>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">(${(mainClause.subClauses || []).reduce((t, sub) => t + (sub.items && sub.items.length > 0 ? sub.items.length : (sub.requirement ? 1 : 0)), 0)} items)</span>
                             </div>
                             <i class="fa-solid fa-chevron-down accordion-icon" style="transition: transform 0.3s; transform: ${idx === 0 ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
                         </div>
@@ -1129,8 +1135,8 @@ function viewChecklistDetail(id) {
                         </table>
                     </div>
                 `}
-            </div>
-        </div>
+            </div >
+        </div >
     `;
 
     window.contentArea.innerHTML = html;
@@ -1144,12 +1150,12 @@ function isChecklistUsedInAudits(checklistId) {
 
     // Check audit reports
     for (const r of reports) {
-        if (String(r.checklistId) === strId) return { used: true, where: `Audit Report: ${r.clientName || r.id}` };
-        if (r.checklistProgress?.some(p => String(p.checklistId) === strId)) return { used: true, where: `Audit Report: ${r.clientName || r.id}` };
+        if (String(r.checklistId) === strId) return { used: true, where: `Audit Report: ${r.clientName || r.id} ` };
+        if (r.checklistProgress?.some(p => String(p.checklistId) === strId)) return { used: true, where: `Audit Report: ${r.clientName || r.id} ` };
     }
     // Check audit executions
     for (const e of executions) {
-        if (String(e.checklistId) === strId) return { used: true, where: `Audit Execution: ${e.clientName || e.id}` };
+        if (String(e.checklistId) === strId) return { used: true, where: `Audit Execution: ${e.clientName || e.id} ` };
     }
     return { used: false };
 }
@@ -1171,7 +1177,7 @@ function archiveChecklist(id) {
         });
     }
 
-    window.showNotification(`"${checklist.name}" has been archived. You can find it under the Archived filter.`, 'success');
+    window.showNotification(`"${checklist.name}" has been archived.You can find it under the Archived filter.`, 'success');
     renderChecklistLibrary();
 }
 
@@ -1220,12 +1226,12 @@ function deleteChecklist(id) {
     // Check if checklist is used in audits
     const usage = isChecklistUsedInAudits(id);
     if (usage.used) {
-        window.showNotification(`This checklist is used in "${usage.where}". It will be archived instead of deleted to preserve audit records.`, 'warning');
+        window.showNotification(`This checklist is used in "${usage.where}".It will be archived instead of deleted to preserve audit records.`, 'warning');
         archiveChecklist(id);
         return;
     }
 
-    if (confirm(`Are you sure you want to permanently delete "${checklist.name}"?`)) {
+    if (confirm(`Are you sure you want to permanently delete "${checklist.name}" ? `)) {
         state.checklists = state.checklists.filter(c => String(c.id) !== String(id));
         window.saveData();
 
