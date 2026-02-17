@@ -2166,13 +2166,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const textarea = document.getElementById('comment-' + uniqueId);
 
         recognition.lang = 'en-US';
-        recognition.continuous = false;
-        recognition.interimResults = true; // Use interim to show real-time transcription if possible, or false for simplicity
+        recognition.continuous = true;
+        recognition.interimResults = true;
 
-        // Visual feedback
+        // Visual feedback — show stop button so user can end early
         const originalIcon = '<i class="fa-solid fa-microphone"></i>';
-        micBtn.innerHTML = '<i class="fa-solid fa-circle-dot fa-fade" style="color: red;"></i>';
-        micBtn.setAttribute('disabled', 'true');
+        micBtn.innerHTML = '<i class="fa-solid fa-stop fa-fade" style="color: red;"></i>';
+        micBtn.title = 'Click to stop recording';
+        micBtn.removeAttribute('disabled');
+
+        // Allow user to stop early by clicking the mic button again
+        const stopHandler = () => {
+            recognition.stop();
+            micBtn.removeEventListener('click', stopHandler);
+        };
+        micBtn.addEventListener('click', stopHandler);
 
         recognition.start();
 
@@ -2193,18 +2201,24 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
+            // Show live preview in the textarea
+            const currentVal = textarea.getAttribute('data-pre-dictation') || textarea.value;
+            if (!textarea.getAttribute('data-pre-dictation')) {
+                textarea.setAttribute('data-pre-dictation', textarea.value);
+            }
+            textarea.value = currentVal ? currentVal + ' ' + finalTranscript + interimTranscript : finalTranscript + interimTranscript;
         };
 
         recognition.onend = function () {
             clearTimeout(timeout);
-            // Append result to textarea
-            if (finalTranscript) {
-                const currentVal = textarea.value;
-                textarea.value = currentVal ? currentVal + ' ' + finalTranscript : finalTranscript;
-            }
+            micBtn.removeEventListener('click', stopHandler);
+            // Set final value
+            const preVal = textarea.getAttribute('data-pre-dictation') || '';
+            textarea.removeAttribute('data-pre-dictation');
+            textarea.value = preVal ? preVal + ' ' + finalTranscript : finalTranscript;
 
             micBtn.innerHTML = originalIcon;
-            micBtn.removeAttribute('disabled');
+            micBtn.title = 'Voice dictation';
         };
 
         recognition.onerror = function (event) {
@@ -2213,7 +2227,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 window.showNotification('Error recording audio: ' + event.error, 'error');
             }
             micBtn.innerHTML = originalIcon;
-            micBtn.removeAttribute('disabled');
+            micBtn.title = 'Voice dictation';
+            micBtn.removeEventListener('click', stopHandler);
             clearTimeout(timeout);
         };
     };
