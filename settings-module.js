@@ -3750,13 +3750,14 @@ SURVEILLANCE-SPECIFIC REQUIREMENTS:
     // ---- MODE-DEPENDENT CONFIGURATION ----
     const modeConfig = {
         short: {
-            sourceLimit: 100000, // Increased from 10k to ensure full doc context
-            maxTokens: 8192,
+            sourceLimit: 100000,
+            maxTokens: 12288,
             questionsPerClause: '1',
             questionsInstruction: '1 practical audit checklist question',
-            batchDelay: 0,
+            batchDelay: 1500,
             batches: [
-                { label: 'Clauses 4-10', range: 'ALL auditable clauses from the standard (typically 4 through 10). Cover EVERY main-level sub-clause (X.Y level) present in the document. Do NOT skip any sub-clause.', useSource: true }
+                { label: 'Clauses 4-7', range: 'Clauses 4, 5, 6, and 7 — include ALL sub-clauses at the X.Y level. Do NOT skip any sub-clause.', useSource: true },
+                { label: 'Clauses 8-10', range: 'Clauses 8, 9, and 10 — include ALL sub-clauses at the X.Y level. Do NOT skip any sub-clause.', useSource: true }
             ]
         },
         standard: {
