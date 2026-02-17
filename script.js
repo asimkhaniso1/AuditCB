@@ -263,7 +263,12 @@ function saveState() {
                 );
             }
 
-            localStorage.setItem('auditCB360State', stateJSON);
+            try {
+                localStorage.setItem('auditCB360State', stateJSON);
+            } catch (quotaErr) {
+                console.warn(`[saveState] localStorage quota exceeded (${sizeInMB.toFixed(2)}MB). State kept in memory only.`);
+                // Don't crash — state is still in memory and the app works fine
+            }
 
             // DISABLED 2026-01-12: Auto-sync causes DELETE ALL + INSERT ALL on every save
             // This was the root cause of "deleted data reappearing" bug
