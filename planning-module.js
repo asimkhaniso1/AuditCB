@@ -1461,8 +1461,11 @@ window.renderConfigureChecklist = async function (planId) {
                 <h2 style="margin: 0;">Configure Checklists</h2>
                 <p style="color: var(--text-secondary); margin: 0;">Tailor the audit scope and requirements for <strong>${plan.client}</strong></p>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <button class="btn btn-outline-secondary" onclick="window.viewAuditPlan('${planId}')">Cancel</button>
+                <button class="btn" style="background: #7c3aed; color: white; border: none;" onclick="window.reviewMergedQuestions('${planId}')">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> Review & Merge Questions
+                </button>
                 <button class="btn btn-primary" onclick="window.saveChecklistConfiguration('${planId}')" style="padding: 0.5rem 1.5rem;">
                     <i class="fa-solid fa-save"></i> Save Configuration
                 </button>
@@ -1605,6 +1608,212 @@ window.saveChecklistConfiguration = async function (planId) {
 };
 
 // Wizard logic removed - consolidated to 1 page
+
+// ── Review & Merge Questions ──────────────────────────────────────
+function _textSimilarity(a, b) {
+    const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+    const wa = norm(a), wb = norm(b);
+    if (!wa.length || !wb.length) return 0;
+    const setB = new Set(wb);
+    const shared = wa.filter(w => setB.has(w)).length;
+    return shared / Math.max(wa.length, wb.length);
+}
+
+window.reviewMergedQuestions = function (planId) {
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan) return;
+
+    // Collect currently-checked items from the DOM
+    const allItems = [];
+    document.querySelectorAll('.checklist-card').forEach(card => {
+        const clCb = card.querySelector('.checklist-select-cb');
+        if (!clCb || !clCb.checked) return;
+        const clId = clCb.getAttribute('data-id');
+        const cl = (state.checklists || []).find(c => String(c.id) === String(clId));
+        const clName = cl ? cl.name : clId;
+
+        card.querySelectorAll('.item-row').forEach(row => {
+            const cb = row.querySelector('.item-select-cb');
+            if (!cb || !cb.checked) return;
+            const itemId = row.getAttribute('data-item-id');
+            const textEl = row.querySelector('.item-text');
+            const clauseEl = row.querySelector('td:nth-child(2)');
+            allItems.push({
+                clId, clName, itemId,
+                clause: clauseEl?.textContent?.trim() || '',
+                text: textEl?.textContent?.trim() || '',
+                isDuplicate: false
+            });
+        });
+    });
+
+    if (allItems.length === 0) {
+        window.showNotification('No items selected. Please select at least one checklist first.', 'warning');
+        return;
+    }
+
+    // Detect duplicates: same clause from different checklists with similar text
+    const clauseGroups = {};
+    allItems.forEach(item => {
+        const key = item.clause.replace(/\s+/g, '');
+        if (!clauseGroups[key]) clauseGroups[key] = [];
+        clauseGroups[key].push(item);
+    });
+
+    let dupCount = 0;
+    Object.values(clauseGroups).forEach(group => {
+        if (group.length < 2) return;
+        for (let i = 1; i < group.length; i++) {
+            for (let j = 0; j < i; j++) {
+                if (group[i].clId === group[j].clId) continue;
+                if (_textSimilarity(group[i].text, group[j].text) > 0.55) {
+                    group[i].isDuplicate = true;
+                    dupCount++;
+                    break;
+                }
+            }
+        }
+    });
+
+    // Sort clauses numerically
+    const sortedClauses = Object.keys(clauseGroups).sort((a, b) => {
+        const na = a.split('.').map(Number), nb = b.split('.').map(Number);
+        for (let k = 0; k < Math.max(na.length, nb.length); k++) {
+            if ((na[k] || 0) !== (nb[k] || 0)) return (na[k] || 0) - (nb[k] || 0);
+        }
+        return 0;
+    });
+
+    let rowsHtml = '';
+    sortedClauses.forEach(clause => {
+        clauseGroups[clause].forEach(item => {
+            const dup = item.isDuplicate;
+            rowsHtml += `
+                <tr class="merge-row" data-cl-id="${item.clId}" data-item-id="${item.itemId}"
+                    style="border-bottom: 1px solid #e2e8f0; ${dup ? 'background: #fef9c3;' : ''}">
+                    <td style="padding: 10px; text-align: center;">
+                        <input type="checkbox" class="merge-cb" ${dup ? '' : 'checked'}
+                               style="width: 18px; height: 18px; cursor: pointer;">
+                    </td>
+                    <td style="padding: 10px; font-weight: 600; font-family: monospace; color: #475569;">${window.UTILS.escapeHtml(item.clause)}</td>
+                    <td style="padding: 10px; line-height: 1.5; ${dup ? 'text-decoration: line-through; opacity: 0.7;' : ''}">${window.UTILS.escapeHtml(item.text)}</td>
+                    <td style="padding: 10px; font-size: 0.8rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.clName)}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        ${dup ? '<span style="background: #fbbf24; color: #78350f; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; white-space: nowrap;">Duplicate</span>' : '<span style="color:#9ca3af;">—</span>'}
+                    </td>
+                </tr>`;
+        });
+    });
+
+    const contentArea = document.getElementById('content-area');
+    contentArea.innerHTML = `
+        <div class="fade-in" style="max-width: 1200px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.configureChecklists('${planId}')" style="margin-bottom: 0.5rem;">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Configure
+                    </button>
+                    <h2 style="margin: 0;">Review & Merge Questions</h2>
+                    <p style="color: var(--text-secondary); margin: 0;">
+                        <strong>${allItems.length}</strong> questions from selected checklists
+                        ${dupCount > 0
+            ? ' &mdash; <span style="color: #b45309; font-weight: 600;">' + dupCount + ' duplicate(s) auto-detected &amp; unchecked</span>'
+            : ' &mdash; <span style="color: #059669;">No duplicates found</span>'}
+                    </p>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-outline-secondary" onclick="window.configureChecklists('${planId}')">Cancel</button>
+                    <button class="btn" style="background: #059669; color: white; border: none;" onclick="window._applyMergedSelections('${planId}')">
+                        <i class="fa-solid fa-check-double"></i> Apply & Save
+                    </button>
+                </div>
+            </div>
+
+            ${dupCount > 0 ? '<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;"><i class="fa-solid fa-wand-magic-sparkles" style="color: #b45309; margin-right: 0.5rem;"></i><strong style="color: #78350f;">' + dupCount + ' duplicate questions auto-detected.</strong> <span style="color: #92400e; font-size: 0.85rem;">They have been unchecked. Review below and click &quot;Apply &amp; Save&quot; to confirm.</span></div>' : ''}
+
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="background: #f1f5f9;">
+                            <th style="width: 40px; padding: 10px; text-align: center;">
+                                <input type="checkbox" id="merge-select-all" checked style="width: 18px; height: 18px; cursor: pointer;">
+                            </th>
+                            <th style="width: 80px; padding: 10px; text-align: left;">Clause</th>
+                            <th style="padding: 10px; text-align: left;">Question / Requirement</th>
+                            <th style="width: 180px; padding: 10px; text-align: left;">Source</th>
+                            <th style="width: 90px; padding: 10px; text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 2rem; text-align: center;">
+                <button class="btn btn-lg" style="background: #059669; color: white; border: none; min-width: 250px;" onclick="window._applyMergedSelections('${planId}')">
+                    <i class="fa-solid fa-check-double"></i> Apply & Save Configuration
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Select-all toggle
+    document.getElementById('merge-select-all')?.addEventListener('change', (e) => {
+        document.querySelectorAll('.merge-cb').forEach(cb => { cb.checked = e.target.checked; });
+        document.querySelectorAll('.merge-row').forEach(row => {
+            const cb = row.querySelector('.merge-cb');
+            const td = row.querySelector('td:nth-child(3)');
+            td.style.textDecoration = cb.checked ? '' : 'line-through';
+            td.style.opacity = cb.checked ? '1' : '0.7';
+            row.style.background = cb.checked ? '' : '#fef9c3';
+        });
+    });
+
+    // Individual checkbox styling
+    document.querySelectorAll('.merge-cb').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const row = e.target.closest('.merge-row');
+            const td = row.querySelector('td:nth-child(3)');
+            td.style.textDecoration = e.target.checked ? '' : 'line-through';
+            td.style.opacity = e.target.checked ? '1' : '0.7';
+            row.style.background = e.target.checked ? '' : '#fef9c3';
+        });
+    });
+};
+
+// Apply merged selections back to plan
+window._applyMergedSelections = async function (planId) {
+    const plan = state.auditPlans.find(p => String(p.id) === String(planId));
+    if (!plan) return;
+
+    const selectedItemsMap = {};
+    document.querySelectorAll('.merge-row').forEach(row => {
+        const clId = row.getAttribute('data-cl-id');
+        const itemId = row.getAttribute('data-item-id');
+        const cb = row.querySelector('.merge-cb');
+        if (!selectedItemsMap[clId]) selectedItemsMap[clId] = [];
+        if (cb.checked) selectedItemsMap[clId].push(itemId);
+    });
+
+    const selectedChecklists = Object.keys(selectedItemsMap).filter(id => selectedItemsMap[id].length > 0);
+    plan.selectedChecklists = selectedChecklists;
+    plan.selectedChecklistItems = selectedItemsMap;
+    plan.selectedChecklistOverrides = plan.selectedChecklistOverrides || {};
+
+    const removedCount = document.querySelectorAll('.merge-cb:not(:checked)').length;
+
+    window.showNotification('Saving merged configuration...', 'info');
+    try {
+        if (window.SupabaseClient) {
+            await window.SupabaseClient.db.update('audit_plans', String(planId), { data: plan });
+        }
+        window.saveData();
+        window.showNotification(removedCount > 0 ? removedCount + ' duplicate(s) removed. Configuration saved.' : 'Configuration saved.', 'success');
+        window.viewAuditPlan(planId);
+    } catch (e) {
+        console.error('Save merged error:', e);
+        window.showNotification('Error saving configuration.', 'danger');
+    }
+};
 
 function addAgendaRow(data = {}) {
     const tbody = document.getElementById('agenda-tbody');
