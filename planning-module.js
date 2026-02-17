@@ -1371,12 +1371,18 @@ window.renderConfigureChecklist = async function (planId) {
     const clientName = plan.client || '';
     const clientChecklists = matchingChecklists.filter(c => {
         const cType = (c.type || '').toLowerCase();
-        if (cType === 'global') return false; // global checklists go in the other section
-        // Match by clientName, clientId, or checklist name containing client name
+        if (cType === 'global') return false;
         if (c.clientName === clientName) return true;
         if (client && String(c.clientId) === String(client.id)) return true;
         if (clientName && c.name && c.name.toLowerCase().includes(clientName.toLowerCase())) return true;
         return false;
+    });
+    // Catch-all: non-global checklists not matched to this client (e.g. imported CSVs)
+    const clientClIds = new Set(clientChecklists.map(c => c.id));
+    const otherChecklists = matchingChecklists.filter(c => {
+        const cType = (c.type || '').toLowerCase();
+        if (cType === 'global') return false;
+        return !clientClIds.has(c.id);
     });
 
     const getFlattenedItems = (cl) => {
@@ -1528,6 +1534,7 @@ window.renderConfigureChecklist = async function (planId) {
                     </div>
                 `}
                 ${renderGroup('Global Checklists', globalChecklists, 'fa-solid fa-globe', '#0369a1')}
+                ${otherChecklists.length > 0 ? renderGroup('Other / Imported Checklists', otherChecklists, 'fa-solid fa-file-import', '#7c3aed') : ''}
             </div>
             
             <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
