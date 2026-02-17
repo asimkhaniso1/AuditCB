@@ -790,12 +790,17 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <div id="evidence-preview-${uniqueId}" style="display: ${(saved.evidenceImage || (saved.evidenceImages && saved.evidenceImages.length)) ? 'flex' : 'none'}; flex-wrap: wrap; gap: 6px; align-items: center;">
                                  ${(function () {
                         const imgs = saved.evidenceImages || (saved.evidenceImage ? [saved.evidenceImage] : []);
-                        return imgs.map((src, imgIdx) => `
-                                         <div class="ev-thumb" data-idx="${imgIdx}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
-                                             <img src="${src}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${src.replace(/'/g, "\\'")}')"/>
+                        return imgs.map((src, imgIdx) => {
+                            const isIdb = src.startsWith('idb://');
+                            const displaySrc = isIdb ? '' : src;
+                            const safeSrc = displaySrc.replace(/'/g, "\\'");
+                            return `
+                                         <div class="ev-thumb" data-idx="${imgIdx}" data-save-url="${window.UTILS.escapeHtml(src)}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
+                                             <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" onclick="window.viewEvidenceImageByUrl(this.src || '${safeSrc}')"/>
                                              <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${imgIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
                                          </div>
-                                     `).join('');
+                                     `;
+                        }).join('');
                     })()}
                              </div>
                              <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
@@ -1909,9 +1914,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
                 const evidenceImages = [];
                 if (previewDiv) {
-                    previewDiv.querySelectorAll('.ev-thumb img').forEach(img => {
-                        if (img.src && !img.src.includes('data:,') && img.src !== window.location.href) {
-                            evidenceImages.push(img.src);
+                    previewDiv.querySelectorAll('.ev-thumb').forEach(thumb => {
+                        // Prefer data-save-url (cloud URL or idb:// key) over img.src (may be base64)
+                        const saveUrl = thumb.dataset.saveUrl;
+                        const imgEl = thumb.querySelector('img');
+                        const url = saveUrl || (imgEl && imgEl.src) || '';
+                        if (url && !url.includes('data:,') && url !== window.location.href) {
+                            evidenceImages.push(url);
                         }
                     });
                 }
@@ -2619,6 +2628,89 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // ============================================
     // EVIDENCE IMAGE HANDLING (Compression & Upload)
     // ============================================
+    // IndexedDB Image Store — avoids localStorage 5MB limit
+    // ============================================
+    const EvidenceDB = {
+        DB_NAME: 'AuditCB_Evidence',
+        STORE_NAME: 'images',
+        DB_VERSION: 1,
+        _db: null,
+        async open() {
+            if (this._db) return this._db;
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    e.target.result.createObjectStore(this.STORE_NAME);
+                };
+                req.onsuccess = (e) => { this._db = e.target.result; resolve(this._db); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        },
+        async put(key, dataUrl) {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readwrite');
+                tx.objectStore(this.STORE_NAME).put(dataUrl, key);
+                tx.oncomplete = () => resolve(key);
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        },
+        async get(key) {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readonly');
+                const req = tx.objectStore(this.STORE_NAME).get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = (e) => reject(e.target.error);
+            });
+        },
+        async remove(key) {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readwrite');
+                tx.objectStore(this.STORE_NAME).delete(key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        }
+    };
+    window._EvidenceDB = EvidenceDB;
+
+    // Resolve idb:// references to displayable blob URLs
+    window.resolveEvidenceUrl = async function (url) {
+        if (!url || !url.startsWith('idb://')) return url;
+        try {
+            const dataUrl = await EvidenceDB.get(url);
+            return dataUrl || url;
+        } catch (e) {
+            console.warn('Failed to resolve evidence URL:', url, e);
+            return url;
+        }
+    };
+
+    // Post-render: resolve all idb:// thumbnails in the DOM
+    window.resolveAllIdbThumbs = async function () {
+        const idbImgs = document.querySelectorAll('img[data-idb-key]');
+        for (const img of idbImgs) {
+            const key = img.dataset.idbKey;
+            if (!key) continue;
+            try {
+                const dataUrl = await EvidenceDB.get(key);
+                if (dataUrl) {
+                    img.src = dataUrl;
+                    img.style.background = '';
+                    img.dataset.idbKey = ''; // mark as resolved
+                }
+            } catch (e) { /* silently skip */ }
+        }
+    };
+    // Auto-resolve when DOM updates (debounced)
+    let _idbResolveTimer;
+    const _idbObserver = new MutationObserver(() => {
+        clearTimeout(_idbResolveTimer);
+        _idbResolveTimer = setTimeout(() => window.resolveAllIdbThumbs(), 300);
+    });
+    _idbObserver.observe(document.body, { childList: true, subtree: true });
 
     // Handle evidence image upload with compression and 5MB limit
     window.handleEvidenceUpload = function (uniqueId, input) {
@@ -2663,6 +2755,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                     let finalUrl = compressedDataUrl;
                     let isCloud = false;
+                    let displayUrl = compressedDataUrl; // always use this for thumbnail display
 
                     // 2. Upload to Supabase (if online)
                     console.log('[Evidence Upload] Online:', window.navigator.onLine, 'SupabaseClient:', !!window.SupabaseClient, 'Initialized:', window.SupabaseClient?.isInitialized);
@@ -2670,7 +2763,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         try {
                             if (!window.SupabaseClient.isInitialized) {
                                 console.warn('[Evidence Upload] Supabase not initialized - trying to wait...');
-                                // Give it a moment in case it's still initializing
                                 await new Promise(r => setTimeout(r, 1000));
                             }
                             if (window.SupabaseClient.isInitialized) {
@@ -2680,10 +2772,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 const uploadFile = new File([blob], file.name, { type: file.type });
 
                                 console.log('[Evidence Upload] Uploading file:', file.name, 'Size:', blob.size, 'bytes');
-                                const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId);
+                                const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-' + Date.now());
                                 console.log('[Evidence Upload] Result:', result);
                                 if (result && result.url) {
                                     finalUrl = result.url;
+                                    displayUrl = result.url;
                                     isCloud = true;
                                     console.log('[Evidence Upload] Success! Cloud URL:', result.url.substring(0, 80));
                                 } else {
@@ -2694,7 +2787,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             }
                         } catch (uploadErr) {
                             console.error('[Evidence Upload] Failed:', uploadErr.message || uploadErr);
-                            console.warn('[Evidence Upload] Falling back to local base64');
+                            console.warn('[Evidence Upload] Falling back to IndexedDB');
+                        }
+                    }
+
+                    // 2b. If cloud failed, store in IndexedDB (avoids localStorage overflow)
+                    if (!isCloud) {
+                        try {
+                            const idbKey = 'idb://evidence-' + uniqueId + '-' + Date.now();
+                            await EvidenceDB.put(idbKey, compressedDataUrl);
+                            finalUrl = idbKey; // small string for state/localStorage
+                            console.log('[Evidence Upload] Stored in IndexedDB:', idbKey);
+                        } catch (idbErr) {
+                            console.error('[Evidence Upload] IndexedDB store failed:', idbErr);
+                            // Last resort: keep base64 in state (may hit quota)
+                            finalUrl = compressedDataUrl;
                         }
                     }
 
@@ -2703,13 +2810,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         previewDiv.style.display = 'flex';
                         const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
                         const newIdx = existingThumbs.length;
-                        const safeUrl = finalUrl.replace(/'/g, "\\'");
+                        const safeDisplay = displayUrl.replace(/'/g, "\\'");
                         const thumb = document.createElement('div');
                         thumb.className = 'ev-thumb';
                         thumb.dataset.idx = newIdx;
+                        thumb.dataset.saveUrl = finalUrl; // store URL/idb-key for saving
                         thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                         thumb.innerHTML = `
-                            <img src="${finalUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeUrl}')"/>
+                            <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeDisplay}')"/>
                             <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${newIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
                         `;
                         previewDiv.appendChild(thumb);
@@ -2738,8 +2846,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
-        // Calculate new dimensions (max 800px on longest side)
-        const maxDimension = 800;
+        // Calculate new dimensions (max 600px on longest side — keeps ~20-40KB per image)
+        const maxDimension = 600;
         let width = img.width;
         let height = img.height;
 
@@ -2759,8 +2867,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // Draw and compress
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to JPEG with 0.7 quality for compression
-        return canvas.toDataURL('image/jpeg', 0.7);
+        // Convert to JPEG with 0.5 quality — good enough for evidence, saves storage
+        return canvas.toDataURL('image/jpeg', 0.5);
     }
 
     // View evidence image in full size (modal/popup)

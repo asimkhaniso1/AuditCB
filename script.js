@@ -238,6 +238,23 @@ function saveState() {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
         try {
+            // Strip base64 evidence images before saving to prevent localStorage overflow
+            // Cloud URLs (https://) and idb:// references are small strings - keep those
+            if (state.auditReports) {
+                for (const report of state.auditReports) {
+                    if (report.checklistProgress) {
+                        for (const item of report.checklistProgress) {
+                            if (item.evidenceImage && item.evidenceImage.startsWith('data:')) {
+                                item.evidenceImage = ''; // strip base64
+                            }
+                            if (item.evidenceImages && Array.isArray(item.evidenceImages)) {
+                                item.evidenceImages = item.evidenceImages.filter(u => u && !u.startsWith('data:'));
+                            }
+                        }
+                    }
+                }
+            }
+
             const stateJSON = JSON.stringify(state);
             const sizeInMB = new Blob([stateJSON]).size / 1024 / 1024;
             lastSaveSize = sizeInMB;
