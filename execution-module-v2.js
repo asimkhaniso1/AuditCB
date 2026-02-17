@@ -3650,6 +3650,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.chart-box canvas{max-height:220px;}'
             + '.chart-title{font-size:0.85rem;font-weight:700;color:#334155;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.3px;}'
             + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:180px;object-fit:cover;}.ev-cap{padding:10px 14px;font-size:0.82rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
+            + '.toc{padding:40px 50px;min-height:60vh;}.toc-title{font-size:1.8rem;font-weight:800;color:#0f172a;margin-bottom:6px;}.toc-sub{font-size:0.92rem;color:#64748b;margin-bottom:30px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin-bottom:35px;}'
+            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:14px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;transition:background 0.2s;}.toc-item:hover{background:#f8fafc;}.toc-num{min-width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:1rem;color:#1e293b;}.toc-item-desc{font-size:0.82rem;color:#94a3b8;margin-top:3px;}'
             + 'footer{margin-top:50px;background:#0f172a;color:white;padding:30px 40px;font-size:0.85rem;display:flex;justify-content:space-between;align-items:center;border-radius:8px;}'
             + '.content{padding:0 40px;}'
             + '.callout{padding:14px 18px;border-radius:8px;margin-top:16px;font-size:0.92rem;line-height:1.7;}'
@@ -3675,9 +3677,32 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div style="position:absolute;bottom:40px;display:flex;align-items:center;gap:16px;">'
             + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:40px;object-fit:contain;opacity:0.6;" alt="Client">' : '')
             + '<img src="' + d.qrCodeUrl + '" style="height:60px;" alt="QR"></div></div>'
+            // TABLE OF CONTENTS
+            + (function () {
+                var tocSections = [];
+                var colors = ['#2563eb', '#059669', '#7c3aed', '#dc2626', '#ea580c', '#0891b2', '#4338ca', '#c2410c'];
+                var descs = ['Organization details, scope, audit team and dates', 'Key findings overview, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Opening and closing meeting records', 'Certification recommendation and auditor signatures', 'Photographic evidence from the audit'];
+                var names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'NON-CONFORMITY DETAILS', 'NCR REGISTER', 'MEETING RECORDS', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
+                var keys = ['audit-info', 'summary', 'charts', 'findings', 'ncrs', 'meetings', 'conclusion', 'evidence'];
+                var num = 1;
+                for (var i = 0; i < keys.length; i++) {
+                    var k = keys[i];
+                    if (k === 'ncrs' && (!(d.report.ncrs || []).length)) continue;
+                    if (k === 'evidence') {
+                        var hasEvidence = (d.hydratedProgress || []).some(function (it) { return it.evidenceImage; }) || (d.report.ncrs || []).some(function (n) { return n.evidenceImage; });
+                        if (!hasEvidence) continue;
+                    }
+                    if (en[k] !== false) {
+                        tocSections.push('<a href="#sec-' + k + '" class="toc-item"><div class="toc-num" style="background:' + colors[i] + ';">' + num + '</div><div class="toc-item-body"><div class="toc-item-title">' + names[i] + '</div><div class="toc-item-desc">' + descs[i] + '</div></div></a>');
+                        num++;
+                    }
+                }
+                if (tocSections.length === 0) return '';
+                return '<div class="toc page-break"><div class="toc-title">Table of Contents</div><div class="toc-sub">' + d.report.client + ' — ' + standard + '</div><div class="toc-line"></div>' + tocSections.join('') + '<div style="margin-top:30px;text-align:center;font-size:0.78rem;color:#94a3b8;"><i class="fa-solid fa-file-lines" style="margin-right:4px;"></i>' + tocSections.length + ' sections in this report</div></div>';
+            })()
             + '<div class="content">'
             // SECTION 1
-            + (en['audit-info'] !== false ? '<div class="sh page-break"><span class="sn">1</span>AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
+            + (en['audit-info'] !== false ? '<div id="sec-audit-info" class="sh page-break"><span class="sn">1</span>AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
                 + '<tr><td>Industry</td><td>' + (d.client.industry || 'N/A') + '</td></tr>'
                 + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || 'N/A') + '</td></tr>'
@@ -3694,12 +3719,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:12px;"><strong style="font-size:0.88rem;color:#334155;">Key Processes:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.keyProcesses.map(p => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;">' + (p.name || p) + '</span>').join('') + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 2
-            + (en['summary'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#047857,#059669);"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
+            + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:linear-gradient(135deg,#047857,#059669);"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + (d.report.positiveObservations ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + formatText(d.report.positiveObservations) + '</div></div>' : '')
                 + (d.report.ofi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + formatText(d.report.ofi) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
-            + (en['charts'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
+            + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
                 + '<div class="stat-grid">'
                 + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
                 + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.ncCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
@@ -3709,11 +3734,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
             // SECTION 4
-            + (en['findings'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">4</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Severity</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
+            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">4</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Severity</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION 5
-            + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">5</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">5</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
             // SECTION 6
-            + (en['meetings'] !== false ? '<div class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">6</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
+            + (en['meetings'] !== false ? '<div id="sec-meetings" class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">6</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
                 + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (d.report.openingMeeting?.attendees || 'N/A') + '</td></tr></table></div>'
                 + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Summary</td><td>' + (d.report.closingMeeting?.summary || 'N/A') + '</td></tr></table></div>'
                 + '</div></div>' : '')
@@ -3735,10 +3760,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     var borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
                     return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
                 }).join('');
-                return '<div class="sh page-break" style="background:linear-gradient(135deg,#7c2d12,#c2410c);"><span class="sn"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
+                return '<div id="sec-evidence" class="sh page-break" style="background:linear-gradient(135deg,#7c2d12,#c2410c);"><span class="sn"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
             })()
             // SECTION 7
-            + (en['conclusion'] !== false ? '<div class="sh" style="background:linear-gradient(135deg,#312e81,#4338ca);"><span class="sn">7</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
+            + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh" style="background:linear-gradient(135deg,#312e81,#4338ca);"><span class="sn">7</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatText(editedConclusion) + '</div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
