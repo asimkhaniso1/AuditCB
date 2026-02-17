@@ -10,6 +10,16 @@ let checklistFilterAuditType = 'all';
 let checklistFilterScope = 'all';
 let checklistSearchTerm = '';
 
+// Format ISO/UTC date to local readable date
+function _fmtDate(raw) {
+    if (!raw) return '—';
+    try {
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return raw;
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch { return raw; }
+}
+
 function renderChecklistLibrary() {
     const contentArea = document.getElementById('content-area');
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
@@ -133,7 +143,7 @@ function renderChecklistLibrary() {
                                         <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
                                         <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
                                         <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
-                                        <td>${window.UTILS.escapeHtml(c.updatedAt || c.createdAt)}</td>
+                                        <td>${_fmtDate(c.updatedAt || c.createdAt)}</td>
                                         <td>
                                             <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
                                                 <i class="fa-solid fa-eye"></i>
@@ -211,6 +221,54 @@ function renderChecklistLibrary() {
                     <p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No custom checklists found. Create one to get started!</p>
                 `}
             </div>
+
+            <!-- Archived Checklists Section -->
+            ${archivedChecklists.length > 0 ? `
+            <div class="card" style="margin-top: 1.5rem; border-left: 4px solid #9ca3af;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0; color: #6b7280;">
+                        <i class="fa-solid fa-box-archive" style="margin-right: 0.5rem; color: #9ca3af;"></i>
+                        Archived Checklists
+                        <span style="background: #f3f4f6; color: #6b7280; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; margin-left: 0.5rem;">${archivedChecklists.length}</span>
+                    </h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Checklist Name</th>
+                                <th>Standard</th>
+                                <th>Archived On</th>
+                                <th>Archived By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${archivedChecklists.map(c => `
+                                <tr style="opacity: 0.75;">
+                                    <td style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</td>
+                                    <td><span style="background: #f3f4f6; color: #6b7280; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(c.standard)}</span></td>
+                                    <td>${_fmtDate(c.archivedAt)}</td>
+                                    <td>${window.UTILS.escapeHtml(c.archivedBy || 'Unknown')}</td>
+                                    <td>
+                                        <button class="btn btn-sm" onclick="window.restoreChecklist('${c.id}')" style="margin-right: 0.25rem;" title="Restore">
+                                            <i class="fa-solid fa-rotate-left"></i> Restore
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="window.permanentDeleteChecklist('${c.id}')" title="Permanently Delete">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            ` : (checklistFilterType === 'archived' ? `
+            <div class="card" style="margin-top: 1.5rem;">
+                <p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No archived checklists found.</p>
+            </div>
+            ` : '')}
         </div>
     `;
 
@@ -1054,7 +1112,7 @@ function viewChecklistDetail(id) {
                     </div>
                     <div style="text-align: right; font-size: 0.85rem; color: var(--text-secondary);">
                         <p style="margin: 0;">Created by: ${checklist.createdBy || 'Unknown'}</p>
-                        <p style="margin: 0;">Last updated: ${checklist.updatedAt || checklist.createdAt}</p>
+                        <p style="margin: 0;">Last updated: ${_fmtDate(checklist.updatedAt || checklist.createdAt)}</p>
                     </div>
                 </div>
             </div>
@@ -1396,6 +1454,28 @@ function printChecklist(id) {
     win.document.write(content);
     win.document.close();
 }
+// Permanently delete an archived checklist (no recovery)
+function permanentDeleteChecklist(id) {
+    const checklist = state.checklists?.find(c => String(c.id) === String(id));
+    if (!checklist) return;
+    if (!confirm(`Permanently delete "${checklist.name}"? This cannot be undone.`)) return;
+
+    state.checklists = state.checklists.filter(c => String(c.id) !== String(id));
+    window.saveData();
+
+    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+        window.SupabaseClient.client
+            .from('checklists')
+            .delete()
+            .eq('id', id)
+            .then(({ error }) => {
+                if (error) console.error('Permanent delete DB error:', error);
+            });
+    }
+
+    window.showNotification(`"${checklist.name}" permanently deleted.`, 'success');
+    renderChecklistLibrary();
+}
 
 // Export functions
 window.renderChecklistLibrary = renderChecklistLibrary;
@@ -1405,4 +1485,5 @@ window.viewChecklistDetail = viewChecklistDetail;
 window.deleteChecklist = deleteChecklist;
 window.archiveChecklist = archiveChecklist;
 window.restoreChecklist = restoreChecklist;
+window.permanentDeleteChecklist = permanentDeleteChecklist;
 window.printChecklist = printChecklist;
