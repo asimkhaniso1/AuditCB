@@ -1625,33 +1625,32 @@ const SupabaseClient = {
                 const fullData = plan.data || {};
 
                 const mappedPlan = {
+                    // Spread data column FIRST so computed fields below override
+                    ...fullData,
+                    // Then set all properly mapped fields (these take precedence)
                     id: plan.id,
-                    client: plan.client_name || plan.client,  // Map client_name to client
-                    clientName: plan.client_name,
-                    clientId: plan.client_id,
-                    date: plan.date,
-                    status: plan.status,
-                    auditType: plan.audit_type,
-                    standard: plan.standard,
-                    scope: plan.scope,
-                    objectives: plan.objectives,
-                    manDays: plan.man_days,
-                    auditors: plan.auditor_ids || [],  // Map auditor_ids to auditors
+                    client: plan.client_name || plan.client || fullData.client,
+                    clientName: plan.client_name || fullData.clientName,
+                    clientId: plan.client_id || fullData.clientId,
+                    date: plan.date || fullData.date,
+                    status: plan.status || fullData.status,
+                    auditType: plan.audit_type || fullData.auditType,
+                    standard: plan.standard || fullData.standard,
+                    scope: plan.scope || fullData.scope,
+                    objectives: plan.objectives || fullData.objectives,
+                    manDays: plan.man_days || fullData.manDays,
+                    auditors: plan.auditor_ids || fullData.auditors || [],
                     // CRITICAL: Load checklist configuration (fallback to data column)
                     checklistIds: (plan.selected_checklists?.length ? plan.selected_checklists : null) || fullData.selectedChecklists || fullData.checklistIds || [],
                     selectedChecklists: (plan.selected_checklists?.length ? plan.selected_checklists : null) || fullData.selectedChecklists || [],
                     selectedChecklistItems: fullData.selectedChecklistItems || {},
                     selectedChecklistOverrides: fullData.selectedChecklistOverrides || {},
                     checklistConfig: plan.checklist_config || fullData.checklistConfig || [],
-                    startDate: plan.start_date,
-                    endDate: plan.end_date,
-                    leadAuditor: plan.lead_auditor,
-                    auditTeam: plan.audit_team || [],
-                    // Preserve other fields from data column
-                    ...fullData,
-                    // Ensure core fields use DB values
-                    id: plan.id,
-                    status: plan.status
+                    startDate: plan.start_date || fullData.startDate,
+                    endDate: plan.end_date || fullData.endDate,
+                    leadAuditor: plan.lead_auditor || fullData.leadAuditor,
+                    auditTeam: plan.audit_team || fullData.auditTeam || [],
+                    preAudit: plan.pre_audit || fullData.preAudit || null,
                 };
 
                 const existing = localPlans.find(p => String(p.id) === String(plan.id));
@@ -1704,27 +1703,27 @@ const SupabaseClient = {
                 const fullData = report.data || {};
 
                 const mappedReport = {
+                    // Spread data column FIRST so computed fields below can override
+                    ...fullData,
+                    // Then set all properly mapped fields (these take precedence)
                     id: report.id,
-                    planId: report.plan_id || report.audit_plan_id,
-                    clientId: report.client_id,
-                    client: report.client_name || fullData.client,  // DB uses client_name
-                    date: report.date || report.audit_date,
-                    status: report.status,
-                    auditType: report.audit_type || report.auditType,
-                    leadAuditor: report.lead_auditor || report.leadAuditor,
-                    findings: report.findings || report.findings_count || 0,
-                    conformities: report.conformities || 0,
-                    conclusion: report.conclusion,
-                    recommendation: report.recommendation,
-                    // Load execution data from BOTH possible column names
-                    // Strip base64 evidence images to prevent localStorage quota overflow
+                    planId: report.plan_id || report.audit_plan_id || fullData.planId,
+                    clientId: report.client_id || fullData.clientId,
+                    client: report.client_name || fullData.client,
+                    date: report.date || report.audit_date || fullData.date,
+                    status: report.status || fullData.status,
+                    auditType: report.audit_type || report.auditType || fullData.auditType,
+                    leadAuditor: report.lead_auditor || report.leadAuditor || fullData.leadAuditor,
+                    findings: report.findings || report.findings_count || fullData.findings || 0,
+                    conformities: report.conformities || fullData.conformities || 0,
+                    conclusion: report.conclusion || fullData.conclusion,
+                    recommendation: report.recommendation || fullData.recommendation,
+                    // Load execution data - strip base64 to prevent localStorage quota overflow
                     checklistProgress: (report.checklist_progress || report.checklist_data || fullData.checklistProgress || []).map(item => {
                         const cleaned = { ...item };
-                        // Strip base64 from single evidence image
                         if (cleaned.evidenceImage && typeof cleaned.evidenceImage === 'string' && cleaned.evidenceImage.startsWith('data:')) {
                             cleaned.evidenceImage = '';
                         }
-                        // Strip base64 from evidence images array
                         if (Array.isArray(cleaned.evidenceImages)) {
                             cleaned.evidenceImages = cleaned.evidenceImages.filter(u => typeof u === 'string' && !u.startsWith('data:'));
                         }
@@ -1734,12 +1733,6 @@ const SupabaseClient = {
                     openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
                     closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
                     ncrs: report.ncrs || fullData.ncrs || [],
-                    // Preserve any other fields from the full data object
-                    ...fullData,
-                    // Ensure core fields use DB values
-                    id: report.id,
-                    client: report.client_name || fullData.client,
-                    status: report.status
                 };
 
                 const existing = localReports.find(r => String(r.id) === String(report.id));
