@@ -349,7 +349,7 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
             const reports = window.state.reports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
             const activeReport = reports.find(r => r.standard === standardName) || reports[0];
             if (activeReport) {
-                const ctx = AI_SERVICE.getOrgAndPlanContext(activeReport);
+                const ctx = KB_HELPERS.getOrgAndPlanContext(activeReport);
                 if (ctx) orgSummary = ctx.substring(0, 800);
             }
         }
@@ -414,7 +414,7 @@ Return a raw JSON array with 'id' and 'refined' fields only:
         const kbContext = reportData.standard ? AI_SERVICE.getRelevantKBClauses(reportData.standard) : '';
 
         // Get Organization Context & Audit Plan details
-        const orgPlanContext = AI_SERVICE.getOrgAndPlanContext(reportData);
+        const orgPlanContext = KB_HELPERS.getOrgAndPlanContext(reportData);
 
         const prompt = `
 Act as a professional ISO Lead Auditor. Write an Executive Summary, Positive Observations, and Opportunities for Improvement for an Audit Report.
