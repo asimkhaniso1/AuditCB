@@ -3779,9 +3779,9 @@ SURVEILLANCE-SPECIFIC REQUIREMENTS:
             questionsInstruction: '3-5 specific audit questions per sub-clause covering evidence, implementation, effectiveness, compliance, and records',
             batchDelay: 3000,
             batches: [
-                { label: 'Clauses 4-6', range: 'Clauses 4, 5, and 6 — include ALL sub-clauses at EVERY level present in the document (X.Y, X.Y.Z, etc.). Do NOT skip any sub-clause.', useSource: true },
-                { label: 'Clauses 7-8', range: 'Clauses 7 and 8 — include ALL sub-clauses at EVERY level present in the document (X.Y, X.Y.Z, etc.). Do NOT skip any sub-clause.', useSource: true },
-                { label: 'Clauses 9-10', range: 'Clauses 9 and 10 — include ALL sub-clauses at EVERY level present in the document. Do NOT skip any sub-clause.', useSource: true }
+                { label: 'Clauses 4-6', range: 'Clauses 4, 5, and 6 — include ALL sub-clauses at EVERY level (X.Y, X.Y.Z). Must include: 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3 and all deeper levels.', useSource: true },
+                { label: 'Clauses 7-8', range: 'Clauses 7 and 8 — include ALL sub-clauses at EVERY level. Must include: 7.1 (AND 7.1.1, 7.1.2, 7.1.3, 7.1.4, 7.1.5, 7.1.6), 7.2, 7.3, 7.4, 7.5 (7.5.1, 7.5.2, 7.5.3), 8.1, 8.2, 8.3, 8.4 (8.4.1, 8.4.2, 8.4.3), 8.5 (8.5.1, 8.5.2, 8.5.3, 8.5.4, 8.5.5, 8.5.6), 8.6, 8.7. Do NOT skip 8.4-8.7.', useSource: true },
+                { label: 'Clauses 9-10', range: 'Clauses 9 and 10 — include ALL sub-clauses. Must include: 9.1 (9.1.1, 9.1.2, 9.1.3), 9.2 (9.2.1, 9.2.2), 9.3 (9.3.1, 9.3.2, 9.3.3), 10.1, 10.2, 10.3 (continual improvement). Do NOT skip 10.3.', useSource: true }
             ]
         }
     };
