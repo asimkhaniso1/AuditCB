@@ -2857,7 +2857,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             if (!report.auditType) report.auditType = auditPlan.type || auditPlan.auditType || '';
         }
         if (!client.certificationScope) {
-            client.certificationScope = auditPlan?.scope || client.scope || '';
+            // Pull scope from client certificates siteScopes (Scopes & Certs tab)
+            const matchingCert = (client.certificates || []).find(c => (c.standard || '').toLowerCase() === (report.standard || '').toLowerCase());
+            if (matchingCert && matchingCert.siteScopes) {
+                // Combine all site scopes into one string
+                const scopeValues = Object.entries(matchingCert.siteScopes).filter(([k, v]) => v).map(([siteName, scopeText]) => siteName + ': ' + scopeText);
+                client.certificationScope = scopeValues.length === 1 ? Object.values(matchingCert.siteScopes)[0] : scopeValues.join('; ') || '';
+            }
+            if (!client.certificationScope) {
+                client.certificationScope = matchingCert?.scope || auditPlan?.scope || client.scope || '';
+            }
         }
         if (!client.city && !client.country) {
             // Try to build location from client address
@@ -3906,8 +3915,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;}"
-            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}}'
-            + '@media print{@page{margin:20mm 15mm 25mm 15mm;}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
+            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:22mm;padding-bottom:18mm;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}}'
+            + '@media print{@page{margin:20mm 15mm 25mm 15mm;}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover{padding-top:0 !important;margin-top:-22mm;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
             + 'body{counter-reset:page;}'
             + '.page-break{counter-increment:page;}'
             + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:18mm;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;padding:4mm 15mm;align-items:center;justify-content:space-between;font-size:0.75rem;z-index:100;}'
@@ -3960,9 +3969,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || 'N/A') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div></div>'
-            + '<div style="position:absolute;bottom:40px;display:flex;align-items:center;gap:16px;">'
-            + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:40px;object-fit:contain;opacity:0.6;" alt="Client">' : '')
-            + '<img src="' + d.qrCodeUrl + '" style="height:60px;" alt="QR"></div></div>'
+            + '<div style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:30px;">'
+            + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:60px;object-fit:contain;" alt="Client">' : '')
+            + '<img src="' + d.qrCodeUrl + '" style="height:80px;" alt="QR"></div></div>'
             // TABLE OF CONTENTS
             + (function () {
                 var tocSections = [];
