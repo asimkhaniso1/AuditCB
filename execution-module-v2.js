@@ -2178,11 +2178,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         let finalTranscript = '';
 
-        // Auto-stop after 10 seconds
+        // Auto-stop after 30 seconds
         const timeout = setTimeout(() => {
             recognition.stop();
-            window.showNotification('Recording limit (10s) reached.', 'info');
-        }, 10000);
+            window.showNotification('Recording limit (30s) reached.', 'info');
+        }, 30000);
 
         recognition.onresult = function (event) {
             let interimTranscript = '';
