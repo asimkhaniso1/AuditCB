@@ -3691,7 +3691,8 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
                     if (s.city) info += ' (' + s.city + ')';
                     if (s.employees) info += ' — ' + s.employees + ' employees';
                     if (s.shiftWork) info += ', shift work';
-                    if (s.standards && s.standards.length > 0) info += ' [' + s.standards.join(', ') + ']';
+                    const stdList = Array.isArray(s.standards) ? s.standards : (s.standards ? [s.standards] : []);
+                    if (stdList.length > 0) info += ' [' + stdList.join(', ') + ']';
                     return info;
                 });
                 parts.push(`Sites: ${siteDetails.join('; ')}`);
