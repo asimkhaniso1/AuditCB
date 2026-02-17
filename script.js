@@ -238,24 +238,19 @@ function saveState() {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
         try {
-            // Strip base64 evidence images before saving to prevent localStorage overflow
-            // Cloud URLs (https://) and idb:// references are small strings - keep those
-            if (state.auditReports) {
-                for (const report of state.auditReports) {
-                    if (report.checklistProgress) {
-                        for (const item of report.checklistProgress) {
-                            if (item.evidenceImage && item.evidenceImage.startsWith('data:')) {
-                                item.evidenceImage = ''; // strip base64
-                            }
-                            if (item.evidenceImages && Array.isArray(item.evidenceImages)) {
-                                item.evidenceImages = item.evidenceImages.filter(u => u && !u.startsWith('data:'));
-                            }
-                        }
-                    }
+            // Use a JSON replacer to strip base64 evidence images DURING serialization only
+            // This avoids mutating the live state object (which would erase images from display)
+            const stateJSON = JSON.stringify(state, (key, value) => {
+                // Strip base64 from evidenceImage (single string)
+                if (key === 'evidenceImage' && typeof value === 'string' && value.startsWith('data:')) {
+                    return '';
                 }
-            }
-
-            const stateJSON = JSON.stringify(state);
+                // Strip base64 entries from evidenceImages array
+                if (key === 'evidenceImages' && Array.isArray(value)) {
+                    return value.filter(u => u && !u.startsWith('data:'));
+                }
+                return value;
+            });
             const sizeInMB = new Blob([stateJSON]).size / 1024 / 1024;
             lastSaveSize = sizeInMB;
 
