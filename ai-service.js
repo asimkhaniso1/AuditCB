@@ -484,7 +484,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 6. Ensure multiple sites are visited if applicable.
 7. In the "Activity / Clause" column, provide ONLY the Clause Number and Title (e.g., "5.1 Leadership"). Do NOT include the full requirement text or summaries. Keep it a single line.
 8. Times should be in "HH:MM - HH:MM" format.
-9. In the "Department / Auditee" column, use ACTUAL personnel names from the roster above where available. Format as "Department / Person Name (Designation)" — e.g., "HR / Ahmed Khan (HR Manager)". If no matching person exists for a clause, use the department name with the relevant designation.
+9. In the "Department / Auditee" column, use ACTUAL personnel names from the roster above where available. Format as "Department / Person Name" — e.g., "HR / Ahmed Khan". If no matching person exists for a clause, use the department name only.
 
 **Output Format:**
 Return ONLY a raw JSON array of objects. Do not include markdown formatting (like \`\`\`json).
