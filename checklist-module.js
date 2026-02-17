@@ -592,7 +592,7 @@ function openImportChecklistModal() {
             });
 
             const newChecklist = {
-                id: Date.now(),
+                id: String(Date.now()),
                 name,
                 standard,
                 type,
@@ -609,25 +609,13 @@ function openImportChecklistModal() {
             state.checklists.push(newChecklist);
             window.saveData();
 
-            // Persist to Supabase DB
+            // Persist to Supabase DB using the same upsert path as the rest of the app
             if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
                 try {
-                    await window.SupabaseClient.db.insert('checklists', {
-                        id: newChecklist.id,
-                        name: newChecklist.name,
-                        standard: newChecklist.standard,
-                        type: newChecklist.type,
-                        clauses: newChecklist.clauses,
-                        cloud_url: newChecklist.cloudUrl || null,
-                        cloud_path: newChecklist.cloudPath || null,
-                        file_name: newChecklist.fileName || null,
-                        created_by: newChecklist.createdBy,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    });
+                    await window.SupabaseClient.syncChecklistsToSupabase([newChecklist]);
                     console.log('✅ Checklist saved to Supabase DB');
                 } catch (dbErr) {
-                    console.error('Checklist DB insert failed:', dbErr);
+                    console.error('Checklist DB save failed:', dbErr);
                     window.showNotification('Imported locally, but DB sync failed: ' + dbErr.message, 'warning');
                 }
             }

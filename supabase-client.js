@@ -1763,8 +1763,6 @@ const SupabaseClient = {
                     audit_type: checklist.auditType || null,
                     audit_scope: checklist.auditScope || null,
                     created_by: checklist.createdBy || null,
-                    client_name: checklist.clientName || null,
-                    client_id: checklist.clientId || null,
                     clauses: checklist.clauses || [],
                     updated_at: new Date().toISOString()
                 };
