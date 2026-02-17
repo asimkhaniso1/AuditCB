@@ -3887,6 +3887,57 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
         }
 
         if (allClauses.length > 0) {
+            // ── Gap-fill: inject missing key clauses from built-in database ──
+            if (mode === 'comprehensive') {
+                const existingNums = new Set(allClauses.map(c => String(c.clause).trim()));
+                const builtIn = getBuiltInClauses(standardName);
+                if (builtIn.length > 0) {
+                    // Key clauses that frequently get skipped by AI
+                    const keyClauses = [
+                        '7.1', '7.1.1', '7.1.2', '7.1.3', '7.1.4', '7.1.5', '7.1.5.1', '7.1.5.2', '7.1.6',
+                        '8.4', '8.4.1', '8.4.2', '8.4.3',
+                        '8.5', '8.5.1', '8.5.2', '8.5.3', '8.5.4', '8.5.5', '8.5.6',
+                        '8.6', '8.7',
+                        '10.1', '10.2', '10.3'
+                    ];
+                    let gapCount = 0;
+                    keyClauses.forEach(num => {
+                        if (!existingNums.has(num)) {
+                            const fallback = builtIn.find(b => String(b.clause).trim() === num);
+                            if (fallback) {
+                                allClauses.push(fallback);
+                                // Also generate a default checklist question
+                                allChecklist.push({
+                                    clause: fallback.clause,
+                                    requirement: `How does the organization demonstrate conformity with ${fallback.clause} — ${fallback.title}?`
+                                });
+                                gapCount++;
+                            }
+                        }
+                    });
+                    if (gapCount > 0) {
+                        console.log(`[KB Analysis] Gap-fill: injected ${gapCount} missing clause(s) from built-in database`);
+                        // Re-sort by clause number
+                        allClauses.sort((a, b) => {
+                            const na = String(a.clause).split('.').map(Number);
+                            const nb = String(b.clause).split('.').map(Number);
+                            for (let k = 0; k < Math.max(na.length, nb.length); k++) {
+                                if ((na[k] || 0) !== (nb[k] || 0)) return (na[k] || 0) - (nb[k] || 0);
+                            }
+                            return 0;
+                        });
+                        allChecklist.sort((a, b) => {
+                            const na = String(a.clause).split('.').map(Number);
+                            const nb = String(b.clause).split('.').map(Number);
+                            for (let k = 0; k < Math.max(na.length, nb.length); k++) {
+                                if ((na[k] || 0) !== (nb[k] || 0)) return (na[k] || 0) - (nb[k] || 0);
+                            }
+                            return 0;
+                        });
+                    }
+                }
+            }
+
             window._kbProgress?.show(`Saving ${allClauses.length} clauses + ${allChecklist.length} questions...`, 95);
             doc.clauses = allClauses;
             doc.generatedChecklist = allChecklist;
