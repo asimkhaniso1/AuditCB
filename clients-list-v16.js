@@ -54,7 +54,7 @@ function renderClientsEnhanced() {
     ).join('')}
             </td>
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
-            <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
+
             <td>
                 <div style="display: flex; gap: 4px; align-items: center;">
                 ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
@@ -155,12 +155,12 @@ function renderClientsEnhanced() {
                             <th>Client Name</th>
                             <th>Standard</th>
                             <th>Status</th>
-                            <th>Next Audit</th>
+
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows || '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No clients found</td></tr>'}
+                        ${rows || '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No clients found</td></tr>'}
                     </tbody>
                 </table>
             </div>

@@ -52,7 +52,7 @@ function renderClientsEnhanced() {
         ).join('')}
             </td>
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
-            <td>${window.UTILS.escapeHtml(client.nextAudit)}</td>
+
             <td>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
@@ -155,12 +155,12 @@ function renderClientsEnhanced() {
                             <th>Client Name</th>
                             <th>Standard</th>
                             <th>Status</th>
-                            <th>Next Audit</th>
+
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows || '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No clients found</td></tr>'}
+                        ${rows || '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No clients found</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -452,10 +452,7 @@ function getClientInfoHTML(client) {
                      <label style="color: var(--text-secondary); font-size: 0.875rem;">Shift Work</label>
                      <p style="font-weight: 500; margin-top: 0.25rem;">${client.shifts === 'Yes' ? 'Yes (Multiple Shifts)' : 'No (General Shift Only)'}</p>
                 </div>
-                <div>
-                    <label style="color: var(--text-secondary); font-size: 0.875rem;">Next Audit Date</label>
-                    <p style="font-weight: 500; margin-top: 0.25rem;">${client.nextAudit}</p>
-                </div>
+
             </div>
         </div >
 
@@ -2341,6 +2338,9 @@ window.handleIndustryChange = function (select) {
                 if (!client.sites) client.sites = [];
                 const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
                 client.sites.push({ name, address, city, country, geotag, employees, shift, standards });
+                // Auto-sync: update company-level employees from sum of site employees
+                const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees) || 0), 0);
+                if (siteTotal > 0) client.employees = siteTotal;
                 window.saveData();
 
                 // Sync to Supabase
@@ -2555,6 +2555,9 @@ window.handleIndustryChange = function (select) {
             if (name) {
                 const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
                 client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift, standards };
+                // Auto-sync: update company-level employees from sum of site employees
+                const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees) || 0), 0);
+                if (siteTotal > 0) client.employees = siteTotal;
                 window.saveData();
 
                 // Sync to Supabase
