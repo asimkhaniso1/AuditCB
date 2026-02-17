@@ -1616,6 +1616,25 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <label>Meeting Notes</label>
                             <textarea id="opening-notes" class="form-control" rows="3" placeholder="Key points discussed, scope confirmed, agenda presented...">${openingMeeting.notes || ''}</textarea>
                         </div>
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                                <label style="font-weight: 600; font-size: 0.85rem; color: #166534; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Opening Meeting Agenda Points</label>
+                                <i class="fa-solid fa-chevron-down" style="color: #166534; font-size: 0.7rem;"></i>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                ${[
+                    { id: 'op-scope', label: 'Introduction of audit team & confirmation of audit scope' },
+                    { id: 'op-methodology', label: 'Audit plan, methodology & sampling approach' },
+                    { id: 'op-ncr-grading', label: 'Nonconformity grading criteria (Major / Minor / OFI)' },
+                    { id: 'op-remote-evidence', label: 'Evidence collection method (photos, screen-shares for remote audits)' },
+                    { id: 'op-process-flow', label: 'Process flow & department visit sequence' },
+                    { id: 'op-confidentiality', label: 'Confidentiality & impartiality declaration' },
+                    { id: 'op-communication', label: 'Communication arrangements & guide/escort' },
+                    { id: 'op-schedule', label: 'Daily schedule, breaks & logistics' },
+                    { id: 'op-prev-findings', label: 'Status of previous audit findings & CAPAs' }
+                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0;"><input type="checkbox" class="opening-pointer" data-key="' + p.id + '" ' + ((openingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #16a34a;"> ' + p.label + '</label>').join('')}
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Closing Meeting -->
@@ -1644,6 +1663,25 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div class="form-group">
                             <label>Client Response/Agreement</label>
                             <textarea id="closing-response" class="form-control" rows="2" placeholder="Client's response to findings...">${closingMeeting.response || ''}</textarea>
+                        </div>
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                                <label style="font-weight: 600; font-size: 0.85rem; color: #991b1b; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Closing Meeting Agenda Points</label>
+                                <i class="fa-solid fa-chevron-down" style="color: #991b1b; font-size: 0.7rem;"></i>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                ${[
+                    { id: 'cl-findings', label: 'Presentation of audit findings (Majors, Minors, OFIs)' },
+                    { id: 'cl-ncr-severity', label: 'Nonconformity severity & implications for certification' },
+                    { id: 'cl-capa-timelines', label: 'Corrective action timelines (Major: 90 days, Minor: 6 months)' },
+                    { id: 'cl-positive', label: 'Positive observations & good practices noted' },
+                    { id: 'cl-recommendation', label: 'Audit recommendation (grant / maintain / suspend / withdraw)' },
+                    { id: 'cl-appeals', label: 'Appeals & complaints process' },
+                    { id: 'cl-followup', label: 'Follow-up / surveillance audit schedule' },
+                    { id: 'cl-remote-evidence', label: 'Remote evidence sufficiency confirmation (if applicable)' },
+                    { id: 'cl-cert-scope', label: 'Certification scope, mark usage & public information' }
+                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0;"><input type="checkbox" class="closing-pointer" data-key="' + p.id + '" ' + ((closingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #dc2626;"> ' + p.label + '</label>').join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2509,7 +2547,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             date: document.getElementById('opening-date')?.value || '',
             time: document.getElementById('opening-time')?.value || '',
             attendees: window._collectMeetingAttendees('opening'),
-            notes: document.getElementById('opening-notes')?.value || ''
+            notes: document.getElementById('opening-notes')?.value || '',
+            keyPointers: (() => { const kp = {}; document.querySelectorAll('.opening-pointer').forEach(cb => { kp[cb.dataset.key] = cb.checked; }); return kp; })()
         };
 
         report.closingMeeting = {
@@ -2517,7 +2556,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             time: document.getElementById('closing-time')?.value || '',
             attendees: window._collectMeetingAttendees('closing'),
             summary: document.getElementById('closing-summary')?.value || '',
-            response: document.getElementById('closing-response')?.value || ''
+            response: document.getElementById('closing-response')?.value || '',
+            keyPointers: (() => { const kp = {}; document.querySelectorAll('.closing-pointer').forEach(cb => { kp[cb.dataset.key] = cb.checked; }); return kp; })()
         };
 
         window.saveData();
