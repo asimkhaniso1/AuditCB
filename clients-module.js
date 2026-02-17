@@ -4299,14 +4299,14 @@ CFO," style="font-family: monospace;"></textarea>
                             <div>
                                 <label style="font-size: 0.8rem;">Current Issue</label>
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-control" value="${cert.currentIssue || ''}" placeholder="e.g. 15-Mar-2025" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value)">
+                                    <input type="text" class="form-control cert-current-issue" value="${cert.currentIssue || ''}" placeholder="e.g. 15-Mar-2025" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value); window.autoFillExpiry(this)">
                                     <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
                                 </div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Expiry Date</label>
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-control" value="${cert.expiryDate || ''}" placeholder="e.g. 14-Mar-2027" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
+                                    <input type="text" class="form-control cert-expiry" value="${cert.expiryDate || ''}" placeholder="e.g. 14-Mar-2027" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
                                     <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
                                 </div>
                             </div>
@@ -4372,6 +4372,26 @@ CFO," style="font-family: monospace;"></textarea>
             // Autosave turned off to allow bulk edits, but for single inputs we might want to save?
             // Let's rely on the explicit "Save" button for major changes, but keep local state updated.
         }
+    };
+
+    // Auto-fill Expiry Date = Current Issue + 364 days
+    window.autoFillExpiry = function (currentIssueEl) {
+        try {
+            const val = currentIssueEl.value;
+            if (!val) return;
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return;
+            d.setDate(d.getDate() + 364);
+            const formatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            // Find the expiry input in the same card
+            const card = currentIssueEl.closest('.card');
+            if (!card) return;
+            const expiryEl = card.querySelector('.cert-expiry');
+            if (expiryEl) {
+                expiryEl.value = formatted;
+                expiryEl.dispatchEvent(new Event('change'));
+            }
+        } catch (e) { console.warn('autoFillExpiry:', e); }
     };
 
     window.updateSiteScope = function (clientId, certIndex, siteName, value) {
