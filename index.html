@@ -102,6 +102,9 @@
                 localStorage.setItem('v' + APP_VERSION + '_reloaded', 'true');
                 // Clear state to force fresh fetch
                 window.location.href = window.location.pathname + '?v=' + APP_VERSION + '&purge=' + Date.now() + window.location.hash;
+            } else if (window.location.search) {
+                // Clean up URL after purge - remove query params
+                window.history.replaceState(null, '', window.location.pathname + window.location.hash);
             }
         })();
     </script>
