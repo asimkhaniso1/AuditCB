@@ -770,6 +770,39 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                          </div>
                          
+                         <!-- Evidence Photos (available for ALL statuses) -->
+                         <div style="margin-top: 0.75rem; padding: 0.5rem 0.6rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                                 <label style="font-size: 0.78rem; font-weight: 600; color: #475569; margin: 0;"><i class="fa-solid fa-images" style="margin-right: 0.25rem; color: #6366f1;"></i>Evidence Photos</label>
+                                 <div style="display: flex; gap: 4px;">
+                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #6366f1; color: white; border: none; border-radius: 4px;" onclick="document.getElementById('img-${uniqueId}').click()" title="Upload image">
+                                         <i class="fa-solid fa-file-image"></i> Upload
+                                     </button>
+                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #0ea5e9; color: white; border: none; border-radius: 4px;" onclick="window.handleCameraButton('${uniqueId}')" title="Camera">
+                                         <i class="fa-solid fa-camera"></i>
+                                     </button>
+                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #8b5cf6; color: white; border: none; border-radius: 4px;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Screen capture">
+                                         <i class="fa-solid fa-desktop"></i>
+                                     </button>
+                                 </div>
+                             </div>
+                             <!-- Multi-image preview strip -->
+                             <div id="evidence-preview-${uniqueId}" style="display: ${(saved.evidenceImage || (saved.evidenceImages && saved.evidenceImages.length)) ? 'flex' : 'none'}; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                 ${(function () {
+                        const imgs = saved.evidenceImages || (saved.evidenceImage ? [saved.evidenceImage] : []);
+                        return imgs.map((src, imgIdx) => `
+                                         <div class="ev-thumb" data-idx="${imgIdx}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
+                                             <img src="${src}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${src.replace(/'/g, "\\'")}')"/>
+                                             <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${imgIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
+                                         </div>
+                                     `).join('');
+                    })()}
+                             </div>
+                             <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
+                             <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
+                             <input type="hidden" id="evidence-data-${uniqueId}" value="${(saved.evidenceImage || (saved.evidenceImages && saved.evidenceImages.length)) ? 'attached' : ''}">
+                         </div>
+                         
                          <!-- Hidden status input -->
                          <input type="hidden" class="status-input" data-checklist="${checklistId}" data-item="${idx}" data-custom="${isCustom}" data-clause="${window.UTILS.escapeHtml(item.clause || '')}" data-requirement="${window.UTILS.escapeHtml(requirementText || '')}" id="status-${uniqueId}" value="${s}">
                          
@@ -801,21 +834,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div style="text-align: right; margin-top: 5px;"><small style="color: blue; cursor: pointer;" onclick="this.parentElement.parentElement.style.display='none'">Close</small></div>
                                      </div>
                                  </div>
-                                 <div style="display: flex; flex-direction: column;">
-                                     <label style="font-size: 0.8rem;">Evidence Image <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
-                                    <div style="display: flex; gap: 5px;">
-                                         <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
-                                             <i class="fa-solid fa-file-image"></i> Upload
-                                         </button>
-                                         <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" onclick="window.handleCameraButton('${uniqueId}')" title="Capture photo from mobile camera or webcam">
-                                             <i class="fa-solid fa-camera"></i> Camera
-                                         </button>
-                                         <button type="button" class="btn btn-sm btn-outline-primary" style="flex: 1;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Capture from Zoom/Teams Screen Share">
-                                             <i class="fa-solid fa-desktop"></i> Screen
-                                         </button>
-                                     </div>
-                                     <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
-                                     <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
                                  </div>
                              </div>
                              
@@ -838,19 +856,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                      </select>
                                  </div>
                              </div>
-                             
-                             <!-- Evidence Image Preview -->
-                             <div id="evidence-preview-${uniqueId}" style="display: ${saved.evidenceImage ? 'block' : 'none'}; margin-bottom: 0.5rem;">
-                                 <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
-                                     <img id="evidence-img-${uniqueId}" src="${saved.evidenceImage || ''}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="event.stopPropagation(); window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
-                                     <div style="flex: 1;">
-                                         <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;"><i class="fa-solid fa-check-circle"></i> Image attached</p>
-                                         <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">${saved.evidenceSize || ''}</p>
-                                     </div>
-                                     <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
-                                 </div>
-                             </div>
-                             <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">
                              
 
 
@@ -1288,13 +1293,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     remarks: item.comment || item.transcript || '',
                     designation: item.designation || '',
                     department: item.department || '',
-                    hasEvidence: !!item.evidenceImage,
+                    hasEvidence: !!(item.evidenceImage || (item.evidenceImages && item.evidenceImages.length)),
                     evidenceImage: item.evidenceImage,
+                    evidenceImages: item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []),
                     clause: clauseText,
                     requirement: reqText && !isBadValue(reqText) ? reqText : '',
                     kbMatch: kbMatch
                 });
-                if (item.evidenceImage) window._evidenceCache[`checklist-${originalIdx}`] = item.evidenceImage;
+                const evImgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+                if (evImgs.length) window._evidenceCache[`checklist-${originalIdx}`] = evImgs;
             });
 
             // Collect manual NCRs
@@ -1898,11 +1905,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
                 const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
 
-                // Get evidence image data
-                const evidenceImg = document.getElementById('evidence-img-' + uniqueId);
-                const evidenceData = document.getElementById('evidence-data-' + uniqueId)?.value || '';
-                const evidenceImage = (evidenceData === 'attached' && evidenceImg?.src && !evidenceImg.src.includes('data:,')) ? evidenceImg.src : '';
-                const evidenceSize = document.getElementById('evidence-size-' + uniqueId)?.textContent || '';
+                // Get all evidence images from thumbnail strip
+                const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+                const evidenceImages = [];
+                if (previewDiv) {
+                    previewDiv.querySelectorAll('.ev-thumb img').forEach(img => {
+                        if (img.src && !img.src.includes('data:,') && img.src !== window.location.href) {
+                            evidenceImages.push(img.src);
+                        }
+                    });
+                }
+                // Backward compat: also store first image as evidenceImage
+                const evidenceImage = evidenceImages.length > 0 ? evidenceImages[0] : '';
+                const evidenceSize = '';
 
                 // Get designation and department
                 const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
@@ -1924,6 +1939,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     transcript: transcript,
                     ncrType: ncrType,
                     evidenceImage: evidenceImage,
+                    evidenceImages: evidenceImages,
                     evidenceSize: evidenceSize,
                     designation: designation,
                     department: department,
@@ -2682,23 +2698,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         }
                     }
 
-                    // 3. Update Preview UI
+                    // 3. Append to multi-image preview strip
                     if (previewDiv) {
-                        previewDiv.style.display = 'block';
-                        previewDiv.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
-                            <img id="evidence-img-${uniqueId}" src="${finalUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
-                            <div style="flex: 1;">
-                                <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;">
-                                    <i class="fa-solid fa-check-circle"></i> ${isCloud ? 'Saved to Cloud' : 'Attached Locally'}
-                                </p>
-                                <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">
-                                    ${compressedSize} KB ${isCloud ? '(Synced)' : '(Pending Sync)'}
-                                </p>
-                            </div>
-                            <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    `;
+                        previewDiv.style.display = 'flex';
+                        const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
+                        const newIdx = existingThumbs.length;
+                        const safeUrl = finalUrl.replace(/'/g, "\\'");
+                        const thumb = document.createElement('div');
+                        thumb.className = 'ev-thumb';
+                        thumb.dataset.idx = newIdx;
+                        thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
+                        thumb.innerHTML = `
+                            <img src="${finalUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeUrl}')"/>
+                            <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${newIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
+                        `;
+                        previewDiv.appendChild(thumb);
                     }
 
                     // 4. Update Hidden Inputs
@@ -2823,22 +2837,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     // View evidence image directly from cached data (used in Review tab)
     window.viewEvidenceImageDirect = function (findingId) {
-        const src = window._evidenceCache && window._evidenceCache[findingId];
-        if (!src) {
+        const cached = window._evidenceCache && window._evidenceCache[findingId];
+        if (!cached) {
             window.showNotification('Evidence image not found. Please view from the Checklist tab.', 'warning');
             return;
         }
+        // Handle both old (string) and new (array) formats
+        const srcs = Array.isArray(cached) ? cached : [cached];
         const overlay = document.createElement('div');
         overlay.id = 'evidence-modal-overlay';
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
-        overlay.onclick = function () { overlay.remove(); };
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
+        overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
         overlay.innerHTML = `
-            <div style="position: relative; max-width: 90%; max-height: 90%;">
-                <img src="${src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
+            <div style="position: relative; max-width: 90%; max-height: 80vh;" onclick="event.stopPropagation();">
+                <img id="ev-gallery-main" src="${srcs[0]}" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
                 <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
+            ${srcs.length > 1 ? `<div style="display: flex; gap: 8px; margin-top: 12px;" onclick="event.stopPropagation();">
+                ${srcs.map((s, i) => `<img src="${s}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid ${i === 0 ? 'white' : 'transparent'}; opacity: ${i === 0 ? '1' : '0.6'};" onclick="document.getElementById('ev-gallery-main').src='${s.replace(/'/g, "\\'")}'; this.parentElement.querySelectorAll('img').forEach(t=>{t.style.border='2px solid transparent';t.style.opacity='0.6';}); this.style.border='2px solid white'; this.style.opacity='1';">`).join('')}
+            </div>` : ''}
+            <p style="color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 8px;">${srcs.length} photo${srcs.length > 1 ? 's' : ''} \u2022 Click outside to close</p>
         `;
         document.body.appendChild(overlay);
     };
@@ -2849,11 +2869,38 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const evidenceData = document.getElementById('evidence-data-' + uniqueId);
         const fileInput = document.getElementById('img-' + uniqueId);
 
-        if (previewDiv) previewDiv.style.display = 'none';
+        if (previewDiv) { previewDiv.style.display = 'none'; previewDiv.innerHTML = ''; }
         if (evidenceData) evidenceData.value = '';
         if (fileInput) fileInput.value = '';
 
         window.showNotification('Evidence image removed', 'info');
+    };
+
+    // Remove a specific image by index from the multi-image strip
+    window.removeEvidenceByIdx = function (uniqueId, idx) {
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        if (!previewDiv) return;
+        const thumbs = previewDiv.querySelectorAll('.ev-thumb');
+        if (thumbs[idx]) thumbs[idx].remove();
+        // If no thumbs left, hide preview and clear data
+        if (previewDiv.querySelectorAll('.ev-thumb').length === 0) {
+            previewDiv.style.display = 'none';
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+            if (evidenceData) evidenceData.value = '';
+        }
+    };
+
+    // View any evidence image by URL in a lightbox overlay
+    window.viewEvidenceImageByUrl = function (url) {
+        if (!url) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; cursor: pointer;';
+        overlay.onclick = () => overlay.remove();
+        overlay.innerHTML = `
+            <img src="${url}" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <button style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;">\u00d7</button>
+        `;
+        document.body.appendChild(overlay);
     };
     // Generate Printable Report - Enhanced Version
     // Generate Printable Report - Enhanced Version
