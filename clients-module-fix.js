@@ -437,6 +437,7 @@ window.getClientContactsHTML = function (client) {
 
 window.getClientDepartmentsHTML = function (client) {
     const departments = client.departments || [];
+    const contacts = client.contacts || [];
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
@@ -452,16 +453,19 @@ window.getClientDepartmentsHTML = function (client) {
         </div>
         <div class="org-table">
             <table id="depts-table"><thead><tr><th>Department Name</th><th>Head</th><th style="width:140px">Actions</th></tr></thead>
-            <tbody>${departments.map((dept, i) => `<tr>
+            <tbody>${departments.map((dept, i) => {
+        const deptHead = dept.head || (contacts.find(c => c.department && c.department.toLowerCase() === dept.name.toLowerCase()) || {}).name || '-';
+        return `<tr>
                 <td class="name-cell">${window.UTILS.escapeHtml(dept.name)}</td>
-                <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
+                <td>${deptHead !== '-' ? '<span class="badge-tag badge-blue">' + window.UTILS.escapeHtml(deptHead) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(dept.head)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})"><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" onclick="window.editDepartment('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(dept.head)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteDepartment('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
-            </tr>`).join('')}</tbody></table>
+            </tr>`;
+    }).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-sitemap"></i><p>No departments added yet.</p></div>'}
     </div>`;
 };
@@ -530,6 +534,7 @@ window.getClientKeyProcessesHTML = function (client) {
 
 window.getClientDesignationsHTML = function (client) {
     const designations = client.designations || [];
+    const contacts = client.contacts || [];
     return `
     <div class="org-table-wrapper">
         <div class="org-table-header">
@@ -545,16 +550,20 @@ window.getClientDesignationsHTML = function (client) {
         </div>
         <div class="org-table">
             <table id="desig-table"><thead><tr><th>Title</th><th>Department</th><th style="width:140px">Actions</th></tr></thead>
-            <tbody>${designations.map((des, i) => `<tr>
-                <td class="name-cell">${window.UTILS.escapeHtml(des.title || des.name || '')}</td>
-                <td>${des.department ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(des.department) + '</span>' : '-'}</td>
+            <tbody>${designations.map((des, i) => {
+        const desTitle = des.title || des.name || '';
+        const desDept = des.department || (contacts.find(c => c.designation && c.designation.toLowerCase() === desTitle.toLowerCase()) || {}).department || '';
+        return `<tr>
+                <td class="name-cell">${window.UTILS.escapeHtml(desTitle)}</td>
+                <td>${desDept ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(desDept) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Designation',{Title:'${_esc(des.title || des.name)}',Department:'${_esc(des.department)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})"><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" onclick="window.editClientDesignation('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Designation',{Title:'${_esc(des.title || des.name)}',Department:'${_esc(des.department)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteClientDesignation('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
-            </tr>`).join('')}</tbody></table>
+            </tr>`;
+    }).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-id-badge"></i><p>No designations added yet.</p></div>'}
     </div>`;
 };
