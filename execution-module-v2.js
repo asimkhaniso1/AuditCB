@@ -3426,8 +3426,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         if (!btn) return;
 
         // Get the report and standard
-        const reports = window.state?.reports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
-        const report = reports.find(r => r.id === reportId);
+        const reports = window.state?.auditReports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
+        const report = reports.find(r => String(r.id) === String(reportId));
         if (!report) { window.showNotification('Report not found.', 'error'); return; }
 
         const standardName = report.standard || '';
