@@ -1717,7 +1717,19 @@ const SupabaseClient = {
                     conclusion: report.conclusion,
                     recommendation: report.recommendation,
                     // Load execution data from BOTH possible column names
-                    checklistProgress: report.checklist_progress || report.checklist_data || fullData.checklistProgress || [],
+                    // Strip base64 evidence images to prevent localStorage quota overflow
+                    checklistProgress: (report.checklist_progress || report.checklist_data || fullData.checklistProgress || []).map(item => {
+                        const cleaned = { ...item };
+                        // Strip base64 from single evidence image
+                        if (cleaned.evidenceImage && typeof cleaned.evidenceImage === 'string' && cleaned.evidenceImage.startsWith('data:')) {
+                            cleaned.evidenceImage = '';
+                        }
+                        // Strip base64 from evidence images array
+                        if (Array.isArray(cleaned.evidenceImages)) {
+                            cleaned.evidenceImages = cleaned.evidenceImages.filter(u => typeof u === 'string' && !u.startsWith('data:'));
+                        }
+                        return cleaned;
+                    }),
                     customItems: report.custom_items || fullData.customItems || [],
                     openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
                     closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
