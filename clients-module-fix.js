@@ -418,15 +418,16 @@ window.getClientContactsHTML = function (client) {
             <input class="org-table-search" placeholder="Search contacts..." oninput="window._orgTableSearch(this, 'contacts-table')">
         </div>
         <div class="org-table">
-            <table id="contacts-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th style="width:140px">Actions</th></tr></thead>
+            <table id="contacts-table"><thead><tr><th>Name</th><th>Designation</th><th>Department</th><th>Email</th><th style="width:140px">Actions</th></tr></thead>
             <tbody>${contacts.map((c, i) => `<tr>
                 <td class="name-cell">${window.UTILS.escapeHtml(c.name)}</td>
+                <td>${c.designation ? '<span class="badge-tag badge-amber">' + window.UTILS.escapeHtml(c.designation) + '</span>' : '-'}</td>
+                <td>${c.department ? '<span class="badge-tag badge-primary">' + window.UTILS.escapeHtml(c.department) + '</span>' : '-'}</td>
                 <td>${window.UTILS.escapeHtml(c.email || '-')}</td>
-                <td>${window.UTILS.escapeHtml(c.phone || '-')}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Contact',{Name:'${_esc(c.name)}',Email:'${_esc(c.email)}',Phone:'${_esc(c.phone)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}',Phone:'${_esc(c.phone)}'})"><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" onclick="window.editContact('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Contact',{Name:'${_esc(c.name)}',Email:'${_esc(c.email)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}'})"><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" onclick="window.deleteContact('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
@@ -752,12 +753,30 @@ window.bulkUploadDepartments = function (clientId) {
 window.addContactPerson = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
+    const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '">' + (d.name || '') + '</option>').join('');
+    const desigs = (client.designations || []).map(d => '<option value="' + (d.title || d.name || '').replace(/"/g, '&quot;') + '">' + (d.title || d.name || '') + '</option>').join('');
     window.openModal('Add Contact', `
-        <form><div class="form-group"><label>Name *</label><input id="contact-name" class="form-control"></div><div class="form-group"><label>Email</label><input id="contact-email" class="form-control"></div></form>`, () => {
+        <form>
+            <div class="form-group"><label>Name *</label><input id="contact-name" class="form-control"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div class="form-group"><label>Designation</label><select id="contact-designation" class="form-control"><option value="">-- Select --</option>${desigs}</select></div>
+                <div class="form-group"><label>Department</label><select id="contact-department" class="form-control"><option value="">-- Select --</option>${depts}</select></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div class="form-group"><label>Email</label><input id="contact-email" class="form-control"></div>
+                <div class="form-group"><label>Phone</label><input id="contact-phone" class="form-control"></div>
+            </div>
+        </form>`, () => {
         const name = document.getElementById('contact-name').value;
         if (name) {
             if (!client.contacts) client.contacts = [];
-            client.contacts.push({ name, email: document.getElementById('contact-email').value });
+            client.contacts.push({
+                name,
+                designation: document.getElementById('contact-designation').value,
+                department: document.getElementById('contact-department').value,
+                email: document.getElementById('contact-email').value,
+                phone: document.getElementById('contact-phone').value
+            });
             window.saveData();
             if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
             window.closeModal();
@@ -779,13 +798,29 @@ window.editContact = function (clientId, index) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.contacts || !client.contacts[index]) return;
     const ct = client.contacts[index];
+    const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '"' + ((ct.department === d.name) ? ' selected' : '') + '>' + (d.name || '') + '</option>').join('');
+    const desigs = (client.designations || []).map(d => { const v = d.title || d.name || ''; return '<option value="' + v.replace(/"/g, '&quot;') + '"' + ((ct.designation === v) ? ' selected' : '') + '>' + v + '</option>'; }).join('');
     window.openModal('Edit Contact', `
-        <form><div class="form-group"><label>Name *</label><input id="contact-name" class="form-control" value="${(ct.name || '').replace(/"/g, '&quot;')}"></div>
-        <div class="form-group"><label>Email</label><input id="contact-email" class="form-control" value="${(ct.email || '').replace(/"/g, '&quot;')}"></div>
-        <div class="form-group"><label>Phone</label><input id="contact-phone" class="form-control" value="${(ct.phone || '').replace(/"/g, '&quot;')}"></div></form>`, () => {
+        <form>
+            <div class="form-group"><label>Name *</label><input id="contact-name" class="form-control" value="${(ct.name || '').replace(/"/g, '&quot;')}"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div class="form-group"><label>Designation</label><select id="contact-designation" class="form-control"><option value="">-- Select --</option>${desigs}</select></div>
+                <div class="form-group"><label>Department</label><select id="contact-department" class="form-control"><option value="">-- Select --</option>${depts}</select></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div class="form-group"><label>Email</label><input id="contact-email" class="form-control" value="${(ct.email || '').replace(/"/g, '&quot;')}"></div>
+                <div class="form-group"><label>Phone</label><input id="contact-phone" class="form-control" value="${(ct.phone || '').replace(/"/g, '&quot;')}"></div>
+            </div>
+        </form>`, () => {
         const name = document.getElementById('contact-name').value;
         if (name) {
-            client.contacts[index] = { name, email: document.getElementById('contact-email').value, phone: document.getElementById('contact-phone').value };
+            client.contacts[index] = {
+                name,
+                designation: document.getElementById('contact-designation').value,
+                department: document.getElementById('contact-department').value,
+                email: document.getElementById('contact-email').value,
+                phone: document.getElementById('contact-phone').value
+            };
             window.saveData();
             if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
             window.closeModal();
@@ -798,12 +833,28 @@ window.editContact = function (clientId, index) {
 window.bulkUploadContacts = function (clientId) {
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client) return;
-    window.openModal('Bulk Contacts', `<textarea id="bulk-cont" rows="5" class="form-control" placeholder="Name, Email"></textarea>`, () => {
+    window.openModal('Bulk Contacts', `
+        <div style="margin-bottom:1rem"><p style="color:grey;font-size:0.85rem">Format: <strong>Name, Designation, Department, Email</strong></p></div>
+        <textarea id="bulk-cont" rows="6" class="form-control" placeholder="Ahmed Khan, Quality Manager, Quality Dept, ahmed@example.com
+Sarah Ali, Production Head, Production, sarah@example.com"></textarea>`, () => {
         const lines = document.getElementById('bulk-cont').value.split('\n');
         if (!client.contacts) client.contacts = [];
-        lines.forEach(l => { const p = l.split(','); if (p[0]) client.contacts.push({ name: p[0].trim(), email: p[1]?.trim() || '' }); });
-        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
-        window.closeModal(); if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 5); else renderClientDetail(clientId);
+        lines.forEach(l => {
+            const p = l.split(',');
+            if (p[0] && p[0].trim()) {
+                client.contacts.push({
+                    name: p[0].trim(),
+                    designation: p[1]?.trim() || '',
+                    department: p[2]?.trim() || '',
+                    email: p[3]?.trim() || ''
+                });
+            }
+        });
+        window.saveData();
+        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.closeModal();
+        if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 5);
+        else renderClientDetail(clientId);
     });
 };
 
