@@ -1154,18 +1154,27 @@ function viewChecklistDetail(id) {
 function isChecklistUsedInAudits(checklistId) {
     const reports = window.state.auditReports || [];
     const executions = window.state.auditExecutions || [];
+    const plans = window.state.auditPlans || [];
     const strId = String(checklistId);
+    const linkedTo = [];
 
+    // Check audit plans (selected checklists)
+    for (const p of plans) {
+        const selectedIds = (p.selectedChecklists || []).map(String);
+        if (selectedIds.includes(strId)) {
+            linkedTo.push(`Plan: ${p.client || p.name || p.id}`);
+        }
+    }
     // Check audit reports
     for (const r of reports) {
-        if (String(r.checklistId) === strId) return { used: true, where: `Audit Report: ${r.clientName || r.id} ` };
-        if (r.checklistProgress?.some(p => String(p.checklistId) === strId)) return { used: true, where: `Audit Report: ${r.clientName || r.id} ` };
+        if (String(r.checklistId) === strId) { linkedTo.push(`Report: ${r.clientName || r.id}`); continue; }
+        if (r.checklistProgress?.some(p => String(p.checklistId) === strId)) linkedTo.push(`Report: ${r.clientName || r.id}`);
     }
     // Check audit executions
     for (const e of executions) {
-        if (String(e.checklistId) === strId) return { used: true, where: `Audit Execution: ${e.clientName || e.id} ` };
+        if (String(e.checklistId) === strId) linkedTo.push(`Execution: ${e.clientName || e.id}`);
     }
-    return { used: false };
+    return linkedTo.length > 0 ? { used: true, linkedTo } : { used: false, linkedTo: [] };
 }
 
 // Archive a checklist (soft delete)
@@ -1234,7 +1243,8 @@ function deleteChecklist(id) {
     // Check if checklist is used in audits
     const usage = isChecklistUsedInAudits(id);
     if (usage.used) {
-        window.showNotification(`This checklist is used in "${usage.where}".It will be archived instead of deleted to preserve audit records.`, 'warning');
+        const linkList = usage.linkedTo.join(', ');
+        window.showNotification(`Cannot delete — this checklist is linked to: ${linkList}. It has been archived instead to preserve audit records.`, 'warning');
         archiveChecklist(id);
         return;
     }
