@@ -3279,9 +3279,17 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
     const modalContent = document.getElementById('modal-body');
     if (!modalContent) return;
 
-    // Build client options for context selector
+    // Build client options for context selector — only clients with matching standards
     const clients = window.state.clients || [];
-    const clientOptions = clients.map(c =>
+    const kb = window.state.knowledgeBase;
+    const kbDoc = kb?.standards?.find(d => d.id == docId);
+    const docISONumbers = (kbDoc?.name || '').match(/\d{4,5}/g) || [];
+    const matchingClients = clients.filter(c => {
+        if (!c.standard || docISONumbers.length === 0) return true;
+        const clientISO = (c.standard || '').match(/\d{4,5}/g) || [];
+        return clientISO.some(n => docISONumbers.includes(n));
+    });
+    const clientOptions = matchingClients.map(c =>
         `<option value="${c.id}">${window.UTILS.escapeHtml(c.name)}${c.industry ? ' (' + c.industry + ')' : ''}</option>`
     ).join('');
 
