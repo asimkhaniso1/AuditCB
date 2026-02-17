@@ -1381,8 +1381,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="margin-bottom: 2rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Findings & Classification</h4>
-                            <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" onclick="window.runFollowUpAIAnalysis('${report.id}')">
-                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify
+                            <button id="btn-ai-classify" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" onclick="window.runFollowUpAIAnalysis('${report.id}')">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify & Polish
                             </button>
                         </div>
 
@@ -1431,10 +1431,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             <div>
                 <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Auditor Remarks / Notes</label>
                 <textarea class="form-control form-control-sm review-remarks" data-finding-id="${f.id}" placeholder="Justification or internal notes..." rows="3" style="font-size: 0.85rem;">${f.remarks || ''}</textarea>
-                <button class="ai-polish-finding-btn" data-finding-id="${f.id}" onclick="window.polishSingleNote(this)" style="margin-top:6px;padding:4px 12px;border-radius:6px;border:1px solid #0ea5e9;background:#f0f9ff;color:#0369a1;font-size:0.75rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size:0.7rem;"></i>Polish with AI
-                </button>
             </div>
+
                                     </div >
                                 </div >
                 `).join('')}
@@ -3418,6 +3416,186 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             pill.style.background = color; pill.style.color = 'white'; pill.style.borderColor = color;
             if (sec) sec.style.display = '';
         }
+    };
+
+    // ============================================
+    // AI AUTO-CLASSIFY & POLISH (Combined: classify severity + refine notes)
+    // ============================================
+    window.runFollowUpAIAnalysis = async function (reportId) {
+        const btn = document.getElementById('btn-ai-classify');
+        if (!btn) return;
+
+        // Get the report and standard
+        const reports = window.state?.reports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
+        const report = reports.find(r => r.id === reportId);
+        if (!report) { window.showNotification('Report not found.', 'error'); return; }
+
+        const standardName = report.standard || '';
+        const checklistProgress = report.checklistProgress || [];
+
+        // Check AI service availability
+        if (!window.AI_SERVICE) {
+            window.showNotification('AI Service not available.', 'warning');
+            return;
+        }
+
+        // Show loading state
+        const originalBtnHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Classifying & Polishing...';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+
+        try {
+            // STEP 1: Collect all findings from the DOM
+            const findingCards = document.querySelectorAll('.review-severity');
+            const findings = [];
+            findingCards.forEach(select => {
+                const fid = select.dataset.findingId;
+                const textarea = document.querySelector('.review-remarks[data-finding-id="' + fid + '"]');
+                const remarkText = textarea?.value || '';
+                const card = select.closest('.card');
+                const clauseEl = card?.querySelector('[style*="font-weight: 700"]');
+                const clause = clauseEl?.textContent?.match(/[\d.]+/)?.[0] || '';
+
+                findings.push({
+                    id: fid,
+                    clause: clause,
+                    status: 'nc',
+                    comment: remarkText,
+                    remarks: remarkText,
+                    type: select.value
+                });
+            });
+
+            if (findings.length === 0) {
+                window.showNotification('No findings to process.', 'info');
+                btn.innerHTML = originalBtnHtml;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                return;
+            }
+
+            let classifyCount = 0;
+            let polishCount = 0;
+
+            // STEP 2: AI Classify Findings (if analyzeFindings available)
+            if (window.AI_SERVICE.analyzeFindings) {
+                try {
+                    const classified = await window.AI_SERVICE.analyzeFindings(findings, standardName);
+                    if (classified && Array.isArray(classified)) {
+                        classified.forEach((result, i) => {
+                            if (result.type && findings[i]) {
+                                const select = document.querySelector('.review-severity[data-finding-id="' + findings[i].id + '"]');
+                                if (select) {
+                                    const newType = result.type.toLowerCase();
+                                    if (['major', 'minor', 'observation'].includes(newType)) {
+                                        select.value = newType;
+                                        classifyCount++;
+                                        // Update border color
+                                        const card = select.closest('.card');
+                                        if (card) {
+                                            const color = newType === 'major' ? '#dc2626' : newType === 'minor' ? '#d97706' : '#8b5cf6';
+                                            card.style.borderLeftColor = color;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } catch (classifyErr) {
+                    console.warn('Classification error (continuing with polish):', classifyErr);
+                }
+            }
+
+            // STEP 3: AI Polish Notes (refine raw text to professional language)
+            if (window.AI_SERVICE.refineAuditNotes) {
+                try {
+                    const toPolish = findings.filter(f => f.comment && f.comment.trim());
+                    if (toPolish.length > 0) {
+                        const refined = await window.AI_SERVICE.refineAuditNotes(toPolish, standardName);
+                        if (refined && Array.isArray(refined)) {
+                            refined.forEach((result, i) => {
+                                if (result.comment && result.comment !== toPolish[i].comment) {
+                                    const textarea = document.querySelector('.review-remarks[data-finding-id="' + toPolish[i].id + '"]');
+                                    if (textarea) {
+                                        textarea.value = result.comment;
+                                        polishCount++;
+                                        // Flash green for polished items
+                                        textarea.style.transition = 'background 0.3s';
+                                        textarea.style.background = '#f0fdf4';
+                                        setTimeout(() => { textarea.style.background = ''; }, 2500);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (polishErr) {
+                    console.warn('Polish error:', polishErr);
+                }
+            }
+
+            // STEP 4: Auto-save to DB by updating the report object and persisting
+            findingCards.forEach(select => {
+                const fid = select.dataset.findingId;
+                const newType = select.value;
+                const textarea = document.querySelector('.review-remarks[data-finding-id="' + fid + '"]');
+                const remarks = textarea?.value || '';
+
+                if (fid.startsWith('checklist-')) {
+                    const idx = parseInt(fid.replace('checklist-', ''));
+                    if (report.checklistProgress && report.checklistProgress[idx]) {
+                        report.checklistProgress[idx].ncrType = newType;
+                        if (remarks) report.checklistProgress[idx].comment = remarks;
+                    }
+                } else if (fid.startsWith('ncr-')) {
+                    const idx = parseInt(fid.replace('ncr-', ''));
+                    if (report.ncrs && report.ncrs[idx]) {
+                        report.ncrs[idx].type = newType;
+                        if (remarks) report.ncrs[idx].description = remarks;
+                    }
+                }
+            });
+
+            // Persist to localStorage
+            const existingReports = JSON.parse(localStorage.getItem('audit_reports') || '[]');
+            const rIdx = existingReports.findIndex(r => r.id === reportId);
+            if (rIdx !== -1) {
+                existingReports[rIdx] = report;
+                localStorage.setItem('audit_reports', JSON.stringify(existingReports));
+            }
+
+            // Persist to Supabase
+            if (window.SupabaseClient?.db?.upsert) {
+                try {
+                    await window.SupabaseClient.db.upsert('audit_reports', {
+                        id: String(reportId),
+                        checklist_progress: report.checklistProgress || [],
+                        ncrs: report.ncrs || [],
+                        data: report || {}
+                    });
+                } catch (dbErr) {
+                    console.warn('DB save after AI classify:', dbErr);
+                }
+            }
+
+            // Success UI
+            btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Done! ' + classifyCount + ' classified, ' + polishCount + ' polished';
+            btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            window.showNotification('AI classified ' + classifyCount + ' findings and polished ' + polishCount + ' notes. Changes saved.', 'success');
+
+        } catch (error) {
+            console.error('AI Classify & Polish error:', error);
+            btn.innerHTML = originalBtnHtml;
+            window.showNotification('AI processing failed: ' + error.message, 'error');
+        }
+
+        // Reset button after 4s
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify & Polish';
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.background = 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)';
+        }, 4000);
     };
 
     // ============================================
