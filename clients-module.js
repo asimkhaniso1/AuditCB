@@ -4291,15 +4291,24 @@ CFO," style="font-family: monospace;"></textarea>
                          <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                             <div>
                                 <label style="font-size: 0.8rem;">Initial Date</label>
-                                <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'initialDate', this.value)">
+                                <div style="display: flex; gap: 4px;">
+                                    <input type="text" class="form-control" value="${cert.initialDate || ''}" placeholder="e.g. 15-Mar-2024" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'initialDate', this.value)">
+                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
+                                </div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Current Issue</label>
-                                <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value)">
+                                <div style="display: flex; gap: 4px;">
+                                    <input type="text" class="form-control" value="${cert.currentIssue || ''}" placeholder="e.g. 15-Mar-2025" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value)">
+                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
+                                </div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Expiry Date</label>
-                                <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
+                                <div style="display: flex; gap: 4px;">
+                                    <input type="text" class="form-control" value="${cert.expiryDate || ''}" placeholder="e.g. 14-Mar-2027" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
+                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
+                                </div>
                             </div>
                          </div>
                          <div style="display: flex; align-items: flex-end;">
