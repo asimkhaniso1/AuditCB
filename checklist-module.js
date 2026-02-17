@@ -546,7 +546,7 @@ function openImportChecklistModal() {
         }
 
         const reader = new FileReader();
-        reader.onload = function (event) {
+        reader.onload = async function (event) {
             const text = event.target.result;
             const lines = text.split(/\r\n|\n/).filter(l => l.trim());
 
@@ -608,6 +608,30 @@ function openImportChecklistModal() {
             if (!state.checklists) state.checklists = [];
             state.checklists.push(newChecklist);
             window.saveData();
+
+            // Persist to Supabase DB
+            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
+                try {
+                    await window.SupabaseClient.db.insert('checklists', {
+                        id: newChecklist.id,
+                        name: newChecklist.name,
+                        standard: newChecklist.standard,
+                        type: newChecklist.type,
+                        clauses: newChecklist.clauses,
+                        cloud_url: newChecklist.cloudUrl || null,
+                        cloud_path: newChecklist.cloudPath || null,
+                        file_name: newChecklist.fileName || null,
+                        created_by: newChecklist.createdBy,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    });
+                    console.log('✅ Checklist saved to Supabase DB');
+                } catch (dbErr) {
+                    console.error('Checklist DB insert failed:', dbErr);
+                    window.showNotification('Imported locally, but DB sync failed: ' + dbErr.message, 'warning');
+                }
+            }
+
             window.closeModal();
             renderChecklistLibrary();
 
