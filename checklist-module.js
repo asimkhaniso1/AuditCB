@@ -1353,16 +1353,23 @@ function printChecklist(id) {
             // Add main clause as a header row (Level 1)
             printItems.push({ clause: main.mainClause || main.clause, requirement: main.title || main.requirement, isHeader: true, level: 1 });
             (main.subClauses || []).forEach(sub => {
+                // Helper to get text from nested items
+                const getNestedReq = (obj) => {
+                    if (!obj.items || !obj.items[0]) return null;
+                    return obj.items[0].requirement || obj.items[0].text || obj.items[0].title;
+                };
                 if (sub.items && sub.items.length > 0) {
                     // Sub-clause header (Level 2)
-                    printItems.push({ clause: sub.clause, requirement: sub.title || '', isHeader: true, level: 2 });
+                    const subTitle = sub.title || sub.requirement || sub.text || '';
+                    printItems.push({ clause: sub.clause, requirement: subTitle, isHeader: true, level: 2 });
                     // Individual items (Level 3+)
                     sub.items.forEach(item => {
-                        printItems.push({ clause: item.clause, requirement: item.requirement });
+                        printItems.push({ clause: item.clause, requirement: item.requirement || item.text || item.title || '' });
                     });
                 } else {
-                    // Legacy flat sub-clause
-                    printItems.push({ clause: sub.clause, requirement: sub.requirement });
+                    // Flat sub-clause — check all possible text fields
+                    const reqText = sub.requirement || sub.title || sub.requirement_text || sub.text || getNestedReq(sub) || '';
+                    printItems.push({ clause: sub.clause, requirement: reqText });
                 }
             });
         });
@@ -1375,85 +1382,123 @@ function printChecklist(id) {
     let content = `
         <html>
         <head>
-            <title>Checklist: ${checklist.name}</title>
+            <title>Audit Checklist Report  ${checklist.name}</title>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; max-width: 900px; margin: 0 auto; }
-                .header { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; position: relative; }
-                h1 { color: #0f172a; margin: 0 0 10px 0; font-size: 1.4rem; }
-                p { margin: 5px 0; color: #64748b; font-size: 0.9rem; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { padding: 10px 12px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; font-size: 0.85rem; }
-                th { background: #f8fafc; font-weight: 600; color: #475569; }
-                td.clause { font-weight: 600; background: #f1f5f9; width: 80px; }
-                tr.section-header td { background: #e0f2fe; font-weight: 700; color: #0369a1; border-bottom: 2px solid #0369a1; }
-                tr.sub-header td { background: #f0f9ff; font-weight: 600; color: #0c4a6e; border-bottom: 1px solid #7dd3fc; font-size: 0.83rem; }
-                .status-box { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 4px; display: inline-block; }
+                * { box-sizing: border-box; }
+                body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; padding: 30px 40px; color: #1e293b; max-width: 960px; margin: 0 auto; font-size: 13px; line-height: 1.5; }
+                .print-bar { text-align: right; margin-bottom: 12px; }
+                .print-bar button { padding: 10px 28px; cursor: pointer; background: #059669; color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; }
+                .print-bar button:hover { background: #047857; }
+                .header { margin-bottom: 24px; border-bottom: 3px solid #059669; padding-bottom: 16px; position: relative; }
+                .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+                .header-left { flex: 1; }
+                .header-right { text-align: right; }
+                .cb-name { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px 0; }
+                h1 { color: #0f172a; margin: 0 0 8px 0; font-size: 18px; line-height: 1.3; }
+                .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 8px; }
+                .meta span { font-size: 12px; color: #475569; }
+                .meta strong { color: #1e293b; }
+                .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+                .badge-green { background: #dcfce7; color: #166534; }
+                .badge-blue { background: #dbeafe; color: #1e40af; }
+                table { width: 100%; border-collapse: collapse; margin-top: 16px; page-break-inside: auto; }
+                thead { display: table-header-group; }
+                tr { page-break-inside: avoid; }
+                th { background: #0f172a; color: #f8fafc; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+                td { padding: 9px 12px; border: 1px solid #e2e8f0; vertical-align: top; font-size: 12.5px; }
+                td.clause { font-weight: 700; background: #f8fafc; width: 75px; color: #334155; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; }
+                tr:nth-child(even):not(.section-header):not(.sub-header) td:not(.clause) { background: #fafbfc; }
+                tr.section-header td { background: #059669; color: #fff; font-weight: 700; font-size: 13px; border-color: #059669; padding: 8px 12px; }
+                tr.sub-header td { background: #ecfdf5; color: #065f46; font-weight: 600; font-size: 12px; border-bottom: 2px solid #a7f3d0; }
+                .status-col { width: 100px; text-align: center; font-size: 11px; }
+                .evidence-col { width: 200px; }
+                .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #e2e8f0; }
+                .sig-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 20px; }
+                .sig-block { flex: 1; }
+                .sig-line { border-bottom: 1px solid #94a3b8; margin-top: 30px; }
+                .sig-label { font-size: 11px; color: #64748b; margin-top: 4px; }
+                .footer-note { font-size: 10px; color: #94a3b8; text-align: center; margin-top: 20px; }
                 @media print {
-                    button { display: none !important; }
-                    body { padding: 20px; }
+                    .print-bar { display: none !important; }
+                    body { padding: 15px; }
                 }
             </style>
         </head>
         <body>
-            <div class="no-print" style="text-align: right; margin-bottom: 1rem;">
-                <button onclick="window.print()" style="padding: 10px 24px; cursor: pointer; background: #0056b3; color: white; border: none; border-radius: 6px; font-weight: 600;">🖨️ Print Checklist</button>
+            <div class="print-bar">
+                <button onclick="window.print()">🖨️ Print / Save PDF</button>
             </div>
             <div class="header">
-                <div style="position: absolute; top: 0; right: 0;">
-                    <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
-                </div>
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    ${(() => {
+                <div class="header-top">
+                    <div class="header-left">
+                        ${(() => {
             const cbSettings = window.state?.cbSettings || {};
             const logoUrl = cbSettings.logoUrl || '';
             const cbName = cbSettings.cbName || 'AuditCB360';
             if (logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'))) {
-                return `<img src="${logoUrl}" style="max-height: 50px; max-width: 200px; object-fit: contain;" alt="${window.UTILS.escapeHtml(cbName)}">`;
-            } else {
-                return `<div style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">${window.UTILS.escapeHtml(cbName)}</div>`;
+                return '<img src="' + logoUrl + '" style="max-height: 45px; max-width: 180px; object-fit: contain; margin-bottom: 6px;" alt="' + window.UTILS.escapeHtml(cbName) + '"><br>';
             }
+            return '';
         })()}
+                        <p class="cb-name">${window.UTILS.escapeHtml((window.state?.cbSettings?.cbName) || 'AuditCB360')}</p>
+                        <h1>${window.UTILS.escapeHtml(checklist.name)}</h1>
+                        <div class="meta">
+                            <span><strong>Standard:</strong> <span class="badge badge-blue">${window.UTILS.escapeHtml(checklist.standard)}</span></span>
+                            <span><strong>Type:</strong> <span class="badge ${checklist.type === 'global' ? 'badge-green' : 'badge-blue'}">${checklist.type === 'global' ? 'Global' : 'Custom'}</span></span>
+                            <span><strong>Items:</strong> ${printItems.filter(i => !i.isHeader).length}</span>
+                            ${checklist.auditType ? '<span><strong>Audit:</strong> ' + window.UTILS.escapeHtml(checklist.auditType) + '</span>' : ''}
+                            ${checklist.auditScope ? '<span><strong>Scope:</strong> ' + window.UTILS.escapeHtml(checklist.auditScope) + '</span>' : ''}
+                            <span><strong>Date:</strong> ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <img src="${qrUrl}" alt="QR" style="width: 72px; height: 72px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    </div>
                 </div>
-                <h1>${window.UTILS.escapeHtml(checklist.name)}</h1>
-                <p><strong>Standard:</strong> ${window.UTILS.escapeHtml(checklist.standard)}</p>
-                <p><strong>Type:</strong> ${checklist.type === 'global' ? 'Global (Organization-wide)' : 'Custom'}</p>
-                <p><strong>Items:</strong> ${printItems.length}${checklist.auditScope ? ` &bull; <strong>Scope:</strong> ${window.UTILS.escapeHtml(checklist.auditScope)}` : ''}</p>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th>Clause</th>
-                        <th>Requirement / Check Item</th>
-                        <th style="width: 60px; text-align:center;">C</th>
-                        <th style="width: 60px; text-align:center;">NC</th>
-                        <th style="width: 60px; text-align:center;">N/A</th>
-                        <th style="width: 180px;">Remarks</th>
+                        <th style="width: 75px;">Clause</th>
+                        <th>Requirement</th>
+                        <th class="status-col">Status</th>
+                        <th class="evidence-col">Auditor Comments / Evidence</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${printItems.map(item => item.isHeader ? `
                         <tr class="${item.level === 2 ? 'sub-header' : 'section-header'}">
                             <td>${window.UTILS.escapeHtml(item.clause)}</td>
-                            <td colspan="5">${window.UTILS.escapeHtml(item.requirement)}</td>
+                            <td colspan="3">${window.UTILS.escapeHtml(item.requirement || '')}</td>
                         </tr>
                     ` : `
                         <tr>
                             <td class="clause">${window.UTILS.escapeHtml(item.clause || '')}</td>
                             <td>${window.UTILS.escapeHtml(item.requirement || '')}</td>
-                            <td style="text-align:center;"><span class="status-box"></span></td>
-                            <td style="text-align:center;"><span class="status-box"></span></td>
-                            <td style="text-align:center;"><span class="status-box"></span></td>
-                            <td></td>
+                            <td class="status-col" style="color: #94a3b8;">Not Checked</td>
+                            <td class="evidence-col">-</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
 
-            <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8;">
-                <span>Generated by ${window.UTILS.escapeHtml((window.state?.cbSettings?.cbName) || 'AuditCB360')} Platform</span>
-                <span>Auditor Signature: ____________________</span>
+            <div class="footer">
+                <div class="sig-row">
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">Lead Auditor Signature</div>
+                    </div>
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">Client Representative</div>
+                    </div>
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">Date</div>
+                    </div>
+                </div>
+                <p class="footer-note">Generated by ${window.UTILS.escapeHtml((window.state?.cbSettings?.cbName) || 'AuditCB360')} &bull; This is a controlled document</p>
             </div>
         </body>
         </html>
