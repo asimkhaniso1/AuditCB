@@ -1228,16 +1228,16 @@ function renderClientFindings(client) {
 
     if (allFindings.length === 0) {
         return `
-        < div class="card" style = "text-align: center; padding: 3rem;" >
+        <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-check-circle" style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No findings recorded for this client.</p>
-            </div >
+            </div>
         `;
     }
 
     return `
-        < div class="fade-in" >
-            < !--Summary Cards-- >
+        <div class="fade-in">
+            <!-- Summary Cards -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
                     <i class="fa-solid fa-search" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
@@ -1294,7 +1294,7 @@ function renderClientFindings(client) {
                     </table>
                 </div>
             </div>
-        </div >
+        </div>
         `;
 }
 
@@ -1308,7 +1308,7 @@ function renderClientCertificates(client) {
 
     if (certs.length === 0) {
         return `
-        < div class="card" style = "text-align: center; padding: 3rem;" >
+        <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No certificates configured for this client yet.</p>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
@@ -1317,13 +1317,13 @@ function renderClientCertificates(client) {
                 <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);">
                     <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
                 </button>
-            </div >
+            </div>
         `;
     }
 
     return `
-        < div class="fade-in" >
-            < !--Summary Cards-- >
+        <div class="fade-in">
+            <!-- Summary Cards -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
                     <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
@@ -1337,7 +1337,7 @@ function renderClientCertificates(client) {
                 </div>
             </div>
 
-            <!--Client Context: Goods / Services & Processes(from Org Setup)-- >
+            <!-- Client Context: Goods / Services & Processes (from Org Setup) -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="card" style="margin: 0;">
                     <h4 style="margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
@@ -1406,7 +1406,7 @@ function renderClientCertificates(client) {
                     </table>
                 </div>
             </div>
-        </div >
+        </div>
         `;
 }
 
