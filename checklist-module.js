@@ -378,7 +378,16 @@ function openImportChecklistModal() {
     const modalSave = document.getElementById('modal-save');
     const modalCancel = document.getElementById('modal-cancel');
 
-    const standards = state.settings?.standards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
+    // Build standards list: cbSettings > KB docs > existing checklists > hardcoded fallback
+    let standards = window.state.cbSettings?.availableStandards || [];
+    if (!standards.length) standards = state.settings?.standards || [];
+    if (!standards.length) {
+        // Fallback: collect from KB documents + existing checklists
+        const kbStds = (state.settings?.knowledgeBase?.standards || []).map(d => d.name).filter(Boolean);
+        const clStds = (state.checklists || []).map(c => c.standard).filter(Boolean);
+        standards = [...new Set([...kbStds, ...clStds])];
+    }
+    if (!standards.length) standards = ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
     const userRole = state.currentUser?.role;
     const isAdmin = state.settings?.isAdmin || false;
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
