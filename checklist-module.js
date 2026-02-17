@@ -912,12 +912,12 @@ function saveChecklistFromEditor(checklistId) {
     };
 
     if (isEdit) {
-        const checklist = state.checklists.find(c => c.id === checklistId);
+        const checklist = state.checklists.find(c => String(c.id) === String(checklistId));
         if (checklist) {
             checklist.name = name;
             checklist.standard = standard;
             checklist.type = type;
-            // checklist.auditType removed
+            checklist.clientId = clientId;
             checklist.auditScope = auditScope;
             checklist.clauses = Object.values(clauseGroups);
             delete checklist.items;

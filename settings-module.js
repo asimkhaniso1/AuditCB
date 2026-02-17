@@ -4552,7 +4552,7 @@ window.createChecklistFromKB = async function (docId) {
         id: Date.now(),
         name: _buildChecklistTitle(doc),
         standard: doc.name,
-        type: 'global',
+        type: doc.lastClientName ? 'custom' : 'global',
         auditType: doc.lastAuditType || 'initial',
         clientName: doc.lastClientName || '',
         clauses: clauseArray,
