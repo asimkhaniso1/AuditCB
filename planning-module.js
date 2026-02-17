@@ -616,9 +616,10 @@ function updateClientDetails(clientName) {
             calcBtn.disabled = !(client.employees > 0 || sitesCount > 0);
         }
 
-        // Auto-fill calculation params
+        // Auto-fill calculation params — use sum of site employees if available
+        const siteEmpSum = (client.sites || []).reduce((s, site) => s + (parseInt(site.employees) || 0), 0);
         if (document.getElementById('plan-employees')) {
-            document.getElementById('plan-employees').value = client.employees || 0;
+            document.getElementById('plan-employees').value = siteEmpSum > 0 ? siteEmpSum : (client.employees || 0);
         }
 
         if (document.getElementById('plan-sites')) {
@@ -633,11 +634,12 @@ function updateClientDetails(clientName) {
             console.log('Rendering sites:', client.sites);
 
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
-                <div style="padding: 10px; background: #fff; border-radius: 4px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; width: 100%; box-sizing: border-box;">
-                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" checked style="cursor: pointer; margin-top: 4px; width: 16px; height: 16px;">
+                <div style="padding: 10px; background: #fff; border-radius: 6px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; width: 100%; box-sizing: border-box;">
+                    <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" data-standards="${s.standards || ''}" checked style="cursor: pointer; margin-top: 4px; width: 16px; height: 16px;">
                     <div style="overflow: hidden;">
                         <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b; line-height: 1.4; margin-bottom: 2px;">${s.name || 'Unnamed Site'}</div>
-                        <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">${s.city || 'No Location'}</div>
+                        <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">${s.city || 'No Location'} · <strong>${s.employees || 0}</strong> emp${s.shift === 'Yes' ? ' · <span style="color:#f59e0b">Shifts</span>' : ''}</div>
+                        <div style="font-size: 0.75rem; color: #3b82f6; margin-top: 3px;">${(s.standards || 'Inherited').split(',').map(st => '<span style="background:#eff6ff;padding:1px 6px;border-radius:4px;margin-right:3px;display:inline-block;margin-bottom:2px">' + st.trim() + '</span>').join('')}</div>
                     </div>
                 </div>
             `).join('');
@@ -645,13 +647,19 @@ function updateClientDetails(clientName) {
             // Add event listener to update site count when checkboxes change
             siteCheckboxes.querySelectorAll('.site-checkbox').forEach(cb => {
                 cb.addEventListener('change', () => {
-                    const count = document.querySelectorAll('.site-checkbox:checked').length;
+                    const checked = document.querySelectorAll('.site-checkbox:checked');
+                    const count = checked.length;
+                    // Recalculate employees from selected sites
+                    let empSum = 0;
+                    checked.forEach(c => { empSum += parseInt(c.dataset.employees) || 0; });
                     if (document.getElementById('plan-sites')) {
                         document.getElementById('plan-sites').value = count;
                     }
+                    if (document.getElementById('plan-employees')) {
+                        document.getElementById('plan-employees').value = empSum > 0 ? empSum : (client.employees || 0);
+                    }
                     // Enable/disable calculate button based on site selection
                     const calcBtn = document.getElementById('btn-calculate-mandays');
-                    const hint = document.getElementById('manday-hint');
                     if (calcBtn) {
                         calcBtn.disabled = count === 0;
                     }
