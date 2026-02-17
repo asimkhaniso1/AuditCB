@@ -1524,9 +1524,9 @@ const SupabaseClient = {
                 const auditTeam = Array.isArray(plan.auditTeam)
                     ? plan.auditTeam.map(t => typeof t === 'object' ? String(t.id || t.name || t) : String(t))
                     : [];
-                const selectedChecklists = Array.isArray(plan.selectedChecklists)
+                const selectedChecklists = Array.isArray(plan.selectedChecklists) && plan.selectedChecklists.length > 0
                     ? plan.selectedChecklists
-                    : [];
+                    : (Array.isArray(plan.checklistIds) ? plan.checklistIds : []);
 
                 const planData = {
                     id: String(plan.id),
@@ -1637,9 +1637,11 @@ const SupabaseClient = {
                     objectives: plan.objectives,
                     manDays: plan.man_days,
                     auditors: plan.auditor_ids || [],  // Map auditor_ids to auditors
-                    // CRITICAL: Load checklist configuration
-                    checklistIds: plan.selected_checklists || fullData.checklistIds || [],
-                    selectedChecklists: plan.selected_checklists || [],
+                    // CRITICAL: Load checklist configuration (fallback to data column)
+                    checklistIds: (plan.selected_checklists?.length ? plan.selected_checklists : null) || fullData.selectedChecklists || fullData.checklistIds || [],
+                    selectedChecklists: (plan.selected_checklists?.length ? plan.selected_checklists : null) || fullData.selectedChecklists || [],
+                    selectedChecklistItems: fullData.selectedChecklistItems || {},
+                    selectedChecklistOverrides: fullData.selectedChecklistOverrides || {},
                     checklistConfig: plan.checklist_config || fullData.checklistConfig || [],
                     startDate: plan.start_date,
                     endDate: plan.end_date,
