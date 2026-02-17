@@ -1273,7 +1273,7 @@ window.closeAuditPlan = function (planId) {
         plan.status = 'Completed';
 
         // Auto-generate certificate if not already exists
-        const report = window.state.auditReports?.find(r => String(r.auditPlanId) === String(planId));
+        const report = window.state.auditReports?.find(r => String(r.planId) === String(planId));
         if (report && report.status === 'Finalized') {
             // Check if certificate already exists
             if (!window.state.certificates) window.state.certificates = [];
