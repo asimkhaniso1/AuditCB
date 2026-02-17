@@ -6,7 +6,7 @@
 // State for filtering
 let checklistFilterStandard = 'all';
 let checklistFilterType = 'all';
-// checklistFilterAuditType removed
+let checklistFilterAuditType = 'all';
 let checklistFilterScope = 'all';
 let checklistSearchTerm = '';
 
@@ -23,12 +23,13 @@ function renderChecklistLibrary() {
         const matchStandard = checklistFilterStandard === 'all' || c.standard === checklistFilterStandard;
         const matchType = checklistFilterType === 'all' || c.type === checklistFilterType;
         const matchScope = checklistFilterScope === 'all' || c.auditScope === checklistFilterScope;
+        const matchAuditType = checklistFilterAuditType === 'all' || (c.auditType || 'initial') === checklistFilterAuditType;
         const matchSearch = checklistSearchTerm === '' ||
             c.name.toLowerCase().includes(checklistSearchTerm.toLowerCase()) ||
             c.standard.toLowerCase().includes(checklistSearchTerm.toLowerCase());
         // Hide archived unless explicitly filtered
         const matchArchived = checklistFilterType === 'archived' ? c.archived === true : !c.archived;
-        return matchStandard && (checklistFilterType === 'archived' || matchType) && matchScope && matchSearch && matchArchived;
+        return matchStandard && (checklistFilterType === 'archived' || matchType) && matchScope && matchAuditType && matchSearch && matchArchived;
     });
 
     // Separate global, custom, and archived
@@ -56,7 +57,11 @@ function renderChecklistLibrary() {
                         <option value="custom" ${checklistFilterType === 'custom' ? 'selected' : ''}>Custom</option>
                         <option value="archived" ${checklistFilterType === 'archived' ? 'selected' : ''}>Archived</option>
                     </select>
-                    <!-- Audit Type filter removed -->
+                    <select id="checklist-filter-audit-type" style="max-width: 150px; margin-bottom: 0;">
+                        <option value="all" ${checklistFilterAuditType === 'all' ? 'selected' : ''}>All Audit Types</option>
+                        <option value="initial" ${checklistFilterAuditType === 'initial' ? 'selected' : ''}>Initial / Recert</option>
+                        <option value="surveillance" ${checklistFilterAuditType === 'surveillance' ? 'selected' : ''}>Surveillance</option>
+                    </select>
                     <select id="checklist-filter-scope" style="max-width: 140px; margin-bottom: 0;">
                         <option value="all" ${checklistFilterScope === 'all' ? 'selected' : ''}>All Scopes</option>
                         ${auditScopes.map(s => `<option value="${window.UTILS.escapeHtml(s)}" ${checklistFilterScope === s ? 'selected' : ''}>${window.UTILS.escapeHtml(s)}</option>`).join('')}
@@ -230,7 +235,10 @@ function renderChecklistLibrary() {
         renderChecklistLibrary();
     });
 
-    // Audit Type listener removed
+    document.getElementById('checklist-filter-audit-type')?.addEventListener('change', (e) => {
+        checklistFilterAuditType = e.target.value;
+        renderChecklistLibrary();
+    });
 
     document.getElementById('checklist-filter-scope')?.addEventListener('change', (e) => {
         checklistFilterScope = e.target.value;
