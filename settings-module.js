@@ -3345,8 +3345,8 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                 <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Standard</div>
                 <div style="font-size:0.75rem;color:#64748b;line-height:1.5;">
                     <div>~80 questions</div>
-                    <div>2 API calls</div>
-                    <div style="color:#3b82f6;font-weight:600;">~25 seconds</div>
+                    <div>3 API calls</div>
+                    <div style="color:#3b82f6;font-weight:600;">~35 seconds</div>
                 </div>
             </div>
             <div onclick="window._startAnalysis('${docId}', 'comprehensive', ${isReanalyze})" 
@@ -3674,9 +3674,19 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
             parts.push(`\nCLIENT CONTEXT (tailor questions to this organization):`);
             parts.push(`Organization: ${client.name}`);
             if (client.industry) parts.push(`Industry: ${client.industry}`);
-            if (client.employees) parts.push(`Employees: ${client.employees}`);
+            if (client.employees) parts.push(`Total Employees: ${client.employees}`);
+            if (client.scope) parts.push(`Scope of Certification: ${client.scope}`);
+            if (client.standard) parts.push(`Applicable Standards: ${client.standard}`);
             if (client.sites && client.sites.length > 0) {
-                parts.push(`Sites: ${client.sites.map(s => s.name + (s.city ? ' (' + s.city + ')' : '')).join(', ')}`);
+                const siteDetails = client.sites.map(s => {
+                    let info = s.name;
+                    if (s.city) info += ' (' + s.city + ')';
+                    if (s.employees) info += ' — ' + s.employees + ' employees';
+                    if (s.shiftWork) info += ', shift work';
+                    if (s.standards && s.standards.length > 0) info += ' [' + s.standards.join(', ') + ']';
+                    return info;
+                });
+                parts.push(`Sites: ${siteDetails.join('; ')}`);
             }
             if (client.goodsServices && client.goodsServices.length > 0) {
                 parts.push(`Products/Services: ${client.goodsServices.map(g => g.name).join(', ')}`);
@@ -3687,9 +3697,12 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
             if (client.departments && client.departments.length > 0) {
                 parts.push(`Departments: ${client.departments.map(d => d.name).join(', ')}`);
             }
-            if (client.standard) parts.push(`Certification Standard: ${client.standard}`);
+            if (client.contacts && client.contacts.length > 0) {
+                const personnel = client.contacts.map(c => c.name + (c.designation ? ' (' + c.designation + ')' : '') + (c.department ? ' — ' + c.department : ''));
+                parts.push(`Key Personnel: ${personnel.join('; ')}`);
+            }
             if (client.profile) parts.push(`Profile: ${client.profile.substring(0, 500)}`);
-            parts.push(`\nIMPORTANT: Make checklist questions SPECIFIC to this organization's industry, processes, and products. Reference their actual processes/products where relevant.`);
+            parts.push(`\nIMPORTANT: Make checklist questions SPECIFIC to this organization's industry, processes, products, and scope. Reference their actual processes/products where relevant.`);
             clientContext = parts.join('\n');
             console.log(`[KB Analysis] Client context added: ${client.name} (${client.industry || 'no industry'})`);
         }
@@ -3721,7 +3734,7 @@ Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage �
             questionsInstruction: '1 practical audit checklist question',
             batchDelay: 0,
             batches: [
-                { label: 'Clauses 4-10', range: 'ALL auditable clauses 4 through 10 — include main sub-clauses only (e.g., 4.1, 4.2, 5.1, 5.2, 6.1, 7.1, 8.1, 9.1, 10.1)', useSource: true }
+                { label: 'Clauses 4-10', range: 'ALL auditable clauses from the standard (typically 4 through 10). Cover EVERY main-level sub-clause (X.Y level) present in the document. Do NOT skip any sub-clause.', useSource: true }
             ]
         },
         standard: {
@@ -3731,9 +3744,9 @@ Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage �
             questionsInstruction: '1-2 practical audit checklist questions',
             batchDelay: 2000,
             batches: [
-                { label: 'Clauses 4-6', range: 'Clauses 4 (Context of the Organization), 5 (Leadership), and 6 (Planning) — include ALL sub-clauses down to the deepest level', useSource: true },
-                { label: 'Clauses 7-8', range: 'Clauses 7 (Support) and 8 (Operation) — include ALL sub-clauses down to the deepest level', useSource: true },
-                { label: 'Clauses 9-10', range: 'Clauses 9 (Performance Evaluation) and 10 (Improvement) — include ALL sub-clauses down to the deepest level. MUST include 9.1, 9.2, 9.3 and 10.1, 10.2, 10.3', useSource: true }
+                { label: 'Clauses 4-6', range: 'Clauses 4, 5, and 6 — include ALL sub-clauses down to the deepest level present in the document', useSource: true },
+                { label: 'Clauses 7-8', range: 'Clauses 7 and 8 — include ALL sub-clauses down to the deepest level present in the document', useSource: true },
+                { label: 'Clauses 9-10', range: 'Clauses 9 and 10 — include ALL sub-clauses down to the deepest level present in the document. Do NOT skip any.', useSource: true }
             ]
         },
         comprehensive: {
@@ -3743,9 +3756,9 @@ Generate FEWER but MORE FOCUSED questions. Skip exhaustive sub-clause coverage �
             questionsInstruction: '3-5 specific audit questions per sub-clause covering evidence, implementation, effectiveness, compliance, and records',
             batchDelay: 3000,
             batches: [
-                { label: 'Clauses 4-6', range: 'Clauses 4 (Context), 5 (Leadership), and 6 (Planning) — include ALL sub-clauses: 4.1, 4.2, 4.3, 4.4, 5.1, 5.1.1, 5.1.2, 5.2, 5.2.1, 5.2.2, 5.3, 6.1, 6.1.1, 6.1.2, 6.1.3, 6.2, 6.3', useSource: true },
-                { label: 'Clauses 7-8', range: 'Clauses 7 (Support) and 8 (Operation) — include ALL sub-clauses: 7.1, 7.2, 7.3, 7.4, 7.5, 7.5.1, 7.5.2, 7.5.3, 8.1, 8.2, 8.3', useSource: true },
-                { label: 'Clauses 9-10', range: 'Clauses 9 (Performance Evaluation) and 10 (Improvement) — include ALL sub-clauses: 9.1, 9.1.1, 9.1.2, 9.2, 9.2.1, 9.2.2, 9.3, 9.3.1, 9.3.2, 9.3.3, 10.1, 10.2', useSource: true }
+                { label: 'Clauses 4-6', range: 'Clauses 4, 5, and 6 — include ALL sub-clauses at EVERY level present in the document (X.Y, X.Y.Z, etc.). Do NOT skip any sub-clause.', useSource: true },
+                { label: 'Clauses 7-8', range: 'Clauses 7 and 8 — include ALL sub-clauses at EVERY level present in the document (X.Y, X.Y.Z, etc.). Do NOT skip any sub-clause.', useSource: true },
+                { label: 'Clauses 9-10', range: 'Clauses 9 and 10 — include ALL sub-clauses at EVERY level present in the document. Do NOT skip any sub-clause.', useSource: true }
             ]
         }
     };
