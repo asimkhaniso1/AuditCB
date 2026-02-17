@@ -1346,7 +1346,15 @@ window.renderConfigureChecklist = async function (planId) {
         return clISO.some(n => planISONumbers.includes(n));
     });
     const clientName = plan.client || '';
-    const clientChecklists = matchingChecklists.filter(c => (c.type === 'custom' || !c.type) && (c.clientName === clientName || (client && String(c.clientId) === String(client.id))));
+    const clientChecklists = matchingChecklists.filter(c => {
+        const cType = (c.type || '').toLowerCase();
+        if (cType === 'global') return false; // global checklists go in the other section
+        // Match by clientName, clientId, or checklist name containing client name
+        if (c.clientName === clientName) return true;
+        if (client && String(c.clientId) === String(client.id)) return true;
+        if (clientName && c.name && c.name.toLowerCase().includes(clientName.toLowerCase())) return true;
+        return false;
+    });
 
     const getFlattenedItems = (cl) => {
         let items = [];
