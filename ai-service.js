@@ -49,6 +49,61 @@ window.KB_HELPERS = {
     },
 
     /**
+     * Extract RELEVANT organizational context and audit plan info for AI prompts.
+     * Only includes key facts (industry, scope, products, processes) — not full profile.
+     */
+    getOrgAndPlanContext: (reportData) => {
+        let context = '';
+
+        // Get client record
+        const client = (reportData.client && window.state?.clients)
+            ? window.state.clients.find(c => c.name === reportData.client || String(c.id) === String(reportData.clientId))
+            : null;
+
+        if (client) {
+            const parts = [];
+            if (client.industry) parts.push('Industry: ' + client.industry);
+            if (client.employees) parts.push('Employees: ' + client.employees);
+            if (client.sites?.length) parts.push('Sites: ' + client.sites.map(s => s.name + (s.city ? ' (' + s.city + ')' : '')).join(', '));
+            if (client.goodsServices?.length) parts.push('Products/Services: ' + client.goodsServices.map(g => g.name).join(', '));
+            if (client.keyProcesses?.length) parts.push('Key Processes: ' + client.keyProcesses.map(p => p.name).join(', '));
+            if (client.departments?.length) parts.push('Departments: ' + client.departments.map(d => d.name).join(', '));
+            if (client.shifts) parts.push('Shift Work: ' + (client.shifts === 'Yes' ? 'Multi-shift operations' : 'General shift'));
+
+            // Include first 500 chars of profile for company overview (not full text)
+            if (client.profile) {
+                const summary = client.profile.substring(0, 500).replace(/\n+/g, ' ').trim();
+                parts.push('Company Overview: ' + summary + (client.profile.length > 500 ? '...' : ''));
+            }
+
+            if (parts.length > 0) {
+                context += '\nOrganization Context:\n' + parts.join('\n') + '\n';
+            }
+        }
+
+        // Get linked audit plan
+        const plan = (reportData.planId && window.state?.auditPlans)
+            ? window.state.auditPlans.find(p => String(p.id) === String(reportData.planId))
+            : null;
+
+        if (plan) {
+            const planParts = [];
+            if (plan.type) planParts.push('Audit Type: ' + plan.type);
+            if (plan.scope) planParts.push('Audit Scope: ' + plan.scope);
+            if (plan.objectives) planParts.push('Objectives: ' + plan.objectives);
+            if (plan.criteria) planParts.push('Audit Criteria: ' + plan.criteria);
+            if (plan.leadAuditor) planParts.push('Lead Auditor: ' + plan.leadAuditor);
+            if (plan.manDays) planParts.push('Duration: ' + plan.manDays + ' man-days');
+
+            if (planParts.length > 0) {
+                context += '\nAudit Plan Details:\n' + planParts.join('\n') + '\n';
+            }
+        }
+
+        return context;
+    },
+
+    /**
      * Lookup a single clause from the Knowledge Base.
      * Uses 4 progressive matching strategies (exact → parent → prefix → top-level)
      * to support up to 4 levels of ISO clause hierarchy.
@@ -287,17 +342,31 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
         // Get KB context for more accurate rephrasing
         const kbContext = standardName ? AI_SERVICE.getRelevantKBClauses(standardName) : '';
 
+        // Get org context for industry-specific language (compact summary)
+        let orgSummary = '';
+        if (window.state?.clients) {
+            // Try to find client from findings context
+            const reports = window.state.reports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
+            const activeReport = reports.find(r => r.standard === standardName) || reports[0];
+            if (activeReport) {
+                const ctx = AI_SERVICE.getOrgAndPlanContext(activeReport);
+                if (ctx) orgSummary = ctx.substring(0, 800);
+            }
+        }
+
         const prompt = `
 You are a professional ISO Lead Auditor writing an audit report. Convert the following raw auditor notes and voice transcripts into professional audit report language.
-
+${orgSummary ? `
+${orgSummary}` : ''}
 Rules:
 1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...")
 2. Reference clause numbers where provided
-3. Keep the same meaning — do NOT change findings or add interpretations
-4. Each remark should be 1-3 clear, complete sentences
-5. Use ISO audit terminology (conformity, non-conformity, objective evidence, etc.)
-6. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
-7. Return plain text only
+3. Reference the organization's specific products, processes, and industry when relevant
+4. Keep the same meaning — do NOT change findings or add interpretations
+5. Each remark should be 1-3 clear, complete sentences
+6. Use ISO audit terminology (conformity, non-conformity, objective evidence, etc.)
+7. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
+8. Return plain text only
 
 ${kbContext ? `Standard Requirements (from Knowledge Base):
 ${kbContext.substring(0, 3000)}
@@ -344,6 +413,9 @@ Return a raw JSON array with 'id' and 'refined' fields only:
         // Get KB context for more accurate positive observations
         const kbContext = reportData.standard ? AI_SERVICE.getRelevantKBClauses(reportData.standard) : '';
 
+        // Get Organization Context & Audit Plan details
+        const orgPlanContext = AI_SERVICE.getOrgAndPlanContext(reportData);
+
         const prompt = `
 Act as a professional ISO Lead Auditor. Write an Executive Summary, Positive Observations, and Opportunities for Improvement for an Audit Report.
 
@@ -353,6 +425,7 @@ Context:
 - Date: ${reportData.date}
 - Total Non-Conformities: ${ncCount}
 - Compliant Clauses/Areas: ${areaText}
+${orgPlanContext}
 ${kbContext ? `
 Standard Requirements (from Knowledge Base):
 ${kbContext}
