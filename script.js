@@ -1418,59 +1418,273 @@ function showLoginOverlay() {
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e1b4b 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
         z-index: 10000;
+        overflow: auto;
     `;
 
+    // Get CB settings for branding
+    const cbName = window.state?.cbSettings?.cbName || 'AuditCB360';
+    const cbLogo = window.state?.cbSettings?.cbLogo || '';
+
     overlay.innerHTML = `
-        <div style="background: white; border-radius: 16px; padding: 3rem; width: 400px; max-width: 90vw; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
-            <div style="text-align: center; margin-bottom: 2rem;">
-                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2rem; box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);">
+        <style>
+            .hero-login-wrap {
+                display: grid;
+                grid-template-columns: 1.1fr 0.9fr;
+                min-height: 100vh;
+                width: 100%;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+            }
+            .hero-left {
+                background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0d9488 100%);
+                color: white;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 4rem 3.5rem;
+                position: relative;
+                overflow: hidden;
+            }
+            .hero-left::before {
+                content: '';
+                position: absolute;
+                top: -50%; left: -50%;
+                width: 200%; height: 200%;
+                background: radial-gradient(circle at 30% 70%, rgba(13,148,136,0.15) 0%, transparent 50%),
+                            radial-gradient(circle at 70% 30%, rgba(59,130,246,0.1) 0%, transparent 50%);
+                animation: heroGlow 8s ease-in-out infinite alternate;
+            }
+            @keyframes heroGlow {
+                0% { transform: translate(0, 0); }
+                100% { transform: translate(-5%, 5%); }
+            }
+            .hero-left > * { position: relative; z-index: 2; }
+            .hero-badge {
+                display: inline-flex; align-items: center; gap: 0.5rem;
+                background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+                padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.8rem;
+                letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 2rem;
+                backdrop-filter: blur(8px); width: fit-content;
+            }
+            .hero-title {
+                font-size: 2.8rem; font-weight: 800; line-height: 1.15;
+                margin: 0 0 1.25rem 0; letter-spacing: -0.5px;
+            }
+            .hero-title span {
+                background: linear-gradient(135deg, #5eead4, #38bdf8);
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            }
+            .hero-subtitle {
+                font-size: 1.1rem; color: rgba(255,255,255,0.7); line-height: 1.6;
+                margin: 0 0 2.5rem 0; max-width: 480px;
+            }
+            .hero-features {
+                display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 3rem;
+            }
+            .hero-feat {
+                display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem;
+                background: rgba(255,255,255,0.05); border-radius: 12px;
+                border: 1px solid rgba(255,255,255,0.08);
+                transition: background 0.3s, border-color 0.3s;
+            }
+            .hero-feat:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+            .hero-feat-icon {
+                width: 38px; height: 38px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                flex-shrink: 0; font-size: 1rem;
+            }
+            .hero-feat h4 { margin: 0 0 0.25rem 0; font-size: 0.9rem; font-weight: 600; }
+            .hero-feat p { margin: 0; font-size: 0.78rem; color: rgba(255,255,255,0.55); line-height: 1.4; }
+            .hero-trust {
+                display: flex; align-items: center; gap: 1.5rem;
+                padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1);
+            }
+            .hero-trust-item { text-align: center; }
+            .hero-trust-item .num { font-size: 1.5rem; font-weight: 700; color: #5eead4; }
+            .hero-trust-item .lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.5); margin-top: 0.15rem; }
+            .hero-right {
+                display: flex; flex-direction: column; justify-content: center;
+                align-items: center; padding: 3rem; background: #f8fafc;
+            }
+            .login-card {
+                width: 100%; max-width: 420px; background: white; border-radius: 16px;
+                padding: 2.5rem; box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+                border: 1px solid #e2e8f0;
+            }
+            .login-card .logo-area { text-align: center; margin-bottom: 2rem; }
+            .login-card .logo-area img { max-height: 56px; margin-bottom: 0.75rem; }
+            .login-card .logo-area .fallback-icon {
+                width: 60px; height: 60px; border-radius: 14px;
+                background: linear-gradient(135deg, #0d9488, #0ea5e9); color: white;
+                display: inline-flex; align-items: center; justify-content: center;
+                font-size: 1.6rem; margin-bottom: 0.75rem;
+            }
+            .login-card .logo-area h2 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #0f172a; }
+            .login-card .logo-area p { margin: 0.35rem 0 0; font-size: 0.85rem; color: #64748b; }
+            .login-card .form-group { margin-bottom: 1.25rem; }
+            .login-card .form-group label {
+                display: block; font-size: 0.85rem; font-weight: 600;
+                color: #334155; margin-bottom: 0.4rem;
+            }
+            .login-card .form-group input {
+                width: 100%; padding: 0.75rem 1rem; border: 1.5px solid #e2e8f0;
+                border-radius: 10px; font-size: 0.95rem; background: #f8fafc;
+                transition: border-color 0.2s, box-shadow 0.2s; outline: none; box-sizing: border-box;
+            }
+            .login-card .form-group input:focus {
+                border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); background: white;
+            }
+            .login-card .login-btn {
+                width: 100%; padding: 0.85rem; border: none; border-radius: 10px;
+                background: linear-gradient(135deg, #0d9488, #0ea5e9); color: white;
+                font-size: 1rem; font-weight: 600; cursor: pointer;
+                transition: opacity 0.2s, transform 0.15s;
+                display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+                margin-top: 0.5rem;
+            }
+            .login-card .login-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+            .login-card .login-btn:active { transform: translateY(0); }
+            .login-info {
+                margin-top: 1.5rem; padding: 0.85rem 1rem; background: #f0fdf4;
+                border-radius: 10px; border: 1px solid #bbf7d0; font-size: 0.82rem;
+                color: #166534; display: flex; align-items: flex-start; gap: 0.5rem; line-height: 1.5;
+            }
+            .hero-footer { margin-top: 2rem; text-align: center; font-size: 0.78rem; color: #94a3b8; }
+            @media (max-width: 900px) {
+                .hero-login-wrap { grid-template-columns: 1fr; }
+                .hero-left { padding: 2rem 1.5rem; min-height: auto; }
+                .hero-title { font-size: 1.8rem; }
+                .hero-features { grid-template-columns: 1fr; }
+                .hero-trust { flex-wrap: wrap; gap: 1rem; }
+                .hero-right { padding: 2rem 1.5rem; }
+                .login-card { padding: 1.5rem; }
+            }
+        </style>
+
+        <div class="hero-login-wrap">
+            <!-- LEFT: Product Hero -->
+            <div class="hero-left">
+                <div class="hero-badge">
                     <i class="fa-solid fa-shield-halved"></i>
+                    ISO/IEC 17021-1 Compliant Platform
                 </div>
-                <h2 style="margin: 0; color: #1e293b; font-size: 1.75rem; font-weight: 700;">AuditCB360</h2>
-                <p style="color: #64748b; margin-top: 0.5rem;">ISO Certification Body Management</p>
+                <h1 class="hero-title">
+                    Manage Your<br>
+                    <span>Certification Body</span><br>
+                    Operations
+                </h1>
+                <p class="hero-subtitle">
+                    The all-in-one platform for audit management, client certification, NCR tracking,
+                    and compliance — purpose-built for accredited Certification Bodies.
+                </p>
+                <div class="hero-features">
+                    <div class="hero-feat">
+                        <div class="hero-feat-icon" style="background: rgba(16,185,129,0.15); color: #34d399;">
+                            <i class="fa-solid fa-list-check"></i>
+                        </div>
+                        <div>
+                            <h4>Smart Checklists</h4>
+                            <p>Auto-generated checklists from your Knowledge Base for any ISO standard</p>
+                        </div>
+                    </div>
+                    <div class="hero-feat">
+                        <div class="hero-feat-icon" style="background: rgba(59,130,246,0.15); color: #60a5fa;">
+                            <i class="fa-solid fa-brain"></i>
+                        </div>
+                        <div>
+                            <h4>AI-Powered</h4>
+                            <p>AI audit scoping, risk analysis, and intelligent report generation</p>
+                        </div>
+                    </div>
+                    <div class="hero-feat">
+                        <div class="hero-feat-icon" style="background: rgba(168,85,247,0.15); color: #a78bfa;">
+                            <i class="fa-solid fa-users-gear"></i>
+                        </div>
+                        <div>
+                            <h4>Full Audit Lifecycle</h4>
+                            <p>Planning, execution, reporting, NCRs, and certification decisions</p>
+                        </div>
+                    </div>
+                    <div class="hero-feat">
+                        <div class="hero-feat-icon" style="background: rgba(251,146,60,0.15); color: #fb923c;">
+                            <i class="fa-solid fa-layer-group"></i>
+                        </div>
+                        <div>
+                            <h4>Multi-Standard</h4>
+                            <p>ISO 9001, 14001, 45001, 22000, 27001 and more — all in one place</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-trust">
+                    <div class="hero-trust-item">
+                        <div class="num">100%</div>
+                        <div class="lbl">Cloud Based</div>
+                    </div>
+                    <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.15);"></div>
+                    <div class="hero-trust-item">
+                        <div class="num">17021</div>
+                        <div class="lbl">Compliant</div>
+                    </div>
+                    <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.15);"></div>
+                    <div class="hero-trust-item">
+                        <div class="num">24/7</div>
+                        <div class="lbl">Access</div>
+                    </div>
+                    <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.15);"></div>
+                    <div class="hero-trust-item">
+                        <div class="num">AI</div>
+                        <div class="lbl">Integrated</div>
+                    </div>
+                </div>
             </div>
-            
-            <form id="login-form" onsubmit="event.preventDefault(); window.handleLoginSubmit(this);">
-                <div style="margin-bottom: 1.25rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.9rem;">Email Address</label>
-                    <input type="email" name="email" placeholder="info@companycertification.com" required 
-                        style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; transition: all 0.2s; box-sizing: border-box;"
-                        onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)';"
-                        onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none';">
+
+            <!-- RIGHT: Login Form -->
+            <div class="hero-right">
+                <div class="login-card">
+                    <div class="logo-area">
+                        ${cbLogo
+            ? '<img src="' + cbLogo + '" alt="Logo">'
+            : '<div class="fallback-icon"><i class="fa-solid fa-certificate"></i></div>'
+        }
+                        <h2>${cbName}</h2>
+                        <p>Sign in to your account</p>
+                    </div>
+
+                    <form id="login-form" onsubmit="event.preventDefault(); window.handleLoginSubmit(this);">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-envelope" style="margin-right: 0.35rem; color: #64748b;"></i>Email</label>
+                            <input type="email" name="email" placeholder="you@company.com" required autofocus>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-lock" style="margin-right: 0.35rem; color: #64748b;"></i>Password</label>
+                            <input type="password" name="password" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit" class="login-btn">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+                        </button>
+                    </form>
+
+                    <div style="text-align: center; margin-top: 1rem;">
+                        <a href="#" onclick="event.preventDefault(); window.showForgotPassword();"
+                           style="color: #0d9488; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+                            <i class="fa-solid fa-key" style="margin-right: 0.25rem;"></i>
+                            Forgot Password?
+                        </a>
+                    </div>
+
+                    <div class="login-info">
+                        <i class="fa-solid fa-info-circle" style="margin-top: 2px; flex-shrink: 0;"></i>
+                        <div>
+                            Use your registered email and password.<br>
+                            <span style="color: #22c55e;">Contact your administrator if you need access.</span>
+                        </div>
+                    </div>
                 </div>
-                
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.9rem;">Password</label>
-                    <input type="password" name="password" placeholder="••••••••" required
-                        style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; transition: all 0.2s; box-sizing: border-box;"
-                        onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)';"
-                        onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none';">
+
+                <div class="hero-footer">
+                    &copy; ${new Date().getFullYear()} ${cbName} &bull; Powered by AuditCB360
                 </div>
-                
-                <button type="submit" style="width: 100%; padding: 1rem; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);"
-                    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 10px -1px rgba(37, 99, 235, 0.4)';"
-                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px -1px rgba(37, 99, 235, 0.3)';">
-                    <i class="fa-solid fa-right-to-bracket" style="margin-right: 0.5rem;"></i>
-                    Sign In
-                </button>
-            </form>
-            
-            <div style="text-align: center; margin-top: 1rem;">
-                <a href="#" onclick="event.preventDefault(); window.showForgotPassword();" 
-                   style="color: #3b82f6; text-decoration: none; font-size: 0.9rem; font-weight: 500;">
-                    <i class="fa-solid fa-key" style="margin-right: 0.25rem;"></i>
-                    Forgot Password?
-                </a>
             </div>
-            
-            <p style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 2rem;">
-                Secure access for authorized personnel only
-            </p>
         </div>
     `;
 
