@@ -463,7 +463,13 @@ document.addEventListener('click', (e) => {
     const item = e.target.closest('li[data-module]');
     if (item) {
         const moduleName = item.getAttribute('data-module');
-        window.location.hash = moduleName;
+        if (moduleName === 'dashboard') {
+            // Clean URL — remove hash entirely
+            history.pushState(null, '', window.location.pathname);
+            handleRouteChange();
+        } else {
+            window.location.hash = moduleName;
+        }
     }
 });
 
