@@ -1592,7 +1592,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             };
 
             tabContent.innerHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                     <!-- Opening Meeting -->
                     <div class="card" style="margin: 0; border-left: 4px solid #16a34a;">
                         <h3 style="margin: 0 0 1rem 0; color: #16a34a;">
@@ -1621,7 +1621,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #166534; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Opening Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #166534; font-size: 0.7rem;"></i>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1.5rem;">
                                 ${[
                     { id: 'op-scope', label: 'Introduction of audit team & confirmation of audit scope' },
                     { id: 'op-methodology', label: 'Audit plan, methodology & sampling approach' },
@@ -1669,7 +1669,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #991b1b; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Closing Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #991b1b; font-size: 0.7rem;"></i>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1.5rem;">
                                 ${[
                     { id: 'cl-findings', label: 'Presentation of audit findings (Majors, Minors, OFIs)' },
                     { id: 'cl-ncr-severity', label: 'Nonconformity severity & implications for certification' },
