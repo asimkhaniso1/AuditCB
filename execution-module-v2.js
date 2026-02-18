@@ -1567,40 +1567,40 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const existingClosingNames = parseExisting(closingMeeting.attendees);
 
             const buildAttendeeSection = (prefix, existingNames) => {
-                let html = '<div style="margin-bottom: 1rem;">';
+                let html = '<div style="margin-bottom: 0.75rem;">';
                 // Audit Team section
                 if (mAuditTeam.length > 0) {
-                    html += '<div style="margin-bottom: 0.75rem;"><div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;"><i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team</div>';
+                    html += '<div style="margin-bottom: 0.5rem;"><div style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;"><i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team</div>';
                     mAuditTeam.forEach(a => {
                         const checked = existingNames.includes(a.name) ? 'checked' : '';
-                        html += `<label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">`;
-                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(a.name || '').replace(/"/g, '&quot;')}" data-role="${(a.role || '').replace(/"/g, '&quot;')}" data-org="${cbName.replace(/"/g, '&quot;')}" ${checked} style="width: 16px; height: 16px;">`;
-                        html += `<span style="font-weight: 500;">${a.name}</span><span style="color: #64748b; font-size: 0.8rem;">– ${a.role}</span>`;
+                        html += `<label style="display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; cursor: pointer; font-size: 0.82rem;">`;
+                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(a.name || '').replace(/"/g, '&quot;')}" data-role="${(a.role || '').replace(/"/g, '&quot;')}" data-org="${cbName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
+                        html += `<span style="font-weight: 500;">${a.name}</span><span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${a.role}</span>`;
                         html += '</label>';
                     });
                     html += '</div>';
                 }
                 // Client Personnel section
                 if (mClientPersonnel.length > 0) {
-                    html += '<div style="margin-bottom: 0.75rem;"><div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;"><i class="fa-solid fa-building" style="margin-right: 0.25rem;"></i>Client Personnel</div>';
+                    html += '<div style="margin-bottom: 0.5rem;"><div style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;"><i class="fa-solid fa-building" style="margin-right: 0.25rem;"></i>Client Personnel</div>';
                     mClientPersonnel.forEach(p => {
                         const checked = existingNames.includes(p.name) ? 'checked' : '';
-                        html += `<label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">`;
-                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(p.name || '').replace(/"/g, '&quot;')}" data-role="${(p.role || '').replace(/"/g, '&quot;')}" data-org="${clientOrgName.replace(/"/g, '&quot;')}" ${checked} style="width: 16px; height: 16px;">`;
-                        html += `<span style="font-weight: 500;">${p.name}</span>${p.role ? `<span style="color: #64748b; font-size: 0.8rem;">– ${p.role}</span>` : ''}`;
+                        html += `<label style="display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; cursor: pointer; font-size: 0.82rem;">`;
+                        html += `<input type="checkbox" class="${prefix}-attendee-cb" data-name="${(p.name || '').replace(/"/g, '&quot;')}" data-role="${(p.role || '').replace(/"/g, '&quot;')}" data-org="${clientOrgName.replace(/"/g, '&quot;')}" ${checked} style="width: 15px; height: 15px; flex-shrink: 0;">`;
+                        html += `<span style="font-weight: 500;">${p.name}</span>${p.role ? `<span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">– ${p.role}</span>` : ''}`;
                         html += '</label>';
                     });
                     html += '</div>';
                 }
                 // Custom add
-                html += `<div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">`;
-                html += `<input type="text" id="${prefix}-custom-name" class="form-control form-control-sm" placeholder="Name" style="flex: 2;">`;
-                html += `<input type="text" id="${prefix}-custom-role" class="form-control form-control-sm" placeholder="Role" style="flex: 1.5;">`;
-                html += `<input type="text" id="${prefix}-custom-org" class="form-control form-control-sm" placeholder="Organization" style="flex: 1.5;">`;
-                html += `<button class="btn btn-sm btn-outline-primary" onclick="window.addCustomMeetingAttendee('${prefix}')"><i class="fa-solid fa-plus"></i></button>`;
+                html += `<div style="margin-top: 0.4rem; display: flex; gap: 0.35rem;">`;
+                html += `<input type="text" id="${prefix}-custom-name" class="form-control form-control-sm" placeholder="Name" style="flex: 2; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
+                html += `<input type="text" id="${prefix}-custom-role" class="form-control form-control-sm" placeholder="Role" style="flex: 1.5; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
+                html += `<input type="text" id="${prefix}-custom-org" class="form-control form-control-sm" placeholder="Organization" style="flex: 1.5; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
+                html += `<button class="btn btn-sm btn-outline-primary" onclick="window.addCustomMeetingAttendee('${prefix}')" style="padding: 0.25rem 0.5rem;"><i class="fa-solid fa-plus"></i></button>`;
                 html += '</div>';
                 // Custom attendees list
-                html += `<div id="${prefix}-custom-list" style="margin-top: 0.5rem;"></div>`;
+                html += `<div id="${prefix}-custom-list" style="margin-top: 0.35rem;"></div>`;
                 html += '</div>';
                 return html;
             };
