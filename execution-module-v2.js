@@ -3110,10 +3110,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 await new Promise(r => setTimeout(r, 1000));
                             }
                             if (window.SupabaseClient.isInitialized) {
-                                // Convert DataURL to Blob
-                                const res = await fetch(compressedDataUrl);
-                                const blob = await res.blob();
-                                const uploadFile = new File([blob], file.name, { type: file.type });
+                                // Convert DataURL to Blob (CSP-safe, no fetch on data: URLs)
+                                const b64 = compressedDataUrl.split(',')[1];
+                                const byteStr = atob(b64);
+                                const mimeMatch = compressedDataUrl.match(/data:([^;]+)/);
+                                const mime = mimeMatch ? mimeMatch[1] : file.type;
+                                const ab = new ArrayBuffer(byteStr.length);
+                                const ia = new Uint8Array(ab);
+                                for (let bi = 0; bi < byteStr.length; bi++) ia[bi] = byteStr.charCodeAt(bi);
+                                const blob = new Blob([ab], { type: mime });
+                                const uploadFile = new File([blob], file.name, { type: mime });
 
                                 console.log('[Evidence Upload] Uploading file:', file.name, 'Size:', blob.size, 'bytes');
                                 const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-' + Date.now());
@@ -4946,8 +4952,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         await new Promise(r => setTimeout(r, 1000));
                     }
                     if (window.SupabaseClient.isInitialized) {
-                        const res = await fetch(dataUrl);
-                        const blob = await res.blob();
+                        // Convert DataURL to Blob (CSP-safe, no fetch on data: URLs)
+                        const b64 = dataUrl.split(',')[1];
+                        const byteStr = atob(b64);
+                        const ab = new ArrayBuffer(byteStr.length);
+                        const ia = new Uint8Array(ab);
+                        for (let bi = 0; bi < byteStr.length; bi++) ia[bi] = byteStr.charCodeAt(bi);
+                        const blob = new Blob([ab], { type: 'image/jpeg' });
                         const uploadFile = new File([blob], 'screen-capture-' + Date.now() + '.jpg', { type: 'image/jpeg' });
                         const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-sc-' + Date.now());
                         if (result && result.url) {
