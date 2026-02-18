@@ -912,11 +912,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
                             return `
-                                        <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                                        <div class="accordion-section" data-clause-id="${checklist.id}-${clause.mainClause}" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                                             <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); user-select: none;">
                                                 <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                                                    <span class="clause-drag-handle" style="cursor: grab; color: #94a3b8; padding: 0 4px; font-size: 1rem;" title="Drag to reorder section"><i class="fa-solid fa-grip-vertical"></i></span>
                                                     <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
-                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">Clause ${clause.mainClause}</span>
+                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">${clause.mainClause}</span>
                                                     <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" onclick="window.toggleAccordion('${sectionId}')">${clause.title}</span>
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${total} items)</span>
                                                 </div>
@@ -1076,6 +1077,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         }
                     });
                 });
+
+                // Init clause section drag-to-reorder
+                if (window.initClauseDragReorder) window.initClauseDragReorder();
 
                 // Setup bulk action button listeners
                 document.querySelectorAll('.bulk-action-btn').forEach(btn => {
@@ -1805,6 +1809,68 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
             }
         }
+    };
+
+    // Drag-to-reorder clause sections (data-safe: only changes DOM order, not progress keys)
+    window.initClauseDragReorder = function () {
+        let draggedSection = null;
+        document.querySelectorAll('.accordion-section[data-clause-id]').forEach(section => {
+            const handle = section.querySelector('.clause-drag-handle');
+            if (!handle) return;
+
+            handle.addEventListener('mousedown', () => { section.draggable = true; });
+            section.addEventListener('mouseup', () => { section.draggable = false; });
+
+            section.addEventListener('dragstart', (e) => {
+                if (!section.draggable) { e.preventDefault(); return; }
+                draggedSection = section;
+                section.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', '');
+            });
+
+            section.addEventListener('dragend', () => {
+                section.draggable = false;
+                draggedSection = null;
+                section.style.opacity = '1';
+                document.querySelectorAll('.accordion-section[data-clause-id]').forEach(s => {
+                    s.style.borderTop = '';
+                    s.style.borderBottom = '';
+                });
+            });
+
+            section.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (!draggedSection || section === draggedSection) return;
+                document.querySelectorAll('.accordion-section[data-clause-id]').forEach(s => {
+                    s.style.borderTop = '';
+                    s.style.borderBottom = '';
+                });
+                const rect = section.getBoundingClientRect();
+                if (e.clientY < rect.top + rect.height / 2) {
+                    section.style.borderTop = '3px solid #2563eb';
+                } else {
+                    section.style.borderBottom = '3px solid #2563eb';
+                }
+            });
+
+            section.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!draggedSection || section === draggedSection) return;
+                const parent = section.parentNode;
+                const rect = section.getBoundingClientRect();
+                if (e.clientY < rect.top + rect.height / 2) {
+                    parent.insertBefore(draggedSection, section);
+                } else {
+                    parent.insertBefore(draggedSection, section.nextElementSibling);
+                }
+                document.querySelectorAll('.accordion-section[data-clause-id]').forEach(s => {
+                    s.style.borderTop = '';
+                    s.style.borderBottom = '';
+                });
+            });
+        });
     };
 
     window.toggleSectionSelection = function (sectionId, checkbox) {
