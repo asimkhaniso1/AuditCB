@@ -3835,6 +3835,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             let classifyCount = 0;
             let polishCount = 0;
+            let generateCount = 0;
 
             // STEP 2: AI Classify Findings (if analyzeFindings available)
             if (window.AI_SERVICE.analyzeFindings) {
@@ -3848,6 +3849,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     const newType = result.type.toLowerCase();
                                     if (['major', 'minor', 'observation'].includes(newType)) {
                                         select.value = newType;
+                                        findings[i].type = newType;
                                         classifyCount++;
                                         // Update border color
                                         const card = select.closest('.card');
@@ -3861,11 +3863,43 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         });
                     }
                 } catch (classifyErr) {
-                    console.warn('Classification error (continuing with polish):', classifyErr);
+                    console.warn('Classification error (continuing with generation):', classifyErr);
+                }
+            }
+
+            // STEP 2.5: AI Generate Conformance Text (for findings with empty remarks)
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating conformance text...';
+            if (window.AI_SERVICE.generateConformanceText) {
+                try {
+                    const emptyFindings = findings.filter(f => !f.comment || f.comment.trim().length < 5);
+                    if (emptyFindings.length > 0) {
+                        const generated = await window.AI_SERVICE.generateConformanceText(emptyFindings, standardName);
+                        if (generated && Array.isArray(generated)) {
+                            generated.forEach((result, i) => {
+                                if (result.comment && result._aiGenerated) {
+                                    const textarea = document.querySelector('.review-remarks[data-finding-id="' + emptyFindings[i].id + '"]');
+                                    if (textarea) {
+                                        textarea.value = result.comment;
+                                        // Also update the finding object for later save
+                                        const origIdx = findings.findIndex(f => f.id === emptyFindings[i].id);
+                                        if (origIdx >= 0) findings[origIdx].comment = result.comment;
+                                        generateCount++;
+                                        // Flash blue for generated items
+                                        textarea.style.transition = 'background 0.3s';
+                                        textarea.style.background = '#eff6ff';
+                                        setTimeout(() => { textarea.style.background = ''; }, 3000);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (genErr) {
+                    console.warn('Conformance text generation error (continuing with polish):', genErr);
                 }
             }
 
             // STEP 3: AI Polish Notes (refine raw text to professional language)
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Polishing notes...';
             if (window.AI_SERVICE.refineAuditNotes) {
                 try {
                     const toPolish = findings.filter(f => f.comment && f.comment.trim());
@@ -3937,9 +3971,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
 
             // Success UI
-            btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Done! ' + classifyCount + ' classified, ' + polishCount + ' polished';
+            const parts = [];
+            if (classifyCount) parts.push(classifyCount + ' classified');
+            if (generateCount) parts.push(generateCount + ' generated');
+            if (polishCount) parts.push(polishCount + ' polished');
+            btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Done! ' + (parts.join(', ') || 'No changes');
             btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            window.showNotification('AI classified ' + classifyCount + ' findings and polished ' + polishCount + ' notes. Changes saved.', 'success');
+            window.showNotification('AI: ' + (parts.join(', ') || 'No changes needed') + '. All saved.', 'success');
 
         } catch (error) {
             console.error('AI Classify & Polish error:', error);
@@ -4180,7 +4218,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;}"
             + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:22mm;padding-bottom:18mm;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}}'
-            + '@media print{@page{margin:20mm 15mm 25mm 15mm;}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover{padding-top:0 !important;margin-top:-22mm;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
+            + '@media print{@page{margin:20mm 15mm 25mm 15mm;@bottom-center{content:counter(page);font-size:0.7rem;color:#64748b;}}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover{padding-top:0 !important;margin-top:-22mm;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
             + 'body{counter-reset:page;}'
             + '.page-break{counter-increment:page;}'
             + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:18mm;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;padding:4mm 15mm;align-items:center;justify-content:space-between;font-size:0.75rem;z-index:100;}'
@@ -4189,10 +4227,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.rpt-hdr-logo-fallback{width:28px;height:28px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;}'
             + '.rpt-hdr-center{text-align:center;flex:1;font-size:0.7rem;opacity:0.85;letter-spacing:0.3px;text-transform:uppercase;}'
             + '.rpt-hdr-right{text-align:right;font-size:0.72rem;opacity:0.85;}'
-            + '.rpt-ftr{display:none;position:fixed;bottom:0;left:0;right:0;height:14mm;border-top:2px solid #2563eb;padding:2mm 15mm;align-items:center;justify-content:space-between;font-size:0.7rem;color:#64748b;background:white;z-index:100;}'
-            + '.rpt-ftr-left{font-weight:600;color:#1e3a5f;font-size:0.68rem;}'
-            + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.65rem;color:#94a3b8;font-style:italic;}'
-            + '.rpt-ftr-right{font-weight:700;color:#1e3a5f;font-size:0.72rem;}'
+            + '.rpt-ftr{display:none;position:fixed;bottom:0;left:0;right:0;height:16mm;border-top:2px solid #2563eb;padding:2mm 15mm;align-items:center;justify-content:space-between;font-size:0.7rem;color:#64748b;background:white;z-index:100;}'
+            + '.rpt-ftr-left{font-weight:600;color:#1e3a5f;font-size:0.68rem;max-width:35%;}'
+            + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.62rem;color:#94a3b8;font-style:italic;padding:0 8px;}'
+            + '.rpt-ftr-right{text-align:right;font-weight:700;color:#1e3a5f;font-size:0.72rem;white-space:nowrap;}'
             + '.cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(180deg,#f8fafc 0%,#e0e7ff 50%,#f8fafc 100%);padding:80px 50px;position:relative;}'
             + '.cover-line{width:80px;height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin:0 auto 30px;}'
             + '.sh{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;padding:14px 24px;font-weight:700;font-size:1rem;letter-spacing:0.5px;display:flex;align-items:center;gap:12px;border-radius:6px 6px 0 0;margin-top:35px;}'
@@ -4216,7 +4254,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.callout{padding:14px 18px;border-radius:8px;margin-top:16px;font-size:0.92rem;line-height:1.7;}'
             + '</style></head><body>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div>') + '<span>' + (cbName || 'Certification Body') + '</span></div><div class="rpt-hdr-center">' + standard + ' Audit Report</div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
-            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Report ID: ' + d.report.id + ' | ' + (cbName || '') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
+            + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
             + '<button onclick="window.print()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
             + '<button onclick="window.close()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
@@ -4344,7 +4382,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '</div>'
             // FOOTER
             + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong><br>' : '') + cbSiteAddr + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
-            + '<div style="text-align:right;">Generated: ' + d.today + '<br>Report ID: ' + d.report.id + '</div></footer>'
+            + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;font-style:italic;max-width:340px;">This report has been prepared in accordance with ' + standard + ' requirements. Distribution is limited to authorized personnel only.</div>'
+            + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>'
             // CHARTS SCRIPT
             + '<script>'
             + 'function rc(){'

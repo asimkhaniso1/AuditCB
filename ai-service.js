@@ -401,7 +401,85 @@ Return a raw JSON array with 'id' and 'refined' fields only:
         }
     },
 
-    // 2. Draft Executive Summary (with KB context)
+    // 1c. Generate conformance text for findings with empty remarks
+    generateConformanceText: async (findings, standardName = null) => {
+        if (!findings || findings.length === 0) return [];
+
+        // Only generate for items with empty/missing remarks
+        const emptyItems = findings
+            .map((f, idx) => ({
+                idx,
+                clause: f.clause || f.clauseRef || '',
+                description: (f.description || '').trim(),
+                type: f.type || f.status || 'observation',
+                requirement: f.requirement || ''
+            }))
+            .filter(f => f.description.length > 3);
+
+        if (emptyItems.length === 0) return findings;
+
+        // Get KB context for accurate conformance statements
+        const kbContext = standardName ? AI_SERVICE.getRelevantKBClauses(standardName) : '';
+
+        // Get org context
+        let orgSummary = '';
+        if (window.state?.clients) {
+            const reports = window.state.reports || JSON.parse(localStorage.getItem('audit_reports') || '[]');
+            const activeReport = reports.find(r => r.standard === standardName) || reports[0];
+            if (activeReport) {
+                const ctx = KB_HELPERS.getOrgAndPlanContext(activeReport);
+                if (ctx) orgSummary = ctx.substring(0, 800);
+            }
+        }
+
+        const prompt = `
+You are a professional ISO Lead Auditor writing an audit report. Generate formal conformance/non-conformance statements for each audit finding below.
+${orgSummary ? `
+${orgSummary}` : ''}
+Rules:
+1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...", "Objective evidence indicates...")
+2. Reference clause numbers and the specific requirement being assessed
+3. For "observation" type: write a constructive observation noting areas of improvement
+4. For "minor" type: write a non-conformity statement citing the specific gap against the standard requirement
+5. For "major" type: write a strong non-conformity statement referencing systemic failure or total absence of required controls
+6. Each statement should be 2-3 clear, complete sentences
+7. Use ISO audit terminology (conformity, non-conformity, objective evidence, effective implementation, etc.)
+8. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
+9. Return plain text only
+10. Reference the organization's specific processes or products when the finding description provides that context
+
+${kbContext ? `Standard Requirements (from Knowledge Base):
+${kbContext.substring(0, 3000)}
+
+` : ''}Findings:
+${JSON.stringify(emptyItems.map(f => ({ id: f.idx, clause: f.clause, type: f.type, description: f.description, requirement: f.requirement })), null, 2)}
+
+Return a raw JSON array with 'id' and 'text' fields only:
+[{"id": 0, "text": "Professional conformance statement..."}, ...]
+`;
+        try {
+            const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
+            const cleaned = apiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const generated = JSON.parse(cleaned);
+
+            // Merge generated text back into findings
+            const result = [...findings];
+            generated.forEach(g => {
+                if (g.id !== undefined && g.text && result[g.id]) {
+                    result[g.id] = {
+                        ...result[g.id],
+                        comment: g.text,
+                        _aiGenerated: true
+                    };
+                }
+            });
+            console.log(`[AI] Generated conformance text for ${generated.length} findings`);
+            return result;
+        } catch (error) {
+            console.error("AI Conformance Text Error:", error);
+            return findings; // Return original on failure
+        }
+    },
     draftExecutiveSummary: async (reportData, compliantAreas = []) => {
         const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc').length;
 
