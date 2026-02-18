@@ -133,6 +133,18 @@ const SupabaseClient = {
             Logger.info('Client sidebar refreshed after sign-in');
         }
 
+        // Show app chrome now that data is loaded
+        const sidebar = document.getElementById('sidebar');
+        const header = document.querySelector('.main-header');
+        if (sidebar) sidebar.style.display = '';
+        if (header) header.style.display = '';
+
+        const appContainer = document.getElementById('app-container');
+        if (appContainer) {
+            appContainer.classList.remove('auth-pending');
+            appContainer.classList.add('auth-ready');
+        }
+
         // Redirect to dashboard if on login page — hashchange listener will render
         if (window.location.hash === '' || window.location.hash === '#login') {
             window.location.hash = 'dashboard';

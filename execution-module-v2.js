@@ -1644,7 +1644,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     { id: 'op-communication', label: 'Communication arrangements & guide/escort' },
                     { id: 'op-schedule', label: 'Daily schedule, breaks & logistics' },
                     { id: 'op-prev-findings', label: 'Status of previous audit findings & CAPAs' }
-                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #dcfce7; min-height: 2.2rem;"><input type="checkbox" class="opening-pointer" data-key="' + p.id + '" ' + ((openingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #16a34a; flex-shrink: 0;"> ' + p.label + '</label>').join('')}
+                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #dcfce7; min-height: 2.2rem;"><input type="checkbox" class="opening-pointer" data-key="' + p.id + '" ' + ((openingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #16a34a; flex-shrink: 0;"><span style="min-width: 0; overflow-wrap: anywhere;">' + p.label + '</span></label>').join('')}
                             </div>
                         </div>
                     </div>
@@ -1692,7 +1692,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     { id: 'cl-followup', label: 'Follow-up / surveillance audit schedule' },
                     { id: 'cl-remote-evidence', label: 'Remote evidence sufficiency confirmation (if applicable)' },
                     { id: 'cl-cert-scope', label: 'Certification scope, mark usage & public information' }
-                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #fecaca; min-height: 2.2rem; word-wrap: break-word;"><input type="checkbox" class="closing-pointer" data-key="' + p.id + '" ' + ((closingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #dc2626; flex-shrink: 0;"> ' + p.label + '</label>').join('')}
+                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #fecaca; min-height: 2.2rem;"><input type="checkbox" class="closing-pointer" data-key="' + p.id + '" ' + ((closingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #dc2626; flex-shrink: 0;"><span style="min-width: 0; overflow-wrap: anywhere;">' + p.label + '</span></label>').join('')}
                             </div>
                         </div>
                     </div>

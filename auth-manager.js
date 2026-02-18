@@ -791,24 +791,10 @@ const AuthManager = {
         const user = await this.login(username, password);
 
         if (user) {
-            // Remove login overlay if present
+            // Remove login overlay — handleSignIn (in supabase-client.js)
+            // will show app chrome and navigate AFTER cloud data loads.
             const loginOverlay = document.getElementById('login-overlay');
             if (loginOverlay) loginOverlay.remove();
-
-            // Show app chrome
-            const sidebar = document.getElementById('sidebar');
-            const header = document.querySelector('.main-header');
-            if (sidebar) sidebar.style.display = '';
-            if (header) header.style.display = '';
-
-            const appContainer = document.getElementById('app-container');
-            if (appContainer) {
-                appContainer.classList.remove('auth-pending');
-                appContainer.classList.add('auth-ready');
-            }
-
-            // Navigate to dashboard — hashchange listener will render it
-            window.location.hash = 'dashboard';
         }
 
         return false;
