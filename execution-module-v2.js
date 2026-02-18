@@ -3158,7 +3158,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const ncRows = d.hydratedProgress.filter(i => i.status === 'nc').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
-            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             const sev = item.ncrType || 'NC';
             const sevStyle = sev === 'Major' ? 'background:#fee2e2;color:#991b1b' : sev === 'Minor' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
             return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
@@ -3168,7 +3168,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const conformRows = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
-            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
@@ -3622,23 +3622,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </script>
                     </div>
                 </div>
-                <!-- 4: Findings -->
-                <div class="rp-sec" id="sec-findings">
-                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#991b1b,#dc2626);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">4</span>NON-CONFORMITY DETAILS (${d.stats.ncCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
-                    <div class="rp-sec-body" style="padding:0;">
-                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
-                            <tbody>${ncRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
-                        </table>
-                    </div>
-                </div>
-                <!-- Conformance Verification -->
+                <!-- 4: Conformance Verification -->
                 <div class="rp-sec" id="sec-conformance">
-                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#047857,#10b981);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-circle-check"></i></span>CONFORMANCE VERIFICATION (${d.stats.conformCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#047857,#10b981);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">4</span>CONFORMANCE VERIFICATION (${d.stats.conformCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f0fdf4;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Status</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
                             <tbody>${conformRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- 5: Findings -->
+                <div class="rp-sec" id="sec-findings">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#991b1b,#dc2626);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">5</span>NON-CONFORMITY DETAILS (${d.stats.ncCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body" style="padding:0;">
+                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
+                            <tbody>${ncRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
                         </table>
                     </div>
                 </div>
@@ -4194,7 +4194,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
-            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             const sev = item.ncrType || 'NC';
             const sevBg = sev === 'Major' ? '#fee2e2' : sev === 'Minor' ? '#fef3c7' : '#dbeafe';
             const sevFg = sev === 'Major' ? '#991b1b' : sev === 'Minor' ? '#92400e' : '#1e40af';
@@ -4205,7 +4205,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const conformRowsHtml = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
-            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
@@ -4340,10 +4340,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
-            // SECTION 4
-            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">4</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Severity</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
-            // CONFORMANCE VERIFICATION SECTION
-            + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:linear-gradient(135deg,#047857,#10b981);"><span class="sn"><i class="fa-solid fa-circle-check"></i></span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Status</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            // SECTION 4 - CONFORMANCE VERIFICATION
+            + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:linear-gradient(135deg,#047857,#10b981);"><span class="sn">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Status</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            // SECTION 5 - NON-CONFORMITY DETAILS
+            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">5</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Severity</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION 5
             + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">5</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
             // SECTION 6

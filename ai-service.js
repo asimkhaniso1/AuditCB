@@ -364,9 +364,10 @@ Rules:
 3. Reference the organization's specific products, processes, and industry when relevant
 4. Keep the same meaning — do NOT change findings or add interpretations
 5. Each remark should be 1-3 clear, complete sentences
-6. Use ISO audit terminology (conformity, non-conformity, objective evidence, etc.)
-7. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
-8. Return plain text only
+6. IMPORTANT: Match the language to the finding status. If status is "observation" or "ofi", use Opportunity for Improvement language (e.g., "The organization may benefit from...", "An opportunity exists to enhance..."). Do NOT use "non-conformity" or "failure" for observations. If status is "minor" or "major", use non-conformity language.
+7. Use ISO audit terminology (conformity, non-conformity, objective evidence, opportunity for improvement, etc.)
+8. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
+9. Return plain text only
 
 ${kbContext ? `Standard Requirements (from Knowledge Base):
 ${kbContext.substring(0, 3000)}
@@ -433,17 +434,17 @@ Return a raw JSON array with 'id' and 'refined' fields only:
         }
 
         const prompt = `
-You are a professional ISO Lead Auditor writing an audit report. Generate formal conformance/non-conformance statements for each audit finding below.
+You are a professional ISO Lead Auditor writing an audit report. Generate formal audit finding statements for each item below. IMPORTANT: classify the language used based on the finding "type".
 ${orgSummary ? `
 ${orgSummary}` : ''}
 Rules:
 1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...", "Objective evidence indicates...")
 2. Reference clause numbers and the specific requirement being assessed
-3. For "observation" type: write a constructive observation noting areas of improvement
-4. For "minor" type: write a non-conformity statement citing the specific gap against the standard requirement
-5. For "major" type: write a strong non-conformity statement referencing systemic failure or total absence of required controls
+3. For "observation" type: This is NOT a non-conformity. Write an Opportunity for Improvement (OFI). Use language like "The organization may benefit from...", "An opportunity for improvement was identified...", "While conformity was demonstrated, further enhancement could be achieved by...". Do NOT use "non-conformity", "failure", or "absence" for observations.
+4. For "minor" type: Write a minor non-conformity statement citing the specific gap. Use language like "A minor non-conformity was identified...", "Partial implementation was observed, however..."
+5. For "major" type: Write a major non-conformity statement referencing systemic failure or total absence of required controls. Use language like "A major non-conformity was raised...", "Systemic failure to implement..."
 6. Each statement should be 2-3 clear, complete sentences
-7. Use ISO audit terminology (conformity, non-conformity, objective evidence, effective implementation, etc.)
+7. Use ISO audit terminology appropriate to the finding type (conformity, non-conformity, objective evidence, effective implementation, opportunity for improvement)
 8. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
 9. Return plain text only
 10. Reference the organization's specific processes or products when the finding description provides that context
@@ -455,7 +456,7 @@ ${kbContext.substring(0, 3000)}
 ${JSON.stringify(emptyItems.map(f => ({ id: f.idx, clause: f.clause, type: f.type, description: f.description, requirement: f.requirement })), null, 2)}
 
 Return a raw JSON array with 'id' and 'text' fields only:
-[{"id": 0, "text": "Professional conformance statement..."}, ...]
+[{"id": 0, "text": "Professional audit finding statement..."}, ...]
 `;
         try {
             const apiResponseText = await AI_SERVICE.callProxyAPI(prompt);
