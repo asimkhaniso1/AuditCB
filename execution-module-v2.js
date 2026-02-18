@@ -1540,6 +1540,78 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                 </div>
             `;
+
+            // Auto-save severity changes and update stats in real-time
+            setTimeout(() => {
+                document.querySelectorAll('.review-severity').forEach(select => {
+                    select.addEventListener('change', function () {
+                        const findingId = this.dataset.findingId;
+                        const newType = this.value;
+
+                        // Update data model immediately
+                        if (findingId.startsWith('checklist-')) {
+                            const idx = parseInt(findingId.replace('checklist-', ''));
+                            if (report.checklistProgress && report.checklistProgress[idx]) {
+                                report.checklistProgress[idx].ncrType = newType;
+                            }
+                        } else if (findingId.startsWith('ncr-')) {
+                            const idx = parseInt(findingId.replace('ncr-', ''));
+                            if (report.ncrs && report.ncrs[idx]) {
+                                report.ncrs[idx].type = newType;
+                            }
+                        }
+
+                        // Update card border color
+                        const card = this.closest('.card');
+                        if (card) {
+                            const colors = { major: '#dc2626', minor: '#d97706', observation: '#8b5cf6', ofi: '#06b6d4' };
+                            card.style.borderLeftColor = colors[newType] || '#8b5cf6';
+                        }
+
+                        // Update stat counters
+                        const allSelects = document.querySelectorAll('.review-severity');
+                        let majors = 0, minors = 0, obs = 0, ofis = 0;
+                        allSelects.forEach(s => {
+                            if (s.value === 'major') majors++;
+                            else if (s.value === 'minor') minors++;
+                            else if (s.value === 'observation') obs++;
+                            else if (s.value === 'ofi') ofis++;
+                        });
+                        const statDivs = tabContent.querySelectorAll('[style*="text-align: center"]');
+                        if (statDivs.length >= 4) {
+                            statDivs[0].querySelector('div').textContent = allSelects.length;
+                            statDivs[1].querySelector('div').textContent = majors;
+                            statDivs[2].querySelector('div').textContent = minors;
+                            statDivs[3].querySelector('div').textContent = obs + ofis;
+                        }
+
+                        // Auto-save
+                        window.saveData();
+                        window.showNotification('Severity updated', 'success');
+                    });
+                });
+
+                // Auto-save remarks on blur
+                document.querySelectorAll('.review-remarks').forEach(textarea => {
+                    textarea.addEventListener('blur', function () {
+                        const findingId = this.dataset.findingId;
+                        const remarks = this.value;
+
+                        if (findingId.startsWith('checklist-')) {
+                            const idx = parseInt(findingId.replace('checklist-', ''));
+                            if (report.checklistProgress && report.checklistProgress[idx]) {
+                                report.checklistProgress[idx].comment = remarks;
+                            }
+                        } else if (findingId.startsWith('ncr-')) {
+                            const idx = parseInt(findingId.replace('ncr-', ''));
+                            if (report.ncrs && report.ncrs[idx]) {
+                                report.ncrs[idx].description = remarks;
+                            }
+                        }
+                        window.saveData();
+                    });
+                });
+            }, 100);
         }
             break;
 
