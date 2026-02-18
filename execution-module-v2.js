@@ -3493,13 +3493,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || 'N/A'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || 'N/A'}</td></tr>
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${[d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || 'N/A'}</td></tr>
-                            ${(() => {
+                ${(() => {
+                const locAddr = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
+                const addrFallback = locAddr ? `<div style="padding:16px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;text-align:center;"><i class="fa-solid fa-map-location-dot" style="font-size:1.5rem;color:#64748b;margin-bottom:6px;display:block;"></i><div style="color:#334155;font-size:0.9rem;font-weight:600;">${locAddr}</div></div>` : '';
                 if (d.client.latitude && d.client.longitude) {
-                    return `<tr><td colspan="2" style="padding:8px 12px;"><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=${(parseFloat(d.client.longitude) - 0.015).toFixed(4)},${(parseFloat(d.client.latitude) - 0.008).toFixed(4)},${(parseFloat(d.client.longitude) + 0.015).toFixed(4)},${(parseFloat(d.client.latitude) + 0.008).toFixed(4)}&layer=mapnik&marker=${d.client.latitude},${d.client.longitude}" style="width:100%;height:140px;border:none;border-radius:8px;"></iframe></td></tr>`;
+                    return `<tr><td colspan="2" style="padding:8px 12px;"><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=${(parseFloat(d.client.longitude) - 0.015).toFixed(4)},${(parseFloat(d.client.latitude) - 0.008).toFixed(4)},${(parseFloat(d.client.longitude) + 0.015).toFixed(4)},${(parseFloat(d.client.latitude) + 0.008).toFixed(4)}&layer=mapnik&marker=${d.client.latitude},${d.client.longitude}" style="width:100%;height:140px;border:none;border-radius:8px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';"></iframe><div style="display:none;">${addrFallback}</div></td></tr>`;
                 }
-                const locQuery = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
-                if (locQuery) {
-                    return `<tr><td colspan="2" style="padding:8px 12px;"><iframe src="https://maps.google.com/maps?q=${encodeURIComponent(locQuery)}&z=13&output=embed" style="width:100%;height:140px;border:none;border-radius:8px;" allowfullscreen></iframe></td></tr>`;
+                if (locAddr) {
+                    return `<tr><td colspan="2" style="padding:8px 12px;">${addrFallback}</td></tr>`;
                 }
                 return '';
             })()}
@@ -4598,12 +4599,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
                 + '</table>'
                 + (function () {
+                    var locAddr = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
+                    var addrBox = '<div style="margin-top:12px;padding:16px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;text-align:center;"><div style="font-size:1.2rem;color:#64748b;margin-bottom:6px;">📍</div><div style="color:#334155;font-size:0.9rem;font-weight:600;">' + (locAddr || 'Address not available') + '</div></div>';
                     if (d.client.latitude && d.client.longitude) {
-                        return '<div style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;"><img src="https://staticmap.openstreetmap.de/staticmap.php?center=' + d.client.latitude + ',' + d.client.longitude + '&zoom=14&size=600x160&maptype=mapnik&markers=' + d.client.latitude + ',' + d.client.longitude + ',red-pushpin" style="width:100%;height:140px;object-fit:cover;display:block;" alt="Audit Location Map"></div>';
+                        return '<div style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;"><img src="https://staticmap.openstreetmap.de/staticmap.php?center=' + d.client.latitude + ',' + d.client.longitude + '&zoom=14&size=600x160&maptype=mapnik&markers=' + d.client.latitude + ',' + d.client.longitude + ',red-pushpin" style="width:100%;height:140px;object-fit:cover;display:block;" alt="Audit Location Map" onerror="this.parentElement.innerHTML=\'' + addrBox.replace(/'/g, "\\'") + '\';"></div>';
                     }
-                    var locQ = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
-                    if (locQ) {
-                        return '<div style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;"><iframe src="https://maps.google.com/maps?q=' + encodeURIComponent(locQ) + '&z=13&output=embed" style="width:100%;height:140px;border:none;display:block;" allowfullscreen></iframe></div>';
+                    if (locAddr) {
+                        return addrBox;
                     }
                     return '';
                 })()
