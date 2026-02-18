@@ -1767,17 +1767,9 @@ const SupabaseClient = {
                     conformities: report.conformities || fullData.conformities || 0,
                     conclusion: report.conclusion || fullData.conclusion,
                     recommendation: report.recommendation || fullData.recommendation,
-                    // Load execution data - strip base64 to prevent localStorage quota overflow
-                    checklistProgress: (report.checklist_progress || report.checklist_data || fullData.checklistProgress || []).map(item => {
-                        const cleaned = { ...item };
-                        if (cleaned.evidenceImage && typeof cleaned.evidenceImage === 'string' && cleaned.evidenceImage.startsWith('data:')) {
-                            cleaned.evidenceImage = '';
-                        }
-                        if (Array.isArray(cleaned.evidenceImages)) {
-                            cleaned.evidenceImages = cleaned.evidenceImages.filter(u => typeof u === 'string' && !u.startsWith('data:'));
-                        }
-                        return cleaned;
-                    }),
+                    // Load execution data - preserve all evidence URLs (idb://, https://, data:)
+                    // Do NOT strip any image references to prevent data loss
+                    checklistProgress: (report.checklist_progress || report.checklist_data || fullData.checklistProgress || []),
                     customItems: report.custom_items || fullData.customItems || [],
                     openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
                     closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
