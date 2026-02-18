@@ -1606,7 +1606,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             tabContent.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                     <!-- Opening Meeting -->
-                    <div class="card" style="margin: 0; border-left: 4px solid #16a34a;">
+                    <div class="card" style="margin: 0; border-left: 4px solid #16a34a; overflow: hidden;">
                         <h3 style="margin: 0 0 1rem 0; color: #16a34a;">
                             <i class="fa-solid fa-door-open" style="margin-right: 0.5rem;"></i>Opening Meeting
                         </h3>
@@ -1628,12 +1628,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <label>Meeting Notes</label>
                             <textarea id="opening-notes" class="form-control" rows="3" placeholder="Key points discussed, scope confirmed, agenda presented...">${openingMeeting.notes || ''}</textarea>
                         </div>
-                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; overflow: hidden;">
                             <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #166534; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Opening Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #166534; font-size: 0.7rem;"></i>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem; max-width: 100%; overflow: hidden;">
                                 ${[
                     { id: 'op-scope', label: 'Introduction of audit team & confirmation of audit scope' },
                     { id: 'op-methodology', label: 'Audit plan, methodology & sampling approach' },
@@ -1644,13 +1644,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     { id: 'op-communication', label: 'Communication arrangements & guide/escort' },
                     { id: 'op-schedule', label: 'Daily schedule, breaks & logistics' },
                     { id: 'op-prev-findings', label: 'Status of previous audit findings & CAPAs' }
-                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #dcfce7; min-height: 2.2rem;"><input type="checkbox" class="opening-pointer" data-key="' + p.id + '" ' + ((openingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #16a34a; flex-shrink: 0;"><span style="min-width: 0; overflow-wrap: anywhere;">' + p.label + '</span></label>').join('')}
+                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #dcfce7; min-height: 2.2rem; width: 100%; box-sizing: border-box;"><input type="checkbox" class="opening-pointer" data-key="' + p.id + '" ' + ((openingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #16a34a; flex-shrink: 0;"><span style="min-width: 0; overflow-wrap: break-word; word-break: break-word; flex: 1;">' + p.label + '</span></label>').join('')}
                             </div>
                         </div>
                     </div>
                     
                     <!-- Closing Meeting -->
-                    <div class="card" style="margin: 0; border-left: 4px solid #dc2626;">
+                    <div class="card" style="margin: 0; border-left: 4px solid #dc2626; overflow: hidden;">
                         <h3 style="margin: 0 0 1rem 0; color: #dc2626;">
                             <i class="fa-solid fa-door-closed" style="margin-right: 0.5rem;"></i>Closing Meeting
                         </h3>
@@ -1676,12 +1676,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <label>Client Response/Agreement</label>
                             <textarea id="closing-response" class="form-control" rows="2" placeholder="Client's response to findings...">${closingMeeting.response || ''}</textarea>
                         </div>
-                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; overflow: hidden;">
                             <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #991b1b; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Closing Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #991b1b; font-size: 0.7rem;"></i>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem; max-width: 100%; overflow: hidden;">
                                 ${[
                     { id: 'cl-findings', label: 'Presentation of audit findings (Majors, Minors, OFIs)' },
                     { id: 'cl-ncr-severity', label: 'Nonconformity severity & implications for certification' },
@@ -1692,7 +1692,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     { id: 'cl-followup', label: 'Follow-up / surveillance audit schedule' },
                     { id: 'cl-remote-evidence', label: 'Remote evidence sufficiency confirmation (if applicable)' },
                     { id: 'cl-cert-scope', label: 'Certification scope, mark usage & public information' }
-                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #fecaca; min-height: 2.2rem;"><input type="checkbox" class="closing-pointer" data-key="' + p.id + '" ' + ((closingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #dc2626; flex-shrink: 0;"><span style="min-width: 0; overflow-wrap: anywhere;">' + p.label + '</span></label>').join('')}
+                ].map(p => '<label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem; color: #334155; cursor: pointer; margin: 0; padding: 0.5rem 0.6rem; background: white; border-radius: 6px; border: 1px solid #fecaca; min-height: 2.2rem; width: 100%; box-sizing: border-box;"><input type="checkbox" class="closing-pointer" data-key="' + p.id + '" ' + ((closingMeeting.keyPointers || {})[p.id] ? 'checked' : '') + ' style="margin-top: 2px; accent-color: #dc2626; flex-shrink: 0;"><span style="min-width: 0; overflow-wrap: break-word; word-break: break-word; flex: 1;">' + p.label + '</span></label>').join('')}
                             </div>
                         </div>
                     </div>
