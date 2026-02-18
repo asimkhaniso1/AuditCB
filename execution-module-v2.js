@@ -4381,7 +4381,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
             + '</div>'
             // FOOTER
-            + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong><br>' : '') + cbSiteAddr + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
+            + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
             + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;font-style:italic;max-width:340px;">This report has been prepared in accordance with ' + standard + ' requirements. Distribution is limited to authorized personnel only.</div>'
             + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>'
             // CHARTS SCRIPT
