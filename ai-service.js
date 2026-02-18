@@ -464,6 +464,29 @@ Return raw JSON:
             personnelSection = `\n- Personnel Roster:\n${roster}\n`;
         }
 
+        // Build previous audit findings section if available
+        let previousAuditSection = '';
+        if (ctx.previousAudit) {
+            const pa = ctx.previousAudit;
+            let ncList = '';
+            if (pa.ncFindings && pa.ncFindings.length > 0) {
+                ncList = pa.ncFindings.map(nc => `  - [${nc.severity}] Clause ${nc.clause}: ${nc.description}`).join('\n');
+            }
+            previousAuditSection = `
+**Previous Audit Findings (${pa.auditType || 'Audit'} — ${pa.date}):**
+- Recommendation: ${pa.recommendation || 'N/A'}
+- Total Non-Conformities: ${pa.ncCount || 0}
+${ncList ? '- NC Details:\n' + ncList : ''}
+${pa.ofiSummary ? '- Opportunities for Improvement: ' + pa.ofiSummary : ''}
+${pa.positiveObservations ? '- Positive Observations: ' + pa.positiveObservations : ''}
+
+**IMPORTANT — Previous Findings Follow-up:**
+- Allocate dedicated time to verify CORRECTIVE ACTIONS for each NC from the previous audit.
+- Prioritize clauses that had non-conformities: ensure objective evidence of closure.
+- Note any recurring problem areas and schedule deeper sampling in those processes.
+`;
+        }
+
         return `
 You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit Agenda/Itinerary (in valid JSON format) for the following audit plan.
 
@@ -474,7 +497,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 - Duration: ${ctx.manDays} Man-days (${ctx.onsiteDays} On-site Days)
 - Sites: ${ctx.sites.map(s => s.name).join(', ')}
 - Departments: ${(ctx.departments || []).join(', ')}
-- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}
+- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}${previousAuditSection}
 **Requirements:**
 1. Create a day-by-day schedule covering ${ctx.onsiteDays} days.
 2. Include "Opening Meeting" (Day 1 AM) and "Closing Meeting" (Last Day PM).
@@ -485,7 +508,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 7. In the "Activity / Clause" column, provide ONLY the Clause Number and Title (e.g., "5.1 Leadership"). Do NOT include the full requirement text or summaries. Keep it a single line.
 8. Times should be in "HH:MM - HH:MM" format.
 9. In the "Department / Auditee" column, use ACTUAL personnel names from the roster above where available. Format as "Department / Person Name" — e.g., "HR / Ahmed Khan". If no matching person exists for a clause, use the department name only.
-
+${ctx.previousAudit ? '10. Include a dedicated "Previous Findings Follow-up / CAPA Verification" session referencing the specific NC clauses from the previous audit.' : ''}
 **Output Format:**
 Return ONLY a raw JSON array of objects. Do not include markdown formatting (like \`\`\`json).
 Example:

@@ -1389,7 +1389,7 @@ function printChecklist(id) {
         printItems = checklist.items;
     }
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`CHECKLIST-${checklist.id}|${checklist.name}|${checklist.standard}`)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://audit.companycertification.com/#/verify/checklist/${checklist.id}`)}`;
 
     let content = `
         <html>

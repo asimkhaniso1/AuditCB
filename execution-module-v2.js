@@ -1633,7 +1633,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #166534; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Opening Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #166534; font-size: 0.7rem;"></i>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem;">
                                 ${[
                     { id: 'op-scope', label: 'Introduction of audit team & confirmation of audit scope' },
                     { id: 'op-methodology', label: 'Audit plan, methodology & sampling approach' },
@@ -3084,7 +3084,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }
 
         // QR Code for Report Verification
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://auditcb.com/verify/' + report.id)}`;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://audit.companycertification.com/#/verify/' + report.id)}`;
 
         // CB Settings (real data, no fake info)
         const cbSettings = window.state.cbSettings || {};
@@ -3137,6 +3137,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             { id: 'summary', label: 'Summary', icon: 'fa-file-lines', color: '#059669' },
             { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
             { id: 'findings', label: 'Findings', icon: 'fa-triangle-exclamation', color: '#dc2626' },
+            { id: 'conformance', label: 'Conformance', icon: 'fa-circle-check', color: '#059669' },
             { id: 'ncrs', label: 'NCRs', icon: 'fa-clipboard-check', color: '#ea580c', hide: !(d.report.ncrs || []).length },
             { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
             { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' }
@@ -3147,13 +3148,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         const pill = (s) => `<label class="rp-pill ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="${s.hide ? 'background:white;color:#94a3b8;border-color:#cbd5e1;' : 'background:' + s.color + ';border-color:' + s.color + ';color:white;'}" onclick="window.toggleReportSection('${s.id}','${s.color}')"><i class="fa-solid ${s.icon}"></i> ${s.label}</label>`;
 
+        // Helper: render all evidence images for a checklist item (preview mode)
+        const renderEvThumbs = (item) => {
+            const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+            if (!imgs.length) return '';
+            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" onclick="window.open('${url}','_blank')">`).join('')}</div>`;
+        };
+
         const ncRows = d.hydratedProgress.filter(i => i.status === 'nc').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
             const sev = item.ncrType || 'NC';
             const sevStyle = sev === 'Major' ? 'background:#fee2e2;color:#991b1b' : sev === 'Minor' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
-            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${item.evidenceImage ? '<div style="margin-top:6px;"><img src="' + item.evidenceImage + '" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;"></div>' : ''}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
+        }).join('');
+
+        // Conformance rows (items with comments or evidence)
+        const conformRows = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
+            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const title = item.kbMatch ? item.kbMatch.title : '';
+            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         const overlay = document.createElement('div');
@@ -3339,7 +3355,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <i class="fa-solid fa-circle-check" style="color:#10b981;font-size:1.25rem;"></i>
                                     <h4 style="margin:0;color:#166534;font-size:1rem;">Strengths Identified</h4>
                                 </div>
-                                <div style="color:#15803d;font-size:0.9rem;line-height:1.7;">
+                                <div id="rp-positive-obs" class="rp-edit" contenteditable="true" style="color:#15803d;font-size:0.9rem;line-height:1.7;">
                                     ${d.report.positiveObservations.split(/\d+\./).filter(s => s.trim()).map((obs, idx) => `
                                         <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">${idx + 1}</div>
@@ -3357,7 +3373,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <i class="fa-solid fa-lightbulb" style="color:#f59e0b;font-size:1.25rem;"></i>
                                     <h4 style="margin:0;color:#854d0e;font-size:1rem;">Improvement Opportunities</h4>
                                 </div>
-                                <div style="color:#92400e;font-size:0.9rem;line-height:1.7;">
+                                <div id="rp-ofi" class="rp-edit" contenteditable="true" style="color:#92400e;font-size:0.9rem;line-height:1.7;">
                                     ${(Array.isArray(d.report.ofi) ? d.report.ofi : d.report.ofi.split(/\d+\./).filter(s => s.trim())).map((ofi, idx) => `
                                         <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">
@@ -3606,6 +3622,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </table>
                     </div>
                 </div>
+                <!-- Conformance Verification -->
+                <div class="rp-sec" id="sec-conformance">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#047857,#10b981);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-circle-check"></i></span>CONFORMANCE VERIFICATION (${d.stats.conformCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body" style="padding:0;">
+                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+                            <thead><tr style="background:#f0fdf4;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Status</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
+                            <tbody>${conformRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
                 ${(d.report.ncrs || []).length > 0 ? `
                 <!-- 5: NCRs -->
                 <div class="rp-sec" id="sec-ncrs">
@@ -3617,8 +3643,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#155e75,#0891b2);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">6</span>MEETING RECORDS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                            <div style="padding:12px;background:#f0fdf4;border-radius:8px;"><strong style="color:#166534;">Opening Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.openingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div></div>
-                            <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;">Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Summary: ${d.report.closingMeeting?.summary || 'N/A'}</div></div>
+                            <div style="padding:12px;background:#f0fdf4;border-radius:8px;"><strong style="color:#166534;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Opening Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.openingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-opening-notes" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.openingMeeting?.notes || '<em style="color:#94a3b8;">Click to add opening meeting notes...</em>'}</div></div>
+                            <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
                         </div>
                     </div>
                 </div>
@@ -4097,6 +4123,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const en = window._reportSectionState || {};
         const editedSummary = document.getElementById('rp-exec-summary')?.innerHTML || d.report.executiveSummary || '';
         const editedConclusion = document.getElementById('rp-conclusion')?.innerHTML || d.report.conclusion || '';
+        const editedPositiveObs = document.getElementById('rp-positive-obs')?.innerHTML || d.report.positiveObservations || '';
+        const editedOfi = document.getElementById('rp-ofi')?.innerHTML || d.report.ofi || '';
+        const editedOpeningNotes = document.getElementById('rp-opening-notes')?.innerText || d.report.openingMeeting?.notes || '';
+        const editedClosingSummary = document.getElementById('rp-closing-summary')?.innerText || d.report.closingMeeting?.summary || '';
         const formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
         const fmtRemark = (t) => { if (!t) return ''; let s = t.trim(); if (!s) return ''; s = s.charAt(0).toUpperCase() + s.slice(1); if (!/[.!?]$/.test(s)) s += '.'; return s; };
         const printWindow = window.open('', '_blank');
@@ -4107,6 +4137,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const cbName = d.cbSettings.cbName || '';
         const cbEmail = d.cbSettings.cbEmail || '';
         const cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
+        // Helper: render all evidence images for PDF (string concat)
+        var renderEvThumbsPdf = function (item) {
+            var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+            if (!imgs.length) return '';
+            return '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">' + imgs.map(function (url) { return '<a href="' + url + '" target="_blank"><img src="' + url + '" style="height:80px;border-radius:6px;border:1px solid #e2e8f0;"></a>'; }).join('') + '</div>';
+        };
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
@@ -4114,7 +4150,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const sev = item.ncrType || 'NC';
             const sevBg = sev === 'Major' ? '#fee2e2' : sev === 'Minor' ? '#fef3c7' : '#dbeafe';
             const sevFg = sev === 'Major' ? '#991b1b' : sev === 'Minor' ? '#92400e' : '#1e40af';
-            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + (item.evidenceImage ? '<div style="margin-top:8px;"><a href="' + item.evidenceImage + '" target="_blank"><img src="' + item.evidenceImage + '" style="height:80px;border-radius:6px;border:1px solid #e2e8f0;"></a></div>' : '') + '</td></tr>';
+            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+        }).join('');
+
+        // Conformance rows for PDF (items with comments or evidence)
+        const conformRowsHtml = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
+            const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+            const title = item.kbMatch ? item.kbMatch.title : '';
+            const req = item.kbMatch ? item.kbMatch.requirement : item.requirement;
+            return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
         const reportHtml = '<!DOCTYPE html><html><head>'
@@ -4185,10 +4229,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // TABLE OF CONTENTS
             + (function () {
                 var tocSections = [];
-                var colors = ['#2563eb', '#059669', '#7c3aed', '#dc2626', '#ea580c', '#0891b2', '#4338ca', '#c2410c'];
-                var descs = ['Organization details, scope, audit team and dates', 'Key findings overview, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Opening and closing meeting records', 'Certification recommendation and auditor signatures', 'Photographic evidence from the audit'];
-                var names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'NON-CONFORMITY DETAILS', 'NCR REGISTER', 'MEETING RECORDS', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
-                var keys = ['audit-info', 'summary', 'charts', 'findings', 'ncrs', 'meetings', 'conclusion', 'evidence'];
+                var colors = ['#2563eb', '#059669', '#7c3aed', '#dc2626', '#059669', '#ea580c', '#0891b2', '#4338ca', '#c2410c'];
+                var descs = ['Organization details, scope, audit team and dates', 'Key findings overview, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Detailed non-conformity findings with evidence', 'Verified conforming items with supporting evidence', 'Formal NCR register with severity classifications', 'Opening and closing meeting records', 'Certification recommendation and auditor signatures', 'Photographic evidence from the audit'];
+                var names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'NON-CONFORMITY DETAILS', 'CONFORMANCE VERIFICATION', 'NCR REGISTER', 'MEETING RECORDS', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
+                var keys = ['audit-info', 'summary', 'charts', 'findings', 'conformance', 'ncrs', 'meetings', 'conclusion', 'evidence'];
                 var num = 1;
                 for (var i = 0; i < keys.length; i++) {
                     var k = keys[i];
@@ -4225,8 +4269,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '</div>' : '')
             // SECTION 2
             + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:linear-gradient(135deg,#047857,#059669);"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
-                + (d.report.positiveObservations ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + formatText(d.report.positiveObservations) + '</div></div>' : '')
-                + (d.report.ofi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + formatText(d.report.ofi) + '</div></div>' : '')
+                + (editedPositiveObs ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + editedPositiveObs + '</div></div>' : '')
+                + (editedOfi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + editedOfi + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
@@ -4240,20 +4284,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
             // SECTION 4
             + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">4</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Severity</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
+            // CONFORMANCE VERIFICATION SECTION
+            + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:linear-gradient(135deg,#047857,#10b981);"><span class="sn"><i class="fa-solid fa-circle-check"></i></span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:10%;">Clause</th><th style="width:40%;">ISO Requirement</th><th style="width:10%;text-align:center;">Status</th><th style="width:40%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION 5
             + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">5</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
             // SECTION 6
             + (en['meetings'] !== false ? '<div id="sec-meetings" class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">6</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
-                + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr></table></div>'
-                + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Summary</td><td>' + (d.report.closingMeeting?.summary || 'N/A') + '</td></tr></table></div>'
+                + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
+                + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || 'N/A') + '</td></tr></table></div>'
                 + '</div></div>' : '')
             // EVIDENCE GALLERY
             + (function () {
                 var evidenceItems = [];
                 (d.hydratedProgress || []).forEach(function (item) {
-                    if (item.evidenceImage) {
-                        evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: item.evidenceImage, status: item.status });
-                    }
+                    var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+                    imgs.forEach(function (img) {
+                        evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: img, status: item.status });
+                    });
                 });
                 (d.report.ncrs || []).forEach(function (ncr) {
                     if (ncr.evidenceImage) {

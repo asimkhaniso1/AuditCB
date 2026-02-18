@@ -426,6 +426,8 @@
             });
         }
 
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('https://audit.companycertification.com/#/verify/checklist/' + checklistId)}`;
+
         const printWindow = window.open('', '_blank', 'width=1000,height=700');
         const htmlContent = `<!DOCTYPE html>
 <html>
@@ -512,6 +514,7 @@
             <p>Audit Checklist • ${questionNumber} Items • Type: ${checklist.type || 'Custom'}</p>
         </div>
         <div class="pdf-header-right">
+            <img src="${qrUrl}" style="width:68px;height:68px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;" alt="QR">
             <div class="standard-tag">${window.UTILS?.escapeHtml(checklist.standard || 'General') || 'General'}</div>
             <p>Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
             <p>AuditCB360 Platform</p>

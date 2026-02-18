@@ -123,12 +123,6 @@ const SupabaseClient = {
                 window.state.currentUser.permissions = rolePermissions[managedUser.role] || ['view_assigned'];
                 Logger.info('Role updated from user management:', managedUser.role);
             }
-
-            // CRITICAL: Re-render dashboard to show fresh data from database
-            if (window.location.hash === '#dashboard' && window.renderModule) {
-                Logger.info('Re-rendering dashboard with fresh data...');
-                window.renderModule('dashboard');
-            }
         } catch (error) {
             Logger.warn('Failed to load cloud data, using local data:', error.message);
         }
@@ -139,9 +133,12 @@ const SupabaseClient = {
             Logger.info('Client sidebar refreshed after sign-in');
         }
 
-        // Redirect to dashboard if on login page
+        // Redirect to dashboard if on login page — hashchange listener will render
         if (window.location.hash === '' || window.location.hash === '#login') {
             window.location.hash = 'dashboard';
+        } else if (window.location.hash === '#dashboard' && window.renderModule) {
+            // Already on dashboard — re-render with fresh cloud data
+            Logger.info('Re-rendering dashboard with fresh cloud data...');
             window.renderModule('dashboard');
         }
     },

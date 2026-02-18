@@ -2380,6 +2380,44 @@ async function generateAIAgenda() {
             })).filter(c => c.name)
         };
 
+        // ── Inject previous audit report context (same client + same standard) ──
+        const allReports = window.state.auditReports || [];
+        const standardTokens = standard.toLowerCase().split(/[,\s]+/).filter(Boolean);
+        const previousReports = allReports
+            .filter(r => {
+                if (r.client !== clientName) return false;
+                if (!r.status || (r.status !== 'Finalized' && r.status !== 'Approved' && r.status !== 'Published')) return false;
+                // Match standard: report.standard OR linked plan.standard
+                const rStd = (r.standard || '').toLowerCase();
+                const linkedPlan = (r.planId && window.state.auditPlans) ? window.state.auditPlans.find(p => String(p.id) === String(r.planId)) : null;
+                const pStd = (linkedPlan?.standard || '').toLowerCase();
+                return standardTokens.some(tok => rStd.includes(tok) || pStd.includes(tok));
+            })
+            .sort((a, b) => new Date(b.finalizedAt || b.date || 0) - new Date(a.finalizedAt || a.date || 0));
+
+        if (previousReports.length > 0) {
+            const lastReport = previousReports[0];
+            const ncFindings = (lastReport.checklistProgress || [])
+                .filter(item => item.status === 'nc')
+                .map(item => {
+                    const clause = item.clauseRef || item.clause || '';
+                    const severity = item.severity || item.ncrType || 'Minor';
+                    const desc = item.ncrDescription || item.comment || item.requirement || '';
+                    return { clause, severity, description: desc.substring(0, 200) };
+                });
+
+            context.previousAudit = {
+                date: lastReport.date || lastReport.finalizedAt || 'Unknown',
+                auditType: lastReport.auditType || '',
+                recommendation: lastReport.recommendation || '',
+                ncCount: ncFindings.length,
+                ncFindings: ncFindings.slice(0, 15), // Top 15 to keep prompt manageable
+                ofiSummary: (lastReport.ofi || '').substring(0, 500),
+                positiveObservations: (lastReport.positiveObservations || '').substring(0, 300),
+                conclusion: (lastReport.conclusion || '').substring(0, 300)
+            };
+        }
+
         const agenda = await window.AI_SERVICE.generateAuditAgenda(context);
 
         // Clear existing rows

@@ -791,9 +791,24 @@ const AuthManager = {
         const user = await this.login(username, password);
 
         if (user) {
-            // Redirect to dashboard
+            // Remove login overlay if present
+            const loginOverlay = document.getElementById('login-overlay');
+            if (loginOverlay) loginOverlay.remove();
+
+            // Show app chrome
+            const sidebar = document.getElementById('sidebar');
+            const header = document.querySelector('.main-header');
+            if (sidebar) sidebar.style.display = '';
+            if (header) header.style.display = '';
+
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.classList.remove('auth-pending');
+                appContainer.classList.add('auth-ready');
+            }
+
+            // Navigate to dashboard — hashchange listener will render it
             window.location.hash = 'dashboard';
-            window.renderModule('dashboard');
         }
 
         return false;
