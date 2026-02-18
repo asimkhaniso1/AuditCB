@@ -636,6 +636,16 @@ function renderExecutionDetail(reportId) {
     const pendingCount = totalItems - answeredCount;
     const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
 
+    // Sub-classify NC items: OBS/OFI vs actual NCs (Minor/Major)
+    const obsOfiCount = allItems.filter(item => {
+        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+        const p = progressMap[key];
+        if (p?.status !== 'nc') return false;
+        const t = (p.ncrType || '').toLowerCase();
+        return t === 'observation' || t === 'ofi';
+    }).length;
+    const actualNCCount = ncCount - obsOfiCount;
+
 
     const html = `
         <div class="fade-in">
@@ -673,22 +683,26 @@ function renderExecutionDetail(reportId) {
                             </div>
                             
                             <!-- Stats Grid -->
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                                <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+                                <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
                                     <div style="font-size: 1.5rem; font-weight: bold;">${totalItems}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Total Items</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Total Items</div>
                                 </div>
-                                <div style="text-align: center; background: rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                <div style="text-align: center; background: rgba(16, 185, 129, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
                                     <div style="font-size: 1.5rem; font-weight: bold;">${conformCount}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Conformities</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Conformities</div>
                                 </div>
-                                <div style="text-align: center; background: rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${ncCount}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Non-Conform.</div>
+                                <div style="text-align: center; background: rgba(245, 158, 11, 0.35); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${obsOfiCount}</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">OBS / OFI</div>
                                 </div>
-                                <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                <div style="text-align: center; background: rgba(239, 68, 68, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${actualNCCount}</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">NC (Min/Maj)</div>
+                                </div>
+                                <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
                                     <div style="font-size: 1.5rem; font-weight: bold;">${pendingCount}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
                                 </div>
                             </div>
                         </div>
