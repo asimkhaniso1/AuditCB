@@ -3356,7 +3356,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     };
     // Generate Printable Report - Enhanced Version
     // Generate Printable Report - Enhanced Version
-    window.generateAuditReport = function (reportId) {
+    window.generateAuditReport = async function (reportId) {
         const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) {
             window.showNotification('Report not found', 'error');
@@ -3386,6 +3386,29 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 comment: item.comment || ''
             };
         });
+
+        // Resolve all idb:// evidence URLs to data URLs (screen captures stored in IndexedDB)
+        const resolveUrl = async (url) => {
+            if (!url || typeof url !== 'string' || !url.startsWith('idb://')) return url;
+            try {
+                const dataUrl = await EvidenceDB.get(url);
+                return dataUrl || '';
+            } catch (e) { return ''; }
+        };
+        for (const item of hydratedProgress) {
+            if (item.evidenceImage) item.evidenceImage = await resolveUrl(item.evidenceImage);
+            if (Array.isArray(item.evidenceImages)) {
+                item.evidenceImages = await Promise.all(item.evidenceImages.map(resolveUrl));
+                item.evidenceImages = item.evidenceImages.filter(u => !!u);
+            }
+        }
+        // Also resolve NCR evidence images
+        if (report.ncrs) {
+            for (const ncr of report.ncrs) {
+                if (ncr.evidenceImage) ncr.evidenceImage = await resolveUrl(ncr.evidenceImage);
+            }
+        }
+        console.log('[Report] Resolved idb:// evidence URLs');
 
         // Attempt to get client details for address/logo if available
         const client = window.state.clients.find(c => c.name === report.client) || {};
