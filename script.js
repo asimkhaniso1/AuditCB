@@ -492,6 +492,11 @@ document.addEventListener('click', (e) => {
 
 // Hash-based Routing
 function handleRouteChange() {
+    // Block rendering while auth is pending (prevents flash of wrong module on login)
+    const appContainer = document.getElementById('app-container');
+    if (appContainer && appContainer.classList.contains('auth-pending')) {
+        return;
+    }
     const hash = window.location.hash.substring(1); // Remove #
     const [baseHash, queryString] = hash.split('?');
 

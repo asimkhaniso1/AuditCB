@@ -795,6 +795,10 @@ const AuthManager = {
             // will show app chrome and navigate AFTER cloud data loads.
             const loginOverlay = document.getElementById('login-overlay');
             if (loginOverlay) loginOverlay.remove();
+
+            // Clear any stale content so nothing flashes before dashboard renders
+            const contentArea = document.getElementById('content-area');
+            if (contentArea) contentArea.innerHTML = '<div style="text-align:center;padding:3rem;"><i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;color:var(--primary-color);"></i><p style="margin-top:1rem;color:#64748b;">Loading your workspace...</p></div>';
         }
 
         return false;
