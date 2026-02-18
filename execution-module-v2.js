@@ -3477,6 +3477,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const minorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'minor').length;
         const observationCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'observation').length;
         const ofiCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'ofi').length;
+        // Actual NC count = only major + minor (excludes observations & OFIs)
+        const actualNCCount = majorNC + minorNC;
+        // OBS/OFI combined count
+        const obsOfiCount = observationCount + ofiCount;
 
         // NC breakdown by clause group (for bar chart)
         const ncByClause = {};
@@ -3491,7 +3495,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             clientLogo: client.logoUrl || '',
             cbLogo: cbSettings.logoUrl || '',
             qrCodeUrl,
-            stats: { totalItems, ncCount: ncItems.length, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, ncByClause },
+            stats: { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause },
             today: new Date().toLocaleDateString()
         };
 
@@ -3739,10 +3743,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #3b82f6;">
                                     <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Compliance</div>
                                     <div style="font-size:1.8rem;font-weight:800;color:#3b82f6;">
-                                        ${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%
+                                        ${Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100)}%
                                     </div>
                                     <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;margin-top:0.5rem;overflow:hidden;">
-                                        <div style="width:${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%;height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:3px;"></div>
+                                        <div style="width:${Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100)}%;height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:3px;"></div>
                                     </div>
                                 </div>
                                 
@@ -3812,7 +3816,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <!-- KPI Metrics Dashboard -->
                         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:2rem;">
                             <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;color:white;">
-                                <div style="font-size:2rem;font-weight:800;">${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%</div>
+                                <div style="font-size:2rem;font-weight:800;">${Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100)}%</div>
                                 <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">COMPLIANCE RATE</div>
                             </div>
                             <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;color:white;">
@@ -4818,9 +4822,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
                 + '<div class="stat-grid">'
-                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
-                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.ncCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
-                + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
+                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
+                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.actualNCCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
+                + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.obsOfiCount + '</div><div class="stat-lbl">Observations / OFI</div></div>'
                 + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
