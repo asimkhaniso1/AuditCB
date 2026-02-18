@@ -4056,7 +4056,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 findings.push({
                     id: fid,
                     clause: clause,
-                    status: 'nc',
+                    status: select.value,
                     comment: remarkText,
                     remarks: remarkText,
                     type: select.value,
@@ -4077,35 +4077,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             let polishCount = 0;
             let generateCount = 0;
 
-            // STEP 2: AI Classify Findings (if analyzeFindings available)
-            if (window.AI_SERVICE.analyzeFindings) {
-                try {
-                    const classified = await window.AI_SERVICE.analyzeFindings(findings, standardName);
-                    if (classified && Array.isArray(classified)) {
-                        classified.forEach((result, i) => {
-                            if (result.type && findings[i]) {
-                                const select = document.querySelector('.review-severity[data-finding-id="' + findings[i].id + '"]');
-                                if (select) {
-                                    const newType = result.type.toLowerCase();
-                                    if (['major', 'minor', 'observation'].includes(newType)) {
-                                        select.value = newType;
-                                        findings[i].type = newType;
-                                        classifyCount++;
-                                        // Update border color
-                                        const card = select.closest('.card');
-                                        if (card) {
-                                            const color = newType === 'major' ? '#dc2626' : newType === 'minor' ? '#d97706' : '#8b5cf6';
-                                            card.style.borderLeftColor = color;
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch (classifyErr) {
-                    console.warn('Classification error (continuing with generation):', classifyErr);
-                }
-            }
+            // STEP 2: Severity classification is PRESERVED as-is (set by auditor/senior reviewer)
+            // AI does NOT change severity — it only polishes text below
+            console.log('[AI] Respecting auditor severity classifications — skipping auto-classify');
 
             // STEP 2.5: AI Generate Conformance Text (for findings with empty remarks)
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating conformance text...';
