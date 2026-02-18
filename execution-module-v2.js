@@ -823,7 +823,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                              <option value="${window.CONSTANTS.NCR_TYPES.OFI}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OFI ? 'selected' : ''}>Opportunity for Improvement (OFI)</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor NC</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
-                                             <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>Pending Classification</option>
+
                                          </select>
                                          <button type="button" class="btn btn-sm btn-info" onclick="const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'" title="View Classification Matrix (ISO 17021-1)">
                                             <i class="fa-solid fa-scale-balanced"></i>
@@ -1435,7 +1435,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div>
                                             <label style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem; font-weight: 600;">Severity Classification</label>
                                             <select class="form-control form-control-sm review-severity" data-finding-id="${f.id}" style="font-size: 0.9rem; padding: 0.4rem;">
-                                                <option value="observation" ${f.type === 'observation' ? 'selected' : ''}>Observation</option>
+                                                <option value="observation" ${f.type === 'observation' ? 'selected' : ''}>Observation (OBS)</option>
+                                                <option value="ofi" ${f.type === 'ofi' ? 'selected' : ''}>Opportunity for Improvement (OFI)</option>
                                                 <option value="minor" ${f.type === 'minor' ? 'selected' : ''}>Minor NC</option>
                                                 <option value="major" ${f.type === 'major' ? 'selected' : ''}>Major NC</option>
                                             </select>
@@ -2277,7 +2278,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <option value="${window.CONSTANTS.NCR_TYPES.OFI}">Opportunity for Improvement (OFI)</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.MINOR}">Minor NC</option>
                     <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}">Major NC</option>
-                    <option value="${window.CONSTANTS.NCR_TYPES.PENDING}">Pending Classification</option>
+
                 </select>
             </div>
             <div class="form-group">
@@ -3140,7 +3141,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
             { id: 'findings', label: 'Findings', icon: 'fa-triangle-exclamation', color: '#dc2626' },
             { id: 'conformance', label: 'Conformance', icon: 'fa-circle-check', color: '#059669' },
-            { id: 'ncrs', label: 'NCRs', icon: 'fa-clipboard-check', color: '#ea580c', hide: !(d.report.ncrs || []).length },
+            { id: 'ncrs', label: 'NCRs', icon: 'fa-clipboard-check', color: '#ea580c' },
             { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
             { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' }
         ];
@@ -3175,7 +3176,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         }).join('');
 
         // Conformance rows (items with comments or evidence)
-        const conformRows = d.hydratedProgress.filter(i => i.status === 'conform' && (i.comment || i.evidenceImage || (i.evidenceImages && i.evidenceImages.length))).map((item, idx) => {
+        const conformRows = d.hydratedProgress.filter(i => i.status === 'conform').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
@@ -3836,13 +3837,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const clauseEl = card?.querySelector('[style*="font-weight: 700"]');
                 const clause = clauseEl?.textContent?.match(/[\d.]+/)?.[0] || '';
 
+                const descEl = card?.querySelector('[style*="color: #334155"]') || card?.querySelector('[style*="color:#334155"]');
+                const reqEl = card?.querySelector('[style*="color: var(--primary-color)"]');
+                const descText = descEl?.textContent?.trim() || '';
+                const reqText = reqEl?.parentElement?.textContent?.trim() || '';
                 findings.push({
                     id: fid,
                     clause: clause,
                     status: 'nc',
                     comment: remarkText,
                     remarks: remarkText,
-                    type: select.value
+                    type: select.value,
+                    description: descText || reqText,
+                    requirement: reqText
                 });
             });
 
@@ -4038,8 +4045,44 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         try {
             const standardName = d.report.standard || d.auditPlan?.standard || '';
+            // Step 1: Generate AI text for conformance items with empty comments
+            if (d.hydratedProgress && d.hydratedProgress.length > 0 && window.AI_SERVICE.generateConformanceText) {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Generating conformance text...';
+                try {
+                    const emptyConformItems = d.hydratedProgress
+                        .map((item, idx) => ({ ...item, _hpIdx: idx }))
+                        .filter(item => item.status === 'conform' && (!item.comment || item.comment.trim().length < 5));
 
-            // Refine checklist progress notes
+                    if (emptyConformItems.length > 0) {
+                        const conformFindings = emptyConformItems.map(item => ({
+                            id: `conform-${item._hpIdx}`,
+                            clause: item.kbMatch ? item.kbMatch.clause : item.clause,
+                            status: 'conform',
+                            type: 'conform',
+                            description: (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || ''),
+                            comment: item.comment || '',
+                            requirement: (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || '')
+                        }));
+
+                        const generated = await window.AI_SERVICE.generateConformanceText(conformFindings, standardName);
+                        if (generated && Array.isArray(generated)) {
+                            generated.forEach((result, i) => {
+                                if (result.comment && result._aiGenerated) {
+                                    const hpIdx = emptyConformItems[i]._hpIdx;
+                                    d.hydratedProgress[hpIdx].comment = result.comment;
+                                    d.hydratedProgress[hpIdx]._aiGenerated = true;
+                                }
+                            });
+                            console.log(`[AI] Generated conformance text for ${generated.filter(g => g._aiGenerated).length} items`);
+                        }
+                    }
+                } catch (conformErr) {
+                    console.warn('Conformance text generation error (continuing with polish):', conformErr);
+                }
+            }
+
+            // Step 2: Refine/polish all checklist progress notes
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Polishing Notes...';
             if (d.hydratedProgress && d.hydratedProgress.length > 0) {
                 const refined = await window.AI_SERVICE.refineAuditNotes(d.hydratedProgress, standardName);
                 d.hydratedProgress = refined;
@@ -4074,6 +4117,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }).join('');
             }
 
+            // Also refresh the conformance table to show AI-generated remarks
+            const conformSec = document.querySelector('#sec-conformance .rp-sec-body tbody');
+            if (conformSec && d.hydratedProgress) {
+                const renderEvThumbs = (item) => {
+                    const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+                    if (!imgs.length) return '';
+                    return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs.map(src => '<img src="' + src + '" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" onclick="window.open(this.src,\'_blank\')">').join('') + '</div>';
+                };
+                const conformItems = d.hydratedProgress.filter(i => i.status === 'conform');
+                conformSec.innerHTML = conformItems.map((item, idx) => {
+                    const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
+                    const title = item.kbMatch ? item.kbMatch.title : '';
+                    const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
+                    return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:10px 14px;font-weight:700;">' + clause + '</td><td style="padding:10px 14px;">' + (title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req) + '</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">' + (item.comment || '<span style="color:#94a3b8;">No remarks</span>') + renderEvThumbs(item) + '</td></tr>';
+                }).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>';
+            }
+
             // Success state
             btn.innerHTML = '<i class="fa-solid fa-check" style="margin-right:6px;"></i>Notes Polished!';
             btn.style.background = 'linear-gradient(135deg,#f0fdf4,#dcfce7)';
@@ -4081,7 +4141,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             btn.style.color = '#166534';
             btn.style.opacity = '1';
 
-            const totalRefined = (d.hydratedProgress?.filter(i => i._originalComment)?.length || 0) + (d.report.ncrs?.filter(n => n._originalDescription)?.length || 0);
+            const totalRefined = (d.hydratedProgress?.filter(i => i._originalComment || i._aiGenerated)?.length || 0) + (d.report.ncrs?.filter(n => n._originalDescription)?.length || 0);
             window.showNotification(`AI polished ${totalRefined} auditor notes into professional language!`, 'success');
 
             // Allow re-polish after 3 seconds

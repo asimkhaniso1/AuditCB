@@ -56,7 +56,6 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                                  <option value="${window.CONSTANTS.NCR_TYPES.OFI}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OFI ? 'selected' : ''}>Opportunity for Improvement (OFI)</option>
                                  <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor NC</option>
                                  <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
-                                 <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>Pending Classification</option>
                              </select>
                              <button type="button" class="btn btn-sm btn-info" onclick="const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'" title="View Classification Matrix (ISO 17021-1)">
                                 <i class="fa-solid fa-scale-balanced"></i>
