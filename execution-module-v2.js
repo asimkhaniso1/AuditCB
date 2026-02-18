@@ -3098,9 +3098,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const ncItems = hydratedProgress.filter(i => i.status === 'nc');
         const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
         const naItems = hydratedProgress.filter(i => i.status === 'na');
-        const majorNC = ncItems.filter(i => i.ncrType === 'Major').length;
-        const minorNC = ncItems.filter(i => i.ncrType === 'Minor').length;
-        const observationCount = ncItems.filter(i => i.ncrType === 'Observation').length;
+        const majorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'major').length;
+        const minorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'minor').length;
+        const observationCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'observation').length;
+        const ofiCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'ofi').length;
 
         // NC breakdown by clause group (for bar chart)
         const ncByClause = {};
@@ -3115,7 +3116,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             clientLogo: client.logoUrl || '',
             cbLogo: cbSettings.logoUrl || '',
             qrCodeUrl,
-            stats: { totalItems, ncCount: ncItems.length, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ncByClause },
+            stats: { totalItems, ncCount: ncItems.length, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, ncByClause },
             today: new Date().toLocaleDateString()
         };
 
@@ -3423,22 +3424,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">3</span>ANALYTICS & INSIGHTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <!-- KPI Metrics Dashboard -->
-                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem;">
-                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;color:white;">
-                                <div style="font-size:2.2rem;font-weight:800;">${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%</div>
-                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">COMPLIANCE RATE</div>
+                        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:2rem;">
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;color:white;">
+                                <div style="font-size:2rem;font-weight:800;">${Math.round((d.stats.conformCount / (d.stats.totalItems || 1)) * 100)}%</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">COMPLIANCE RATE</div>
                             </div>
-                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;color:white;">
-                                <div style="font-size:2.2rem;font-weight:800;">${d.stats.ncCount}</div>
-                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">NON-CONFORMITIES</div>
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;color:white;">
+                                <div style="font-size:2rem;font-weight:800;">${d.stats.majorNC}</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">MAJOR NC</div>
                             </div>
-                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;color:white;">
-                                <div style="font-size:2.2rem;font-weight:800;">${d.stats.observationCount}</div>
-                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">OBSERVATIONS</div>
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;color:white;">
+                                <div style="font-size:2rem;font-weight:800;">${d.stats.minorNC}</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">MINOR NC</div>
                             </div>
-                            <div style="text-align:center;padding:18px 12px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:10px;color:white;">
-                                <div style="font-size:2.2rem;font-weight:800;">${d.stats.totalItems}</div>
-                                <div style="font-size:0.8rem;font-weight:600;opacity:0.9;">TOTAL CHECKS</div>
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border-radius:10px;color:white;">
+                                <div style="font-size:2rem;font-weight:800;">${d.stats.observationCount}</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">OBSERVATIONS</div>
+                            </div>
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#06b6d4,#0891b2);border-radius:10px;color:white;">
+                                <div style="font-size:2rem;font-weight:800;">${d.stats.ofiCount}</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">OFI</div>
+                            </div>
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#64748b,#475569);border-radius:10px;color:white;">
+                                <div style="font-size:2rem;font-weight:800;">${d.stats.totalItems}</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">TOTAL CHECKS</div>
                             </div>
                         </div>
                         
@@ -3456,7 +3465,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         
                         <!-- Findings by Main Clause Chart -->
                         <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
-                            <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;">Findings by ISO Clause (Main Clauses 4-10)</h4>
+                            <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;">Findings by ISO Clause (Main Clauses)</h4>
                             <canvas id="clause-findings-chart" style="max-height:300px;"></canvas>
                         </div>
                         
@@ -3470,32 +3479,34 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     return;
                                 }
                                 
-                                // 1. Compliance Pie Chart
+                                // 1. Compliance Pie Chart — 5 slices
                                 const pieCtx = document.getElementById('compliance-pie-chart');
                                 if (pieCtx) {
                                     new Chart(pieCtx.getContext('2d'), {
                                         type: 'doughnut',
                                         data: {
-                                            labels: ['Conforming', 'Non-Conformity', 'Observation'],
+                                            labels: ['Conforming', 'Major NC', 'Minor NC', 'OBS / OFI', 'N/A'],
                                             datasets: [{
-                                                data: [${d.stats.conformCount}, ${d.stats.ncCount}, ${d.stats.observationCount}],
-                                                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
-                                                borderWidth: 0
+                                                data: [${d.stats.conformCount}, ${d.stats.majorNC}, ${d.stats.minorNC}, ${d.stats.observationCount + d.stats.ofiCount}, ${d.stats.naCount}],
+                                                backgroundColor: ['#10b981', '#dc2626', '#f59e0b', '#8b5cf6', '#94a3b8'],
+                                                borderWidth: 2,
+                                                borderColor: '#ffffff'
                                             }]
                                         },
                                         options: {
                                             responsive: true,
                                             maintainAspectRatio: true,
+                                            cutout: '55%',
                                             plugins: {
                                                 legend: { 
                                                     position: 'bottom',
-                                                    labels: { font: { size: 11 }, padding: 10 }
+                                                    labels: { font: { size: 11 }, padding: 10, usePointStyle: true, pointStyle: 'circle' }
                                                 },
                                                 tooltip: {
                                                     callbacks: {
                                                         label: (context) => {
-                                                            const total = ${d.stats.conformCount + d.stats.ncCount + d.stats.observationCount};
-                                                            const pct = ((context.parsed / total) * 100).toFixed(1);
+                                                            const total = ${d.stats.totalItems};
+                                                            const pct = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : '0.0';
                                                             return context.label + ': ' + context.parsed + ' (' + pct + '%)';
                                                         }
                                                     }
@@ -3505,22 +3516,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     });
                                 }
                                 
-                                // 2. Severity Bar Chart
+                                // 2. Severity Bar Chart — 4 categories
                                 const sevCtx = document.getElementById('severity-bar-chart');
                                 if (sevCtx) {
-                                    const majorCount = ${d.hydratedProgress.filter(i => i.ncrType === 'Major').length};
-                                    const minorCount = ${d.hydratedProgress.filter(i => i.ncrType === 'Minor').length};
-                                    const obsCount = ${d.stats.observationCount};
-                                    
                                     new Chart(sevCtx.getContext('2d'), {
                                         type: 'bar',
                                         data: {
-                                            labels: ['Major NC', 'Minor NC', 'Observations'],
+                                            labels: ['Major NC', 'Minor NC', 'Observations', 'OFI'],
                                             datasets: [{
                                                 label: 'Count',
-                                                data: [majorCount, minorCount, obsCount],
-                                                backgroundColor: ['#dc2626', '#f59e0b', '#fbbf24'],
-                                                borderWidth: 0
+                                                data: [${d.stats.majorNC}, ${d.stats.minorNC}, ${d.stats.observationCount}, ${d.stats.ofiCount}],
+                                                backgroundColor: ['#dc2626', '#f59e0b', '#8b5cf6', '#06b6d4'],
+                                                borderWidth: 0,
+                                                borderRadius: 6
                                             }]
                                         },
                                         options: {
@@ -3547,21 +3555,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     const allItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
                 clause: i.kbMatch?.clause || i.clause || 'N/A',
                 status: i.status,
-                ncrType: i.ncrType
+                ncrType: (i.ncrType || '').toLowerCase()
             })))};
                                     
                                     allItems.forEach(item => {
                                         const mainClause = item.clause.split('.')[0]; // Extract main clause (e.g., "4" from "4.1.2")
                                         if (!clauseData[mainClause]) {
-                                            clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ok: 0 };
+                                            clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ofi: 0, ok: 0 };
                                         }
                                         
                                         if (item.status === 'nc') {
-                                            if (item.ncrType === 'Major') clauseData[mainClause].major++;
-                                            else if (item.ncrType === 'Minor') clauseData[mainClause].minor++;
-                                        } else if (item.status === 'observation') {
-                                            clauseData[mainClause].obs++;
-                                        } else if (item.status === 'ok') {
+                                            if (item.ncrType === 'major') clauseData[mainClause].major++;
+                                            else if (item.ncrType === 'minor') clauseData[mainClause].minor++;
+                                            else if (item.ncrType === 'ofi') clauseData[mainClause].ofi++;
+                                            else clauseData[mainClause].obs++;
+                                        } else if (item.status === 'conform') {
                                             clauseData[mainClause].ok++;
                                         }
                                     });
@@ -3593,7 +3601,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 {
                                                     label: 'Observations',
                                                     data: sortedClauses.map(c => clauseData[c].obs),
-                                                    backgroundColor: '#fbbf24',
+                                                    backgroundColor: '#8b5cf6',
+                                                    stack: 'findings'
+                                                },
+                                                {
+                                                    label: 'OFI',
+                                                    data: sortedClauses.map(c => clauseData[c].ofi),
+                                                    backgroundColor: '#06b6d4',
                                                     stack: 'findings'
                                                 },
                                                 {
@@ -3610,7 +3624,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                             plugins: {
                                                 legend: { 
                                                     position: 'bottom',
-                                                    labels: { font: { size: 11 }, padding: 10 }
+                                                    labels: { font: { size: 11 }, padding: 10, usePointStyle: true, pointStyle: 'circle' }
                                                 },
                                                 tooltip: {
                                                     mode: 'index',
