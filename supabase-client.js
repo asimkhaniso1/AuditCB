@@ -630,9 +630,17 @@ const SupabaseClient = {
 
                 if (error) throw error;
 
-                // Get URL (use public if bucket is public, signed otherwise)
-                // For now, we'll try to get a signed URL by default for security
-                const url = await this.getSignedUrl(bucket, path);
+                // Get URL - prefer public URL (permanent) for public buckets like audit-images
+                let url;
+                const { data: publicUrlData } = SupabaseClient.client.storage
+                    .from(bucket)
+                    .getPublicUrl(path);
+                if (publicUrlData && publicUrlData.publicUrl) {
+                    url = publicUrlData.publicUrl;
+                } else {
+                    // Fallback to signed URL for private buckets
+                    url = await this.getSignedUrl(bucket, path);
+                }
 
                 Logger.info(`File uploaded to ${bucket}:`, path);
                 return { url, path, fileName: file.name || filename };
