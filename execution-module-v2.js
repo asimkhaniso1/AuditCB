@@ -1019,6 +1019,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
 
                         <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-outline-secondary" id="toggle-all-accordions" onclick="window.toggleAllAccordions()" title="Collapse/Expand all sections">
+                                <i class="fa-solid fa-compress-alt" style="margin-right: 0.5rem;"></i> <span>Collapse All</span>
+                            </button>
                             <button class="btn btn-secondary" onclick="window.addCustomQuestion('${report.id}')">
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
@@ -1836,6 +1839,43 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             content.style.display = isVisible ? 'none' : 'block';
             if (icon) {
                 icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+            }
+        }
+    };
+
+    // Collapse/Expand ALL accordion sections at once
+    window.toggleAllAccordions = function () {
+        const sections = document.querySelectorAll('.accordion-section[data-clause-id]');
+        const btn = document.getElementById('toggle-all-accordions');
+        // If any are open, collapse all; if all closed, expand all
+        const anyOpen = Array.from(sections).some(s => {
+            const content = s.querySelector('[id^="clause-"]');
+            return content && content.style.display === 'block';
+        });
+
+        sections.forEach(s => {
+            const sectionId = s.querySelector('[id^="clause-"]')?.id;
+            if (!sectionId) return;
+            const content = document.getElementById(sectionId);
+            const icon = document.getElementById('icon-' + sectionId);
+            if (content) {
+                content.style.display = anyOpen ? 'none' : 'block';
+            }
+            if (icon) {
+                icon.style.transform = anyOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+            }
+        });
+
+        // Update button label
+        if (btn) {
+            const icon = btn.querySelector('i');
+            const label = btn.querySelector('span');
+            if (anyOpen) {
+                if (icon) icon.className = 'fa-solid fa-expand-alt';
+                if (label) label.textContent = 'Expand All';
+            } else {
+                if (icon) icon.className = 'fa-solid fa-compress-alt';
+                if (label) label.textContent = 'Collapse All';
             }
         }
     };
