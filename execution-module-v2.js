@@ -894,12 +894,27 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     if (useClauses) {
                         // New hierarchical format with accordion
                         let itemIdx = 0;
+
+                        // Apply saved clause order if available
+                        let orderedClauses = [...checklist.clauses];
+                        const savedOrder = report.clauseOrder;
+                        if (Array.isArray(savedOrder) && savedOrder.length > 0) {
+                            orderedClauses.sort((a, b) => {
+                                const idA = `${checklist.id}-${a.mainClause}`;
+                                const idB = `${checklist.id}-${b.mainClause}`;
+                                const posA = savedOrder.indexOf(idA);
+                                const posB = savedOrder.indexOf(idB);
+                                // Items not in savedOrder go to the end, in original order
+                                return (posA === -1 ? 9999 : posA) - (posB === -1 ? 9999 : posB);
+                            });
+                        }
+
                         return `
                             <div style="margin-bottom: 2rem;">
                                 <h4 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
                                     <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color); -webkit-text-fill-color: #667eea;"></i> ${checklist.name}
                                 </h4>
-                                ${checklist.clauses.map((clause, clauseIdx) => {
+                                ${orderedClauses.map((clause, clauseIdx) => {
                             const allowedIds = selectionMap[checklist.id];
                             const isSelective = Array.isArray(allowedIds) && allowedIds.length > 0;
 
@@ -1883,6 +1898,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     s.style.borderTop = '';
                     s.style.borderBottom = '';
                 });
+
+                // Persist the new clause order
+                const newOrder = Array.from(document.querySelectorAll('.accordion-section[data-clause-id]'))
+                    .map(s => s.getAttribute('data-clause-id'));
+                // Find report from current execution context
+                const reportId = document.querySelector('[data-report-id]')?.getAttribute('data-report-id')
+                    || document.querySelector('.bulk-action-btn[data-report-id]')?.getAttribute('data-report-id');
+                if (reportId) {
+                    const report = window.state.auditReports?.find(r => String(r.id) === String(reportId));
+                    if (report) {
+                        report.clauseOrder = newOrder;
+                        window.saveData();
+                        console.log('[Reorder] Saved clause order:', newOrder);
+                    }
+                }
             });
         });
     };
