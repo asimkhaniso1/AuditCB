@@ -2932,7 +2932,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         // Sync meetings to Supabase directly (immediate persistence)
         const supabase = window.SupabaseClient;
-        if (supabase && supabase.isConfigured && supabase.isConfigured() && supabase.upsertAuditReport) {
+        if (supabase && supabase.isInitialized && supabase.upsertAuditReport) {
             supabase.upsertAuditReport(reportId, {
                 openingMeeting: report.openingMeeting,
                 closingMeeting: report.closingMeeting
