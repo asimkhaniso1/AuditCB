@@ -1606,7 +1606,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             };
 
             tabContent.innerHTML = `
-                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start;">
                     <!-- Opening Meeting -->
                     <div class="card" style="margin: 0; border-left: 4px solid #16a34a; overflow: hidden;">
                         <h3 style="margin: 0 0 1rem 0; color: #16a34a;">
