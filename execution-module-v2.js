@@ -1191,7 +1191,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <td>${window.UTILS.escapeHtml(ncr.clause || '-')}</td>
                                         <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.description || '-')}">${window.UTILS.escapeHtml(ncr.description || '-')}</td>
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
-                                        <td><button class="btn btn-sm" style="color: var(--primary-color);"><i class="fa-solid fa-edit"></i></button></td>
+                                        <td>${ncr.source === 'manual'
+                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" onclick="window.editNCR('${report.id}', ${idx - checklistNCRs.length < 0 ? idx : idx})"><i class="fa-solid fa-edit"></i></button>`
+                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Edit in Checklist tab" onclick="window.showNotification('Edit this NCR in the Checklist tab where it was raised', 'info')"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
+                }</td>
                                     </tr>
                                 `).join('') : `
                                     <tr>
@@ -2471,6 +2474,107 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         };
     }
 
+    // Edit existing NCR
+    function editNCR(reportId, ncrIdx) {
+        const report = state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report || !report.ncrs || !report.ncrs[ncrIdx]) return;
+
+        const ncr = report.ncrs[ncrIdx];
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        modalTitle.textContent = 'Edit NCR-' + String(ncrIdx + 1).padStart(3, '0');
+        modalBody.innerHTML = `
+    <form id="ncr-form">
+        <div class="form-group">
+            <label>Type <span style="color: var(--danger-color);">*</span></label>
+            <select class="form-control" id="ncr-type" required>
+                <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${ncr.type === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation (OBS)</option>
+                <option value="${window.CONSTANTS.NCR_TYPES.OFI}" ${ncr.type === window.CONSTANTS.NCR_TYPES.OFI ? 'selected' : ''}>Opportunity for Improvement (OFI)</option>
+                <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${ncr.type === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor NC</option>
+                <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${ncr.type === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Clause/Requirement</label>
+            <input type="text" class="form-control" id="ncr-clause" placeholder="e.g. 7.2, 8.3" value="${window.UTILS.escapeHtml(ncr.clause || '')}">
+        </div>
+        <div class="form-group">
+            <label>Description <span style="color: var(--danger-color);">*</span></label>
+            <textarea class="form-control" id="ncr-description" rows="3" required>${window.UTILS.escapeHtml(ncr.description || '')}</textarea>
+        </div>
+        <div class="form-group">
+            <label>Evidence / Objective Evidence</label>
+            <textarea class="form-control" id="ncr-evidence" rows="2">${window.UTILS.escapeHtml(ncr.evidence || '')}</textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Interviewee Designation</label>
+                <input type="text" class="form-control" id="ncr-designation" value="${window.UTILS.escapeHtml(ncr.designation || '')}">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Department</label>
+                <input type="text" class="form-control" id="ncr-department" value="${window.UTILS.escapeHtml(ncr.department || '')}">
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Status</label>
+                <select class="form-control" id="ncr-status">
+                    <option value="Open" ${ncr.status === 'Open' || !ncr.status ? 'selected' : ''}>Open</option>
+                    <option value="In Progress" ${ncr.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                    <option value="Closed" ${ncr.status === 'Closed' || ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'selected' : ''}>Closed</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Created</label>
+                <input type="text" class="form-control" value="${ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : 'N/A'}" readonly style="background: #f1f5f9;">
+            </div>
+        </div>
+        <input type="hidden" id="ncr-evidence-image-url" value="${window.UTILS.escapeHtml(ncr.evidenceImage || '')}">
+        ${ncr.evidenceImage ? '<div style="margin-top: 0.5rem;"><img src="' + ncr.evidenceImage + '" style="max-height: 100px; border-radius: 6px; border: 1px solid #e2e8f0;"></div>' : ''}
+    </form>
+`;
+
+        window.openModal();
+
+        modalSave.onclick = () => {
+            const type = document.getElementById('ncr-type').value;
+            const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
+            const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
+            const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
+            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation').value);
+            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department').value);
+            const status = document.getElementById('ncr-status').value;
+            const evidenceImage = document.getElementById('ncr-evidence-image-url').value;
+
+            if (!description.trim()) {
+                window.showNotification('Description is required', 'error');
+                return;
+            }
+
+            // Update existing NCR
+            report.ncrs[ncrIdx] = {
+                ...report.ncrs[ncrIdx],
+                type,
+                clause,
+                description,
+                evidence,
+                evidenceImage,
+                designation,
+                department,
+                status,
+                updatedAt: new Date().toISOString()
+            };
+
+            window.saveData();
+            window.closeModal();
+            renderExecutionDetail(reportId);
+            window.showNotification('NCR updated successfully', 'success');
+        };
+    }
+
     function createCAPA(reportId) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) return;
@@ -2624,6 +2728,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     window.renderExecutionDetail = renderExecutionDetail;
     window.saveChecklist = saveChecklist;
     window.createNCR = createNCR;
+    window.editNCR = editNCR;
     window.createCAPA = createCAPA;
     // Note: submitForReview, publishReport, revertToDraft, saveReportDraft,
     //       generateAIConclusion, generateAuditReport are now in reporting-module.js
