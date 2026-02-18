@@ -988,7 +988,26 @@ function viewAuditPlan(id) {
                     <div style="margin-bottom: 1.25rem;">
                         <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Scope & Sites</div>
                         <div style="background: white; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">
-                             ${(plan.selectedSites || []).map(s => `<div style="font-size: 0.9rem; color: #334155; margin-bottom: 0.25rem;"><i class="fa-solid fa-map-pin" style="color: var(--danger-color); margin-right: 0.5rem;"></i>${s.name}</div>`).join('') || '<div style="font-size: 0.9rem;">All Sites</div>'}
+                             ${(() => {
+            const sites = plan.selectedSites || [];
+            // Get scope per site from client certificates
+            const matchingCert = (client.certificates || []).find(c => (c.standard || '').toLowerCase() === (plan.standard || '').toLowerCase());
+            const siteScopes = matchingCert?.siteScopes || {};
+            // Overall scope fallback
+            const overallScope = matchingCert?.scope || (client.goodsServices || []).map(g => g.name).join(', ') || '';
+
+            if (sites.length > 0) {
+                return sites.map(s => {
+                    const sScope = siteScopes[s.name] || '';
+                    return '<div style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">'
+                        + '<div style="font-size: 0.9rem; color: #334155; font-weight: 600;"><i class="fa-solid fa-map-pin" style="color: var(--danger-color); margin-right: 0.5rem;"></i>' + s.name + '</div>'
+                        + (sScope ? '<div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; padding-left: 1.25rem;">' + sScope + '</div>' : '')
+                        + '</div>';
+                }).join('');
+            }
+            return '<div style="font-size: 0.9rem;">All Sites</div>'
+                + (overallScope ? '<div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">' + overallScope + '</div>' : '');
+        })()}
                         </div>
                     </div>
 

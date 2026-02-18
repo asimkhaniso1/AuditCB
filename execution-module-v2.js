@@ -56,7 +56,7 @@ function renderAuditExecutionEnhanced() {
         });
 
         const rows = filteredReports.map(report => {
-            const planRef = report.planId ? `PLN-${report.planId}` : '-';
+            const planRef = report.planId ? window.UTILS.getPlanRef(report.planId) : '-';
             const clientId = state.clients.find(c => c.name === report.client)?.id;
 
             return `
@@ -251,7 +251,7 @@ function openCreateReportModal() {
 
         document.getElementById('report-plan').value = id;
         document.getElementById('report-date').value = plan.date;
-        document.getElementById('plan-display').textContent = `PLN-${id}: ${plan.client}`;
+        document.getElementById('plan-display').textContent = `${window.UTILS.getPlanRef(plan)}: ${plan.client}`;
         document.querySelectorAll('.select-plan-btn').forEach(b => {
             b.className = 'btn btn-sm btn-outline-primary select-plan-btn';
             b.textContent = 'Select';
@@ -273,7 +273,7 @@ function openCreateReportModal() {
         if (plans.length === 0) return '<tr><td colspan="5" style="padding:1rem; text-align:center; color:#999;">No open plans found for selected criteria.</td></tr>';
         return plans.map(p => `
             <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 8px; font-weight: 600;">PLN-${p.id}</td>
+                <td style="padding: 8px; font-weight: 600;">${window.UTILS.getPlanRef(p)}</td>
                 <td style="padding: 8px;">${window.UTILS.escapeHtml(p.client)}</td>
                 <td style="padding: 8px;">${window.UTILS.escapeHtml(p.standard)}</td>
                 <td style="padding: 8px;">${window.UTILS.escapeHtml(p.date)}</td>
@@ -3077,10 +3077,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             if (!client.certificationScope) {
                 client.certificationScope = matchingCert?.scope || auditPlan?.scope || client.scope || '';
             }
-        }
-        if (!client.city && !client.country) {
-            // Try to build location from client address
-            if (client.address) client.city = client.address;
+            // Final fallback: build scope from goodsServices
+            if (!client.certificationScope && client.goodsServices && client.goodsServices.length > 0) {
+                client.certificationScope = client.goodsServices.map(g => g.name + (g.description ? ': ' + g.description : '')).join(', ');
+            }
         }
 
         // QR Code for Report Verification
@@ -3293,7 +3293,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${d.auditPlan?.auditType || 'Initial'}</td></tr>
                             <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || 'N/A'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || 'N/A'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${d.client.city || ''} ${d.client.province || ''} ${d.client.country || ''}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${[d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || 'N/A'}</td></tr>
                         </table>
                     </div>
                 </div>
@@ -4262,7 +4262,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || 'N/A') + '</td></tr>'
                 + '<tr><td>Audit Location</td><td>' + ([d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || 'N/A') + '</td></tr>'
                 + (d.client.latitude ? '<tr><td>Geo-Coordinates</td><td><a href="https://www.openstreetmap.org/?mlat=' + d.client.latitude + '&mlon=' + d.client.longitude + '#map=15/' + d.client.latitude + '/' + d.client.longitude + '" target="_blank" style="color:#2563eb;text-decoration:none;">' + d.client.latitude + ', ' + d.client.longitude + ' ↗</a></td></tr>' : '')
-                + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? '#' + d.auditPlan.id.substring(0, 8) : 'Not Linked') + '</td></tr>'
+                + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
                 + '</table>'
                 + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:16px;"><strong style="font-size:0.88rem;color:#334155;">Goods & Services:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.goodsServices.map(g => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#fef3c7;color:#92400e;border:1px solid #fde047;">' + g.name + (g.category ? ' (' + g.category + ')' : '') + '</span>').join('') + '</div></div>' : '')
                 + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:12px;"><strong style="font-size:0.88rem;color:#334155;">Key Processes:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.keyProcesses.map(p => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;">' + (p.name || p) + '</span>').join('') + '</div></div>' : '')

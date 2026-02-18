@@ -39,5 +39,57 @@ window.UTILS = {
 
     generateId: function () {
         return Date.now() + Math.random().toString(36).substr(2, 9);
+    },
+
+    /**
+     * Generate a human-readable plan reference.
+     * Format: PLN-{ClientInitials}-{YYYY}-{NN}
+     * e.g.  PLN-PC-2026-01  (1st plan for "PC Connection" in 2026)
+     * Falls back to PLN-{first8chars} if plan data is missing.
+     */
+    getPlanRef: function (planOrId) {
+        const plans = (window.state && window.state.auditPlans) || [];
+        let plan = planOrId;
+        if (typeof planOrId === 'string') {
+            plan = plans.find(function (p) { return String(p.id) === String(planOrId); });
+        }
+        if (!plan) {
+            // Fallback: show short id
+            var rawId = typeof planOrId === 'string' ? planOrId : (planOrId && planOrId.id ? planOrId.id : '');
+            return 'PLN-' + (rawId ? rawId.substring(0, 8) : '???');
+        }
+
+        // Client initials: take first letter of each word, max 3 chars
+        var clientName = plan.client || '';
+        var initials = clientName
+            .replace(/[^a-zA-Z0-9\s]/g, '')
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(function (w) { return w[0].toUpperCase(); })
+            .join('')
+            .substring(0, 3);
+        if (!initials) initials = 'XX';
+
+        // Year from plan date
+        var year = '';
+        if (plan.date) {
+            var d = new Date(plan.date);
+            year = !isNaN(d.getTime()) ? String(d.getFullYear()) : plan.date.substring(0, 4);
+        } else {
+            year = String(new Date().getFullYear());
+        }
+
+        // Sequence: count plans for same client in same year, order by date
+        var samePlans = plans
+            .filter(function (p) {
+                return p.client === plan.client &&
+                    p.date && p.date.substring(0, 4) === year;
+            })
+            .sort(function (a, b) { return (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)); });
+        var idx = samePlans.findIndex(function (p) { return String(p.id) === String(plan.id); });
+        var seq = (idx >= 0 ? idx + 1 : samePlans.length + 1);
+        var seqStr = seq < 10 ? '0' + seq : String(seq);
+
+        return 'PLN-' + initials + '-' + year + '-' + seqStr;
     }
 };

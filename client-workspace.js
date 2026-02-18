@@ -1151,7 +1151,7 @@ function renderClientExecution(client) {
                             <tbody>
                                 ${scheduledPlans.map(p => `
                                     <tr>
-                                        <td><strong>PLN-${p.id}</strong></td>
+                                        <td><strong>${window.UTILS.getPlanRef(p)}</strong></td>
                                         <td>${p.date}</td>
                                         <td>${p.standard}</td>
                                         <td>${p.type}</td>
