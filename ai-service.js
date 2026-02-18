@@ -440,7 +440,7 @@ ${orgSummary}` : ''}
 Rules:
 1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...", "Objective evidence indicates...")
 2. Reference clause numbers and the specific requirement being assessed
-3. For "observation" type: This is NOT a non-conformity. Write an Opportunity for Improvement (OFI). Use language like "The organization may benefit from...", "An opportunity for improvement was identified...", "While conformity was demonstrated, further enhancement could be achieved by...". Do NOT use "non-conformity", "failure", or "absence" for observations.
+3. For "observation" or "ofi" type: This is NOT a non-conformity. Write an Opportunity for Improvement (OFI). Use language like "The organization may benefit from...", "An opportunity for improvement was identified...", "While conformity was demonstrated, further enhancement could be achieved by...". Do NOT use "non-conformity", "failure", or "absence" for observations/OFIs.
 4. For "minor" type: Write a minor non-conformity statement citing the specific gap. Use language like "A minor non-conformity was identified...", "Partial implementation was observed, however..."
 5. For "major" type: Write a major non-conformity statement referencing systemic failure or total absence of required controls. Use language like "A major non-conformity was raised...", "Systemic failure to implement..."
 6. Each statement should be 2-3 clear, complete sentences
@@ -481,12 +481,19 @@ Return a raw JSON array with 'id' and 'text' fields only:
             return findings; // Return original on failure
         }
     },
-    draftExecutiveSummary: async (reportData, compliantAreas = []) => {
-        const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc').length;
+    draftExecutiveSummary: async (reportData, compliantAreas = [], observationItems = []) => {
+        const ncCount = (reportData.ncrs || []).length + (reportData.checklistProgress || []).filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').length;
+        const obsCount = (reportData.checklistProgress || []).filter(i => i.status === 'nc' && (!i.ncrType || i.ncrType.toLowerCase() === 'observation' || i.ncrType.toLowerCase() === 'ofi')).length;
 
         let areaText = "No specific compliant areas recorded.";
         if (compliantAreas.length > 0) {
             areaText = compliantAreas.join(', ');
+        }
+
+        // Format observation items for the prompt
+        let obsText = '';
+        if (observationItems.length > 0) {
+            obsText = observationItems.map((o, i) => `${i + 1}. Clause ${o.clause}: ${o.text}${o.comment ? ' — Auditor note: ' + o.comment : ''}`).join('\n');
         }
 
         // Get KB context for more accurate positive observations
@@ -502,17 +509,22 @@ Context:
 - Client: ${reportData.client}
 - Standard: ${reportData.standard || 'ISO Standard'}
 - Date: ${reportData.date}
-- Total Non-Conformities: ${ncCount}
+- Total Non-Conformities (Minor/Major): ${ncCount}
+- Observations / OFI Count: ${obsCount}
 - Compliant Clauses/Areas: ${areaText}
 ${orgPlanContext}
 ${kbContext ? `
 Standard Requirements (from Knowledge Base):
 ${kbContext}
 ` : ''}
+${obsText ? `
+Audit Observations & OFI Findings (from checklist):
+${obsText}
+` : ''}
 Instructions:
-1. Executive Summary: Write a professional paragraph summarizing the audit conclusion.
+1. Executive Summary: Write a professional paragraph summarizing the audit conclusion. Mention both non-conformities (${ncCount}) and observations/OFIs (${obsCount}) if any were raised.
 2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "Effective implementation of Clause 5.1 Leadership was observed..."). Use professional audit reporting language. Do NOT use markdown formatting (no asterisks, no bold markers, no bullet symbols).
-3. OFI: Write a list of general opportunities for improvement (not specific NCs). Use plain text without markdown.
+3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers.' : 'Write a list of general opportunities for improvement (not specific NCs).'} Use plain text without markdown. These are NOT non-conformities — use constructive improvement language (e.g. "The organization may benefit from...", "Consider enhancing...").
 
 IMPORTANT: Return plain text only. Do NOT use markdown formatting like **, ***, ##, or bullet symbols in any field values. Use numbered lists (1. 2. 3.) instead.
 
@@ -1016,7 +1028,20 @@ window.runAutoSummary = async function (reportId) {
         // Resolve standard name using shared helper
         report.standard = window.KB_HELPERS.resolveStandardName(report) || report.standard;
 
-        const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas);
+        // Gather OBS/OFI items for AI analysis
+        const obsItems = [];
+        if (report.checklistProgress) {
+            report.checklistProgress.filter(p => p.status === 'nc' && (!p.ncrType || p.ncrType.toLowerCase() === 'observation' || p.ncrType.toLowerCase() === 'ofi')).forEach(item => {
+                const { clauseText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
+                obsItems.push({
+                    clause: clauseText || item.clause || item.id,
+                    text: item.requirement || item.description || item.text || clauseText || '',
+                    comment: item.comment || ''
+                });
+            });
+        }
+
+        const result = await window.AI_SERVICE.draftExecutiveSummary(report, uniqueCompliantAreas, obsItems);
 
         // Helper to strip any remaining markdown from AI response
         const stripMd = (text) => text ? text.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '').trim() : '';
