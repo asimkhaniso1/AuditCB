@@ -1845,22 +1845,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     // Collapse/Expand ALL accordion sections at once
     window.toggleAllAccordions = function () {
-        const sections = document.querySelectorAll('.accordion-section[data-clause-id]');
+        const allContent = document.querySelectorAll('.accordion-section[data-clause-id] > .accordion-content');
         const btn = document.getElementById('toggle-all-accordions');
-        // If any are open, collapse all; if all closed, expand all
-        const anyOpen = Array.from(sections).some(s => {
-            const content = s.querySelector('[id^="clause-"]');
-            return content && content.style.display === 'block';
-        });
 
-        sections.forEach(s => {
-            const sectionId = s.querySelector('[id^="clause-"]')?.id;
-            if (!sectionId) return;
-            const content = document.getElementById(sectionId);
-            const icon = document.getElementById('icon-' + sectionId);
-            if (content) {
-                content.style.display = anyOpen ? 'none' : 'block';
-            }
+        // If any are visible, collapse all; otherwise expand all
+        const anyOpen = Array.from(allContent).some(c => c.style.display === 'block');
+
+        allContent.forEach(content => {
+            content.style.display = anyOpen ? 'none' : 'block';
+            // Update the corresponding chevron icon
+            const icon = document.getElementById('icon-' + content.id);
             if (icon) {
                 icon.style.transform = anyOpen ? 'rotate(0deg)' : 'rotate(180deg)';
             }
