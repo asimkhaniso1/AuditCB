@@ -687,7 +687,9 @@ function setupCSVUpload() {
                     if ((clause || requirement) && clause.toLowerCase() !== 'clause' && mainClause.toLowerCase() !== 'main clause') {
                         const newRow = document.createElement('tr');
                         newRow.className = 'checklist-item-row';
+                        newRow.draggable = true;
                         newRow.innerHTML = `
+                            <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
                             <td><input type="text" class="form-control item-main-clause" value="${window.UTILS.escapeHtml(mainClause)}" style="margin: 0;"></td>
                             <td><input type="text" class="form-control item-main-title" value="${window.UTILS.escapeHtml(mainTitle)}" style="margin: 0;"></td>
                             <td><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(clause)}" style="margin: 0;"></td>
@@ -701,6 +703,7 @@ function setupCSVUpload() {
             });
 
             attachRemoveRowListeners();
+            attachDragReorderListeners();
             if (addedCount > 0) {
                 window.showNotification(`Imported ${addedCount} items from CSV`);
             } else {
@@ -829,6 +832,7 @@ function renderChecklistEditor(checklistId) {
                         <table style="width: 100%; margin: 0;">
                             <thead style="position: sticky; top: 0; background: #f1f5f9; color: #1e293b;">
                                 <tr>
+                                    <th style="width: 36px; padding: 0.75rem 0.25rem; text-align: center;" title="Drag to reorder"><i class="fa-solid fa-arrows-up-down" style="color:#94a3b8;font-size:0.75rem;"></i></th>
                                     <th style="width: 120px; padding: 0.75rem;">Clause #</th>
                                     <th style="padding: 0.75rem;">Requirement</th>
                                     <th style="width: 50px; padding: 0.75rem;"></th>
@@ -836,13 +840,15 @@ function renderChecklistEditor(checklistId) {
                             </thead>
                             <tbody id="checklist-items-body">
                                 ${existingItems.length > 0 ? existingItems.map(item => `
-                                    <tr class="checklist-item-row">
+                                    <tr class="checklist-item-row" draggable="true">
+                                        <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(item.clause || '')}" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(item.requirement || '')}" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
                                 `).join('') : `
-                                    <tr class="checklist-item-row">
+                                    <tr class="checklist-item-row" draggable="true">
+                                        <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
@@ -883,17 +889,21 @@ function attachChecklistEditorListeners(checklistId) {
         const tbody = document.getElementById('checklist-items-body');
         const newRow = document.createElement('tr');
         newRow.className = 'checklist-item-row';
+        newRow.draggable = true;
         newRow.innerHTML = `
+            <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
             <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
             <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
             <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
         `;
         tbody.appendChild(newRow);
         attachRemoveRowListeners();
+        attachDragReorderListeners();
         newRow.querySelector('.item-clause')?.focus();
     });
 
     attachRemoveRowListeners();
+    attachDragReorderListeners();
 
     // Save handler
     document.getElementById('save-checklist-btn')?.addEventListener('click', () => {
@@ -1065,6 +1075,81 @@ function attachRemoveRowListeners() {
                 window.showNotification('At least one row is required', 'error');
             }
         };
+    });
+}
+
+// Drag-to-reorder for checklist editor rows
+let _draggedRow = null;
+function attachDragReorderListeners() {
+    const tbody = document.getElementById('checklist-items-body');
+    if (!tbody) return;
+
+    tbody.querySelectorAll('.checklist-item-row').forEach(row => {
+        // Only start drag from handle
+        row.addEventListener('mousedown', (e) => {
+            const handle = e.target.closest('.drag-handle');
+            row.draggable = !!handle;
+        });
+
+        row.addEventListener('dragstart', (e) => {
+            _draggedRow = row;
+            row.style.opacity = '0.4';
+            row.style.background = '#e0f2fe';
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+        });
+
+        row.addEventListener('dragend', () => {
+            _draggedRow = null;
+            row.style.opacity = '1';
+            row.style.background = '';
+            // Clean all indicators
+            tbody.querySelectorAll('.checklist-item-row').forEach(r => {
+                r.style.borderTop = '';
+                r.style.borderBottom = '';
+            });
+        });
+
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!_draggedRow || row === _draggedRow) return;
+
+            // Clear previous indicators
+            tbody.querySelectorAll('.checklist-item-row').forEach(r => {
+                r.style.borderTop = '';
+                r.style.borderBottom = '';
+            });
+
+            // Show indicator
+            const rect = row.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                row.style.borderTop = '3px solid #2563eb';
+            } else {
+                row.style.borderBottom = '3px solid #2563eb';
+            }
+        });
+
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!_draggedRow || row === _draggedRow) return;
+
+            const rect = row.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+
+            if (e.clientY < midY) {
+                tbody.insertBefore(_draggedRow, row);
+            } else {
+                tbody.insertBefore(_draggedRow, row.nextElementSibling);
+            }
+
+            // Clean indicators
+            tbody.querySelectorAll('.checklist-item-row').forEach(r => {
+                r.style.borderTop = '';
+                r.style.borderBottom = '';
+            });
+        });
     });
 }
 
