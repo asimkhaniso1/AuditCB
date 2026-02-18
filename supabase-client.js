@@ -1591,6 +1591,10 @@ const SupabaseClient = {
                     audit_type: report.auditType || null,
                     lead_auditor: report.leadAuditor || null,
                     audit_plan_id: report.auditPlanId ? String(report.auditPlanId) : null,
+                    opening_meeting: report.openingMeeting || {},
+                    closing_meeting: report.closingMeeting || {},
+                    checklist_progress: report.checklistProgress || [],
+                    custom_items: report.customItems || [],
                     updated_at: new Date().toISOString()
                 };
 
@@ -1602,6 +1606,42 @@ const SupabaseClient = {
         } catch (error) {
             Logger.error('Failed to sync audit reports:', error);
             throw error;
+        }
+    },
+
+    /**
+     * Upsert a single audit report with partial data (used by OfflineManager)
+     * Maps camelCase keys to snake_case DB columns automatically
+     */
+    async upsertAuditReport(reportId, updateFields) {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized for upsertAuditReport');
+            return false;
+        }
+
+        try {
+            // Map camelCase to snake_case for known fields
+            const dbData = { updated_at: new Date().toISOString() };
+            if (updateFields.openingMeeting !== undefined) dbData.opening_meeting = updateFields.openingMeeting;
+            if (updateFields.closingMeeting !== undefined) dbData.closing_meeting = updateFields.closingMeeting;
+            if (updateFields.checklistProgress !== undefined) dbData.checklist_progress = updateFields.checklistProgress;
+            if (updateFields.customItems !== undefined) dbData.custom_items = updateFields.customItems;
+            if (updateFields.ncrs !== undefined) dbData.ncrs = updateFields.ncrs;
+            if (updateFields.status !== undefined) dbData.status = updateFields.status;
+            if (updateFields.conclusion !== undefined) dbData.conclusion = updateFields.conclusion;
+            if (updateFields.recommendation !== undefined) dbData.recommendation = updateFields.recommendation;
+
+            const { error } = await this.client
+                .from('audit_reports')
+                .update(dbData)
+                .eq('id', String(reportId));
+
+            if (error) throw error;
+            Logger.info(`upsertAuditReport: updated report ${reportId}`, Object.keys(dbData));
+            return true;
+        } catch (error) {
+            Logger.error('upsertAuditReport failed:', error);
+            return false;
         }
     },
 

@@ -2847,8 +2847,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         window.saveData();
 
-        // Queue meeting records for offline sync
-        if (window.OfflineManager) {
+        // Sync meetings to Supabase directly (immediate persistence)
+        const supabase = window.SupabaseClient;
+        if (supabase && supabase.isConfigured && supabase.isConfigured() && supabase.upsertAuditReport) {
+            supabase.upsertAuditReport(reportId, {
+                openingMeeting: report.openingMeeting,
+                closingMeeting: report.closingMeeting
+            }).then(() => {
+                console.log('[Meetings] Synced to Supabase');
+            }).catch(err => {
+                console.warn('[Meetings] Supabase sync failed, queuing for offline:', err);
+                // Fallback to offline queue
+                if (window.OfflineManager) {
+                    window.OfflineManager.queueAction('SAVE_MEETINGS', {
+                        reportId: reportId,
+                        client: report.client,
+                        openingMeeting: report.openingMeeting,
+                        closingMeeting: report.closingMeeting
+                    });
+                }
+            });
+        } else if (window.OfflineManager) {
+            // Offline fallback
             window.OfflineManager.queueAction('SAVE_MEETINGS', {
                 reportId: reportId,
                 client: report.client,
