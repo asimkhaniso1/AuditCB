@@ -1845,7 +1845,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
     // Collapse/Expand ALL accordion sections at once
     window.toggleAllAccordions = function () {
-        const allContent = document.querySelectorAll('.accordion-section[data-clause-id] > .accordion-content');
+        const allContent = document.querySelectorAll('.accordion-content');
         const btn = document.getElementById('toggle-all-accordions');
 
         // If any are visible, collapse all; otherwise expand all
@@ -1859,6 +1859,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 icon.style.transform = anyOpen ? 'rotate(0deg)' : 'rotate(180deg)';
             }
         });
+
+        // Also collapse/expand NCR panels and evidence details when collapsing all
+        if (anyOpen) {
+            document.querySelectorAll('.ncr-panel').forEach(p => { if (p.style.display !== 'none') p.dataset.wasOpen = 'true'; });
+        }
 
         // Update button label
         if (btn) {
