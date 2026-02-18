@@ -4590,25 +4590,78 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
-            // DO NOT stop tracks here. We reuse them.
-
-            // Update UI
-            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-            const imgElem = document.getElementById('evidence-img-' + uniqueId);
-            const dataInput = document.getElementById('evidence-data-' + uniqueId);
-            const sizeElem = document.getElementById('evidence-size-' + uniqueId);
-
-            if (imgElem) imgElem.src = dataUrl;
-            if (previewDiv) previewDiv.style.display = 'block';
-            if (dataInput) dataInput.value = 'attached';
-            if (sizeElem) sizeElem.textContent = 'Screen Capture';
-
-            window.showNotification('Captured!', 'success');
-
-            // Cleanup element
+            // Cleanup video element (keep stream alive for reuse)
             video.pause();
             video.srcObject = null;
             video.remove();
+
+            // Store the image (Supabase or IndexedDB)
+            let finalUrl = dataUrl;
+            let displayUrl = dataUrl;
+            let isCloud = false;
+
+            if (window.navigator.onLine && window.SupabaseClient) {
+                try {
+                    if (!window.SupabaseClient.isInitialized) {
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    if (window.SupabaseClient.isInitialized) {
+                        const res = await fetch(dataUrl);
+                        const blob = await res.blob();
+                        const uploadFile = new File([blob], 'screen-capture-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                        const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-sc-' + Date.now());
+                        if (result && result.url) {
+                            finalUrl = result.url;
+                            displayUrl = result.url;
+                            isCloud = true;
+                        }
+                    }
+                } catch (uploadErr) {
+                    console.error('[Screen Capture] Cloud upload failed:', uploadErr.message);
+                }
+            }
+
+            // Fallback to IndexedDB
+            if (!isCloud) {
+                try {
+                    const idbKey = 'idb://evidence-' + uniqueId + '-sc-' + Date.now();
+                    await EvidenceDB.put(idbKey, dataUrl);
+                    finalUrl = idbKey;
+                    console.log('[Screen Capture] Stored in IndexedDB:', idbKey);
+                } catch (idbErr) {
+                    console.error('[Screen Capture] IndexedDB store failed:', idbErr);
+                    finalUrl = dataUrl;
+                }
+            }
+
+            // Append thumbnail to multi-image preview strip
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            if (previewDiv) {
+                previewDiv.style.display = 'flex';
+                // Remove any loading spinner if present
+                const spinner = previewDiv.querySelector('.fa-spinner');
+                if (spinner) spinner.closest('div')?.remove();
+
+                const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
+                const newIdx = existingThumbs.length;
+                const safeDisplay = displayUrl.replace(/'/g, "\\'");
+                const thumb = document.createElement('div');
+                thumb.className = 'ev-thumb';
+                thumb.dataset.idx = newIdx;
+                thumb.dataset.saveUrl = finalUrl;
+                thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
+                thumb.innerHTML = `
+                    <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeDisplay}')"/>
+                    <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${newIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
+                `;
+                previewDiv.appendChild(thumb);
+            }
+
+            // Update hidden input
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+            if (evidenceData) evidenceData.value = 'attached';
+
+            window.showNotification(isCloud ? 'Screen captured & uploaded to cloud' : 'Screen captured & saved locally', 'success');
 
         } catch (err) {
             if (err.name !== 'NotAllowedError') {
