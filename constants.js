@@ -24,6 +24,7 @@ window.CONSTANTS = {
         MAJOR: 'major',
         MINOR: 'minor',
         OBSERVATION: 'observation',
+        OFI: 'ofi',
         PENDING: 'pending_classification'
     },
     // ISO 17021-1:2015 Classification Matrix
