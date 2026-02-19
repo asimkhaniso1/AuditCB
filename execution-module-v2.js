@@ -5202,12 +5202,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const d = window._reportPreviewData;
         if (!d) return;
         const en = window._reportSectionState || {};
-        const editedSummary = document.getElementById('rp-exec-summary')?.innerHTML || d.report.executiveSummary || '';
-        const editedConclusion = document.getElementById('rp-conclusion')?.innerHTML || d.report.conclusion || '';
+        let editedSummary = document.getElementById('rp-exec-summary')?.innerHTML || d.report.executiveSummary || '';
+        editedSummary = editedSummary.replace(/<em[^>]*>Click to add executive summary[^<]*<\/em>/gi, '').trim();
+        let editedConclusion = document.getElementById('rp-conclusion')?.innerHTML || d.report.conclusion || '';
+        // Strip placeholder text that leaks from contenteditable
+        editedConclusion = editedConclusion.replace(/Click to edit this conclusion\.?/gi, '').trim();
         const editedPositiveObs = document.getElementById('rp-positive-obs')?.innerHTML || d.report.positiveObservations || '';
-        const editedOfi = document.getElementById('rp-ofi')?.innerHTML || d.report.ofi || '';
         const editedOpeningNotes = document.getElementById('rp-opening-notes')?.innerText || d.report.openingMeeting?.notes || '';
-        const editedClosingSummary = document.getElementById('rp-closing-summary')?.innerText || d.report.closingMeeting?.summary || '';
+        let editedClosingSummary = document.getElementById('rp-closing-summary')?.innerText || d.report.closingMeeting?.summary || '';
+        editedClosingSummary = editedClosingSummary.replace(/Click to add closing meeting summary[.]*/gi, '').trim();
         const formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
         // Rich text formatter for PDF: handles numbered lists, bullets, paragraphing, markdown
         const formatRichText = (text, color) => {
@@ -5490,7 +5493,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div class="sh page-break" style="border-left-color:#22c55e;"><span class="sn"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
-                + (editedOfi ? '<div class="sh page-break" style="border-left-color:#f59e0b;"><span class="sn"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb"><div style="color:#a16207;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedOfi, '#a16207') + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="border-left-color:#7c3aed;"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
