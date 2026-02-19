@@ -231,7 +231,10 @@ function switchNCRTab(tabName, btnElement) {
         case 'register': container.innerHTML = getNCRRegisterHTML(); break;
         case 'capa': container.innerHTML = getCAPATrackerHTML(); break;
         case 'verification': container.innerHTML = getVerificationHTML(); break;
-        case 'analytics': container.innerHTML = getAnalyticsHTML(); break;
+        case 'analytics':
+            container.innerHTML = getAnalyticsHTML();
+            requestAnimationFrame(() => { if (typeof initNCRAnalyticsCharts === 'function') initNCRAnalyticsCharts(); });
+            break;
     }
 }
 
@@ -566,61 +569,215 @@ function getAnalyticsHTML() {
     }
 
     const total = ncrs.length;
-    const open = ncrs.filter(n => n.status !== 'Closed').length;
+    const open = ncrs.filter(n => n.status === 'Open').length;
+    const inProgress = ncrs.filter(n => n.status === 'In Progress').length;
+    const verification = ncrs.filter(n => n.status === 'Verification').length;
+    const closed = ncrs.filter(n => n.status === 'Closed').length;
     const today = new Date();
-    const overdue = ncrs.filter(n => n.status !== 'Closed' && new Date(n.dueDate) < today).length;
+    const overdue = ncrs.filter(n => n.status !== 'Closed' && n.dueDate && new Date(n.dueDate) < today).length;
     const effective = ncrs.filter(n => n.effectiveness === 'Effective').length;
-    const effectivenessRate = total > 0 ? Math.round((effective / total) * 100) : 0;
+    const effectivenessRate = closed > 0 ? Math.round((effective / closed) * 100) : 0;
 
     // Severity Breakdown
-    const major = ncrs.filter(n => n.severity === 'Major').length;
-    const minor = ncrs.filter(n => n.severity === 'Minor').length;
+    const major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
+    const minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
+    const obs = ncrs.filter(n => {
+        const s = (n.severity || '').toLowerCase();
+        return s === 'observation' || s === 'ofi' || s === 'observation/ofi';
+    }).length;
+
+    // Top clauses
+    const clauseMap = {};
+    ncrs.forEach(n => {
+        const c = n.clause || 'Unspecified';
+        clauseMap[c] = (clauseMap[c] || 0) + 1;
+    });
+    const topClauses = Object.entries(clauseMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    // Avg resolution time
+    const resolvedNCRs = ncrs.filter(n => n.status === 'Closed' && n.raisedDate && n.verifiedDate);
+    let avgDays = 0;
+    if (resolvedNCRs.length > 0) {
+        const totalDays = resolvedNCRs.reduce((sum, n) => {
+            return sum + Math.max(0, Math.ceil((new Date(n.verifiedDate) - new Date(n.raisedDate)) / (1000 * 60 * 60 * 24)));
+        }, 0);
+        avgDays = Math.round(totalDays / resolvedNCRs.length);
+    }
 
     return `
         <div class="fade-in">
             <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
                 <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
-                Analytics
+                NCR & CAPA Analytics
             </h3>
 
             <!-- KPI Cards -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; text-align:center;">
-                    <div style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">${total}</div>
-                    <div style="opacity: 0.9;">Total NCRs</div>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.25rem; text-align:center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${total}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Total NCRs</div>
                 </div>
-                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.5rem; text-align:center;">
-                    <div style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">${open}</div>
-                    <div style="opacity: 0.9;">Open</div>
+                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.25rem; text-align:center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${open}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Open</div>
                 </div>
-                <div class="card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1.5rem; text-align:center;">
-                    <div style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">${overdue}</div>
-                    <div style="opacity: 0.9;">Overdue</div>
+                <div class="card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1.25rem; text-align:center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${overdue}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Overdue</div>
                 </div>
-                <div class="card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 1.5rem; text-align:center;">
-                    <div style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">${effectivenessRate}%</div>
-                    <div style="opacity: 0.9;">Effectiveness</div>
+                <div class="card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 1.25rem; text-align:center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${closed}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Closed</div>
+                </div>
+                <div class="card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; padding: 1.25rem; text-align:center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${effectivenessRate}%</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">CAPA Effective</div>
                 </div>
             </div>
-            
-             <!-- Simple Severity Bar Chart representation -->
-            <div class="card" style="padding: 1.5rem;">
-                <h4 style="margin-bottom: 1rem;">Severity Breakdown</h4>
-                <div style="display: flex; gap: 1rem; align-items: flex-end; height: 150px; border-bottom: 1px solid #ccc;">
-                     <div style="flex:1; background: #dc2626; height: ${total ? (major / total) * 100 : 0}%; min-height: 2px; border-radius: 4px 4px 0 0; position: relative;">
-                        <span style="position: absolute; top: -20px; width: 100%; text-align: center; font-weight: bold;">${major}</span>
-                        <div style="margin-top: 100%; text-align: center; padding-top: 5px; font-weight: bold; color: black;">Major</div>
-                     </div>
-                     <div style="flex:1; background: #f59e0b; height: ${total ? (minor / total) * 100 : 0}%; min-height: 2px; border-radius: 4px 4px 0 0; position: relative;">
-                        <span style="position: absolute; top: -20px; width: 100%; text-align: center; font-weight: bold;">${minor}</span>
-                        <div style="margin-top: 100%; text-align: center; padding-top: 5px; font-weight: bold; color: black;">Minor</div>
-                     </div>
-                     <!-- Add more bars if needed -->
+
+            <!-- Charts Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <!-- Severity Distribution Doughnut -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-chart-pie" style="color: #dc2626; margin-right: 0.5rem;"></i>Severity Distribution</h4>
+                    <div style="position: relative; height: 250px;">
+                        <canvas id="ncr-severity-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Status Pipeline Bar -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-filter" style="color: #2563eb; margin-right: 0.5rem;"></i>Status Pipeline</h4>
+                    <div style="position: relative; height: 250px;">
+                        <canvas id="ncr-status-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Top Clauses + Resolution Stats -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <!-- Top Non-Conforming Clauses -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-ranking-star" style="color: #7c3aed; margin-right: 0.5rem;"></i>Top Non-Conforming Clauses</h4>
+                    ${topClauses.length > 0 ? `
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${topClauses.map(([clause, count], i) => `
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="min-width: 28px; height: 28px; background: linear-gradient(135deg, #7c3aed, #a78bfa); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.8rem;">${i + 1}</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.9rem;">${window.UTILS.escapeHtml(clause)}</div>
+                                        <div style="background: #f1f5f9; border-radius: 4px; height: 8px; margin-top: 4px;">
+                                            <div style="background: linear-gradient(90deg, #7c3aed, #a78bfa); height: 100%; border-radius: 4px; width: ${total > 0 ? Math.round((count / total) * 100) : 0}%;"></div>
+                                        </div>
+                                    </div>
+                                    <div style="font-weight: 700; color: #7c3aed; font-size: 0.9rem;">${count}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p style="text-align: center; color: var(--text-secondary);">No data available</p>'}
+                </div>
+                <!-- Resolution Stats -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock" style="color: #059669; margin-right: 0.5rem;"></i>Resolution Statistics</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #059669;">${avgDays}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Avg Days to Close</div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: #eff6ff; border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #2563eb;">${inProgress}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">In Progress</div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: #faf5ff; border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #7c3aed;">${verification}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Pending Verification</div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: #fef3c7; border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #d97706;">${effectivenessRate}%</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">CAPA Effective Rate</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     `;
 }
+
+// Initialize NCR Analytics Charts after DOM render
+function initNCRAnalyticsCharts() {
+    // Severity Distribution Doughnut
+    const sevCtx = document.getElementById('ncr-severity-chart');
+    if (sevCtx) {
+        const existing = Chart.getChart(sevCtx);
+        if (existing) existing.destroy();
+
+        let ncrs = window.state.ncrs || [];
+        if (window.state.ncrContextClientId) {
+            ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
+        }
+        const major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
+        const minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
+        const obs = ncrs.filter(n => {
+            const s = (n.severity || '').toLowerCase();
+            return s === 'observation' || s === 'ofi' || s === 'observation/ofi';
+        }).length;
+
+        new Chart(sevCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Major', 'Minor', 'Observation/OFI'],
+                datasets: [{
+                    data: [major || 0, minor || 0, obs || 0],
+                    backgroundColor: ['#dc2626', '#f59e0b', '#6366f1'],
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+    // Status Pipeline Bar
+    const statusCtx = document.getElementById('ncr-status-chart');
+    if (statusCtx) {
+        const existing = Chart.getChart(statusCtx);
+        if (existing) existing.destroy();
+
+        let ncrs = window.state.ncrs || [];
+        if (window.state.ncrContextClientId) {
+            ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
+        }
+        const open = ncrs.filter(n => n.status === 'Open').length;
+        const inProg = ncrs.filter(n => n.status === 'In Progress').length;
+        const verif = ncrs.filter(n => n.status === 'Verification').length;
+        const closed = ncrs.filter(n => n.status === 'Closed').length;
+
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Open', 'In Progress', 'Verification', 'Closed'],
+                datasets: [{
+                    label: 'NCRs',
+                    data: [open, inProg, verif, closed],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e'],
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } }
+                }
+            }
+        });
+    }
+}
+window.initNCRAnalyticsCharts = initNCRAnalyticsCharts;
 
 // --------------------------------------------
 // MODAL & FORM FUNCTIONS
@@ -787,37 +944,59 @@ window.viewNCRDetails = function (ncrId) {
 }
 
 window.editNCR = function (ncrId) {
-    // Keep existing simplified or full edit logic? 
-    // For brevity in this fix, I'll alert that editing utilizes the same persist loop.
     const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
-    // ... (Full Edit Form Logic would go here - ensuring it calls persistNCR) ...
-    // To ensure functionality, I should copy the Edit logic but ensure it uses persistNCR.
-    // For now, I will assume the previous implementation of Edit works because it modifies the object reference 
-    // in window.state.ncrs and calls persistNCR(ncr), which I have updated to use Supabase.
-
-    // Logic:
-    // 1. Open Modal with fields
-    // 2. On Save -> Update Object -> persistNCR(ncr)
-
-    // I will trigger the old edit logic if available or simple rebuild it if I overwrote the file.
-    // Since I am overwriting the file, I must provide the Edit Logic.
+    if (!ncr) return;
 
     document.getElementById('modal-title').textContent = 'Edit NCR';
     document.getElementById('modal-body').innerHTML = `
         <form id="edit-ncr-form">
-            <div class="form-group"><label>Description</label><textarea id="edit-desc" class="form-control">${window.UTILS.escapeHtml(ncr.description)}</textarea></div>
-            <div class="form-group"><label>Status</label>
-                <select id="edit-status" class="form-control">
-                    <option value="Open" ${ncr.status === 'Open' ? 'selected' : ''}>Open</option>
-                    <option value="Closed" ${ncr.status === 'Closed' ? 'selected' : ''}>Closed</option>
-                </select>
+            <div class="form-group"><label>Description <span style="color: var(--danger-color);">*</span></label>
+                <textarea id="edit-desc" class="form-control" rows="3">${window.UTILS.escapeHtml(ncr.description || '')}</textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group"><label>Standard</label>
+                    <input type="text" class="form-control" id="edit-standard" value="${window.UTILS.escapeHtml(ncr.standard || '')}">
+                </div>
+                <div class="form-group"><label>Clause</label>
+                    <input type="text" class="form-control" id="edit-clause" value="${window.UTILS.escapeHtml(ncr.clause || '')}">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group"><label>Severity</label>
+                    <select id="edit-severity" class="form-control">
+                        <option value="Major" ${ncr.severity === 'Major' ? 'selected' : ''}>Major</option>
+                        <option value="Minor" ${ncr.severity === 'Minor' ? 'selected' : ''}>Minor</option>
+                        <option value="Observation" ${(ncr.severity || '').includes('Observation') ? 'selected' : ''}>Observation/OFI</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Status</label>
+                    <select id="edit-status" class="form-control">
+                        <option value="Open" ${ncr.status === 'Open' ? 'selected' : ''}>Open</option>
+                        <option value="In Progress" ${ncr.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                        <option value="Verification" ${ncr.status === 'Verification' ? 'selected' : ''}>Verification</option>
+                        <option value="Closed" ${ncr.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group"><label>Due Date</label>
+                    <input type="date" class="form-control" id="edit-due-date" value="${ncr.dueDate || ''}">
+                </div>
+                <div class="form-group"><label>Source</label>
+                    <input type="text" class="form-control" id="edit-source" value="${window.UTILS.escapeHtml(ncr.source || '')}">
+                </div>
             </div>
         </form>
     `;
     document.getElementById('modal-save').style.display = 'block';
     document.getElementById('modal-save').onclick = async () => {
         ncr.description = document.getElementById('edit-desc').value;
+        ncr.standard = document.getElementById('edit-standard').value;
+        ncr.clause = document.getElementById('edit-clause').value;
+        ncr.severity = document.getElementById('edit-severity').value;
         ncr.status = document.getElementById('edit-status').value;
+        ncr.dueDate = document.getElementById('edit-due-date').value;
+        ncr.source = document.getElementById('edit-source').value;
         await persistNCR(ncr);
         window.closeModal();
         renderNCRCAPAModuleContent(window.state.ncrContextClientId);
@@ -832,15 +1011,37 @@ window.openAddCAPAModal = function (ncrId) {
     document.getElementById('modal-title').textContent = 'Add CAPA';
     document.getElementById('modal-body').innerHTML = `
         <form id="capa-form">
-            <div class="form-group"><label>Root Cause</label><textarea id="capa-rc" class="form-control">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea></div>
-            <div class="form-group"><label>Corrective Action</label><textarea id="capa-ca" class="form-control">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea></div>
+            <div style="padding: 0.75rem; background: #f8fafc; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary-color);">
+                <strong>NCR:</strong> ${window.UTILS.escapeHtml(ncr.description || '')}
+                <br><small style="color: var(--text-secondary);">Clause: ${window.UTILS.escapeHtml(ncr.clause || 'N/A')} | Severity: ${ncr.severity || 'N/A'}</small>
+            </div>
+            <div class="form-group"><label>Correction (Immediate Action)</label>
+                <textarea id="capa-corr" class="form-control" rows="2" placeholder="What immediate correction was taken?">${window.UTILS.escapeHtml(ncr.correction || '')}</textarea>
+            </div>
+            <div class="form-group"><label>Root Cause Analysis <span style="color: var(--danger-color);">*</span></label>
+                <textarea id="capa-rc" class="form-control" rows="3" placeholder="Describe the root cause...">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+            </div>
+            <div class="form-group"><label>Corrective Action <span style="color: var(--danger-color);">*</span></label>
+                <textarea id="capa-ca" class="form-control" rows="3" placeholder="Describe corrective action planned...">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group"><label>Responsible Person</label>
+                    <input type="text" class="form-control" id="capa-responsible" value="${window.UTILS.escapeHtml(ncr.capaResponsible || '')}" placeholder="Name of responsible person">
+                </div>
+                <div class="form-group"><label>Target Completion Date</label>
+                    <input type="date" class="form-control" id="capa-target-date" value="${ncr.dueDate || ''}">
+                </div>
+            </div>
         </form>
     `;
 
     document.getElementById('modal-save').style.display = 'block';
     document.getElementById('modal-save').onclick = async () => {
+        ncr.correction = document.getElementById('capa-corr').value;
         ncr.rootCause = document.getElementById('capa-rc').value;
         ncr.correctiveAction = document.getElementById('capa-ca').value;
+        ncr.capaResponsible = document.getElementById('capa-responsible').value;
+        ncr.dueDate = document.getElementById('capa-target-date').value;
         ncr.status = 'In Progress';
         await persistNCR(ncr);
         window.closeModal();
@@ -953,6 +1154,60 @@ window.verifyCAPA = function (ncrId) {
     };
     window.openModal();
 }
+// --- UPDATE CAPA PROGRESS ---
+window.updateCAPAProgress = function (ncrId) {
+    const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
+    if (!ncr) return;
+
+    document.getElementById('modal-title').textContent = 'Update CAPA Progress';
+    document.getElementById('modal-body').innerHTML = `
+        <form id="capa-progress-form">
+            <div style="padding: 0.75rem; background: #f8fafc; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary-color);">
+                <strong>NCR-${String(ncr.id).padStart(3, '0')}:</strong> ${window.UTILS.escapeHtml(ncr.description || '')}
+                <br><small style="color: var(--text-secondary);">Severity: ${ncr.severity || 'N/A'} | Status: ${ncr.status || 'Open'}</small>
+            </div>
+            <div class="form-group"><label>Root Cause</label>
+                <textarea id="prog-rc" class="form-control" rows="2">${window.UTILS.escapeHtml(ncr.rootCause || '')}</textarea>
+            </div>
+            <div class="form-group"><label>Corrective Action</label>
+                <textarea id="prog-ca" class="form-control" rows="2">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group"><label>Responsible Person</label>
+                    <input type="text" class="form-control" id="prog-resp" value="${window.UTILS.escapeHtml(ncr.capaResponsible || '')}">
+                </div>
+                <div class="form-group"><label>Implementation Date</label>
+                    <input type="date" class="form-control" id="prog-impl-date" value="${ncr.capaImplementedDate || ''}">
+                </div>
+            </div>
+            <div class="form-group"><label>Status</label>
+                <select id="prog-status" class="form-control">
+                    <option value="Open" ${ncr.status === 'Open' ? 'selected' : ''}>Open</option>
+                    <option value="In Progress" ${ncr.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                    <option value="Verification" ${ncr.status === 'Verification' ? 'selected' : ''}>Ready for Verification</option>
+                    <option value="Closed" ${ncr.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                </select>
+            </div>
+        </form>
+    `;
+    document.getElementById('modal-save').style.display = 'block';
+    document.getElementById('modal-save').onclick = async () => {
+        ncr.rootCause = document.getElementById('prog-rc').value;
+        ncr.correctiveAction = document.getElementById('prog-ca').value;
+        ncr.capaResponsible = document.getElementById('prog-resp').value;
+        ncr.capaImplementedDate = document.getElementById('prog-impl-date').value;
+        ncr.status = document.getElementById('prog-status').value;
+        // Auto-transition: if implementation date set and status is still "In Progress", move to Verification
+        if (ncr.capaImplementedDate && ncr.status === 'In Progress') {
+            ncr.status = 'Verification';
+        }
+        await persistNCR(ncr);
+        window.closeModal();
+        renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+        window.showNotification('CAPA progress updated', 'success');
+    };
+    window.openModal();
+};
 
 // Export
 window.renderNCRCAPAModule = renderNCRCAPAModule;

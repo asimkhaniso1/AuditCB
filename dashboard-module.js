@@ -2,6 +2,21 @@
 // ENHANCED DASHBOARD ANALYTICS MODULE v2.0
 // ============================================
 
+// Helper: Get ALL findings from a report (manual NCRs + checklist NCs)
+function getAllDashboardFindings(report) {
+    const manual = (report.ncrs || []).map(n => ({ ...n, source: 'manual' }));
+    const checklist = (report.checklistProgress || [])
+        .filter(p => p.status === 'nc')
+        .map(p => ({
+            type: p.ncrType || 'Observation',
+            clause: p.clause || 'Checklist Item',
+            description: p.ncrDescription || p.comment || '',
+            status: p.ncrStatus || 'Open',
+            source: 'checklist'
+        }));
+    return [...manual, ...checklist];
+}
+
 function renderDashboardEnhanced() {
     // Safety: Initialize if missing
     if (!window.state) {
@@ -29,7 +44,7 @@ function renderDashboardEnhanced() {
     const completedAudits = auditPlans.filter(p => p.status === 'Completed').length;
     const draftPlans = auditPlans.filter(p => p.status === 'Draft').length;
 
-    // NCR Analysis from actual reports
+    // NCR Analysis from actual reports (includes checklist NCs via getAllDashboardFindings)
     let totalNCRs = 0;
     let majorNCRs = 0;
     let minorNCRs = 0;
@@ -39,19 +54,27 @@ function renderDashboardEnhanced() {
     let complianceCount = 0;
 
     auditReports.forEach(report => {
-        const ncrs = report.ncrs || [];
+        const ncrs = getAllDashboardFindings(report);
         // NCR Stats
         totalNCRs += ncrs.length;
-        const major = ncrs.filter(n => n.type === 'major').length;
-        const minor = ncrs.filter(n => n.type === 'minor').length;
+        const major = ncrs.filter(n => (n.type || '').toLowerCase() === 'major').length;
+        const minor = ncrs.filter(n => (n.type || '').toLowerCase() === 'minor').length;
 
         majorNCRs += major;
         minorNCRs += minor;
-        openNCRs += ncrs.filter(n => n.status === 'Open').length;
+        openNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
         closedNCRs += ncrs.filter(n => n.status === 'Closed').length;
 
-        // Compliance Score (Calculate per report then average)
-        if (report.status === 'Completed' || report.status === 'Review' || ncrs.length > 0) {
+        // Compliance Score: use real checklist data when available
+        const progress = report.checklistProgress || [];
+        if (progress.length > 0) {
+            const assessed = progress.filter(p => p.status && p.status !== '');
+            if (assessed.length > 0) {
+                const conformCount = assessed.filter(p => p.status === 'conform').length;
+                complianceScoreSum += Math.round((conformCount / assessed.length) * 100);
+                complianceCount++;
+            }
+        } else if (report.status === 'Completed' || report.status === 'Review' || ncrs.length > 0) {
             const reportScore = Math.max(0, 100 - (major * 15) - (minor * 5));
             complianceScoreSum += reportScore;
             complianceCount++;
@@ -626,18 +649,20 @@ function renderNCRTrendsChart() {
         months.push(d.toLocaleDateString('en-US', { month: 'short' }));
     }
 
-    // Process reports for NCR data
+    // Process reports for NCR data — include checklist NCs
     const reports = window.state.auditReports || [];
     reports.forEach(report => {
-        if (!report.ncrs || !report.date) return;
+        if (!report.date) return;
+        const allFindings = getAllDashboardFindings(report);
+        if (allFindings.length === 0) return;
 
         const reportDate = new Date(report.date);
         const monthDiff = (today.getFullYear() - reportDate.getFullYear()) * 12 + (today.getMonth() - reportDate.getMonth());
 
         if (monthDiff >= 0 && monthDiff <= 5) {
             const index = 5 - monthDiff;
-            report.ncrs.forEach(ncr => {
-                if (ncr.status === 'Open') openNCRs[index]++;
+            allFindings.forEach(ncr => {
+                if (ncr.status === 'Open' || !ncr.status || ncr.status === '') openNCRs[index]++;
                 else closedNCRs[index]++;
             });
         }
