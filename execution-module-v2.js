@@ -4756,14 +4756,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div class="cover-line"></div>'
             + '<h1 style="font-size:2.8rem;font-weight:800;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
             + '<p style="font-size:1.15rem;color:#64748b;margin-top:8px;">' + standard + '</p>'
-            + '<div style="margin-top:50px;"><div style="font-size:2rem;font-weight:700;color:#2563eb;">' + d.report.client + '</div>'
+            + '<div style="margin-top:50px;">'
+            + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:60px;object-fit:contain;margin-bottom:16px;" alt="Client">' : '')
+            + '<div style="font-size:2rem;font-weight:700;color:#2563eb;">' + d.report.client + '</div>'
             + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || 'N/A') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || 'N/A') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div></div>'
-            + (d.clientLogo ? '<div style="position:absolute;bottom:50px;"><img src="' + d.clientLogo + '" style="height:50px;object-fit:contain;" alt="Client"></div>' : '')
+
             + '</div>'
             // TABLE OF CONTENTS
             + (function () {
