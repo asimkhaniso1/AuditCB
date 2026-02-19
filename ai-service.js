@@ -100,6 +100,12 @@ window.KB_HELPERS = {
             }
         }
 
+        // Append client document context if available
+        if (client) {
+            const docContext = KB_HELPERS.getClientDocumentContext(client);
+            if (docContext) context += docContext;
+        }
+
         return context;
     },
 
@@ -232,6 +238,31 @@ window.KB_HELPERS = {
         }
 
         return { clauseText, reqText };
+    },
+
+    /**
+     * Build a token-efficient summary of client documents for AI prompt injection.
+     * Includes document name, category, revision, linked clauses, and truncated notes.
+     * @param {Object} client - Client object with .documents array
+     * @returns {string} Formatted document context or empty string
+     */
+    getClientDocumentContext: (client) => {
+        if (!client?.documents?.length) return '';
+
+        const docs = client.documents.slice(0, 10); // Cap at 10 to manage token usage
+        const lines = docs.map(doc => {
+            let line = `- ${doc.name}`;
+            if (doc.category) line += ` [${doc.category}]`;
+            if (doc.revision) line += ` (${doc.revision})`;
+            if (doc.linkedClauses) line += ` — Clauses: ${doc.linkedClauses}`;
+            if (doc.notes) {
+                const truncated = doc.notes.substring(0, 200).replace(/\n+/g, ' ').trim();
+                line += `\n  Key Info: ${truncated}${doc.notes.length > 200 ? '...' : ''}`;
+            }
+            return line;
+        });
+
+        return `\nClient Documents Provided (${client.documents.length} total):\n${lines.join('\n')}\n`;
     }
 };
 
@@ -593,7 +624,7 @@ You are an expert ISO Certification Body Lead Auditor. Create a detailed Audit A
 - Duration: ${ctx.manDays} Man-days (${ctx.onsiteDays} On-site Days)
 - Sites: ${ctx.sites.map(s => s.name).join(', ')}
 - Departments: ${(ctx.departments || []).join(', ')}
-- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}${previousAuditSection}
+- Key Designations: ${(ctx.designations || []).map(d => d.title || d).join(', ')}${personnelSection}${previousAuditSection}${ctx.clientDocumentContext || ''}
 **Requirements:**
 1. Create a day-by-day schedule covering ${ctx.onsiteDays} days.
 2. Include "Opening Meeting" (Day 1 AM) and "Closing Meeting" (Last Day PM).

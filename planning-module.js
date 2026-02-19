@@ -2432,7 +2432,8 @@ async function generateAIAgenda() {
                 designation: c.designation || '',
                 department: c.department || '',
                 email: c.email || ''
-            })).filter(c => c.name)
+            })).filter(c => c.name),
+            clientDocumentContext: window.KB_HELPERS?.getClientDocumentContext?.(clientObj) || ''
         };
 
         // ── Inject previous audit report context (same client + same standard) ──
