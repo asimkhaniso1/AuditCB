@@ -947,6 +947,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <i class="fa-solid fa-microphone"></i>
                                     </button>
                                 </div>
+                                ${saved._originalComment ? `
+                                <div style="margin-top: 4px;">
+                                    <button type="button" onclick="var el=document.getElementById('orig-note-${uniqueId}');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('span').textContent=el.style.display==='none'?'View Original Notes':'Hide Original Notes'" style="font-size:0.7rem;color:#8b5cf6;background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">
+                                        <i class="fa-solid fa-clock-rotate-left" style="font-size:0.65rem;"></i> <span>View Original Notes</span>
+                                    </button>
+                                    <div id="orig-note-${uniqueId}" style="display:none;margin-top:4px;padding:6px 10px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#92400e;line-height:1.4;">
+                                        <div style="font-weight:600;font-size:0.7rem;color:#b45309;margin-bottom:2px;"><i class="fa-solid fa-pen-nib" style="margin-right:4px;"></i>Original Auditor Notes:</div>
+                                        ${window.UTILS.escapeHtml(saved._originalComment)}
+                                    </div>
+                                </div>` : ''}
                             </div>
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                                 <button type="button" class="btn-icon btn-na status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NA}" title="Not Applicable">N/A</button>
@@ -1229,6 +1239,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <button class="btn btn-primary" onclick="window.saveChecklist('${report.id}')" id="save-progress-btn">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                             </button>
+                            ${(report.checklistRevisions && report.checklistRevisions.length > 0) ? `
+                            <span id="revision-badge" title="${report.checklistRevisions.map(r => 'v' + r.rev + ' — ' + new Date(r.timestamp).toLocaleString()).join('\n')}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;font-size:0.75rem;font-weight:600;color:#166534;cursor:help;">
+                                <i class="fa-solid fa-code-branch" style="font-size:0.7rem;"></i> v${report.checklistRevisions.length}
+                            </span>` : ''}
                         </div>
                     </div>
 
@@ -2359,7 +2373,52 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     requirement: requirementText || input.dataset.requirement || ''
                 });
             });
+            // Preserve _originalComment from previous saves (set by AI refinement)
+            checklistData.forEach(item => {
+                const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
+                const prev = (report.checklistProgress || []).find(p => {
+                    const pk = p.isCustom ? `custom-${p.itemIdx}` : `${p.checklistId}-${p.itemIdx}`;
+                    return pk === key;
+                });
+                if (prev && prev._originalComment && !item._originalComment) {
+                    item._originalComment = prev._originalComment;
+                }
+                if (prev && prev._aiGenerated && !item._aiGenerated) {
+                    item._aiGenerated = prev._aiGenerated;
+                }
+            });
+
             report.checklistProgress = checklistData;
+
+            // Revision tracking
+            if (!report.checklistRevisions) report.checklistRevisions = [];
+            report.checklistRevisions.push({
+                rev: report.checklistRevisions.length + 1,
+                timestamp: new Date().toISOString(),
+                itemCount: checklistData.length,
+                ncCount: checklistData.filter(d => d.status === 'nc').length,
+                conformCount: checklistData.filter(d => d.status === 'conform').length,
+                naCount: checklistData.filter(d => d.status === 'na').length
+            });
+
+            // Update revision badge in UI
+            const badge = document.getElementById('revision-badge');
+            const rev = report.checklistRevisions.length;
+            if (badge) {
+                badge.innerHTML = `<i class="fa-solid fa-code-branch" style="font-size:0.7rem;"></i> v${rev}`;
+                badge.title = report.checklistRevisions.map(r => 'v' + r.rev + ' — ' + new Date(r.timestamp).toLocaleString()).join('\n');
+            } else {
+                // Insert badge after save button
+                const saveBtn = document.getElementById('save-progress-btn');
+                if (saveBtn) {
+                    const span = document.createElement('span');
+                    span.id = 'revision-badge';
+                    span.title = 'v' + rev + ' — ' + new Date().toLocaleString();
+                    span.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;font-size:0.75rem;font-weight:600;color:#166534;cursor:help;';
+                    span.innerHTML = `<i class="fa-solid fa-code-branch" style="font-size:0.7rem;"></i> v${rev}`;
+                    saveBtn.parentElement.appendChild(span);
+                }
+            }
         }
 
         // Handle Review & Submit Tab classifications if present
