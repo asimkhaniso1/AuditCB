@@ -337,11 +337,6 @@ function renderClientDetail(clientId, options = {}) {
 
             <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
                 <button class="tab-btn active" data-tab="info">Summary</button>
-                ${showAccountSetup && window.state.activeClientId ? `
-                <button class="tab-btn" data-tab="client_org" style="background: #fdf4ff; color: #a21caf;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Account Setup
-                </button>
-                ` : ''}
                 <button class="tab-btn" data-tab="audit_team">
                     <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team
                 </button>
@@ -1181,10 +1176,13 @@ function getClientDocumentsHTML(client) {
     return `
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="margin: 0;">Documents</h3>
+            <div>
+                <h3 style="margin: 0;">Client Documents</h3>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">System manuals, procedures, and documents provided by the client for audit preparation</p>
+            </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-primary btn-sm" onclick="openUploadDocumentModal('${client.id}')">
-                    <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
+                <button class="btn btn-primary btn-sm" onclick="openClientDocumentModal('${client.id}')">
+                    <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Add Document
                 </button>
                 ` : ''}
         </div>
@@ -1195,27 +1193,32 @@ function getClientDocumentsHTML(client) {
                         <thead>
                             <tr>
                                 <th>Document Name</th>
-                                <th>Type</th>
-                                <th>Date Uploaded</th>
-                                <th>Actions</th>
+                                <th>Category</th>
+                                <th>Revision</th>
+                                <th>Linked Clause(s)</th>
+                                <th>Date</th>
+                                <th style="width: 80px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${docs.map(doc => `
                                 <tr>
                                     <td>
-                                        <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
+                                        <i class="fa-solid fa-file-${doc.type === 'PDF' ? 'pdf' : doc.category === 'System Manual' ? 'book' : doc.category === 'Process Map' ? 'diagram-project' : 'lines'}" style="color: var(--text-secondary); margin-right: 0.5rem;"></i>
                                         ${window.UTILS.escapeHtml(doc.name)}
                                     </td>
                                     <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.category || 'General')}</span></td>
+                                    <td style="font-family: monospace; font-size: 0.85rem;">${window.UTILS.escapeHtml(doc.revision || '-')}</td>
+                                    <td style="font-size: 0.85rem;">${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="alert('Downloading ${window.UTILS.escapeHtml(doc.name)} (Simulated)')"><i class="fa-solid fa-download"></i></button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="viewDocumentNotes('${client.id}', '${window.UTILS.escapeHtml(doc.id)}')" title="View Notes"><i class="fa-solid fa-eye"></i></button>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument('${client.id}', '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
                                 </tr>
+                                ${doc.notes ? `<tr><td colspan="6" style="padding: 4px 12px 10px 36px; font-size: 0.82rem; color: #475569; background: #fafafa; border-bottom: 1px solid #f1f5f9;"><i class="fa-solid fa-sticky-note" style="color:#f59e0b;margin-right:6px;font-size:0.7rem;"></i>${window.UTILS.escapeHtml(doc.notes).substring(0, 200)}${doc.notes.length > 200 ? '...' : ''}</td></tr>` : ''}
                             `).join('')}
                         </tbody>
                     </table>
@@ -1223,9 +1226,10 @@ function getClientDocumentsHTML(client) {
             ` : `
                 <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: var(--radius-md); border: 2px dashed var(--border-color);">
                     <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">No documents uploaded for this client yet.</p>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">No documents uploaded for this client yet.</p>
+                    <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 1rem;">Upload system manuals, procedures, org charts and other documents to help prepare custom checklists.</p>
                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-outline-primary btn-sm" onclick="openUploadDocumentModal('${client.id}')">Upload First Document</button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="openClientDocumentModal('${client.id}')">Add First Document</button>
                     ` : ''}
                 </div>
             `}
@@ -2358,7 +2362,7 @@ window.handleIndustryChange = function (select) {
     }
 
     // Upload Document Modal
-    window.openUploadDocumentModal = function (clientId) {
+    window.openClientDocumentModal = function (clientId) {
         const client = window.state.clients.find(c => String(c.id) === String(clientId));
         if (!client) return;
 
@@ -2366,39 +2370,58 @@ window.handleIndustryChange = function (select) {
         const modalBody = document.getElementById('modal-body');
         const modalSave = document.getElementById('modal-save');
 
-        modalTitle.textContent = 'Upload Document';
+        modalTitle.textContent = 'Add Client Document';
         modalBody.innerHTML = `
         <form id="upload-form">
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="doc-name" required placeholder="e.g. ISO 9001 Certificate">
+                <input type="text" class="form-control" id="doc-name" required placeholder="e.g. Quality Management System Manual">
             </div>
-            <div class="form-group">
-                <label>Category</label>
-                <select class="form-control" id="doc-category">
-                    <option>Contract / Agreement</option>
-                    <option>Audit Report</option>
-                    <option>Certificate</option>
-                    <option>Corrective Action Plan</option>
-                    <option>Correspondence</option>
-                    <option>Other</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>File Select</label>
-                <div style="border: 2px dashed var(--border-color); padding: 1.5rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
-                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 0.5rem;"></i>
-                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">Click to browse files</p>
-                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #94a3b8;">(Simulated upload)</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Category</label>
+                    <select class="form-control" id="doc-category">
+                        <option>System Manual</option>
+                        <option>Quality Procedures</option>
+                        <option>Work Instructions</option>
+                        <option>Policy Document</option>
+                        <option>Records / Forms Register</option>
+                        <option>Org Chart</option>
+                        <option>Process Map</option>
+                        <option>Risk Register</option>
+                        <option>Compliance Matrix</option>
+                        <option>Contract / Agreement</option>
+                        <option>Certificate</option>
+                        <option>Corrective Action Plan</option>
+                        <option>Other</option>
+                    </select>
                 </div>
-                <!-- Hidden file input for visual completeness -->
+                <div class="form-group">
+                    <label>Revision</label>
+                    <input type="text" class="form-control" id="doc-revision" placeholder="e.g. Rev 3 or v2.1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Linked ISO Clause(s)</label>
+                <input type="text" class="form-control" id="doc-clauses" placeholder="e.g. 4.1, 7.5, 8.1 (comma-separated)">
+                <small style="color: var(--text-secondary);">Map to ISO clauses this document covers</small>
+            </div>
+            <div class="form-group">
+                <label>Notes / Key Excerpts</label>
+                <textarea class="form-control" id="doc-notes" rows="3" placeholder="Paste key information from the document that auditors should reference during checklist preparation..." style="resize: vertical;"></textarea>
+            </div>
+            <div class="form-group">
+                <label>File Attachment <span style="font-size: 0.8rem; color: #94a3b8;">(optional)</span></label>
+                <div style="border: 2px dashed var(--border-color); padding: 1rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.25rem; color: var(--primary-color); margin-bottom: 0.25rem;"></i>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Click to browse files</p>
+                </div>
                 <input type="file" id="doc-file" style="display: none;" onchange="if(this.files[0]) { 
                     if(this.files[0].size > 5242880) { 
                         alert('File is too large! Max limit is 5MB.'); 
                         this.value = ''; 
-                        document.getElementById('doc-name').value = '';
                     } else {
-                        document.getElementById('doc-name').value = this.files[0].name; 
+                        if(!document.getElementById('doc-name').value) document.getElementById('doc-name').value = this.files[0].name; 
                     }
                 }">
             </div>
@@ -2410,10 +2433,12 @@ window.handleIndustryChange = function (select) {
         modalSave.onclick = () => {
             const name = document.getElementById('doc-name').value;
             const category = document.getElementById('doc-category').value;
+            const revision = document.getElementById('doc-revision').value;
+            const linkedClauses = document.getElementById('doc-clauses').value;
+            const notes = document.getElementById('doc-notes').value;
             const fileInput = document.getElementById('doc-file');
 
             if (name) {
-                // Final validation before save
                 if (fileInput.files[0] && fileInput.files[0].size > 5242880) {
                     alert('File is too large! Max limit is 5MB.');
                     return;
@@ -2425,26 +2450,60 @@ window.handleIndustryChange = function (select) {
                     id: Date.now().toString(),
                     name: name,
                     category: category,
+                    revision: revision || '',
+                    linkedClauses: linkedClauses || '',
+                    notes: notes || '',
                     type: name.split('.').pop().toUpperCase() || 'FILE',
                     date: new Date().toISOString().split('T')[0],
-                    size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Simulated'
+                    size: fileInput.files[0] ? (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB' : 'Manual entry'
                 };
 
                 client.documents.push(newDoc);
 
                 window.saveData();
                 window.closeModal();
-                renderClientDetail(clientId); // Refresh to show new doc in tab
-                // Force switch back to documents tab
+                renderClientDetail(clientId);
                 setTimeout(() => {
                     document.querySelector('.tab-btn[data-tab="documents"]')?.click();
                 }, 100);
-                window.showNotification('Document uploaded successfully');
+                window.showNotification('Document added successfully');
             } else {
                 alert('Please enter a document name');
             }
         };
     }
+
+    // View Document Notes
+    window.viewDocumentNotes = function (clientId, docId) {
+        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        if (!client || !client.documents) return;
+        const doc = client.documents.find(d => d.id === docId);
+        if (!doc) return;
+
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        modalTitle.textContent = doc.name;
+        modalBody.innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Category</strong><div>${window.UTILS.escapeHtml(doc.category || 'General')}</div></div>
+                <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Revision</strong><div style="font-family: monospace;">${window.UTILS.escapeHtml(doc.revision || '-')}</div></div>
+                <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Linked Clauses</strong><div>${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:4px;font-size:0.85rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '—'}</div></div>
+                <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Date Added</strong><div>${window.UTILS.escapeHtml(doc.date || '-')}</div></div>
+            </div>
+            ${doc.notes ? `<div style="margin-top: 0.5rem;"><strong style="color: var(--text-secondary); font-size: 0.82rem;">Notes / Key Excerpts</strong><div style="margin-top: 0.5rem; padding: 1rem; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 6px 6px 0; font-size: 0.9rem; line-height: 1.7; white-space: pre-wrap;">${window.UTILS.escapeHtml(doc.notes)}</div></div>` : '<p style="color: #94a3b8; font-size: 0.9rem;">No notes added for this document.</p>'}
+        `;
+        modalSave.style.display = 'none';
+        window.openModal();
+        // Restore save button visibility on close
+        const origClose = window.closeModal;
+        window.closeModal = function () {
+            modalSave.style.display = '';
+            window.closeModal = origClose;
+            origClose();
+        };
+    };
 
     // Delete Document Helper
     window.deleteDocument = function (clientId, docId) {

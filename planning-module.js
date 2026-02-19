@@ -1788,6 +1788,42 @@ window.reviewMergedQuestions = function (planId) {
 
             ${dupCount > 0 ? '<div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;"><i class="fa-solid fa-wand-magic-sparkles" style="color: #b45309; margin-right: 0.5rem;"></i><strong style="color: #78350f;">' + dupCount + ' duplicate questions auto-detected.</strong> <span style="color: #92400e; font-size: 0.85rem;">They have been unchecked. Review below and click &quot;Apply &amp; Save&quot; to confirm.</span></div>' : ''}
 
+            ${(() => {
+            const clientForPlan = (window.state.clients || []).find(c => c.name === plan.client || String(c.id) === String(plan.clientId));
+            const clientDocs = clientForPlan?.documents || [];
+            if (clientDocs.length === 0) return '';
+            return `
+                <div class="card" style="margin-bottom: 1.5rem; border: 1px solid #c7d2fe; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="(function(el){ var body = el.closest('.card').querySelector('.client-docs-body'); var arrow = el.querySelector('.doc-arrow'); if(body.style.display === 'none') { body.style.display = 'block'; arrow.style.transform = 'rotate(0)'; } else { body.style.display = 'none'; arrow.style.transform = 'rotate(-90deg)'; } })(this)">
+                        <div>
+                            <h4 style="margin: 0; color: #4338ca;"><i class="fa-solid fa-folder-open" style="margin-right: 0.5rem;"></i>Client Documents (${clientDocs.length})</h4>
+                            <p style="margin: 0.25rem 0 0 0; color: #6366f1; font-size: 0.82rem;">Reference materials provided by ${window.UTILS.escapeHtml(clientForPlan.name)}</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-down doc-arrow" style="color: #6366f1; transition: transform 0.2s;"></i>
+                    </div>
+                    <div class="client-docs-body" style="margin-top: 1rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+                            ${clientDocs.map(doc => `
+                                <div style="background: white; border-radius: 8px; padding: 0.75rem; border: 1px solid #e0e7ff;">
+                                    <div style="display: flex; align-items: start; gap: 0.5rem;">
+                                        <i class="fa-solid fa-file-${doc.category === 'System Manual' ? 'book' : doc.category === 'Process Map' ? 'diagram-project' : 'lines'}" style="color: #6366f1; margin-top: 2px;"></i>
+                                        <div style="flex: 1; min-width: 0;">
+                                            <div style="font-weight: 600; font-size: 0.85rem; color: #1e1b4b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${window.UTILS.escapeHtml(doc.name)}</div>
+                                            <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                                                <span style="background: #f1f5f9; padding: 1px 6px; border-radius: 3px;">${window.UTILS.escapeHtml(doc.category || 'General')}</span>
+                                                ${doc.revision ? ' <span style="font-family:monospace;">• ' + window.UTILS.escapeHtml(doc.revision) + '</span>' : ''}
+                                            </div>
+                                            ${doc.linkedClauses ? '<div style="margin-top: 4px;"><span style="background:#eff6ff;color:#1d4ed8;padding:1px 6px;border-radius:3px;font-size:0.75rem;">Clauses: ' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span></div>' : ''}
+                                            ${doc.notes ? '<div style="margin-top: 4px;font-size:0.78rem;color:#475569;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;"><i class="fa-solid fa-sticky-note" style="color:#f59e0b;font-size:0.65rem;margin-right:4px;"></i>' + window.UTILS.escapeHtml(doc.notes).substring(0, 120) + (doc.notes.length > 120 ? '...' : '') + '</div>' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+        })()}
+
             <div class="card" style="padding: 0; overflow: hidden;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
                     <thead>

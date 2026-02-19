@@ -222,52 +222,36 @@ function renderClientSidebarMenu(clientId) {
         <li class="active" onclick="window.location.hash = 'client/${clientId}/overview'">
             <i class="fa-solid fa-house"></i> Overview
         </li>
-
-        <!-- Group: Audit Operations -->
-        <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
-            <span style="font-size: 0.9em; font-weight: 600;"><i class="fa-solid fa-clipboard-list"></i> Audit Ops</span>
-            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
+        <li onclick="window.location.hash = 'client/${clientId}/account-setup'">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color: #a21caf;"></i> Account Setup
         </li>
-        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
-            <li onclick="window.location.hash = 'client/${clientId}/plans'">
-                <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
-            </li>
-            <li onclick="window.location.hash = 'client/${clientId}/execution'">
-                <i class="fa-solid fa-tasks"></i> Execution
-            </li>
 
-        </div>
-
-        <!-- Group: Outcomes -->
-        <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
-             <span style="font-size: 0.9em; font-weight: 600;"><i class="fa-solid fa-check-double"></i> Outcomes</span>
-            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
+        <!-- Section: Audit Workflow -->
+        <li style="padding: 0.5rem 1rem 0.25rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; pointer-events: none; margin-top: 0.5rem; border-top: 1px solid var(--border-color);">Audit Workflow</li>
+        <li onclick="window.location.hash = 'client/${clientId}/plans'">
+            <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
-        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
-            <li onclick="window.location.hash = 'client/${clientId}/findings'">
-                <i class="fa-solid fa-triangle-exclamation"></i> Findings
-            </li>
-            <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
-                <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
-            </li>
-            <li onclick="window.location.hash = 'client/${clientId}/certs'">
-                <i class="fa-solid fa-certificate"></i> Certificates
-            </li>
-        </div>
-
-        <!-- Group: Records & Compliance -->
-        <li class="nav-group-header" onclick="window.toggleNavGroup(this)" role="button" tabindex="0" style="justify-content: space-between;">
-             <span style="font-size: 0.9em; font-weight: 600;"><i class="fa-solid fa-box-archive"></i> Records</span>
-            <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
+        <li onclick="window.location.hash = 'client/${clientId}/execution'">
+            <i class="fa-solid fa-tasks"></i> Execution
         </li>
-        <div class="nav-group-content collapsed" style="overflow: hidden; padding-left: 0.5rem; display: none;">
-            <li onclick="window.location.hash = 'client/${clientId}/compliance'">
-                <i class="fa-solid fa-shield-halved"></i> Compliance
-            </li>
-            <li onclick="window.location.hash = 'client/${clientId}/docs'">
-                <i class="fa-solid fa-folder-open"></i> Documents
-            </li>
-        </div>
+        <li onclick="window.location.hash = 'client/${clientId}/findings'">
+            <i class="fa-solid fa-triangle-exclamation"></i> Findings
+        </li>
+        <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
+            <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
+        </li>
+
+        <!-- Section: Records -->
+        <li style="padding: 0.5rem 1rem 0.25rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; pointer-events: none; margin-top: 0.5rem; border-top: 1px solid var(--border-color);">Records & Compliance</li>
+        <li onclick="window.location.hash = 'client/${clientId}/certs'">
+            <i class="fa-solid fa-certificate"></i> Certificates
+        </li>
+        <li onclick="window.location.hash = 'client/${clientId}/compliance'">
+            <i class="fa-solid fa-shield-halved"></i> Compliance
+        </li>
+        <li onclick="window.location.hash = 'client/${clientId}/docs'">
+            <i class="fa-solid fa-folder-open"></i> Documents
+        </li>
     `;
 }
 
@@ -406,6 +390,19 @@ window.renderClientModule = function (clientId, moduleName) {
             } else {
                 console.error('[DEBUG-WORKSPACE] renderClientDetail is not defined');
                 contentArea.innerHTML = 'Settings not available (Module error)';
+            }
+            break;
+        case 'account-setup':
+            if (typeof renderClientDetail === 'function') {
+                renderClientDetail(client.id, { showAccountSetup: true, showAnalytics: false });
+                setTimeout(() => {
+                    // Render Account Setup directly (tab button removed from tab bar)
+                    if (typeof renderClientTab === 'function') {
+                        renderClientTab(client, 'client_org');
+                    }
+                }, 200);
+            } else {
+                contentArea.innerHTML = 'Module not loaded';
             }
             break;
     }
