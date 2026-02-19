@@ -4730,14 +4730,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.stat-box{text-align:center;padding:16px 10px;border-radius:10px;border-bottom:3px solid transparent;}'
             + '.stat-val{font-size:1.8rem;font-weight:800;line-height:1;margin-bottom:4px;}'
             + '.stat-lbl{font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;}'
-            + '.chart-grid{display:flex;flex-direction:column;gap:24px;margin-top:24px;}'
-            + '.chart-box{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:24px 32px;text-align:center;}'
-            + '.chart-box canvas{max-height:320px;width:100% !important;}'
-            + '.chart-title{font-size:0.9rem;font-weight:700;color:#1e293b;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;}'
+            + '.chart-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px;}'
+            + '.chart-box{background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px;text-align:center;}'
+            + '.chart-box canvas{max-height:180px;width:100% !important;}'
+            + '.chart-title{font-size:0.8rem;font-weight:700;color:#1e293b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px;}'
             + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:160px;object-fit:cover;}.ev-cap{padding:8px 12px;font-size:0.78rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
             + '.toc{padding:30px 40px;}.toc-title{font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:4px;}.toc-sub{font-size:0.88rem;color:#64748b;margin-bottom:20px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin-bottom:25px;}'
             + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}'
-            + 'footer{margin-top:40px;background:#0f172a;color:white;padding:24px 32px;font-size:0.82rem;display:flex;justify-content:space-between;align-items:center;border-radius:8px;}'
+            + 'footer{display:none;}'
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
             + '.ev-inline{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}.ev-inline img{height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;}'
@@ -4749,7 +4749,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<button onclick="window.close()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
             // COVER PAGE
             + '<div class="cover">'
-            + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:70px;object-fit:contain;margin-bottom:30px;" alt="CB Logo">' : '')
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
+            + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo">' : '<div></div>')
+            + '<img src="' + d.qrCodeUrl + '" style="height:70px;" alt="QR"></div>'
+            + '<div style="margin-top:40px;"></div>'
             + '<div class="cover-line"></div>'
             + '<h1 style="font-size:2.8rem;font-weight:800;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
             + '<p style="font-size:1.15rem;color:#64748b;margin-top:8px;">' + standard + '</p>'
@@ -4760,9 +4763,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || 'N/A') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div></div>'
-            + '<div style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:30px;">'
-            + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:60px;object-fit:contain;" alt="Client">' : '')
-            + '<img src="' + d.qrCodeUrl + '" style="height:80px;" alt="QR"></div></div>'
+            + (d.clientLogo ? '<div style="position:absolute;bottom:50px;"><img src="' + d.clientLogo + '" style="height:50px;object-fit:contain;" alt="Client"></div>' : '')
+            + '</div>'
             // TABLE OF CONTENTS
             + (function () {
                 var tocSections = [];
@@ -4809,7 +4811,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // SECTION 2
             + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="border-left-color:#059669;"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + (editedPositiveObs ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + editedPositiveObs + '</div></div>' : '')
-                + (editedOfi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + editedOfi + '</div></div>' : '')
+                + (editedOfi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;page-break-before:always;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + editedOfi + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="border-left-color:#7c3aed;"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
