@@ -4792,20 +4792,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
                 + '<tr><td>Industry</td><td>' + (d.client.industry || 'N/A') + '</td></tr>'
                 + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || 'N/A') + '</td></tr>'
-                + '<tr><td>Number of Employees</td><td>' + (d.client.numberOfEmployees || 'N/A') + '</td></tr>'
+                + '<tr><td>Number of Employees</td><td>' + (d.client.employees || d.client.numberOfEmployees || 'N/A') + '</td></tr>'
                 + '<tr><td>Audit Standard</td><td>' + standard + '</td></tr>'
                 + '<tr><td>Audit Type</td><td>' + (d.auditPlan?.auditType || 'Initial') + '</td></tr>'
                 + '<tr><td>Audit Dates</td><td>' + (d.report.date || 'N/A') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
                 + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || 'N/A') + '</td></tr>'
-                + '<tr><td>Audit Location</td><td>' + ([d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || 'N/A') + '</td></tr>'
-                + (d.client.latitude ? '<tr><td>Geo-Coordinates</td><td><a href="https://www.openstreetmap.org/?mlat=' + d.client.latitude + '&mlon=' + d.client.longitude + '#map=15/' + d.client.latitude + '/' + d.client.longitude + '" target="_blank" style="color:#2563eb;text-decoration:none;">' + d.client.latitude + ', ' + d.client.longitude + ' ↗</a></td></tr>' : '')
+                + '<tr><td>Audit Location</td><td>' + (function () { var s = (d.client.sites && d.client.sites[0]) || {}; return [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || 'N/A'; })() + '</td></tr>'
+                + (function () { var lat = d.client.latitude || ((d.client.sites && d.client.sites[0]) ? d.client.sites[0].latitude : null); var lng = d.client.longitude || ((d.client.sites && d.client.sites[0]) ? d.client.sites[0].longitude : null); return lat ? '<tr><td>Geo-Coordinates</td><td><a href="https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=15/' + lat + '/' + lng + '" target="_blank" style="color:#2563eb;text-decoration:none;">' + lat + ', ' + lng + ' ↗</a></td></tr>' : ''; })()
                 + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
                 + '</table>'
                 + (function () {
-                    var locAddr = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
+                    var s = (d.client.sites && d.client.sites[0]) || {};
+                    var locAddr = [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ');
                     var addrBox = '<div style="margin-top:12px;padding:16px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;text-align:center;"><div style="font-size:1.2rem;color:#64748b;margin-bottom:6px;">📍</div><div style="color:#334155;font-size:0.9rem;font-weight:600;">' + (locAddr || 'Address not available') + '</div></div>';
-                    if (d.client.latitude && d.client.longitude) {
-                        return '<div style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;"><img src="https://staticmap.openstreetmap.de/staticmap.php?center=' + d.client.latitude + ',' + d.client.longitude + '&zoom=14&size=600x160&maptype=mapnik&markers=' + d.client.latitude + ',' + d.client.longitude + ',red-pushpin" style="width:100%;height:140px;object-fit:cover;display:block;" alt="Audit Location Map" onerror="this.parentElement.innerHTML=\'' + addrBox.replace(/'/g, "\\'") + '\';"></div>';
+                    var lat = d.client.latitude || s.latitude; var lng = d.client.longitude || s.longitude;
+                    if (lat && lng) {
+                        return '<div style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;"><img src="https://staticmap.openstreetmap.de/staticmap.php?center=' + lat + ',' + lng + '&zoom=14&size=600x160&maptype=mapnik&markers=' + lat + ',' + lng + ',red-pushpin" style="width:100%;height:140px;object-fit:cover;display:block;" alt="Audit Location Map" onerror="this.parentElement.innerHTML=\'' + addrBox.replace(/'/g, "\\'") + '\';"></div>';
                     }
                     if (locAddr) {
                         return addrBox;
