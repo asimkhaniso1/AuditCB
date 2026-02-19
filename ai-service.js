@@ -538,6 +538,28 @@ Return a raw JSON array with 'id' and 'text' fields only:
         // Get Organization Context & Audit Plan details
         const orgPlanContext = KB_HELPERS.getOrgAndPlanContext(reportData);
 
+        // Build opening meeting context
+        let openingMeetingContext = '';
+        if (reportData.openingMeeting) {
+            const om = reportData.openingMeeting;
+            const parts = [];
+            if (om.date) parts.push(`Date: ${om.date}${om.time ? ' at ' + om.time : ''}`);
+            if (om.attendees) {
+                if (Array.isArray(om.attendees)) {
+                    const attList = om.attendees.map(a => typeof a === 'object' ? `${a.name || ''}${a.role ? ' (' + a.role + ')' : ''}${a.organization ? ' - ' + a.organization : ''}` : a).filter(Boolean).join(', ');
+                    parts.push(`Attendees: ${attList}`);
+                } else {
+                    parts.push(`Attendees: ${om.attendees}`);
+                }
+            }
+            if (om.notes) parts.push(`Notes: ${om.notes}`);
+            if (om.keyPointers) {
+                const pointers = Object.entries(om.keyPointers).filter(([, v]) => v).map(([k]) => k);
+                if (pointers.length > 0) parts.push(`Key Points Covered: ${pointers.join(', ')}`);
+            }
+            if (parts.length > 0) openingMeetingContext = `\nOpening Meeting:\n${parts.join('\n')}\n`;
+        }
+
         const prompt = `
 Act as a professional ISO Lead Auditor. Write an Executive Summary, Positive Observations, and Opportunities for Improvement for an Audit Report.
 
@@ -549,6 +571,7 @@ Context:
 - Observations / OFI Count: ${obsCount}
 - Compliant Clauses/Areas: ${areaText}
 ${orgPlanContext}
+${openingMeetingContext}
 ${kbContext ? `
 Standard Requirements (from Knowledge Base):
 ${kbContext}
@@ -558,16 +581,16 @@ Audit Observations & OFI Findings (from checklist):
 ${obsText}
 ` : ''}
 Instructions:
-1. Executive Summary: Write a professional paragraph summarizing the audit conclusion. Mention both non-conformities (${ncCount}) and observations/OFIs (${obsCount}) if any were raised.
-2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "Effective implementation of Clause 5.1 Leadership was observed..."). Use professional audit reporting language. Do NOT use markdown formatting (no asterisks, no bold markers, no bullet symbols).
+1. Executive Summary: Write a professional paragraph summarizing the audit conclusion. Include a brief mention of the opening meeting (attendees, date, key points covered). Mention both non-conformities (${ncCount}) and observations/OFIs (${obsCount}) if any were raised.
+2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "Effective implementation of Clause 5.1 Leadership was observed..."). Use professional audit reporting language. Do NOT use markdown formatting (no asterisks, no bold markers, no bullet symbols). Each observation MUST be on its own numbered line (1. 2. 3. etc).
 3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers.' : 'Write a list of general opportunities for improvement (not specific NCs).'} Use plain text without markdown. These are NOT non-conformities — use constructive improvement language (e.g. "The organization may benefit from...", "Consider enhancing...").
 
-IMPORTANT: Return plain text only. Do NOT use markdown formatting like **, ***, ##, or bullet symbols in any field values. Use numbered lists (1. 2. 3.) instead.
+IMPORTANT: Return plain text only. Do NOT use markdown formatting like **, ***, ##, or bullet symbols in any field values. Use numbered lists (1. 2. 3.) instead. Each numbered item MUST be separated by a newline character.
 
 Return raw JSON:
 {
   "executiveSummary": "...",
-  "positiveObservations": "...",
+  "positiveObservations": "1. First observation\\n2. Second observation\\n3. Third observation",
   "ofi": ["...", "..."]
 }
 `;
