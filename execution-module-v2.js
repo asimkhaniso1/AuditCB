@@ -4766,6 +4766,106 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         });
                     }
                 }
+
+                // 4. Department Findings Chart
+                const deptCtx = document.getElementById('dept-findings-chart');
+                if (deptCtx) {
+                    const deptData = {};
+                    d.hydratedProgress.forEach(item => {
+                        const dept = item.department || '';
+                        if (!dept) return;
+                        if (!deptData[dept]) deptData[dept] = { major: 0, minor: 0, obs: 0, conform: 0 };
+                        if (item.status === 'nc') {
+                            if ((item.ncrType || '').toLowerCase() === 'major') deptData[dept].major++;
+                            else if ((item.ncrType || '').toLowerCase() === 'minor') deptData[dept].minor++;
+                            else deptData[dept].obs++;
+                        } else if (item.status === 'conform') {
+                            deptData[dept].conform++;
+                        }
+                    });
+                    const deptLabels = Object.keys(deptData).sort();
+                    if (deptLabels.length > 0) {
+                        new Chart(deptCtx.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: deptLabels,
+                                datasets: [
+                                    { label: 'Major NC', data: deptLabels.map(dl => deptData[dl].major), backgroundColor: '#dc2626', stack: 'd' },
+                                    { label: 'Minor NC', data: deptLabels.map(dl => deptData[dl].minor), backgroundColor: '#f59e0b', stack: 'd' },
+                                    { label: 'Observations', data: deptLabels.map(dl => deptData[dl].obs), backgroundColor: '#fbbf24', stack: 'd' },
+                                    { label: 'Conforming', data: deptLabels.map(dl => deptData[dl].conform), backgroundColor: '#10b981', stack: 'd' }
+                                ]
+                            },
+                            options: { responsive: true, indexAxis: 'y', plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8, usePointStyle: true, pointStyle: 'circle' } } }, scales: { x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }, y: { stacked: true } } }
+                        });
+                    } else {
+                        deptCtx.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-building" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>No department data. Use AI Auto Map to assign departments.</div>';
+                    }
+                }
+
+                // 5. Personnel Workload Chart
+                const persCtx = document.getElementById('personnel-workload-chart');
+                if (persCtx) {
+                    const persData = {};
+                    d.hydratedProgress.forEach(item => {
+                        if (!item.personnel) return;
+                        if (!persData[item.personnel]) persData[item.personnel] = { conform: 0, nc: 0, na: 0 };
+                        if (item.status === 'conform') persData[item.personnel].conform++;
+                        else if (item.status === 'nc') persData[item.personnel].nc++;
+                        else if (item.status === 'na') persData[item.personnel].na++;
+                    });
+                    const persLabels = Object.keys(persData).sort((a, b) => {
+                        return (persData[b].conform + persData[b].nc + persData[b].na) - (persData[a].conform + persData[a].nc + persData[a].na);
+                    }).slice(0, 10);
+                    if (persLabels.length > 0) {
+                        new Chart(persCtx.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: persLabels,
+                                datasets: [
+                                    { label: 'Conform', data: persLabels.map(p => persData[p].conform), backgroundColor: '#10b981', stack: 'p' },
+                                    { label: 'NC', data: persLabels.map(p => persData[p].nc), backgroundColor: '#ef4444', stack: 'p' },
+                                    { label: 'N/A', data: persLabels.map(p => persData[p].na), backgroundColor: '#94a3b8', stack: 'p' }
+                                ]
+                            },
+                            options: { indexAxis: 'y', responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8, usePointStyle: true, pointStyle: 'circle' } } }, scales: { x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }, y: { stacked: true, ticks: { font: { size: 10 } } } } }
+                        });
+                    } else {
+                        persCtx.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-user-tie" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>No personnel data. Use AI Auto Map to assign personnel.</div>';
+                    }
+                }
+
+                // 6. Compliance by Department Radar
+                const radarCtx = document.getElementById('dept-compliance-radar');
+                if (radarCtx) {
+                    const rDeptData = {};
+                    d.hydratedProgress.forEach(item => {
+                        if (!item.department) return;
+                        if (!rDeptData[item.department]) rDeptData[item.department] = { total: 0, conform: 0 };
+                        rDeptData[item.department].total++;
+                        if (item.status === 'conform') rDeptData[item.department].conform++;
+                    });
+                    const rLabels = Object.keys(rDeptData).sort();
+                    if (rLabels.length >= 3) {
+                        new Chart(radarCtx.getContext('2d'), {
+                            type: 'radar',
+                            data: {
+                                labels: rLabels,
+                                datasets: [{
+                                    label: 'Compliance %',
+                                    data: rLabels.map(rl => rDeptData[rl].total > 0 ? Math.round((rDeptData[rl].conform / rDeptData[rl].total) * 100) : 0),
+                                    borderColor: '#6366f1',
+                                    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                                    borderWidth: 2,
+                                    pointBackgroundColor: '#6366f1'
+                                }]
+                            },
+                            options: { responsive: true, plugins: { legend: { display: false } }, scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 25, font: { size: 9 } }, pointLabels: { font: { size: 10 } } } } }
+                        });
+                    } else {
+                        radarCtx.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-chart-radar" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>Need 3+ departments for radar chart. Use AI Auto Map.</div>';
+                    }
+                }
             }
 
             // Load Chart.js if not already loaded
