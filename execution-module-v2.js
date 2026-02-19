@@ -747,6 +747,32 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         case 'checklist':
             const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], designations = [], auditTeam = [], clientPersonnel = [], clientData = null, plan = null, selectionMap = {}, overridesMap = {} } = contextData;
 
+            // Auto-fill designation and department when personnel name is selected
+            window._autoFillPersonnel = function (suffix) {
+                const sel = document.getElementById('ncr-personnel-' + suffix);
+                const desEl = document.getElementById('ncr-designation-' + suffix);
+                const deptEl = document.getElementById('ncr-department-' + suffix);
+                if (!sel) return;
+                const name = sel.value;
+                let designation = '';
+                let department = '';
+                if (name) {
+                    // Find contact to get designation
+                    const contacts = (clientData && clientData.contacts) || [];
+                    const contact = contacts.find(c => c.name === name);
+                    if (contact && contact.designation) {
+                        designation = contact.designation;
+                        // Find department from designations mapping
+                        const desigs = (clientData && clientData.designations) || [];
+                        const desMatch = desigs.find(d => (d.title || d) === designation);
+                        if (desMatch && desMatch.department) {
+                            department = desMatch.department;
+                        }
+                    }
+                }
+                if (desEl) desEl.value = designation;
+                if (deptEl) deptEl.value = department;
+            };
 
             // Helper to render row
             const renderRow = (item, checklistId, idx, isCustom = false) => {
@@ -857,23 +883,23 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                  </div>
                              </div>
                              
-                             <!-- Cross-Reference: Designation & Department -->
-                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
+                             <!-- Cross-Reference: Personnel, Designation & Department -->
+                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.5rem;">
                                  <div>
-                                     <label style="font-size: 0.8rem;">Interviewee Designation</label>
-                                     <select id="ncr-designation-${uniqueId}" class="form-control form-control-sm">
+                                     <label style="font-size: 0.8rem;">Personnel Name</label>
+                                     <select id="ncr-personnel-${uniqueId}" class="form-control form-control-sm" onchange="window._autoFillPersonnel && window._autoFillPersonnel('${uniqueId}')">
                                         <option value="">-- Select --</option>
-                                        ${designations.map(d => `<option value="${window.UTILS.escapeHtml(d)}" ${saved.designation === d ? 'selected' : ''}>${window.UTILS.escapeHtml(d)}</option>`).join('')}
-                                        ${saved.designation && !designations.includes(saved.designation) ? `<option value="${window.UTILS.escapeHtml(saved.designation)}" selected>${window.UTILS.escapeHtml(saved.designation)}</option>` : ''}
+                                        ${clientPersonnel.map(p => `<option value="${window.UTILS.escapeHtml(p.name)}" ${saved.personnel === p.name ? 'selected' : ''}>${window.UTILS.escapeHtml(p.name)}</option>`).join('')}
+                                        ${saved.personnel && !clientPersonnel.some(p => p.name === saved.personnel) ? `<option value="${window.UTILS.escapeHtml(saved.personnel)}" selected>${window.UTILS.escapeHtml(saved.personnel)}</option>` : ''}
                                      </select>
                                  </div>
                                  <div>
+                                     <label style="font-size: 0.8rem;">Designation</label>
+                                     <input type="text" id="ncr-designation-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.designation || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
+                                 </div>
+                                 <div>
                                      <label style="font-size: 0.8rem;">Department</label>
-                                     <select id="ncr-department-${uniqueId}" class="form-control form-control-sm">
-                                        <option value="">-- Select --</option>
-                                        ${departments.map(d => `<option value="${window.UTILS.escapeHtml(d)}" ${saved.department === d ? 'selected' : ''}>${window.UTILS.escapeHtml(d)}</option>`).join('')}
-                                        ${saved.department && !departments.includes(saved.department) ? `<option value="${window.UTILS.escapeHtml(saved.department)}" selected>${window.UTILS.escapeHtml(saved.department)}</option>` : ''}
-                                     </select>
+                                     <input type="text" id="ncr-department-${uniqueId}" class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.department || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
                                  </div>
                              </div>
                              
@@ -1311,7 +1337,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const { assignedChecklists = [] } = contextData;
 
             // Known bad values from old DOM scraping — filter these out
-            const BAD_VALUES = ['severity', 'non-conformity details', 'interviewee designation', 'department', 'evidence image', 'upload', 'camera', 'screen'];
+            const BAD_VALUES = ['severity', 'non-conformity details', 'personnel name', 'department', 'evidence image', 'upload', 'camera', 'screen'];
             const isBadValue = (v) => !v || BAD_VALUES.includes(v.toLowerCase().trim());
 
             // Collect checklist NCs — use original index into checklistProgress
@@ -2154,7 +2180,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const evidenceImage = evidenceImages.length > 0 ? evidenceImages[0] : '';
                 const evidenceSize = '';
 
-                // Get designation and department
+                // Get personnel, designation and department
+                const personnel = Sanitizer.sanitizeText(document.getElementById('ncr-personnel-' + uniqueId)?.value || '');
                 const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-' + uniqueId)?.value || '');
                 const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-' + uniqueId)?.value || '');
 
@@ -2176,6 +2203,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     evidenceImage: evidenceImage,
                     evidenceImages: evidenceImages,
                     evidenceSize: evidenceSize,
+                    personnel: personnel,
                     designation: designation,
                     department: department,
                     // Include clause and requirement for report display
@@ -2524,14 +2552,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             </div>
             
             <!-- Cross-Reference Fields -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label>Interviewee Designation</label>
-                    <input type="text" class="form-control" id="ncr-designation" placeholder="e.g., Quality Manager">
+                    <label>Personnel Name</label>
+                    <select class="form-control" id="ncr-personnel-modal" onchange="window._autoFillPersonnel && window._autoFillPersonnel('modal')">
+                        <option value="">-- Select --</option>
+                        ${((state.clients || []).find(c => c.name === report.client)?.contacts || []).map(c => `<option value="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Designation</label>
+                    <input type="text" class="form-control" id="ncr-designation-modal" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Department</label>
-                    <input type="text" class="form-control" id="ncr-department" placeholder="e.g., Production">
+                    <input type="text" class="form-control" id="ncr-department-modal" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
                 </div>
             </div>
             
@@ -2660,8 +2695,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
             const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
             const evidenceImage = Sanitizer.sanitizeURL(document.getElementById('ncr-evidence-image-url').value);
-            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation').value);
-            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department').value);
+            const personnel = Sanitizer.sanitizeText(document.getElementById('ncr-personnel-modal')?.value || '');
+            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-modal')?.value || '');
+            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-modal')?.value || '');
 
             // 5. Save
             if (!report.ncrs) report.ncrs = [];
@@ -2672,6 +2708,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 evidence,
                 evidenceImage,
                 transcript: description,
+                personnel,
                 designation,
                 department,
                 status: 'Open',
@@ -2729,14 +2766,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             <label>Evidence / Objective Evidence</label>
             <textarea class="form-control" id="ncr-evidence" rows="2">${window.UTILS.escapeHtml(ncr.evidence || '')}</textarea>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <div class="form-group" style="margin-bottom: 0;">
-                <label>Interviewee Designation</label>
-                <input type="text" class="form-control" id="ncr-designation" value="${window.UTILS.escapeHtml(ncr.designation || '')}">
+                <label>Personnel Name</label>
+                <select class="form-control" id="ncr-personnel-modal" onchange="window._autoFillPersonnel && window._autoFillPersonnel('modal')">
+                    <option value="">-- Select --</option>
+                    ${((state.clients || []).find(c => c.name === report.client)?.contacts || []).map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${ncr.personnel === c.name ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                    ${ncr.personnel && !((state.clients || []).find(c => c.name === report.client)?.contacts || []).some(c => c.name === ncr.personnel) ? `<option value="${window.UTILS.escapeHtml(ncr.personnel)}" selected>${window.UTILS.escapeHtml(ncr.personnel)}</option>` : ''}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Designation</label>
+                <input type="text" class="form-control" id="ncr-designation-modal" value="${window.UTILS.escapeHtml(ncr.designation || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label>Department</label>
-                <input type="text" class="form-control" id="ncr-department" value="${window.UTILS.escapeHtml(ncr.department || '')}">
+                <input type="text" class="form-control" id="ncr-department-modal" value="${window.UTILS.escapeHtml(ncr.department || '')}" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
             </div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
@@ -2765,8 +2810,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
             const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
             const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
-            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation').value);
-            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department').value);
+            const personnel = Sanitizer.sanitizeText(document.getElementById('ncr-personnel-modal')?.value || '');
+            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-modal')?.value || '');
+            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-modal')?.value || '');
             const status = document.getElementById('ncr-status').value;
             const evidenceImage = document.getElementById('ncr-evidence-image-url').value;
 
@@ -2783,6 +2829,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 description,
                 evidence,
                 evidenceImage,
+                personnel,
                 designation,
                 department,
                 status,
