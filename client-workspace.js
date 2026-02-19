@@ -595,6 +595,86 @@ function renderClientOverview(client) {
                 </div>
             </div>
 
+            <!-- Upcoming Audit Timeline + Obs/OFI Tracker Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <!-- Upcoming Audit Timeline -->
+                <div class="card">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-calendar-days" style="margin-right: 0.5rem; color: #6366f1;"></i>Upcoming Audit Timeline</h3>
+                    ${(function () {
+            const upcoming = clientPlans
+                .filter(p => ['Scheduled', 'Planned', 'Approved', 'In Progress'].includes(p.status))
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(0, 5);
+            if (upcoming.length === 0) return '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No upcoming audits</p>';
+            return '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + upcoming.map((p, i) => {
+                const daysUntil = Math.ceil((new Date(p.date) - new Date()) / 86400000);
+                const urgency = daysUntil < 0 ? '#ef4444' : daysUntil <= 7 ? '#f59e0b' : daysUntil <= 30 ? '#3b82f6' : '#10b981';
+                const label = daysUntil < 0 ? Math.abs(daysUntil) + 'd overdue' : daysUntil === 0 ? 'Today' : daysUntil + 'd away';
+                return '<div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid ' + urgency + ';">'
+                    + '<div style="min-width: 80px; font-weight: 600; font-size: 0.85rem; color: #1e293b;">' + (p.date || '-') + '</div>'
+                    + '<div style="flex: 1;"><div style="font-weight: 500; font-size: 0.85rem;">' + window.UTILS.escapeHtml(p.type || 'Audit') + '</div>'
+                    + '<div style="font-size: 0.75rem; color: var(--text-secondary);">' + window.UTILS.escapeHtml(p.standard || '') + '</div></div>'
+                    + '<span style="background: ' + urgency + '20; color: ' + urgency + '; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">' + label + '</span>'
+                    + '</div>';
+            }).join('') + '</div>';
+        })()}
+                </div>
+
+                <!-- Observation/OFI Tracker -->
+                <div class="card" style="min-height: 280px;">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-eye" style="margin-right: 0.5rem; color: #8b5cf6;"></i>Observation & OFI Tracker</h3>
+                    <div style="position: relative; height: 200px; width: 100%;"><canvas id="obsOfiChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Auditor Assignment + CAPA Closure Trend Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <!-- Assigned Audit Team -->
+                <div class="card">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-user-tie" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Assigned Audit Team</h3>
+                    ${(function () {
+            // Gather unique auditors from plans
+            const auditorMap = new Map();
+            clientPlans.forEach(p => {
+                (p.team || []).forEach((name, idx) => {
+                    if (!name) return;
+                    const existing = auditorMap.get(name);
+                    if (!existing) {
+                        const auditorObj = (window.state.auditors || []).find(a => a.name === name);
+                        auditorMap.set(name, {
+                            name,
+                            role: idx === 0 ? 'Lead Auditor' : 'Team Member',
+                            competencies: auditorObj?.competencies || auditorObj?.qualifications || [],
+                            audits: 1
+                        });
+                    } else {
+                        existing.audits++;
+                        if (idx === 0) existing.role = 'Lead Auditor';
+                    }
+                });
+            });
+            const auditors = [...auditorMap.values()];
+            if (auditors.length === 0) return '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No auditors assigned</p>';
+            return '<div style="display: flex; flex-direction: column; gap: 0.5rem;">' + auditors.map(a => {
+                const isLead = a.role === 'Lead Auditor';
+                return '<div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; background: ' + (isLead ? '#f0f9ff' : '#f8fafc') + '; border-radius: 8px; border-left: 3px solid ' + (isLead ? '#0284c7' : '#94a3b8') + ';">'
+                    + '<div style="width: 36px; height: 36px; border-radius: 50%; background: ' + (isLead ? 'linear-gradient(135deg,#0284c7,#0369a1)' : 'linear-gradient(135deg,#64748b,#475569)') + '; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">'
+                    + a.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() + '</div>'
+                    + '<div style="flex: 1;"><div style="font-weight: 500; font-size: 0.85rem;">' + window.UTILS.escapeHtml(a.name) + '</div>'
+                    + '<div style="font-size: 0.75rem; color: var(--text-secondary);">' + a.role + ' • ' + a.audits + ' audit' + (a.audits !== 1 ? 's' : '') + '</div></div>'
+                    + (isLead ? '<i class="fa-solid fa-star" style="color: #fbbf24; font-size: 0.85rem;" title="Lead Auditor"></i>' : '')
+                    + '</div>';
+            }).join('') + '</div>';
+        })()}
+                </div>
+
+                <!-- CAPA Closure Trend -->
+                <div class="card" style="min-height: 280px;">
+                    <h3 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>CAPA Closure Trend</h3>
+                    <div style="position: relative; height: 200px; width: 100%;"><canvas id="capaClosureChart"></canvas></div>
+                </div>
+            </div>
+
             <!-- TAB: PROFILE -->
             <div id="tab-profile" class="tab-content" style="display: none;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
@@ -1422,6 +1502,151 @@ window.initClientDashboardCharts = function (clientId) {
                     ctx.save();
                 }
             }]
+        });
+    }
+
+    // ----------------------------
+    // 3. Observation & OFI Tracker Chart
+    // ----------------------------
+    const ctxObs = document.getElementById('obsOfiChart');
+    if (ctxObs) {
+        if (clientDashboardCharts.obsOfi) {
+            clientDashboardCharts.obsOfi.destroy();
+        }
+
+        const allFindings = reports.flatMap(r => getAllFindings(r));
+        const observations = allFindings.filter(f => (f.type || '').toLowerCase() === 'observation').length;
+        const ofis = allFindings.filter(f => (f.type || '').toLowerCase() === 'ofi' || (f.type || '').toLowerCase() === 'opportunity for improvement').length;
+        const majors = allFindings.filter(f => (f.type || '').toLowerCase() === 'major').length;
+        const minors = allFindings.filter(f => (f.type || '').toLowerCase() === 'minor').length;
+
+        clientDashboardCharts.obsOfi = new Chart(ctxObs, {
+            type: 'bar',
+            data: {
+                labels: ['Major NC', 'Minor NC', 'Observation', 'OFI'],
+                datasets: [{
+                    label: 'Count',
+                    data: [majors, minors, observations, ofis],
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(6, 182, 212, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgb(239, 68, 68)',
+                        'rgb(245, 158, 11)',
+                        'rgb(139, 92, 246)',
+                        'rgb(6, 182, 212)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#f1f5f9' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // ----------------------------
+    // 4. CAPA Closure Trend Chart
+    // ----------------------------
+    const ctxCAPA = document.getElementById('capaClosureChart');
+    if (ctxCAPA) {
+        if (clientDashboardCharts.capaClosure) {
+            clientDashboardCharts.capaClosure.destroy();
+        }
+
+        // Build monthly data from NCR register for this client
+        const clientNCRs = (window.state.ncrs || []).filter(n =>
+            (n.clientId && String(n.clientId) === String(client.id)) ||
+            (n.clientName && n.clientName.trim().toLowerCase() === client.name.trim().toLowerCase())
+        );
+
+        // Group by month
+        const monthMap = {};
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = d.toISOString().substring(0, 7); // YYYY-MM
+            monthMap[key] = { raised: 0, closed: 0 };
+        }
+
+        clientNCRs.forEach(n => {
+            const raisedKey = (n.raisedDate || '').substring(0, 7);
+            if (monthMap[raisedKey]) monthMap[raisedKey].raised++;
+
+            if (n.status === 'Closed' && n.verifiedDate) {
+                const closedKey = n.verifiedDate.substring(0, 7);
+                if (monthMap[closedKey]) monthMap[closedKey].closed++;
+            }
+        });
+
+        // Also count from report findings
+        reports.forEach(r => {
+            const reportKey = (r.date || '').substring(0, 7);
+            if (monthMap[reportKey]) {
+                const findings = getAllFindings(r);
+                monthMap[reportKey].raised += findings.length;
+                monthMap[reportKey].closed += findings.filter(f => f.status === 'Closed').length;
+            }
+        });
+
+        const labels = Object.keys(monthMap).map(k => {
+            const [y, m] = k.split('-');
+            return new Date(y, m - 1).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+        });
+        const raisedData = Object.values(monthMap).map(v => v.raised);
+        const closedData = Object.values(monthMap).map(v => v.closed);
+
+        clientDashboardCharts.capaClosure = new Chart(ctxCAPA, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Raised',
+                        data: raisedData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#ef4444'
+                    },
+                    {
+                        label: 'Closed',
+                        data: closedData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#10b981'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, pointStyle: 'circle' }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#f1f5f9' } },
+                    x: { grid: { display: false } }
+                }
+            }
         });
     }
 };
