@@ -981,7 +981,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                                 <button type="button" class="btn-icon btn-na status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NA}" title="Not Applicable">N/A</button>
                                 <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity"><i class="fa fa-check"></i></button>
-                                <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity"><i class="fa fa-times"></i></button>
+                                <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity"><i class="fa fa-flag"></i></button>
                             </div>
                          </div>
                          
@@ -1028,7 +1028,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                          
                          <!-- NCR Panel (Conditional) -->
                          <div id="ncr-panel-${uniqueId}" class="ncr-panel" style="display: ${s === 'nc' ? 'block' : 'none'}; background: #fff1f2; border: 1px solid #fecaca; padding: 1rem; margin-top: 1rem; border-radius: 6px;">
-                             <h5 style="color: var(--danger-color); margin-bottom: 0.5rem; display: flex; align-items: center;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem;"></i> Non-Conformity Details</h5>
+                             <h5 style="color: var(--danger-color); margin-bottom: 0.5rem; display: flex; align-items: center;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.5rem;"></i> Finding Details</h5>
                              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
                                  <div>
                                      <label style="font-size: 0.8rem;">Severity</label>
@@ -1239,7 +1239,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <span>Conform</span>
                                     </button>
                                     <button class="bulk-action-btn" data-action="nc" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
-                                        <i class="fa-solid fa-times" style="color: var(--danger-color); width: 18px;"></i>
+                                        <i class="fa-solid fa-flag" style="color: var(--danger-color); width: 18px;"></i>
                                         <span>Non-Conform</span>
                                     </button>
                                     <button class="bulk-action-btn" data-action="na" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
@@ -4661,7 +4661,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>` : ''}
                 <!-- 7: Findings -->
                 <div class="rp-sec" id="sec-findings">
-                    <div class="rp-sec-hdr" style="border-left-color:#dc2626;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>NON-CONFORMITY DETAILS (${d.stats.majorNC + d.stats.minorNC})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#dc2626;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.majorNC + d.stats.minorNC})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
@@ -5468,7 +5468,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 var tocSections = [];
                 var colors = ['#2563eb', '#059669', '#7c3aed', '#059669', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#4338ca', '#c2410c'];
                 var descs = ['Organization details, scope, audit team and dates', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Closing meeting, certification recommendation and signatures', 'Photographic evidence from the audit'];
-                var names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'NON-CONFORMITY DETAILS', 'NCR REGISTER', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
+                var names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
                 var keys = ['audit-info', 'summary', 'charts', 'conformance', 'obs', 'ofi', 'findings', 'ncrs', 'conclusion', 'evidence'];
                 var num = 1;
                 for (var i = 0; i < keys.length; i++) {
@@ -5538,8 +5538,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + (obsOnlyRowsHtml ? '<div id="sec-obs" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">5</span>OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
             // SECTION 6 - OPPORTUNITIES FOR IMPROVEMENT
             + (ofiOnlyRowsHtml ? '<div id="sec-ofi" class="sh page-break" style="background:#ecfeff;border-left-color:#06b6d4;"><span class="sn" style="background:#06b6d4;">6</span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table></div>' : '')
-            // SECTION 7 - NON-CONFORMITY DETAILS
-            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#dc2626;"><span class="sn" style="background:#dc2626;">7</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
+            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#dc2626;"><span class="sn" style="background:#dc2626;">7</span>FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION 8 - NCR REGISTER
             + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#ea580c;"><span class="sn" style="background:#ea580c;">8</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
