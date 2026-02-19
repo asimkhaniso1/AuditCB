@@ -4470,37 +4470,51 @@ CFO," style="font-family: monospace;"></textarea>
         // Save locally first
         window.saveData();
 
-        // Sync specific certificates to Supabase (certification_decisions table)
-        if (window.SupabaseClient?.isInitialized && client.certificates && client.certificates.length > 0) {
-            let successCount = 0;
-            const promises = client.certificates.map((cert, i) => {
-                // Ensure the cert has the client name attached for mapping
-                if (!cert.client) cert.client = client.name;
+        // Sync to Supabase
+        if (window.SupabaseClient?.isInitialized) {
+            const syncPromises = [];
 
-                // SELF-HEAL: If cert has no ID (legacy bug), generate one now
-                if (!cert.id) {
-                    cert.id = 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i;
-                    console.log('Generated missing ID for cert:', cert.id);
-                }
+            // 1. Sync the CLIENT object (so data.certificates JSONB persists dates)
+            syncPromises.push(
+                window.SupabaseClient.upsertClient(client)
+                    .then(() => console.log('[saveCertificateDetails] Client synced to Supabase'))
+                    .catch(err => console.error('[saveCertificateDetails] Client sync failed:', err))
+            );
 
-                return window.SupabaseClient.upsertCertificate(cert)
-                    .then(() => successCount++)
-                    .catch(err => console.error(`Failed to save cert ${cert.id}:`, err));
-            });
+            // 2. Sync individual certs to certification_decisions table
+            if (client.certificates && client.certificates.length > 0) {
+                let successCount = 0;
+                const certPromises = client.certificates.map((cert, i) => {
+                    if (!cert.client) cert.client = client.name;
 
-            Promise.all(promises).then(() => {
-                if (successCount > 0) {
-                    window.showNotification(`Saved ${successCount} certificates successfully`, 'success');
-                } else {
-                    window.showNotification('Failed to save certificates to cloud', 'error');
-                }
-            }).catch(error => {
+                    // SELF-HEAL: If cert has no ID (legacy bug), generate one now
+                    if (!cert.id) {
+                        cert.id = 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i;
+                        console.log('Generated missing ID for cert:', cert.id);
+                    }
+
+                    return window.SupabaseClient.upsertCertificate(cert)
+                        .then(() => successCount++)
+                        .catch(err => console.error(`Failed to save cert ${cert.id}:`, err));
+                });
+
+                syncPromises.push(
+                    Promise.all(certPromises).then(() => {
+                        if (successCount > 0) {
+                            window.showNotification(`Saved ${successCount} certificates successfully`, 'success');
+                        } else {
+                            window.showNotification('Failed to save certificates to cloud', 'error');
+                        }
+                    })
+                );
+            }
+
+            Promise.all(syncPromises).catch(error => {
                 console.error('Save Certificate Error:', error);
-                // Alert user to specific error (e.g. RLS policy)
                 alert('Cloud Save Failed:\n' + (error.message || JSON.stringify(error)));
             });
         } else {
-            // Fallback for local-only or no certs to save
+            // Fallback for local-only
             window.showNotification('Certificate details saved locally', 'success');
         }
     };
