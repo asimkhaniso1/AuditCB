@@ -796,6 +796,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         window.showNotification('Could not match opening meeting attendees to contacts. Using full roster.', 'warning');
                         contacts = allContacts;
                     } else {
+                        window.showNotification(`Using ${contacts.length} personnel from Opening Meeting attendees.`, 'info');
                         console.log(`[AI AutoMap] Filtered to ${contacts.length} opening meeting attendees out of ${allContacts.length} total contacts`);
                     }
                 } else {
