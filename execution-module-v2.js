@@ -4659,7 +4659,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         var renderEvThumbsPdf = function (item) {
             var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
             if (!imgs.length) return '';
-            return '<div class="ev-inline">' + imgs.map(function (url) { return '<a href="' + url + '" target="_blank"><img src="' + url + '" style="height:120px;max-width:200px;border-radius:6px;border:1px solid #e2e8f0;object-fit:cover;"></a>'; }).join('') + '</div>';
+            var limited = imgs.slice(0, 2);
+            var extra = imgs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (imgs.length - 2) + ' more)</span>' : '';
+            return '<div class="ev-inline">' + limited.map(function (url) { return '<a href="' + url + '" target="_blank"><img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;"></a>'; }).join('') + extra + '</div>';
         };
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
@@ -4738,7 +4740,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + 'footer{margin-top:40px;background:#0f172a;color:white;padding:24px 32px;font-size:0.82rem;display:flex;justify-content:space-between;align-items:center;border-radius:8px;}'
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
-            + '.ev-inline{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;}.ev-inline img{height:120px;max-width:200px;border-radius:6px;border:1px solid #e2e8f0;object-fit:cover;}'
+            + '.ev-inline{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}.ev-inline img{height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;}'
             + '</style></head><body>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div>') + '<span>' + (cbName || 'Certification Body') + '</span></div><div class="rpt-hdr-center">' + standard + ' Audit Report</div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
@@ -4797,6 +4799,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<tr><td>Audit Type</td><td>' + (d.auditPlan?.auditType || 'Initial') + '</td></tr>'
                 + '<tr><td>Audit Dates</td><td>' + (d.report.date || 'N/A') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
                 + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || 'N/A') + '</td></tr>'
+                + '<tr><td>Audit Method</td><td>' + (d.auditPlan?.auditMethod || 'On-site') + '</td></tr>'
                 + '<tr><td>Audit Location</td><td>' + (function () { var s = (d.client.sites && d.client.sites[0]) || {}; return [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || 'N/A'; })() + '</td></tr>'
                 + (function () { var lat = d.client.latitude || ((d.client.sites && d.client.sites[0]) ? d.client.sites[0].latitude : null); var lng = d.client.longitude || ((d.client.sites && d.client.sites[0]) ? d.client.sites[0].longitude : null); return lat ? '<tr><td>Geo-Coordinates</td><td><a href="https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=15/' + lat + '/' + lng + '" target="_blank" style="color:#2563eb;text-decoration:none;">' + lat + ', ' + lng + ' ↗</a></td></tr>' : ''; })()
                 + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
