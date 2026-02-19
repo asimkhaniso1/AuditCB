@@ -234,9 +234,7 @@ function renderClientSidebarMenu(clientId) {
         <li onclick="window.location.hash = 'client/${clientId}/execution'">
             <i class="fa-solid fa-tasks"></i> Execution
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/findings'">
-            <i class="fa-solid fa-triangle-exclamation"></i> Findings
-        </li>
+
         <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
             <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
         </li>
@@ -342,8 +340,9 @@ window.renderClientModule = function (clientId, moduleName) {
             break;
 
         case 'findings':
-            contentArea.innerHTML = renderClientFindings(client);
-            break;
+            // Redirect legacy findings route to NCR & CAPA
+            window.location.hash = `client/${client.id}/ncr-capa`;
+            return;
         case 'ncr-capa':
             // We can pass the client ID to the module if needed, or rely on window.state.activeClientId
             if (typeof renderNCRCAPAModule === 'function') {
@@ -497,7 +496,7 @@ function renderClientOverview(client) {
                 ${openNCs > 0 ? `
                 <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <div><i class="fa-solid fa-exclamation-triangle" style="color: #f59e0b; margin-right: 0.5rem;"></i><strong>${openNCs} Open NC${openNCs !== 1 ? 's' : ''}</strong> - Action required</div>
-                    <button class="btn btn-sm" style="background: #f59e0b; color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/findings'">View</button>
+                    <button class="btn btn-sm" style="background: #f59e0b; color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">View</button>
                 </div>` : ''}
                 ${upcomingAudits > 0 ? `
                 <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; display: flex; justify-content: space-between; align-items: center;">
@@ -518,7 +517,7 @@ function renderClientOverview(client) {
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${validCerts}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Valid Certs</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/findings'">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">
                     <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
