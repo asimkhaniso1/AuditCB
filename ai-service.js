@@ -386,20 +386,20 @@ Example: [{"id": 0, "type": "minor"}, {"id": 1, "type": "observation"}]
         }
 
         const prompt = `
-You are a professional ISO Lead Auditor writing an audit report. Convert the following raw auditor notes and voice transcripts into professional audit report language.
+You are a Senior Lead Auditor with over 30 years of experience at a top-tier international Certification Body (e.g., BSI, Bureau Veritas, DNV, TÜV, SGS). You are writing a formal audit report for client submission. Convert the following raw auditor notes and voice transcripts into polished, authoritative audit report language that reflects the depth of experience and professionalism expected from a world-class CB. The report will be reviewed and attested by a Qualified Registrar before client submission.
 ${orgSummary ? `
 ${orgSummary}` : ''}
 Rules:
-1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...")
-2. Reference clause numbers where provided
-3. Reference the organization's specific products, processes, and industry when relevant
-4. Keep the same meaning — do NOT change findings or add interpretations
-5. Each remark should be 1-3 clear, complete sentences
-6. IMPORTANT: Match the language to the finding status:
-   - If status is "conform", use conformity verification language (e.g., "The organization demonstrated effective implementation of...", "Objective evidence confirmed compliance with...", "Records reviewed demonstrated adequate..."). Describe positive evidence found.
-   - If status is "observation" or "ofi", use Opportunity for Improvement language (e.g., "The organization may benefit from...", "An opportunity exists to enhance...", "It was noted that..."). Do NOT use "non-conformity" or "failure" for observations/OFIs.
-   - If status is "minor" or "major", use non-conformity language.
-7. Use ISO audit terminology (conformity, non-conformity, objective evidence, opportunity for improvement, etc.)
+1. Write in a measured, authoritative tone using formal third-person audit language (e.g., "The audit team verified that the organization has established and maintains...", "Through examination of objective evidence, it was confirmed that...", "The assessment revealed that...")
+2. Reference clause numbers precisely where provided, linking observations to specific standard requirements
+3. Reference the organization's specific products, processes, industry context, and operational environment when relevant
+4. Preserve the original meaning — do NOT alter findings, downgrade severity, or add speculative interpretations
+5. Each remark should be 2-4 clear, authoritative sentences that demonstrate systematic assessment
+6. IMPORTANT: Match the language precisely to the finding status:
+   - If status is "conform", use affirmative conformity verification language (e.g., "The audit team confirmed effective implementation of...", "Objective evidence including [records/interviews/observation] substantiated conformity with...", "The organization demonstrated a mature and well-embedded approach to..."). Describe the specific evidence examined.
+   - If status is "observation" or "ofi", use constructive Opportunity for Improvement language (e.g., "While conformity with the requirements was confirmed, the organization may benefit from...", "An opportunity to further strengthen the existing framework was identified...", "The audit team noted that enhanced..."). Do NOT use "non-conformity" or "failure" for observations/OFIs.
+   - If status is "minor" or "major", use precise non-conformity language citing the specific gap between the requirement and the objective evidence.
+7. Use ISO audit terminology consistently (conformity, non-conformity, objective evidence, systematic approach, effective implementation, continual improvement, opportunity for improvement)
 8. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
 9. Return plain text only
 
@@ -468,19 +468,19 @@ Return a raw JSON array with 'id' and 'refined' fields only:
         }
 
         const prompt = `
-You are a professional ISO Lead Auditor writing an audit report. Generate formal audit finding statements for each item below. IMPORTANT: classify the language used based on the finding "type".
+You are a Senior Lead Auditor with over 30 years of experience at a top-tier international Certification Body (e.g., BSI, Bureau Veritas, DNV, TÜV, SGS). You are writing formal audit finding statements for client submission. Generate authoritative finding statements that reflect the depth of expertise and precision expected from a world-class CB. The report will be reviewed and attested by a Qualified Registrar before client submission. IMPORTANT: classify the language used based on the finding "type".
 ${orgSummary ? `
 ${orgSummary}` : ''}
 Rules:
-1. Use formal, third-person audit language (e.g., "The organization has demonstrated...", "It was observed that...", "Objective evidence indicates...")
-2. Reference clause numbers and the specific requirement being assessed
-3. For "observation" type: This is NOT a non-conformity. Write an Observation (OBS). Use language like "It was noted that...", "The audit team observed that...". Do NOT use "non-conformity", "failure", or "absence" for observations.
-4. For "ofi" type: This is NOT a non-conformity. Write an Opportunity for Improvement (OFI). Use language like "The organization may benefit from...", "An opportunity for improvement was identified...", "While conformity was demonstrated, further enhancement could be achieved by...". Do NOT use "non-conformity", "failure", or "absence" for OFIs.
-5. For "minor" type: Write a minor non-conformity statement citing the specific gap. Use language like "A minor non-conformity was identified...", "Partial implementation was observed, however..."
-6. For "major" type: Write a major non-conformity statement referencing systemic failure or total absence of required controls. Use language like "A major non-conformity was raised...", "Systemic failure to implement..."
-7. For "conform" type: Write a conformity verification statement. Describe what evidence of conformity was observed. Use language like "The organization demonstrated effective implementation of...", "Objective evidence confirmed compliance with...", "Records reviewed demonstrated adequate...". Be specific about the evidence observed.
-8. Each statement should be 2-3 clear, complete sentences
-9. Use ISO audit terminology appropriate to the finding type (conformity, non-conformity, objective evidence, effective implementation, opportunity for improvement)
+1. Write in a measured, authoritative tone using formal third-person audit language (e.g., "The audit team verified that the organization has established...", "Through examination of objective evidence, it was confirmed...", "The assessment revealed that...")
+2. Reference clause numbers precisely and link to the specific requirement being assessed
+3. For "observation" type: This is NOT a non-conformity. Write an Observation (OBS). Use authoritative observational language like "The audit team noted that...", "During the assessment, it was observed that...", "While conformity was established, the audit team draws attention to...". Do NOT use "non-conformity", "failure", or "absence" for observations.
+4. For "ofi" type: This is NOT a non-conformity. Write an Opportunity for Improvement (OFI). Use constructive senior-level language like "The organization would benefit from further developing...", "An opportunity to enhance the effectiveness of the existing framework was identified...", "The audit team recommends consideration of...", "While the current approach meets requirements, maturity could be enhanced by...". Do NOT use "non-conformity", "failure", or "absence" for OFIs.
+5. For "minor" type: Write a minor non-conformity statement precisely citing the specific gap between the requirement and objective evidence. Use language like "A minor non-conformity was identified where...", "The assessment identified a partial implementation gap in..."
+6. For "major" type: Write a major non-conformity statement referencing systemic failure or total absence of required controls. Use language like "A major non-conformity was raised due to...", "The audit team identified a systemic failure to..."
+7. For "conform" type: Write an authoritative conformity verification statement describing the specific objective evidence examined. Use language like "The audit team confirmed effective implementation of...", "Through review of [specific records], interview with [role], and observation of [process], conformity with the requirement was verified...", "The organization demonstrated a well-embedded and mature approach to...". Be specific about the evidence.
+8. Each statement should be 2-4 clear, authoritative sentences demonstrating systematic assessment
+9. Use ISO audit terminology precisely: conformity, non-conformity, objective evidence, effective implementation, systematic approach, continual improvement, opportunity for improvement
 10. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
 11. Return plain text only
 12. Reference the organization's specific processes or products when the finding description provides that context
@@ -561,7 +561,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
         }
 
         const prompt = `
-Act as a professional ISO Lead Auditor. Write an Executive Summary, Positive Observations, and Opportunities for Improvement for an Audit Report.
+You are a Senior Lead Auditor with over 30 years of experience at a top-tier international Certification Body (e.g., BSI, Bureau Veritas, DNV, TÜV, SGS). Write an Executive Summary, Positive Observations, and Opportunities for Improvement for a formal Audit Report that will be submitted to the client. Your writing must reflect the authority, precision, and measured judgment of a seasoned CB professional. The report will be reviewed and attested by a Qualified Registrar before client submission.
 
 Context:
 - Client: ${reportData.client}
@@ -581,9 +581,9 @@ Audit Observations & OFI Findings (from checklist):
 ${obsText}
 ` : ''}
 Instructions:
-1. Executive Summary: Write a professional paragraph summarizing the audit conclusion. Include a brief mention of the opening meeting (attendees, date, key points covered). Mention both non-conformities (${ncCount}) and observations/OFIs (${obsCount}) if any were raised.
-2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 3-5 specific positive observations. Reference the specific clause numbers and titles (e.g. "Effective implementation of Clause 5.1 Leadership was observed..."). Use professional audit reporting language. Do NOT use markdown formatting (no asterisks, no bold markers, no bullet symbols). Each observation MUST be on its own numbered line (1. 2. 3. etc).
-3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers.' : 'Write a list of general opportunities for improvement (not specific NCs).'} Use plain text without markdown. These are NOT non-conformities — use constructive improvement language (e.g. "The organization may benefit from...", "Consider enhancing...").
+1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}) and observations/OFIs (${obsCount}) raised. Conclude with the audit team's overall impression of the management system's maturity and effectiveness. Use language that reflects 30+ years of assessment experience — measured, precise, and professional.
+2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 4-6 specific positive observations. Each must reference the specific clause number and title (e.g. "Clause 5.1 Leadership and commitment"). Describe the specific objective evidence of effective implementation observed. Use authoritative language (e.g., "The audit team confirmed that the organization has established a well-embedded approach to...", "Through examination of records and interviews, the assessment confirmed mature implementation of..."). Do NOT use markdown formatting. Each observation MUST be on its own numbered line (1. 2. 3. etc).
+3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific, actionable opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers and reference specific documents, procedures, or records where improvement is recommended.' : 'Write a list of specific, actionable opportunities for improvement referencing relevant clause requirements.'} Use measured, constructive improvement language befitting a senior auditor (e.g., "The organization would benefit from further developing...", "The audit team recommends consideration of...", "To further enhance the maturity of the management system, the organization may consider..."). These are NOT non-conformities.
 
 IMPORTANT: Return plain text only. Do NOT use markdown formatting like **, ***, ##, or bullet symbols in any field values. Use numbered lists (1. 2. 3.) instead. Each numbered item MUST be separated by a newline character.
 
