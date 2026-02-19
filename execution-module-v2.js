@@ -2518,7 +2518,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
             if (!window.state.ncrs) window.state.ncrs = [];
             const assignedChecklists = [];
-            const client = window.state.clients?.find(c => String(c.id) === String(report.clientId));
+            // Resolve client by name first, then by ID as fallback
+            const client = window.state.clients?.find(c => c.name === report.client)
+                || window.state.clients?.find(c => String(c.id) === String(report.clientId));
+            const resolvedClientId = client?.id || report.clientId || '';
             if (client && client.data?.assignedChecklists) {
                 assignedChecklists.push(...client.data.assignedChecklists);
             }
@@ -2556,7 +2559,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // Create new NCR record
                 const ncrRecord = {
                     _sourceKey: sourceKey,
-                    clientId: report.clientId || '',
+                    clientId: resolvedClientId,
                     clientName: report.client || '',
                     auditId: reportId,
                     auditPlanId: report.planId || '',
