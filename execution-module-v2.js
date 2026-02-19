@@ -2512,6 +2512,92 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
         })();
 
+        // ── Sync checklist NC items → NCR & CAPA Register ──
+        // ISO 17021-1 requires NCRs to flow into the formal CAPA lifecycle
+        try {
+            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
+            if (!window.state.ncrs) window.state.ncrs = [];
+            const assignedChecklists = [];
+            const client = window.state.clients?.find(c => String(c.id) === String(report.clientId));
+            if (client && client.data?.assignedChecklists) {
+                assignedChecklists.push(...client.data.assignedChecklists);
+            }
+
+            // Track which sourceKeys are still active NC
+            const activeSourceKeys = new Set();
+
+            ncItems.forEach(item => {
+                // Build stable key to prevent duplicates
+                const sourceKey = `exec-${reportId}-${item.checklistId || 'custom'}-${item.itemIdx}`;
+                activeSourceKeys.add(sourceKey);
+
+                // Check if already synced
+                const existing = window.state.ncrs.find(n => n._sourceKey === sourceKey);
+                if (existing) {
+                    // Update severity/description if changed
+                    existing.severity = item.ncrType || 'Observation';
+                    existing.description = item.ncrDescription || item.comment || existing.description;
+                    return;
+                }
+
+                // Resolve clause text
+                let clauseText = item.clause || 'Checklist Item';
+                if (item.checklistId && assignedChecklists.length > 0) {
+                    const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
+                    if (cl && cl.clauses && String(item.itemIdx).includes('-')) {
+                        const [mc, si] = String(item.itemIdx).split('-');
+                        const mainObj = cl.clauses.find(m => m.mainClause == mc);
+                        if (mainObj && mainObj.subClauses && mainObj.subClauses[si]) {
+                            clauseText = mainObj.subClauses[si].clause || clauseText;
+                        }
+                    }
+                }
+
+                // Create new NCR record
+                const ncrRecord = {
+                    _sourceKey: sourceKey,
+                    clientId: report.clientId || '',
+                    clientName: report.client || '',
+                    auditId: reportId,
+                    auditPlanId: report.planId || '',
+                    level: 'client',
+                    source: 'checklist',
+                    standard: report.standard || '',
+                    clause: clauseText,
+                    severity: item.ncrType || 'Observation',
+                    description: item.ncrDescription || item.comment || 'Non-conformity identified during audit',
+                    raisedBy: report.auditor || 'Auditor',
+                    raisedDate: new Date().toISOString().split('T')[0],
+                    dueDate: '',
+                    status: 'Open',
+                    correction: '',
+                    rootCause: '',
+                    correctiveAction: '',
+                    evidence: item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : [])
+                };
+
+                window.state.ncrs.push(ncrRecord);
+
+                // Persist to Supabase async (fire-and-forget)
+                if (typeof persistNCR === 'function') {
+                    persistNCR(ncrRecord).catch(e => console.warn('NCR sync persist error:', e));
+                } else if (window.persistNCR) {
+                    window.persistNCR(ncrRecord).catch(e => console.warn('NCR sync persist error:', e));
+                }
+            });
+
+            // Remove register entries for items no longer marked NC
+            window.state.ncrs = window.state.ncrs.filter(n => {
+                if (!n._sourceKey || !n._sourceKey.startsWith(`exec-${reportId}-`)) return true;
+                return activeSourceKeys.has(n._sourceKey);
+            });
+
+            if (typeof updateNCRAnalytics === 'function') updateNCRAnalytics();
+            else if (window.updateNCRAnalytics) window.updateNCRAnalytics();
+        } catch (syncErr) {
+            console.warn('NCR register sync error (non-fatal):', syncErr);
+        }
+
         window.saveData();
     };
 

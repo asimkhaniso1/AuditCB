@@ -425,12 +425,27 @@ function matchesClient(item, client) {
     return false;
 }
 
+// Helper: Get ALL findings from a report (manual NCRs + checklist NCs)
+function getAllFindings(report) {
+    const manual = (report.ncrs || []).map(n => ({ ...n, source: 'manual' }));
+    const checklist = (report.checklistProgress || [])
+        .filter(p => p.status === 'nc')
+        .map(p => ({
+            type: p.ncrType || 'Observation',
+            clause: p.clause || 'Checklist Item',
+            description: p.ncrDescription || p.comment || '',
+            status: p.ncrStatus || 'Open',
+            source: 'checklist'
+        }));
+    return [...manual, ...checklist];
+}
+
 // Overview tab content
 function renderClientOverview(client) {
     const clientPlans = (window.state.auditPlans || []).filter(p => matchesClient(p, client));
     const clientCerts = (window.state.certifications || []).filter(c => matchesClient(c, client));
     const clientReports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
-    const openNCs = clientReports.reduce((count, r) => count + ((r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length), 0);
+    const openNCs = clientReports.reduce((count, r) => count + (getAllFindings(r).filter(f => f.status !== 'Closed' && f.status !== 'closed').length), 0);
 
     // Calculate additional metrics
     const completedAudits = clientPlans.filter(p => p.status === 'Completed').length;
@@ -560,7 +575,7 @@ function renderClientOverview(client) {
                     <div class="card">
                         <h4 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Quick Info</h4>
                         <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
-                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Next Audit:</span><strong>${client.nextAudit || 'Not scheduled'}</strong></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Next Audit:</span><strong>${(function () { const upcoming = clientPlans.filter(p => p.status === 'Scheduled' || p.status === 'Planned' || p.status === 'Approved').sort((a, b) => new Date(a.date) - new Date(b.date))[0]; return upcoming ? upcoming.date : 'Not scheduled'; })()}</strong></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Industry:</span><span>${window.UTILS.escapeHtml(client.industry || '-')}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Standard:</span><span>${window.UTILS.escapeHtml(client.standard || '-')}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Sites:</span><span>${totalSites || 1}</span></div>
@@ -1051,11 +1066,11 @@ function renderClientPlans(client) {
                         <tbody>
                             ${plans.sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => `
                                 <tr>
-                                    <td>${p.date || '-'}</td>
+                                    <td><a href="#" onclick="event.preventDefault(); window.viewAuditPlan('${p.id}')" style="color: var(--primary-color); text-decoration: none; font-weight: 500;">${p.date || '-'}</a></td>
                                     <td>${p.type || 'Audit'}</td>
                                     <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${p.standard || 'ISO'}</span></td>
                                     <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
-                                    <td>${p.lead || '-'}</td>
+                                    <td>${(p.team && p.team[0]) || p.lead || '-'}</td>
                                     <td>
                                         <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan('${p.id}')"><i class="fa-solid fa-eye"></i></button>
                                     </td>
@@ -1076,7 +1091,7 @@ function renderClientExecution(client) {
     const totalReports = reports.length;
     const finalizedReports = reports.filter(r => r.status === 'Finalized').length;
     const inProgressReports = reports.filter(r => r.status !== 'Finalized').length;
-    const totalFindings = reports.reduce((sum, r) => sum + (r.ncrs || r.findings || []).length, 0);
+    const totalFindings = reports.reduce((sum, r) => sum + getAllFindings(r).length, 0);
 
     if (reports.length === 0) {
         return `
@@ -1180,8 +1195,9 @@ function renderClientExecution(client) {
                         </thead>
                         <tbody>
                             ${reports.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => {
-            const findingsCount = (r.ncrs || r.findings || []).length;
-            const openNCs = (r.ncrs || r.findings || []).filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
+            const allF = getAllFindings(r);
+            const findingsCount = allF.length;
+            const openNCs = allF.filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
 
             return `
                                 <tr>
@@ -1263,10 +1279,10 @@ window.initClientDashboardCharts = function (clientId) {
             clientDashboardCharts.ncr.destroy();
         }
 
-        // Aggregate findings (Mocking a timeline for now, or just aggregating by status)
-        const findings = reports.flatMap(r => r.ncrs || []);
-        const major = findings.filter(f => f.type === 'major').length;
-        const minor = findings.filter(f => f.type === 'minor').length;
+        // Aggregate findings from ALL sources (manual NCRs + checklist NCs)
+        const findings = reports.flatMap(r => getAllFindings(r));
+        const major = findings.filter(f => (f.type || '').toLowerCase() === 'major').length;
+        const minor = findings.filter(f => (f.type || '').toLowerCase() === 'minor').length;
         const closed = findings.filter(f => f.status === 'Closed').length;
         const open = findings.length - closed;
 
@@ -1335,18 +1351,18 @@ window.initClientDashboardCharts = function (clientId) {
             clientDashboardCharts.performance.destroy();
         }
 
-        // Mock Calculation: (Total Checkpoints - NCs) / Total Checkpoints * 100
-        // Since we don't have total checkpoints easily, we'll mock a "Conformity Score" based on trends
-        const totalFindings = reports.reduce((acc, r) => acc + (r.ncrs ? r.ncrs.length : 0), 0);
-        // Scores starts at 100, deduct 5 for major, 1 for minor
-        let deduction = 0;
+        // Calculate real conformity from checklist progress
+        let totalItems = 0, conformItems = 0;
         reports.forEach(r => {
-            (r.ncrs || []).forEach(n => {
-                deduction += (n.type === 'major' ? 5 : 1);
-            });
+            const progress = r.checklistProgress || [];
+            if (progress.length > 0) {
+                const assessed = progress.filter(p => p.status && p.status !== '');
+                totalItems += assessed.length;
+                conformItems += assessed.filter(p => p.status === 'conform').length;
+            }
         });
 
-        let score = Math.max(0, 100 - (deduction / (reports.length || 1))); // Average deduction per audit
+        let score = totalItems > 0 ? Math.round((conformItems / totalItems) * 100) : 100;
         score = Math.round(score);
 
         clientDashboardCharts.performance = new Chart(ctxPerf, {
