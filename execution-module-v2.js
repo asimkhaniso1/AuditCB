@@ -5209,6 +5209,56 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const editedOpeningNotes = document.getElementById('rp-opening-notes')?.innerText || d.report.openingMeeting?.notes || '';
         const editedClosingSummary = document.getElementById('rp-closing-summary')?.innerText || d.report.closingMeeting?.summary || '';
         const formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
+        // Rich text formatter for PDF: handles numbered lists, bullets, paragraphing, markdown
+        const formatRichText = (text, color) => {
+            if (!text) return '';
+            const clr = color || '#334155';
+            // Normalize HTML from contenteditable
+            let t = text.replace(/&nbsp;/g, ' ')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/?(div|p|li|ul|ol)[^>]*>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>')
+                .trim();
+            // Detect numbered items: "1. ...", "2) ...", "3- ..."
+            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):\-]\s*/);
+            if (numbered.length > 2) {
+                let items = [];
+                for (let i = 1; i < numbered.length; i += 2) {
+                    let txt = (numbered[i + 1] || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (txt) items.push(txt);
+                }
+                if (items.length > 0) {
+                    return items.map((obs, idx) =>
+                        '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;">'
+                        + '<div style="min-width:26px;height:26px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.78rem;flex-shrink:0;">' + (idx + 1) + '</div>'
+                        + '<div style="flex:1;padding-top:2px;color:' + clr + ';">' + obs + '</div></div>'
+                    ).join('');
+                }
+            }
+            // Detect bullet items: "- ...", "• ...", "▸ ..."
+            let lines = t.split(/\n+/).filter(s => s.trim().length > 0);
+            let bulletLines = lines.filter(s => /^\s*[\-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s/.test(s));
+            if (bulletLines.length > 1 && bulletLines.length >= lines.length * 0.5) {
+                return lines.map(line => {
+                    let isBullet = /^\s*[\-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s*/.test(line);
+                    let txt = line.replace(/^\s*[\-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s*/, '').trim();
+                    if (isBullet) {
+                        return '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;">'
+                            + '<div style="min-width:8px;height:8px;background:' + clr + ';border-radius:50%;margin-top:7px;flex-shrink:0;opacity:0.6;"></div>'
+                            + '<div style="flex:1;color:' + clr + ';">' + txt + '</div></div>';
+                    }
+                    return '<div style="margin-bottom:10px;color:' + clr + ';font-weight:600;">' + txt + '</div>';
+                }).join('');
+            }
+            // Default: paragraph mode — split on double newlines or treat single newlines as line breaks
+            if (lines.length > 1) {
+                return lines.map(para => '<p style="margin:0 0 10px 0;color:' + clr + ';">' + para.trim() + '</p>').join('');
+            }
+            return '<span style="color:' + clr + ';">' + t + '</span>';
+        };
         const fmtRemark = (t) => { if (!t) return ''; let s = t.trim(); if (!s) return ''; s = s.charAt(0).toUpperCase() + s.slice(1); if (!/[.!?]$/.test(s)) s += '.'; return s; };
         const formatPositiveObs = (text) => {
             if (!text) return '';
@@ -5436,11 +5486,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || 'N/A') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.manDays || d.auditPlan?.man_days || 'N/A') + ' Man-Days' + (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
-                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
+                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div class="sh page-break" style="border-left-color:#22c55e;"><span class="sn"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
-                + (editedOfi ? '<div class="sh page-break" style="border-left-color:#f59e0b;"><span class="sn"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb"><div style="color:#a16207;font-size:0.95rem;line-height:1.8;">' + editedOfi + '</div></div>' : '')
+                + (editedOfi ? '<div class="sh page-break" style="border-left-color:#f59e0b;"><span class="sn"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb"><div style="color:#a16207;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedOfi, '#a16207') + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="border-left-color:#7c3aed;"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
@@ -5491,7 +5541,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // SECTION 7
             + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="border-left-color:#4338ca;"><span class="sn">9</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
-                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatText(editedConclusion) + '</div>'
+                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || 'N/A') + '</td></tr></table></div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
