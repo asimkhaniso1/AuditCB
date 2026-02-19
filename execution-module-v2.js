@@ -5284,6 +5284,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             if (lines.length > 1) {
                 return lines.map(para => '<p style="margin:0 0 10px 0;color:' + clr + ';">' + para.trim() + '</p>').join('');
             }
+            // Single block of text — split into paragraphs every 2-3 sentences for readability
+            if (t.length > 200) {
+                let sentences = t.split(/(?<=[.!?])\s+/);
+                if (sentences.length > 3) {
+                    let paras = [];
+                    let current = [];
+                    for (let i = 0; i < sentences.length; i++) {
+                        current.push(sentences[i]);
+                        // Break every 2-3 sentences, preferring breaks at topic transitions
+                        if (current.length >= 2 && (current.length >= 3 || (i < sentences.length - 1 && /^(The |While |Overall|In |During |Furthermore|Additionally|Moreover|However|Based |Addressing|This )/.test(sentences[i + 1])))) {
+                            paras.push(current.join(' '));
+                            current = [];
+                        }
+                    }
+                    if (current.length > 0) paras.push(current.join(' '));
+                    if (paras.length > 1) {
+                        return paras.map(p => '<p style="margin:0 0 12px 0;text-align:justify;color:' + clr + ';">' + p.trim() + '</p>').join('');
+                    }
+                }
+            }
             return '<span style="color:' + clr + ';">' + t + '</span>';
         };
         const fmtRemark = (t) => { if (!t) return ''; let s = t.trim(); if (!s) return ''; s = s.charAt(0).toUpperCase() + s.slice(1); if (!/[.!?]$/.test(s)) s += '.'; return s; };
