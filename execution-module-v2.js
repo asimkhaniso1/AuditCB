@@ -2036,33 +2036,33 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const allContent = document.querySelectorAll('.accordion-content');
         const btn = document.getElementById('toggle-all-accordions');
 
-        // If any are visible, collapse all; otherwise expand all
-        const anyOpen = Array.from(allContent).some(c => c.style.display === 'block');
+        // Determine action from the button label — avoids desync when individual sections are toggled
+        const label = btn?.querySelector('span');
+        const shouldExpand = label ? label.textContent.trim().toLowerCase().includes('expand') : true;
 
         allContent.forEach(content => {
-            content.style.display = anyOpen ? 'none' : 'block';
+            content.style.display = shouldExpand ? 'block' : 'none';
             // Update the corresponding chevron icon
             const icon = document.getElementById('icon-' + content.id);
             if (icon) {
-                icon.style.transform = anyOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+                icon.style.transform = shouldExpand ? 'rotate(180deg)' : 'rotate(0deg)';
             }
         });
 
         // Also collapse/expand NCR panels and evidence details when collapsing all
-        if (anyOpen) {
+        if (!shouldExpand) {
             document.querySelectorAll('.ncr-panel').forEach(p => { if (p.style.display !== 'none') p.dataset.wasOpen = 'true'; });
         }
 
         // Update button label
         if (btn) {
             const icon = btn.querySelector('i');
-            const label = btn.querySelector('span');
-            if (anyOpen) {
-                if (icon) icon.className = 'fa-solid fa-expand-alt';
-                if (label) label.textContent = 'Expand All';
-            } else {
+            if (shouldExpand) {
                 if (icon) icon.className = 'fa-solid fa-compress-alt';
                 if (label) label.textContent = 'Collapse All';
+            } else {
+                if (icon) icon.className = 'fa-solid fa-expand-alt';
+                if (label) label.textContent = 'Expand All';
             }
         }
     };
@@ -2561,8 +2561,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     _sourceKey: sourceKey,
                     clientId: resolvedClientId,
                     clientName: report.client || '',
-                    auditId: reportId,
-                    auditPlanId: report.planId || '',
+                    auditId: report.planId || null,          // FK → audit_plans(id)
                     level: 'client',
                     source: 'checklist',
                     standard: report.standard || '',
@@ -2571,7 +2570,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     description: item.ncrDescription || item.comment || 'Non-conformity identified during audit',
                     raisedBy: report.auditor || 'Auditor',
                     raisedDate: new Date().toISOString().split('T')[0],
-                    dueDate: '',
+                    dueDate: null,                           // null for DATE column
                     status: 'Open',
                     correction: '',
                     rootCause: '',
@@ -5211,6 +5210,31 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const editedClosingSummary = document.getElementById('rp-closing-summary')?.innerText || d.report.closingMeeting?.summary || '';
         const formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
         const fmtRemark = (t) => { if (!t) return ''; let s = t.trim(); if (!s) return ''; s = s.charAt(0).toUpperCase() + s.slice(1); if (!/[.!?]$/.test(s)) s += '.'; return s; };
+        const formatPositiveObs = (text) => {
+            if (!text) return '';
+            // Normalize HTML: convert block-level tags and <br> to newlines, strip remaining tags
+            let t = text.replace(/&nbsp;/g, ' ')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/?(div|p|li|ul|ol)[^>]*>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .trim();
+            let items = [];
+            // Try numbered splitting: "1. ...", "2) ...", "3- ..."
+            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):\-]\s*/);
+            if (numbered.length > 2) {
+                for (let i = 1; i < numbered.length; i += 2) {
+                    let txt = (numbered[i + 1] || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (txt) items.push(txt);
+                }
+            } else {
+                // Fall back to splitting on newlines
+                items = t.split(/\n+/).map(s => s.replace(/^\s*[\-\u2022\u2023\u25E6]\s*/, '').trim()).filter(s => s.length > 3);
+            }
+            if (items.length === 0) items = [t.replace(/\n/g, ' ').trim()];
+            return items.map((obs, idx) => '<div style="display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;">'
+                + '<div style="min-width:28px;height:28px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;flex-shrink:0;">' + (idx + 1) + '</div>'
+                + '<div style="flex:1;padding-top:3px;">' + obs + '</div></div>').join('');
+        };
         const printWindow = window.open('', '_blank');
         if (!printWindow) { window.showNotification('Pop-up blocked. Please allow pop-ups.', 'warning'); return; }
         const clauseLabels = Object.keys(d.stats.ncByClause).sort((a, b) => parseInt(a) - parseInt(b));
@@ -5415,7 +5439,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
-                + (editedPositiveObs ? '<div class="sh page-break" style="border-left-color:#22c55e;"><span class="sn"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + (function (text) { if (!text) return ''; var plain = text.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim(); var items = []; if (plain.match(/\d+\.\s/)) { items = plain.split(/(?=\d+\.\s)/).map(function (s) { return s.replace(/^\d+\.\s*/, '').trim(); }).filter(Boolean); } else if (text.includes('<br') || text.includes('\n')) { items = text.split(/<br\s*\/?>|\n/).map(function (s) { return s.replace(/<[^>]+>/g, '').replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean); } if (items.length > 1) { return items.map(function (obs, idx) { return '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;"><div style="min-width:28px;height:28px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;">' + (idx + 1) + '</div><div style="flex:1;padding-top:3px;">' + obs + '</div></div>'; }).join(''); } return text; })(editedPositiveObs) + '</div></div>' : '')
+                + (editedPositiveObs ? '<div class="sh page-break" style="border-left-color:#22c55e;"><span class="sn"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + (editedOfi ? '<div class="sh page-break" style="border-left-color:#f59e0b;"><span class="sn"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb"><div style="color:#a16207;font-size:0.95rem;line-height:1.8;">' + editedOfi + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3

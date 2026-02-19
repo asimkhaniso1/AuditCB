@@ -40,7 +40,7 @@ window.fetchNCRs = async function () {
             id: row.id,
             clientId: row.client_id,
             auditId: row.audit_id,
-            auditPlanId: row.audit_plan_id,
+            // audit_id is the FK to audit_plans – no separate audit_plan_id column
             level: row.level,
             clientName: row.client_name,
             source: row.source,
@@ -82,10 +82,12 @@ window.fetchNCRs = async function () {
 async function persistNCR(ncr) {
     if (!window.SupabaseClient) return;
 
+    // Helper: coerce empty/falsy to null for DATE and FK columns
+    const toNullable = (v) => (v === '' || v === undefined || v === null) ? null : v;
+
     const dbPayload = {
-        client_id: ncr.clientId,
-        audit_id: ncr.auditId,
-        audit_plan_id: ncr.auditPlanId || null,
+        client_id: toNullable(ncr.clientId),
+        audit_id: toNullable(ncr.auditId),           // FK → audit_plans(id)
         level: ncr.level,
         client_name: ncr.clientName,
         source: ncr.source,
@@ -94,18 +96,18 @@ async function persistNCR(ncr) {
         severity: ncr.severity,
         description: ncr.description,
         raised_by: ncr.raisedBy,
-        raised_date: ncr.raisedDate || null,
-        due_date: ncr.dueDate || null,
+        raised_date: toNullable(ncr.raisedDate),      // DATE column
+        due_date: toNullable(ncr.dueDate),             // DATE column
         status: ncr.status,
         correction: ncr.correction,
-        correction_date: ncr.correctionDate || null,
+        correction_date: toNullable(ncr.correctionDate), // DATE column
         root_cause: ncr.rootCause,
         corrective_action: ncr.correctiveAction,
         capa_responsible: ncr.capaResponsible,
-        capa_implemented_date: ncr.capaImplementedDate || null,
+        capa_implemented_date: toNullable(ncr.capaImplementedDate), // DATE column
         verification_method: ncr.verificationMethod,
         verified_by: ncr.verifiedBy,
-        verified_date: ncr.verifiedDate || null,
+        verified_date: toNullable(ncr.verifiedDate),   // DATE column
         effectiveness: ncr.effectiveness,
         evidence: ncr.evidence || []
     };
@@ -893,7 +895,7 @@ async function saveNewNCR() {
         level: 'client', // All NCRs are now client-based (including CB internal via internal client)
         clientId: clientId,
         clientName: clientName,
-        auditPlanId: document.getElementById('ncr-audit-plan')?.value || null,
+        auditId: document.getElementById('ncr-audit-plan')?.value || null, // FK → audit_plans(id)
         source: document.getElementById('ncr-source').value,
         standard: document.getElementById('ncr-standard').value,
         clause: document.getElementById('ncr-clause').value,
