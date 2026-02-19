@@ -241,9 +241,7 @@ function renderClientSidebarMenu(clientId) {
 
         <!-- Section: Records -->
         <li style="padding: 0.5rem 1rem 0.25rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; pointer-events: none; margin-top: 0.5rem; border-top: 1px solid var(--border-color);">Records & Compliance</li>
-        <li onclick="window.location.hash = 'client/${clientId}/certs'">
-            <i class="fa-solid fa-certificate"></i> Certificates
-        </li>
+
         <li onclick="window.location.hash = 'client/${clientId}/compliance'">
             <i class="fa-solid fa-shield-halved"></i> Compliance
         </li>
@@ -352,8 +350,13 @@ window.renderClientModule = function (clientId, moduleName) {
             }
             break;
         case 'certs':
-            contentArea.innerHTML = renderClientCertificates(client);
-            break;
+            // Redirect legacy certs route to Account Setup → Scopes & Certs
+            window.location.hash = `client/${client.id}/account-setup`;
+            setTimeout(() => {
+                const scopesTab = document.querySelector('.tab-btn[data-tab="scopes"]');
+                if (scopesTab) scopesTab.click();
+            }, 300);
+            return;
         case 'compliance':
             // Reuse existing compliance rendering
             if (typeof renderClientTab === 'function') {
@@ -512,7 +515,7 @@ function renderClientOverview(client) {
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/certs'">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/account-setup'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 300);">
                     <i class="fa-solid fa-certificate" style="font-size: 1.25rem; color: #10b981; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${validCerts}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Valid Certs</p>
@@ -1213,198 +1216,7 @@ function renderClientExecution(client) {
     `;
 }
 
-// Client findings/NCs
-function renderClientFindings(client) {
-    const reports = (window.state.auditReports || []).filter(r => matchesClient(r, client));
-    const allFindings = reports.flatMap(r => (r.ncrs || r.findings || []).map(f => ({ ...f, reportId: r.id, reportDate: r.date })));
-    const totalFindings = allFindings.length;
-    const majorNCs = allFindings.filter(f => f.type === 'Major').length;
-    const minorNCs = allFindings.filter(f => f.type === 'Minor').length;
-    const openNCsCount = allFindings.filter(f => f.status !== 'Closed' && f.status !== 'closed').length;
 
-    if (allFindings.length === 0) {
-        return `
-        <div class="card" style="text-align: center; padding: 3rem;">
-                <i class="fa-solid fa-check-circle" style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;"></i>
-                <p style="color: var(--text-secondary);">No findings recorded for this client.</p>
-            </div>
-        `;
-    }
-
-    return `
-        <div class="fade-in">
-            <!-- Summary Cards -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
-                    <i class="fa-solid fa-search" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalFindings}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Findings</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #ef4444;">
-                    <i class="fa-solid fa-exclamation-circle" style="font-size: 1.5rem; color: #ef4444; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${majorNCs}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Major NCs</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
-                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${minorNCs}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Minor NCs</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCsCount > 0 ? '#ef4444' : '#10b981'};">
-                    <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; color: ${openNCsCount > 0 ? '#ef4444' : '#10b981'}; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${openNCsCount}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3 style="margin: 0 0 1rem 0;">Findings & Non-Conformities</h3>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Clause</th>
-                                <th>Type</th>
-                                <th>Description</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${allFindings.map(f => `
-                                <tr>
-                                    <td>${f.reportDate || '-'}</td>
-                                    <td>${f.clause || '-'}</td>
-                                    <td><span class="badge" style="background: ${f.type === 'Major' ? '#fee2e2' : '#fef3c7'}; color: ${f.type === 'Major' ? '#dc2626' : '#d97706'};">${f.type || 'NC'}</span></td>
-                                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.description || f.finding || '-'}</td>
-                                    <td><span class="status-badge status-${(f.status || 'open').toLowerCase()}">${f.status || 'Open'}</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail('${f.reportId}')" title="View Report">
-                                            <i class="fa-solid fa-eye"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        `;
-}
-
-// Client certificates - UNIFIED with Settings → Scopes
-function renderClientCertificates(client) {
-    // Use client.certificates from Settings (same as Audit Cycle)
-    const certs = client.certificates || [];
-
-    const totalCerts = certs.length;
-    const validCertsCount = certs.filter(c => c.status === 'Active' || !c.status).length;
-
-    if (certs.length === 0) {
-        return `
-        <div class="card" style="text-align: center; padding: 3rem;">
-                <i class="fa-solid fa-certificate" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                <p style="color: var(--text-secondary);">No certificates configured for this client yet.</p>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                    Go to Settings → Certification Scopes & History to set up certifications.
-                </p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);">
-                    <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
-                </button>
-            </div>
-        `;
-    }
-
-    return `
-        <div class="fade-in">
-            <!-- Summary Cards -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
-                    <i class="fa-solid fa-certificate" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${totalCerts}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Certificates</p>
-                </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
-                    <i class="fa-solid fa-shield-check" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
-                    <p style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;">${validCertsCount}</p>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Valid Certificates</p>
-                </div>
-            </div>
-
-            <!-- Client Context: Goods / Services & Processes (from Org Setup) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                <div class="card" style="margin: 0;">
-                    <h4 style="margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-boxes-stacked" style="color: #f59e0b;"></i> Goods & Services
-                    </h4>
-                    ${(client.goodsServices && client.goodsServices.length > 0) ? `
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            ${client.goodsServices.map(g => `<span class="badge" style="background: #fef3c7; color: #92400e;">${g.name}</span>`).join('')}
-                        </div>
-                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
-                </div>
-                <div class="card" style="margin: 0;">
-                    <h4 style="margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fa-solid fa-diagram-project" style="color: #06b6d4;"></i> Key Processes
-                    </h4>
-                    ${(client.keyProcesses && client.keyProcesses.length > 0) ? `
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            ${client.keyProcesses.map(p => `<span class="badge" style="background: ${p.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${p.category === 'Core' ? '#065f46' : '#0369a1'};">${p.name}</span>`).join('')}
-                        </div>
-                    ` : `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Not defined - complete Account Setup</p>`}
-                </div>
-            </div>
-
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">Certificates</h3>
-                    <button class="btn btn-sm btn-primary" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 100);" title="Manage certifications in Settings">
-                        <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Manage in Settings
-                    </button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Certificate #</th>
-                                <th>Standard</th>
-                                <th>Initial Date</th>
-                                <th>Current Issue</th>
-                                <th>Expiry Date</th>
-                                <th>Revision</th>
-                                <th>Status</th>
-                                <th style="text-align: right;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${certs.map(c => `
-                                <tr>
-                                    <td style="font-weight: 500;">${c.certificateNo || 'Not assigned'}</td>
-                                    <td><span class="badge" style="background: #d1fae5; color: #065f46;">${c.standard || 'ISO'}</span></td>
-                                    <td>${c.initialDate || '-'}</td>
-                                    <td>${c.currentIssue || '-'}</td>
-                                    <td>${c.expiryDate || '-'}</td>
-                                    <td><span class="badge" style="background: #e0f2fe; color: #0369a1;">${c.revision || '00'}</span></td>
-                                    <td><span class="status-badge status-${(c.status || 'active').toLowerCase()}">${c.status || 'Active'}</span></td>
-                                    <td style="text-align: right;">
-                                        <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 100);" title="Edit in Settings">
-                                            <i class="fa-solid fa-pen"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-icon" onclick="window.location.hash = 'client/${client.id}/overview'" title="View in Overview">
-                                            <i class="fa-solid fa-chart-line"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        `;
-}
 
 // Re-populate sidebar when state changes
 window.refreshClientSidebar = populateClientSidebar;
