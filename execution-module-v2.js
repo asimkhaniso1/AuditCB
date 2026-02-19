@@ -776,11 +776,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             // AI Auto Map: Use AI to assign personnel/designation/department based on question context
             window.autoMapPersonnel = async function (reportId) {
-                const contacts = (clientData && clientData.contacts) || [];
+                const allContacts = (clientData && clientData.contacts) || [];
                 const desigs = (clientData && clientData.designations) || [];
-                if (!contacts.length) {
+                if (!allContacts.length) {
                     window.showNotification('No client contacts found. Please add contacts in the client profile first.', 'warning');
                     return;
+                }
+
+                // Filter to only opening meeting attendees
+                const attendees = report.openingMeeting?.attendees;
+                let contacts = allContacts;
+                if (attendees && Array.isArray(attendees) && attendees.length > 0) {
+                    const attendeeNames = new Set(
+                        attendees.map(a => (typeof a === 'object' ? (a.name || '') : String(a)).trim().toLowerCase()).filter(Boolean)
+                    );
+                    contacts = allContacts.filter(c => c.name && attendeeNames.has(c.name.trim().toLowerCase()));
+                    if (!contacts.length) {
+                        // Fallback if name matching failed
+                        window.showNotification('Could not match opening meeting attendees to contacts. Using full roster.', 'warning');
+                        contacts = allContacts;
+                    } else {
+                        console.log(`[AI AutoMap] Filtered to ${contacts.length} opening meeting attendees out of ${allContacts.length} total contacts`);
+                    }
+                } else {
+                    window.showNotification('No opening meeting attendees recorded. Using full client roster.', 'warning');
                 }
 
                 // Build contacts list with departments for AI context
