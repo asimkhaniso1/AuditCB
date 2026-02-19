@@ -774,6 +774,151 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (deptEl) deptEl.value = department;
             };
 
+            // AI Auto Map: Use AI to assign personnel/designation/department based on question context
+            window.autoMapPersonnel = async function (reportId) {
+                const contacts = (clientData && clientData.contacts) || [];
+                const desigs = (clientData && clientData.designations) || [];
+                if (!contacts.length) {
+                    window.showNotification('No client contacts found. Please add contacts in the client profile first.', 'warning');
+                    return;
+                }
+
+                // Build contacts list with departments for AI context
+                const contactList = contacts.map(c => {
+                    let dept = '';
+                    if (c.designation) {
+                        const dm = desigs.find(d => (d.title || d) === c.designation);
+                        if (dm && dm.department) dept = dm.department;
+                    }
+                    return { name: c.name, designation: c.designation || '', department: dept };
+                });
+
+                // Ask user: unfilled only or all items?
+                const choice = await new Promise(resolve => {
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                    overlay.innerHTML = `
+                        <div style="background:white;border-radius:12px;padding:2rem;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                            <div style="text-align:center;margin-bottom:1.5rem;">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="font-size:2rem;background:linear-gradient(135deg,#8b5cf6,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"></i>
+                                <h3 style="margin:0.5rem 0 0.25rem;">AI Auto Map Personnel</h3>
+                                <p style="color:#64748b;font-size:0.85rem;margin:0;">Choose which items to auto-assign</p>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                                <button id="am-unfilled" class="btn" style="padding:0.75rem;border:2px solid #8b5cf6;background:#f5f3ff;border-radius:8px;cursor:pointer;font-weight:600;color:#6d28d9;">
+                                    <i class="fa-solid fa-filter" style="margin-right:0.5rem;"></i> Unfilled Items Only
+                                </button>
+                                <button id="am-all" class="btn" style="padding:0.75rem;border:2px solid #e2e8f0;background:white;border-radius:8px;cursor:pointer;font-weight:500;color:#334155;">
+                                    <i class="fa-solid fa-arrows-rotate" style="margin-right:0.5rem;"></i> Re-map All Items
+                                </button>
+                                <button id="am-cancel" style="padding:0.5rem;border:none;background:none;cursor:pointer;color:#94a3b8;font-size:0.85rem;">Cancel</button>
+                            </div>
+                        </div>`;
+                    document.body.appendChild(overlay);
+                    overlay.querySelector('#am-unfilled').onclick = () => { document.body.removeChild(overlay); resolve('unfilled'); };
+                    overlay.querySelector('#am-all').onclick = () => { document.body.removeChild(overlay); resolve('all'); };
+                    overlay.querySelector('#am-cancel').onclick = () => { document.body.removeChild(overlay); resolve(null); };
+                    overlay.onclick = (e) => { if (e.target === overlay) { document.body.removeChild(overlay); resolve(null); } };
+                });
+
+                if (!choice) return;
+
+                // Collect NC items from the DOM
+                const rows = document.querySelectorAll('.checklist-item');
+                const itemsToMap = [];
+                rows.forEach(row => {
+                    const uniqueId = row.id?.replace('row-', '');
+                    if (!uniqueId) return;
+                    const personnelEl = document.getElementById('ncr-personnel-' + uniqueId);
+                    if (!personnelEl) return; // No personnel field = not expanded NC form
+                    const desEl = document.getElementById('ncr-designation-' + uniqueId);
+                    const deptEl = document.getElementById('ncr-department-' + uniqueId);
+
+                    // Check if already filled
+                    const currentPersonnel = personnelEl.value || '';
+                    if (choice === 'unfilled' && currentPersonnel) return;
+
+                    // Get the question/clause context from the row
+                    const clauseEl = row.querySelector('[style*="font-weight: bold"]');
+                    const reqEl = row.querySelector('.requirement-text') || row.querySelector('[style*="line-height"]');
+                    const clause = clauseEl?.textContent?.trim() || '';
+                    const question = reqEl?.textContent?.trim() || '';
+
+                    if (clause || question) {
+                        itemsToMap.push({ uniqueId, clause, question: question.substring(0, 200) });
+                    }
+                });
+
+                if (!itemsToMap.length) {
+                    window.showNotification(choice === 'unfilled' ? 'All items already have personnel assigned!' : 'No items found to map.', 'info');
+                    return;
+                }
+
+                // Show loading
+                window.showNotification(`AI mapping ${itemsToMap.length} item(s)... Please wait.`, 'info');
+
+                try {
+                    const contactsDesc = contactList.map((c, i) =>
+                        `${i + 1}. ${c.name} — ${c.designation || 'No designation'}${c.department ? ' (' + c.department + ')' : ''}`
+                    ).join('\n');
+
+                    const questionsDesc = itemsToMap.map(it =>
+                        `{ "id": "${it.uniqueId}", "clause": "${it.clause}", "question": "${it.question.replace(/"/g, '\\"')}" }`
+                    ).join(',\n');
+
+                    const prompt = `You are an ISO audit expert. Given these client personnel:\n${contactsDesc}\n\nFor each audit question below, determine the most relevant person who would be responsible or interviewed for that area. Match based on their designation/role and the nature of the audit clause.\n\nQuestions:\n[${questionsDesc}]\n\nRespond ONLY with a JSON array, no markdown, no explanation:\n[{"id":"...","personnel":"exact name","designation":"their designation","department":"their department"}]\n\nRules:\n- Use EXACT names from the personnel list\n- If no clear match, use the most senior/relevant person\n- Match based on clause topic (e.g., quality clauses → quality roles, production → operations, HR → HR roles, management review → top management)`;
+
+                    const response = await AI_SERVICE.callProxyAPI(prompt);
+
+                    // Parse JSON from response
+                    let mappings;
+                    try {
+                        const jsonStr = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
+                        mappings = JSON.parse(jsonStr);
+                    } catch (e) {
+                        // Try to extract JSON array
+                        const match = response.match(/\[[\s\S]*\]/);
+                        if (match) {
+                            mappings = JSON.parse(match[0]);
+                        } else {
+                            throw new Error('Could not parse AI response');
+                        }
+                    }
+
+                    // Apply mappings to DOM
+                    let mapped = 0;
+                    mappings.forEach(m => {
+                        const pEl = document.getElementById('ncr-personnel-' + m.id);
+                        const dEl = document.getElementById('ncr-designation-' + m.id);
+                        const dpEl = document.getElementById('ncr-department-' + m.id);
+                        if (pEl && m.personnel) {
+                            // Set personnel dropdown — find matching option or add it
+                            const opts = Array.from(pEl.options);
+                            const match = opts.find(o => o.value === m.personnel);
+                            if (match) {
+                                pEl.value = m.personnel;
+                            } else {
+                                // Add the option if not found (shouldn't happen but safe)
+                                const opt = document.createElement('option');
+                                opt.value = m.personnel;
+                                opt.textContent = m.personnel;
+                                pEl.appendChild(opt);
+                                pEl.value = m.personnel;
+                            }
+                            if (dEl) dEl.value = m.designation || '';
+                            if (dpEl) dpEl.value = m.department || '';
+                            mapped++;
+                        }
+                    });
+
+                    window.showNotification(`AI Auto Map complete: ${mapped} of ${itemsToMap.length} items mapped successfully!`, 'success');
+
+                } catch (error) {
+                    console.error('AI Auto Map error:', error);
+                    window.showNotification('AI Auto Map failed: ' + (error.message || 'Unknown error'), 'error');
+                }
+            };
+
             // Helper to render row
             const renderRow = (item, checklistId, idx, isCustom = false) => {
                 const uniqueId = isCustom ? `custom-${idx}` : `${checklistId}-${idx}`;
@@ -1078,6 +1223,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     </div>
                                 </div>
                             </div>
+                            <button class="btn btn-outline-secondary" onclick="window.autoMapPersonnel('${report.id}')" title="AI auto-assign personnel, designation & department to items" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto Map
+                            </button>
                             <button class="btn btn-primary" onclick="window.saveChecklist('${report.id}')" id="save-progress-btn">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                             </button>
