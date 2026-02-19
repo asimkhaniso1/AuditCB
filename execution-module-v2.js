@@ -4022,12 +4022,27 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <h4 style="margin:0;color:#166534;font-size:1rem;">Strengths Identified</h4>
                                 </div>
                                 <div id="rp-positive-obs" class="rp-edit" contenteditable="true" style="color:#15803d;font-size:0.9rem;line-height:1.7;">
-                                    ${d.report.positiveObservations.split(/\d+\./).filter(s => s.trim()).map((obs, idx) => `
+                                    ${(function () {
+                        var t = d.report.positiveObservations;
+                        var items = [];
+                        if (t.includes('\n')) {
+                            items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[\.)\-]\s*/, '').trim()).filter(Boolean);
+                        } else {
+                            // Flat text: split on sequential "N. " at sentence boundaries
+                            var parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
+                            if (parts && parts.length > 1) {
+                                items = parts.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+                            } else {
+                                items = [t.replace(/^\s*\d+\.\s*/, '').trim()];
+                            }
+                        }
+                        return items.map((obs, idx) => `
                                         <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">${idx + 1}</div>
-                                            <div style="flex:1;padding-top:0.25rem;">${obs.trim()}</div>
+                                            <div style="flex:1;padding-top:0.25rem;">${obs}</div>
                                         </div>
-                                    `).join('')}
+                                        `).join('');
+                    })()}
                                 </div>
                             </div>
                             ` : ''}
@@ -4040,14 +4055,30 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <h4 style="margin:0;color:#854d0e;font-size:1rem;">Improvement Opportunities</h4>
                                 </div>
                                 <div id="rp-ofi" class="rp-edit" contenteditable="true" style="color:#92400e;font-size:0.9rem;line-height:1.7;">
-                                    ${(Array.isArray(d.report.ofi) ? d.report.ofi : d.report.ofi.split(/\d+\./).filter(s => s.trim())).map((ofi, idx) => `
+                                    ${(function () {
+                        var t = d.report.ofi;
+                        var items = [];
+                        if (Array.isArray(t)) {
+                            items = t;
+                        } else if (t.includes('\n')) {
+                            items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[\.)\-]\s*/, '').trim()).filter(Boolean);
+                        } else {
+                            var parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
+                            if (parts && parts.length > 1) {
+                                items = parts.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+                            } else {
+                                items = [t.replace(/^\s*\d+\.\s*/, '').trim()];
+                            }
+                        }
+                        return items.map((ofi, idx) => `
                                         <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">
                                                 <i class="fa-solid fa-arrow-up" style="font-size:0.75rem;"></i>
                                             </div>
-                                            <div style="flex:1;padding-top:0.25rem;">${typeof ofi === 'string' ? ofi.trim() : ofi}</div>
+                                            <div style="flex:1;padding-top:0.25rem;">${typeof ofi === 'string' ? ofi : ofi}</div>
                                         </div>
-                                    `).join('')}
+                                        `).join('');
+                    })()}
                                 </div>
                             </div>
                             ` : ''}
@@ -4111,6 +4142,48 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
                             <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;">Findings by ISO Clause (Main Clauses)</h4>
                             <canvas id="clause-findings-chart" style="max-height:300px;"></canvas>
+                        </div>
+                        
+                        <!-- Department-based Analysis Chart -->
+                        <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;margin-top:1.5rem;">
+                            <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;"><i class="fa-solid fa-building" style="margin-right:0.5rem;color:#6366f1;"></i>Findings by Department</h4>
+                            <canvas id="dept-findings-chart" style="max-height:300px;"></canvas>
+                        </div>
+                        
+                        <!-- Personnel Workload & Department Compliance Charts -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem;">
+                            <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
+                                <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;"><i class="fa-solid fa-user-tie" style="margin-right:0.5rem;color:#ea580c;"></i>Personnel Workload</h4>
+                                <canvas id="personnel-workload-chart" style="max-height:250px;"></canvas>
+                            </div>
+                            <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
+                                <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;"><i class="fa-solid fa-chart-radar" style="margin-right:0.5rem;color:#0891b2;"></i>Compliance by Department</h4>
+                                <canvas id="dept-compliance-radar" style="max-height:250px;"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Department Summary Table -->
+                        <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;margin-top:1.5rem;">
+                            <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;"><i class="fa-solid fa-table-cells" style="margin-right:0.5rem;color:#7c3aed;"></i>Department Summary</h4>
+                            <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
+                                <thead><tr style="background:#f8fafc;"><th style="padding:8px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Department</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Personnel</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Items</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Conform</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">NC</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Compliance %</th></tr></thead>
+                                <tbody>${(() => {
+                const deptMap = {};
+                d.hydratedProgress.forEach(i => {
+                    const dept = i.department || 'Unassigned';
+                    if (!deptMap[dept]) deptMap[dept] = { personnel: new Set(), items: 0, conform: 0, nc: 0 };
+                    if (i.personnel) deptMap[dept].personnel.add(i.personnel);
+                    deptMap[dept].items++;
+                    if (i.status === 'conform') deptMap[dept].conform++;
+                    else if (i.status === 'nc') deptMap[dept].nc++;
+                });
+                return Object.entries(deptMap).sort((a, b) => a[0].localeCompare(b[0])).map(([dept, data]) => {
+                    const compPct = data.items > 0 ? Math.round((data.conform / data.items) * 100) : 0;
+                    const pctColor = compPct >= 80 ? '#16a34a' : compPct >= 50 ? '#d97706' : '#dc2626';
+                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + dept + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:' + pctColor + '15;color:' + pctColor + ';">' + compPct + '%</span></td></tr>';
+                }).join('');
+            })()}</tbody>
+                            </table>
                         </div>
                         
                         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -4286,6 +4359,157 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         }
                                     });
                                 }
+
+                                // 4. Department-based Chart
+                                const deptCtx = document.getElementById('dept-findings-chart');
+                                if (deptCtx) {
+                                    const deptData = {};
+                                    const deptItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
+                department: i.department || 'Unassigned',
+                status: i.status,
+                ncrType: (i.ncrType || '').toLowerCase()
+            })))};
+                                    deptItems.forEach(item => {
+                                        const dept = item.department || 'Unassigned';
+                                        if (!deptData[dept]) deptData[dept] = { ok: 0, major: 0, minor: 0, obs: 0, ofi: 0, na: 0 };
+                                        if (item.status === 'conform') deptData[dept].ok++;
+                                        else if (item.status === 'na') deptData[dept].na++;
+                                        else if (item.status === 'nc') {
+                                            if (item.ncrType === 'major') deptData[dept].major++;
+                                            else if (item.ncrType === 'observation') deptData[dept].obs++;
+                                            else if (item.ncrType === 'ofi') deptData[dept].ofi++;
+                                            else deptData[dept].minor++;
+                                        }
+                                    });
+                                    const deptLabels = Object.keys(deptData).filter(d => d !== 'Unassigned').sort();
+                                    if (deptData['Unassigned'] && (deptData['Unassigned'].ok + deptData['Unassigned'].major + deptData['Unassigned'].minor + deptData['Unassigned'].obs + deptData['Unassigned'].ofi) > 0) {
+                                        deptLabels.push('Unassigned');
+                                    }
+                                    if (deptLabels.length > 0) {
+                                        new Chart(deptCtx.getContext('2d'), {
+                                            type: 'bar',
+                                            data: {
+                                                labels: deptLabels,
+                                                datasets: [
+                                                    { label: 'Conforming', data: deptLabels.map(d => deptData[d].ok), backgroundColor: '#10b981', stack: 'dept' },
+                                                    { label: 'Major NC', data: deptLabels.map(d => deptData[d].major), backgroundColor: '#dc2626', stack: 'dept' },
+                                                    { label: 'Minor NC', data: deptLabels.map(d => deptData[d].minor), backgroundColor: '#f59e0b', stack: 'dept' },
+                                                    { label: 'Observations', data: deptLabels.map(d => deptData[d].obs), backgroundColor: '#8b5cf6', stack: 'dept' },
+                                                    { label: 'OFI', data: deptLabels.map(d => deptData[d].ofi), backgroundColor: '#06b6d4', stack: 'dept' }
+                                                ]
+                                            },
+                                            options: {
+                                                indexAxis: 'y',
+                                                responsive: true,
+                                                maintainAspectRatio: true,
+                                                plugins: {
+                                                    legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, usePointStyle: true, pointStyle: 'circle' } }
+                                                },
+                                                scales: {
+                                                    x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } },
+                                                    y: { stacked: true }
+                                                }
+                                            }
+                                        });
+                                    } else {
+                                        deptCtx.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-building" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>No department data yet. Use AI Auto Map to assign departments.</div>';
+                                    }
+                                }
+
+                                // 5. Personnel Workload Chart
+                                const persCtx = document.getElementById('personnel-workload-chart');
+                                if (persCtx) {
+                                    const persData = {};
+                                    const persItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
+                personnel: i.personnel || '',
+                status: i.status
+            })))};
+                                    persItems.forEach(item => {
+                                        if (!item.personnel) return;
+                                        if (!persData[item.personnel]) persData[item.personnel] = { conform: 0, nc: 0, na: 0 };
+                                        if (item.status === 'conform') persData[item.personnel].conform++;
+                                        else if (item.status === 'nc') persData[item.personnel].nc++;
+                                        else if (item.status === 'na') persData[item.personnel].na++;
+                                    });
+                                    const persLabels = Object.keys(persData).sort((a, b) => {
+                                        const ta = persData[a].conform + persData[a].nc + persData[a].na;
+                                        const tb = persData[b].conform + persData[b].nc + persData[b].na;
+                                        return tb - ta;
+                                    }).slice(0, 10);
+                                    if (persLabels.length > 0) {
+                                        new Chart(persCtx.getContext('2d'), {
+                                            type: 'bar',
+                                            data: {
+                                                labels: persLabels,
+                                                datasets: [
+                                                    { label: 'Conform', data: persLabels.map(p => persData[p].conform), backgroundColor: '#10b981', stack: 'pers' },
+                                                    { label: 'NC', data: persLabels.map(p => persData[p].nc), backgroundColor: '#ef4444', stack: 'pers' },
+                                                    { label: 'N/A', data: persLabels.map(p => persData[p].na), backgroundColor: '#94a3b8', stack: 'pers' }
+                                                ]
+                                            },
+                                            options: {
+                                                indexAxis: 'y',
+                                                responsive: true,
+                                                maintainAspectRatio: true,
+                                                plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8, usePointStyle: true, pointStyle: 'circle' } } },
+                                                scales: { x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }, y: { stacked: true, ticks: { font: { size: 10 } } } }
+                                            }
+                                        });
+                                    } else {
+                                        persCtx.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-user-tie" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>No personnel data yet. Use AI Auto Map to assign personnel.</div>';
+                                    }
+                                }
+
+                                // 6. Compliance by Department Radar
+                                const radarCtx = document.getElementById('dept-compliance-radar');
+                                if (radarCtx) {
+                                    const rDeptData = {};
+                                    const rItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
+                department: i.department || '',
+                status: i.status
+            })))};
+                                    rItems.forEach(item => {
+                                        if (!item.department) return;
+                                        if (!rDeptData[item.department]) rDeptData[item.department] = { total: 0, conform: 0 };
+                                        rDeptData[item.department].total++;
+                                        if (item.status === 'conform') rDeptData[item.department].conform++;
+                                    });
+                                    const rLabels = Object.keys(rDeptData).sort();
+                                    if (rLabels.length >= 3) {
+                                        new Chart(radarCtx.getContext('2d'), {
+                                            type: 'radar',
+                                            data: {
+                                                labels: rLabels,
+                                                datasets: [{
+                                                    label: 'Compliance %',
+                                                    data: rLabels.map(d => rDeptData[d].total > 0 ? Math.round((rDeptData[d].conform / rDeptData[d].total) * 100) : 0),
+                                                    borderColor: '#6366f1',
+                                                    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                                                    borderWidth: 2,
+                                                    pointBackgroundColor: '#6366f1',
+                                                    pointRadius: 4
+                                                }]
+                                            },
+                                            options: {
+                                                responsive: true,
+                                                maintainAspectRatio: true,
+                                                plugins: { legend: { display: false } },
+                                                scales: {
+                                                    r: {
+                                                        beginAtZero: true,
+                                                        max: 100,
+                                                        ticks: { stepSize: 25, font: { size: 10 }, backdropColor: 'transparent' },
+                                                        pointLabels: { font: { size: 10 } },
+                                                        grid: { color: '#e2e8f0' },
+                                                        angleLines: { color: '#e2e8f0' }
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    } else {
+                                        radarCtx.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-chart-radar" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>Need at least 3 departments for radar chart.</div>';
+                                    }
+                                }
                             }, 300);
                         })();
                         </script>
@@ -4341,12 +4565,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>` : ''}
                 <!-- 8: Meetings -->
                 <div class="rp-sec" id="sec-meetings">
-                    <div class="rp-sec-hdr" style="border-left-color:#0891b2;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>MEETING RECORDS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#0891b2;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CLOSING MEETING<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                            <div style="padding:12px;background:#f0fdf4;border-radius:8px;"><strong style="color:#166534;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Opening Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.openingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-opening-notes" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.openingMeeting?.notes || '<em style="color:#94a3b8;">Click to add opening meeting notes...</em>'}</div></div>
-                            <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
-                        </div>
+                        <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
                     </div>
                 </div>
                 <!-- 7: Conclusion -->
@@ -5118,7 +5339,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div></div>' : '')
+                + '<div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
+                + '<div style="margin-top:18px;"><div style="font-weight:700;font-size:0.9rem;color:#1e293b;margin-bottom:10px;"><i class="fa-solid fa-building" style="margin-right:6px;color:#6366f1;"></i>Department Summary</div><table class="f-tbl"><thead><tr style="background:#f8fafc;"><th style="width:25%;">Department</th><th style="width:15%;text-align:center;">Personnel</th><th style="width:15%;text-align:center;">Items</th><th style="width:15%;text-align:center;">Conform</th><th style="width:15%;text-align:center;">NC</th><th style="width:15%;text-align:center;">Compliance</th></tr></thead><tbody>'
+                + (function () { var deptMap = {}; (d.hydratedProgress || []).forEach(function (i) { var dept = i.department || 'Unassigned'; if (!deptMap[dept]) deptMap[dept] = { pers: {}, items: 0, conform: 0, nc: 0 }; if (i.personnel) deptMap[dept].pers[i.personnel] = 1; deptMap[dept].items++; if (i.status === 'conform') deptMap[dept].conform++; else if (i.status === 'nc') deptMap[dept].nc++; }); return Object.keys(deptMap).sort().map(function (dept) { var d2 = deptMap[dept]; var pct = d2.items > 0 ? Math.round((d2.conform / d2.items) * 100) : 0; var clr = pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626'; return '<tr><td style="padding:8px 10px;font-weight:500;">' + dept + '</td><td style="padding:8px 10px;text-align:center;">' + Object.keys(d2.pers).length + '</td><td style="padding:8px 10px;text-align:center;">' + d2.items + '</td><td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:600;">' + d2.conform + '</td><td style="padding:8px 10px;text-align:center;color:#dc2626;font-weight:600;">' + d2.nc + '</td><td style="padding:8px 10px;text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-weight:700;font-size:0.78rem;background:' + clr + '15;color:' + clr + ';">' + pct + '%</span></td></tr>'; }).join(''); })()
+                + '</tbody></table></div></div>' : '')
             // SECTION 4 - CONFORMANCE VERIFICATION
             + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="border-left-color:#10b981;"><span class="sn">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION 5 - OBSERVATIONS
