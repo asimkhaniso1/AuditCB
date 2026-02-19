@@ -5378,7 +5378,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
             + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-bottom:14mm;font-size:10pt;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;break-after:avoid;margin-top:12px;}.sb{break-before:avoid;}}'
-            + '@media print{@page{size:A4;margin:14mm 12mm 18mm 12mm;}.rpt-hdr{display:none !important;}.rpt-ftr{display:flex !important;}.cover .rpt-ftr{display:none !important;}}'
+            + '@media print{@page{size:A4;margin:14mm 12mm 22mm 12mm;@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:Outfit,sans-serif;font-size:8pt;color:#64748b;}}.rpt-hdr{display:none !important;}.rpt-ftr{display:flex !important;}.cover .rpt-ftr{display:none !important;}}'
             + 'body{counter-reset:page;}'
             + '.page-break{counter-increment:page;}'
             + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:16mm;background:white;color:#1e293b;padding:3mm 12mm;align-items:center;justify-content:space-between;font-size:0.72rem;z-index:100;border-bottom:1px solid #e2e8f0;}'
@@ -5408,7 +5408,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.chart-title{font-size:0.8rem;font-weight:700;color:#1e293b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px;}'
             + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:160px;object-fit:cover;}.ev-cap{padding:8px 12px;font-size:0.78rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
             + '.toc{padding:30px 40px;}.toc-title{font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:4px;}.toc-sub{font-size:0.88rem;color:#64748b;margin-bottom:20px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin-bottom:25px;}'
-            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}'
+            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}.toc-pg{min-width:40px;text-align:right;font-weight:700;font-size:0.88rem;color:#2563eb;align-self:center;white-space:nowrap;}'
             + 'footer{display:none;}'
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
@@ -5457,7 +5457,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         if (!hasEvidence) continue;
                     }
                     if (en[k] !== false) {
-                        tocSections.push('<a href="#sec-' + k + '" class="toc-item"><div class="toc-num" style="background:' + colors[i] + ';">' + num + '</div><div class="toc-item-body"><div class="toc-item-title">' + names[i] + '</div><div class="toc-item-desc">' + descs[i] + '</div></div></a>');
+                        tocSections.push('<a href="#sec-' + k + '" class="toc-item" data-toc-target="sec-' + k + '"><div class="toc-num" style="background:' + colors[i] + ';">' + num + '</div><div class="toc-item-body"><div class="toc-item-title">' + names[i] + '</div><div class="toc-item-desc">' + descs[i] + '</div></div><div class="toc-pg" data-pg-for="sec-' + k + '"></div></a>');
                         num++;
                     }
                 }
@@ -5566,6 +5566,20 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + 'if(c4){var ad=' + areaChartData + ';new Chart(c4,{type:"bar",data:{labels:ad.names,datasets:[{label:"Conform",data:ad.conform,backgroundColor:"#22c55e",borderRadius:3},{label:"NC",data:ad.nc,backgroundColor:"#ef4444",borderRadius:3},{label:"OBS",data:ad.obs,backgroundColor:"#3b82f6",borderRadius:3},{label:"OFI",data:ad.ofi,backgroundColor:"#f59e0b",borderRadius:3}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}'
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.height="auto";cv.parentNode.replaceChild(im,cv);}catch(e){}});},2000);'
             + '}rc();'
+            + 'setTimeout(function(){try{'
+            + 'var pageH=1123;'
+            + 'var tocItems=document.querySelectorAll(".toc-item[data-toc-target]");'
+            + 'tocItems.forEach(function(item){'
+            + 'var targetId=item.getAttribute("data-toc-target");'
+            + 'var el=document.getElementById(targetId);'
+            + 'if(!el)return;'
+            + 'var top=el.getBoundingClientRect().top+window.scrollY;'
+            + 'var pg=Math.ceil(top/pageH)+1;'
+            + 'var pgEl=item.querySelector(".toc-pg");'
+            + 'if(pgEl)pgEl.textContent=pg;'
+            + '});'
+            + '}catch(e){console.warn("TOC page calc:",e);}'
+            + '},1200);'
             + '<\/script></body></html>';
 
         printWindow.document.write(reportHtml);
