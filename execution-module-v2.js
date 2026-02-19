@@ -4697,6 +4697,37 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             return '<tr style="background:' + (idx % 2 ? '#f0fdf4' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;">Conform</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
+        // Build clause/area performance analysis
+        const clauseAreaNames = { '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning', '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement' };
+        const areaStats = {};
+        (d.hydratedProgress || []).forEach(function (item) {
+            var clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
+            var mainC = clause.split('.')[0];
+            if (!mainC || !clauseAreaNames[mainC]) return;
+            if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
+            if (item.status === 'conform') areaStats[mainC].conform++;
+            else if (item.status === 'nc') {
+                var t = (item.ncrType || '').toLowerCase();
+                if (t === 'major') areaStats[mainC].major++;
+                else if (t === 'minor') areaStats[mainC].minor++;
+                else if (t === 'observation') areaStats[mainC].obs++;
+                else if (t === 'ofi') areaStats[mainC].ofi++;
+                else areaStats[mainC].minor++;
+            }
+        });
+        var areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a) - parseInt(b); });
+        var areaTableRows = areaSortedKeys.map(function (k) {
+            var s = areaStats[k]; var total = s.conform + s.minor + s.major + s.obs + s.ofi;
+            var hasIssue = s.major > 0 || s.minor > 0;
+            var statusBg = hasIssue ? (s.major > 0 ? '#fee2e2' : '#fef3c7') : '#dcfce7';
+            var statusFg = hasIssue ? (s.major > 0 ? '#991b1b' : '#92400e') : '#166534';
+            var statusTxt = hasIssue ? (s.major > 0 ? 'Needs Action' : 'Minor Issues') : 'Satisfactory';
+            return '<tr><td style="padding:8px 12px;font-weight:600;">Clause ' + k + '</td><td style="padding:8px 12px;">' + clauseAreaNames[k] + '</td><td style="padding:8px 12px;text-align:center;">' + total + '</td><td style="padding:8px 12px;text-align:center;color:#166534;">' + s.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;">' + (s.major + s.minor) + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + statusTxt + '</span></td></tr>';
+        }).join('');
+        var areaTableHtml = areaSortedKeys.length > 0 ? '<div style="margin-top:16px;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Area</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">NC</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table></div>' : '';
+        // Serialize area stats for chart script
+        var areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
+
         const reportHtml = '<!DOCTYPE html><html><head>'
             + '<title>Audit Report — ' + d.report.client + '</title>'
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
@@ -4730,7 +4761,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.stat-box{text-align:center;padding:16px 10px;border-radius:10px;border-bottom:3px solid transparent;}'
             + '.stat-val{font-size:1.8rem;font-weight:800;line-height:1;margin-bottom:4px;}'
             + '.stat-lbl{font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;}'
-            + '.chart-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px;}'
+            + '.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}'
             + '.chart-box{background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px;text-align:center;}'
             + '.chart-box canvas{max-height:180px;width:100% !important;}'
             + '.chart-title{font-size:0.8rem;font-weight:700;color:#1e293b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px;}'
@@ -4812,11 +4843,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '</div>' : '')
             // SECTION 2
             + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="border-left-color:#059669;"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb">'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.manDays || d.auditPlan?.man_days || 'N/A') + ' Man-Days' + (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
+                + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || 'N/A') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.manDays || d.auditPlan?.man_days || 'N/A') + ' Man-Days' + (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
+                + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div class="sh page-break" style="border-left-color:#22c55e;"><span class="sn"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + editedPositiveObs + '</div></div>' : '')
                 + (editedOfi ? '<div class="sh page-break" style="border-left-color:#f59e0b;"><span class="sn"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb"><div style="color:#a16207;font-size:0.95rem;line-height:1.8;">' + editedOfi + '</div></div>' : '')
@@ -4830,7 +4863,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
+                + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div>'
+                + '<div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div></div>' : '')
             // SECTION 4 - CONFORMANCE VERIFICATION
             + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="border-left-color:#10b981;"><span class="sn">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION 5 - OBSERVATIONS
@@ -4885,6 +4919,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#2563eb",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
             + 'var c3=document.getElementById("chart-findings");'
             + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.ncCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'var c4=document.getElementById("chart-area");'
+            + 'if(c4){var ad=' + areaChartData + ';new Chart(c4,{type:"bar",data:{labels:ad.names,datasets:[{label:"Conform",data:ad.conform,backgroundColor:"#22c55e",borderRadius:3},{label:"NC",data:ad.nc,backgroundColor:"#ef4444",borderRadius:3},{label:"OBS",data:ad.obs,backgroundColor:"#3b82f6",borderRadius:3},{label:"OFI",data:ad.ofi,backgroundColor:"#f59e0b",borderRadius:3}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}'
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.height="auto";cv.parentNode.replaceChild(im,cv);}catch(e){}});},2000);'
             + '}rc();'
             + '<\/script></body></html>';
