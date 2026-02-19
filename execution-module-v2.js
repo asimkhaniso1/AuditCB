@@ -2069,9 +2069,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
         });
 
-        // Also collapse/expand NCR panels and evidence details when collapsing all
+        // Also collapse/expand NCR panels, evidence details, and sub-sections when collapsing all
         if (!shouldExpand) {
-            document.querySelectorAll('.ncr-panel').forEach(p => { if (p.style.display !== 'none') p.dataset.wasOpen = 'true'; });
+            document.querySelectorAll('.ncr-panel').forEach(p => { p.style.display = 'none'; });
+            document.querySelectorAll('.evidence-photos-container, .evidence-section, details[open]').forEach(el => {
+                if (el.tagName === 'DETAILS') el.removeAttribute('open');
+                else el.style.display = 'none';
+            });
         }
 
         // Update button label

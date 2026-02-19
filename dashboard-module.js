@@ -43,6 +43,11 @@ function renderDashboardEnhanced() {
     const upcomingAudits = auditPlans.filter(p => p.status !== 'Completed').length;
     const completedAudits = auditPlans.filter(p => p.status === 'Completed').length;
     const draftPlans = auditPlans.filter(p => p.status === 'Draft').length;
+    const completionRate = auditPlans.length > 0 ? Math.round((completedAudits / auditPlans.length) * 100) : 0;
+
+    // Auditor stats
+    const leadAuditorCount = auditors.filter(a => a.role === 'Lead Auditor').length;
+    const supportAuditorCount = totalAuditors - leadAuditorCount;
 
     // NCR Analysis from actual reports (includes checklist NCs via getAllDashboardFindings)
     let totalNCRs = 0;
@@ -50,8 +55,10 @@ function renderDashboardEnhanced() {
     let minorNCRs = 0;
     let openNCRs = 0;
     let closedNCRs = 0;
+    let overdueNCRs = 0;
     let complianceScoreSum = 0;
     let complianceCount = 0;
+    const now30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     auditReports.forEach(report => {
         const ncrs = getAllDashboardFindings(report);
@@ -64,6 +71,12 @@ function renderDashboardEnhanced() {
         minorNCRs += minor;
         openNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
         closedNCRs += ncrs.filter(n => n.status === 'Closed').length;
+
+        // Overdue NCRs: open NCRs from reports older than 30 days
+        const reportDate = report.date ? new Date(report.date) : null;
+        if (reportDate && reportDate < now30DaysAgo) {
+            overdueNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
+        }
 
         // Compliance Score: use real checklist data when available
         const progress = report.checklistProgress || [];
@@ -81,10 +94,13 @@ function renderDashboardEnhanced() {
         }
     });
 
+    // Certificates issued (count completed audit plans as proxy)
+    const certificatesIssued = (window.state.certificates || []).length || completedAudits;
+
     // Compliance Score Analysis
     const avgComplianceScore = complianceCount > 0
         ? Math.round(complianceScoreSum / complianceCount)
-        : 95;
+        : 0;
 
     // Industry Distribution
     const industryStats = {};
@@ -201,6 +217,65 @@ function renderDashboardEnhanced() {
                 </div>
             </div>
 
+            <!-- Second KPI Row -->
+            <div class="dashboard-stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <!-- Auditors -->
+                <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Auditors</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${totalAuditors}</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-user-tie" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${leadAuditorCount} leads · ${supportAuditorCount} support</div>
+                </div>
+
+                <!-- Completion Rate -->
+                <div style="background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Completion Rate</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${completionRate}%</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-clipboard-check" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${completedAudits} of ${auditPlans.length} audits complete</div>
+                </div>
+
+                <!-- Overdue NCRs -->
+                <div style="background: linear-gradient(135deg, ${overdueNCRs > 0 ? '#dc2626 0%, #ef4444 100%' : '#6b7280 0%, #9ca3af 100%'}); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px ${overdueNCRs > 0 ? 'rgba(220, 38, 38, 0.3)' : 'rgba(107, 114, 128, 0.3)'};">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Overdue NCRs</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${overdueNCRs}</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-clock" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">${overdueNCRs > 0 ? 'Open > 30 days' : 'No overdue NCRs'}</div>
+                </div>
+
+                <!-- Certificates Issued -->
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%); padding: 1.5rem; border-radius: 12px; color: white; box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;">Certificates</div>
+                            <div style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;">${certificatesIssued}</div>
+                        </div>
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-award" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">Total issued to date</div>
+                </div>
+            </div>
+
             <!-- Quick Actions (Simplified) -->
             <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); border: none;">
                 <h3 style="margin: 0 0 1rem 0; color: #1e293b;"><i class="fa-solid fa-bolt" style="margin-right: 0.5rem; color: #8b5cf6;"></i>Quick Actions</h3>
@@ -285,6 +360,16 @@ function renderDashboardEnhanced() {
                 </div>
             </div>
 
+            <!-- Fourth Row: Auditor Workload -->
+            <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="card">
+                    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-users-gear" style="color: #8b5cf6; margin-right: 0.5rem;"></i>Auditor Workload Distribution</h3>
+                    <div style="position: relative; height: ${Math.max(200, totalAuditors * 50)}px; width: 100%;">
+                        <canvas id="auditorWorkloadChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
             <!-- Clause Compliance Analytics -->
             ${typeof window.renderClauseAnalyticsCard === 'function' ? window.renderClauseAnalyticsCard() : ''}
 
@@ -293,8 +378,16 @@ function renderDashboardEnhanced() {
                 <!-- Alerts & Notifications -->
                 <div class="card">
                     <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-bell" style="color: var(--warning-color); margin-right: 0.5rem;"></i>Alerts & Notifications</h3>
-                    ${expiringIn30Days > 0 || expiringIn90Days > 0 || openNCRs > 0 || draftPlans > 0 ? `
+                    ${expiringIn30Days > 0 || expiringIn90Days > 0 || openNCRs > 0 || overdueNCRs > 0 || draftPlans > 0 ? `
                         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${overdueNCRs > 0 ? `
+                                <div style="padding: 0.75rem; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 6px;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; color: #991b1b;">
+                                        <i class="fa-solid fa-fire"></i>
+                                        <strong>${overdueNCRs} NCR(s) OVERDUE</strong> — open more than 30 days
+                                    </div>
+                                </div>
+                            ` : ''}
                             ${expiringIn30Days > 0 ? `
                                 <div style="padding: 0.75rem; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 6px;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem; color: #d97706;">
@@ -367,7 +460,7 @@ function renderDashboardEnhanced() {
     `;
 
     // Destroy existing chart instances BEFORE setting innerHTML to prevent "Canvas already in use" errors
-    const chartIds = ['auditTrendsChart', 'ncrDistributionChart', 'industryChart', 'standardsChart', 'ncrTrendsChart', 'clientGrowthChart'];
+    const chartIds = ['auditTrendsChart', 'ncrDistributionChart', 'industryChart', 'standardsChart', 'ncrTrendsChart', 'clientGrowthChart', 'auditorWorkloadChart'];
 
     chartIds.forEach(id => {
         const existingChart = Chart.getChart(id);
@@ -380,7 +473,6 @@ function renderDashboardEnhanced() {
     if (window.dashboardCharts) {
         Object.values(window.dashboardCharts).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') {
-                // Check if not already destroyed via getChart
                 try { chart.destroy(); } catch (e) { }
             }
         });
@@ -401,6 +493,7 @@ function renderDashboardEnhanced() {
             renderStandardsChart(standardStats);
             renderNCRTrendsChart();
             renderClientGrowthChart();
+            renderAuditorWorkloadChart();
         }, 100);
     });
 }
@@ -513,13 +606,19 @@ function renderNCRDistributionChart(major, minor) {
     const existingChart = Chart.getChart(ctx);
     if (existingChart) existingChart.destroy();
 
+    // Handle zero-state
+    if (!major && !minor) {
+        ctx.parentElement.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#94a3b8;"><i class="fa-solid fa-check-circle" style="font-size:3rem;color:#22c55e;margin-bottom:1rem;"></i><div style="font-weight:600;font-size:1rem;color:#334155;">No NCRs Found</div><div style="font-size:0.85rem;margin-top:0.25rem;">All audits are fully conforming</div></div>';
+        return;
+    }
+
     try {
         window.dashboardCharts.ncrDistribution = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['Major NCRs', 'Minor NCRs'],
                 datasets: [{
-                    data: [major || 1, minor || 1],
+                    data: [major, minor],
                     backgroundColor: ['#ef4444', '#f59e0b'],
                     borderWidth: 0
                 }]
@@ -721,18 +820,28 @@ function renderClientGrowthChart() {
         months.push(d.toLocaleDateString('en-US', { month: 'short' }));
     }
 
-    // Count clients by creation month (simulated based on ID order)
+    // Count clients by creation month using real created_at data
     const clients = window.getVisibleClients?.() || window.state.clients || [];
-    const totalClients = clients.length;
+    const totalClientsCount = clients.length;
 
-    // Simulate growth distribution (since we don't have createdAt dates)
-    // In production, you'd use actual createdAt timestamps
-    let runningTotal = Math.max(0, totalClients - 5);
+    // Use real created_at timestamps where available
+    clients.forEach(c => {
+        const createdAt = c.created_at || c.createdAt;
+        if (!createdAt) return;
+        const cDate = new Date(createdAt);
+        const monthDiff = (today.getFullYear() - cDate.getFullYear()) * 12 + (today.getMonth() - cDate.getMonth());
+        if (monthDiff >= 0 && monthDiff <= 5) {
+            newClients[5 - monthDiff]++;
+        }
+    });
+
+    // Build cumulative totals
+    // Clients created before the 6-month window
+    const clientsBefore = totalClientsCount - newClients.reduce((s, v) => s + v, 0);
+    let running = clientsBefore;
     for (let i = 0; i < 6; i++) {
-        const addition = i === 5 ? totalClients - runningTotal : Math.floor(Math.random() * 2);
-        newClients[i] = Math.min(addition, totalClients - runningTotal);
-        runningTotal += newClients[i];
-        cumulativeTotal[i] = runningTotal;
+        running += newClients[i];
+        cumulativeTotal[i] = running;
     }
 
     try {
@@ -741,10 +850,20 @@ function renderClientGrowthChart() {
             data: {
                 labels: months,
                 datasets: [{
+                    label: 'New Clients',
+                    data: newClients,
+                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                    borderRadius: 4
+                }, {
                     label: 'Total Clients',
                     data: cumulativeTotal,
-                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
-                    borderRadius: 4
+                    type: 'line',
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#667eea'
                 }]
             },
             options: {
@@ -760,6 +879,86 @@ function renderClientGrowthChart() {
         });
     } catch (err) {
         console.error('Error rendering Client Growth Chart:', err);
+    }
+}
+
+// Auditor Workload Chart - Shows audit count per auditor
+function renderAuditorWorkloadChart() {
+    const ctx = document.getElementById('auditorWorkloadChart');
+    if (!ctx) return;
+
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
+    const auditors = window.state.auditors || [];
+    const plans = window.state.auditPlans || [];
+
+    if (!auditors.length) {
+        ctx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;"><i class="fa-solid fa-users" style="font-size:2rem;margin-right:1rem;"></i>No auditors registered yet</div>';
+        return;
+    }
+
+    // Count audits per auditor
+    const workload = {};
+    auditors.forEach(a => { workload[a.name || a.id] = { total: 0, completed: 0 }; });
+
+    plans.forEach(plan => {
+        const assignedAuditors = plan.auditors || plan.assignedAuditors || [];
+        const lead = plan.leadAuditor || '';
+
+        // Count lead auditor
+        if (lead && workload[lead]) {
+            workload[lead].total++;
+            if (plan.status === 'Completed') workload[lead].completed++;
+        }
+
+        // Count team members
+        assignedAuditors.forEach(name => {
+            const aName = typeof name === 'object' ? (name.name || '') : name;
+            if (aName && workload[aName]) {
+                workload[aName].total++;
+                if (plan.status === 'Completed') workload[aName].completed++;
+            }
+        });
+    });
+
+    const labels = Object.keys(workload);
+    const totalData = labels.map(l => workload[l].total);
+    const completedData = labels.map(l => workload[l].completed);
+    const pendingData = labels.map((l, i) => totalData[i] - completedData[i]);
+
+    try {
+        window.dashboardCharts.auditorWorkload = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Completed',
+                    data: completedData,
+                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                    borderRadius: 4
+                }, {
+                    label: 'Pending',
+                    data: pendingData,
+                    backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } },
+                    y: { stacked: true, ticks: { font: { size: 12 } } }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    } catch (err) {
+        console.error('Error rendering Auditor Workload Chart:', err);
     }
 }
 
