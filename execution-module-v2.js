@@ -4705,8 +4705,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
-            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:22mm;padding-bottom:18mm;font-size:10pt;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;break-after:avoid;margin-top:20px;}.sb{break-before:avoid;}}'
-            + '@media print{@page{size:A4;margin:18mm 12mm 22mm 12mm;@bottom-center{content:counter(page);font-size:0.7rem;color:#64748b;}}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover{padding-top:0 !important;margin-top:-22mm;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
+            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:28mm;padding-bottom:18mm;font-size:10pt;}.page-break{page-break-before:always;padding-top:2mm;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;break-after:avoid;margin-top:8px;}.sb{break-before:avoid;}}'
+            + '@media print{@page{size:A4;margin:25mm 12mm 22mm 12mm;@bottom-center{content:counter(page);font-size:0.7rem;color:#64748b;}}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover{padding-top:0 !important;margin-top:-28mm;}.cover .rpt-hdr,.cover .rpt-ftr{display:none !important;}}'
             + 'body{counter-reset:page;}'
             + '.page-break{counter-increment:page;}'
             + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:16mm;background:white;color:#1e293b;padding:3mm 12mm;align-items:center;justify-content:space-between;font-size:0.72rem;z-index:100;border-bottom:1px solid #e2e8f0;}'
@@ -4725,7 +4725,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '.sn{background:rgba(255,255,255,0.2);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;}'
             + '.sb{padding:20px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;}'
             + '.info-tbl{width:100%;border-collapse:collapse;}.info-tbl td{padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:0.88rem;}.info-tbl td:first-child{width:28%;color:#64748b;font-weight:600;}.info-tbl tr:nth-child(even){background:#f8fafc;}'
-            + '.f-tbl{width:100%;border-collapse:collapse;font-size:0.85rem;table-layout:fixed;}.f-tbl th{background:#f1f5f9;color:#475569;font-weight:700;text-align:left;padding:10px 12px;border-bottom:2px solid #e2e8f0;}.f-tbl td{padding:10px 12px;border-bottom:1px solid #e2e8f0;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;}.f-tbl tbody tr:nth-child(even){background:#f8fafc;}.f-tbl tbody tr{break-inside:avoid;}'
+            + '.f-tbl{width:100%;border-collapse:collapse;font-size:0.85rem;table-layout:fixed;}.f-tbl th{background:#f1f5f9;color:#475569;font-weight:700;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0;}.f-tbl td{padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;}.f-tbl tbody tr:nth-child(even){background:#f8fafc;}.f-tbl tbody tr{break-inside:avoid;}'
             + '.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}'
             + '.stat-box{text-align:center;padding:16px 10px;border-radius:10px;border-bottom:3px solid transparent;}'
             + '.stat-val{font-size:1.8rem;font-weight:800;line-height:1;margin-bottom:4px;}'
@@ -4806,260 +4806,260 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:16px;"><strong style="font-size:0.88rem;color:#334155;">Goods & Services:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.goodsServices.map(g => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#fef3c7;color:#92400e;border:1px solid #fde047;">' + g.name + (g.category ? ' (' + g.category + ')' : '') + '</span>').join('') + '</div></div>' : '')
                 + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:12px;"><strong style="font-size:0.88rem;color:#334155;">Key Processes:</strong><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">' + d.client.keyProcesses.map(p => '<span style="padding:3px 10px;border-radius:12px;font-size:0.8rem;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;">' + (p.name || p) + '</span>').join('') + '</div></div>' : '')
                 + '</div>' : '')
-    // SECTION 2
-    + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:linear-gradient(135deg,#047857,#059669);"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
-        + (editedPositiveObs ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + editedPositiveObs + '</div></div>' : '')
-        + (editedOfi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + editedOfi + '</div></div>' : '')
-        + '</div>' : '')
-        // SECTION 3
-        + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
-            + '<div class="stat-grid">'
-            + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
-            + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.actualNCCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
-            + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.obsOfiCount + '</div><div class="stat-lbl">Observations / OFI</div></div>'
-            + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
-            + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
-            + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
-            + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
-        // SECTION 4 - CONFORMANCE VERIFICATION
-        + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:linear-gradient(135deg,#047857,#10b981);"><span class="sn">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:50%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
-        // SECTION 5 - OBSERVATIONS
-        + (obsOnlyRowsHtml ? '<div id="sec-obs" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">5</span>OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:50%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
-        // SECTION 6 - OPPORTUNITIES FOR IMPROVEMENT
-        + (ofiOnlyRowsHtml ? '<div id="sec-ofi" class="sh page-break" style="background:linear-gradient(135deg,#0e7490,#06b6d4);"><span class="sn">6</span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:50%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table></div>' : '')
-        // SECTION 7 - NON-CONFORMITY DETAILS
-        + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">7</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:50%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
-        // SECTION 8 - NCR REGISTER
-        + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">8</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
-        // SECTION 9 - MEETINGS
-        + (en['meetings'] !== false ? '<div id="sec-meetings" class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">9</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
-            + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
-            + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || 'N/A') + '</td></tr></table></div>'
-            + '</div></div>' : '')
-        // EVIDENCE GALLERY
-        + (function () {
-            var evidenceItems = [];
-            (d.hydratedProgress || []).forEach(function (item) {
-                var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
-                imgs.forEach(function (img) {
-                    evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: img, status: item.status });
+            // SECTION 2
+            + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:linear-gradient(135deg,#047857,#059669);"><span class="sn">2</span>EXECUTIVE SUMMARY</div><div class="sb"><div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
+                + (editedPositiveObs ? '<div class="callout" style="background:#f0fdf4;border-left:4px solid #22c55e;"><strong style="color:#166534;">Positive Observations</strong><div style="color:#15803d;margin-top:6px;">' + editedPositiveObs + '</div></div>' : '')
+                + (editedOfi ? '<div class="callout" style="background:#fffbeb;border-left:4px solid #f59e0b;"><strong style="color:#854d0e;">Opportunities for Improvement</strong><div style="color:#a16207;margin-top:6px;">' + editedOfi + '</div></div>' : '')
+                + '</div>' : '')
+            // SECTION 3
+            + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
+                + '<div class="stat-grid">'
+                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
+                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.actualNCCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
+                + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.obsOfiCount + '</div><div class="stat-lbl">Observations / OFI</div></div>'
+                + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
+                + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
+                + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
+                + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div></div></div>' : '')
+            // SECTION 4 - CONFORMANCE VERIFICATION
+            + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:linear-gradient(135deg,#047857,#10b981);"><span class="sn">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:50%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            // SECTION 5 - OBSERVATIONS
+            + (obsOnlyRowsHtml ? '<div id="sec-obs" class="sh page-break" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);"><span class="sn">5</span>OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:50%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
+            // SECTION 6 - OPPORTUNITIES FOR IMPROVEMENT
+            + (ofiOnlyRowsHtml ? '<div id="sec-ofi" class="sh page-break" style="background:linear-gradient(135deg,#0e7490,#06b6d4);"><span class="sn">6</span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:50%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table></div>' : '')
+            // SECTION 7 - NON-CONFORMITY DETAILS
+            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:linear-gradient(135deg,#991b1b,#dc2626);"><span class="sn">7</span>NON-CONFORMITY DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:50%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No non-conformities found.</td></tr>') + '</tbody></table></div>' : '')
+            // SECTION 8 - NCR REGISTER
+            + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:linear-gradient(135deg,#9a3412,#ea580c);"><span class="sn">8</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            // SECTION 9 - MEETINGS
+            + (en['meetings'] !== false ? '<div id="sec-meetings" class="sh page-break" style="background:linear-gradient(135deg,#155e75,#0891b2);"><span class="sn">9</span>MEETING RECORDS</div><div class="sb"><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
+                + '<div style="padding:18px;background:#f0fdf4;border-radius:10px;"><strong style="color:#166534;font-size:0.95rem;"><i class="fa-solid fa-door-open" style="margin-right:6px;"></i>Opening Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
+                + '<div style="padding:18px;background:#eff6ff;border-radius:10px;"><strong style="color:#1e40af;font-size:0.95rem;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i>Closing Meeting</strong><table class="info-tbl" style="margin-top:10px;"><tr><td style="width:35%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || 'N/A') + '</td></tr></table></div>'
+                + '</div></div>' : '')
+            // EVIDENCE GALLERY
+            + (function () {
+                var evidenceItems = [];
+                (d.hydratedProgress || []).forEach(function (item) {
+                    var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+                    imgs.forEach(function (img) {
+                        evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: img, status: item.status });
+                    });
                 });
-            });
-            (d.report.ncrs || []).forEach(function (ncr) {
-                if (ncr.evidenceImage) {
-                    evidenceItems.push({ clause: ncr.clause, title: ncr.type + ' Non-Conformity', img: ncr.evidenceImage, status: 'nc' });
-                }
-            });
-            if (evidenceItems.length === 0) return '';
-            var cards = evidenceItems.map(function (ev) {
-                var borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
-                return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
-            }).join('');
-            return '<div id="sec-evidence" class="sh page-break" style="background:linear-gradient(135deg,#7c2d12,#c2410c);"><span class="sn"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
-        })()
-        // SECTION 7
-        + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh" style="background:linear-gradient(135deg,#312e81,#4338ca);"><span class="sn">10</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
-            + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
-            + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatText(editedConclusion) + '</div>'
-            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
-            + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
-            + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
-        + '</div>'
-        // FOOTER
-        + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
-        + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;font-style:italic;max-width:340px;">This report has been prepared in accordance with ' + standard + ' requirements. Distribution is limited to authorized personnel only.</div>'
-        + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>'
-        // CHARTS SCRIPT
-        + '<script>'
-        + 'function rc(){'
-        + 'var c1=document.getElementById("chart-doughnut");'
-        + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#22c55e","#f59e0b","#ef4444","#3b82f6"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
-        + 'var c2=document.getElementById("chart-clause");'
-        + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#2563eb",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
-        + 'var c3=document.getElementById("chart-findings");'
-        + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.ncCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
-        + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.height="auto";cv.parentNode.replaceChild(im,cv);}catch(e){}});},1200);'
-        + '}rc();'
-        + '<\/script></body></html>';
-
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-    setTimeout(function () { printWindow.print(); }, 1800);
-    var overlay = document.getElementById('report-preview-overlay');
-    if (overlay) overlay.remove();
-};
-
-window.openCreateReportModal = openCreateReportModal;
-window.openEditReportModal = openEditReportModal;
-
-// Persistent stream for remote audits
-window.activeAuditScreenStream = null;
-
-window.captureScreenEvidence = async function (uniqueId) {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
-        return;
-    }
-
-    try {
-        let stream = window.activeAuditScreenStream;
-        let isNew = false;
-
-        // Check active stream
-        if (!stream || !stream.active) {
-            window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
-            stream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always" },
-                audio: false
-            });
-            window.activeAuditScreenStream = stream;
-            isNew = true;
-
-            // Handle stop sharing
-            stream.getVideoTracks()[0].onended = () => {
-                window.activeAuditScreenStream = null;
-                window.showNotification('Screen sharing session ended.', 'info');
-            };
-        }
-
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.muted = true;
-        video.play();
-
-        // Wait for buffer
-        await new Promise(r => setTimeout(r, isNew ? 500 : 200));
-
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-
-        // Cleanup video element (keep stream alive for reuse)
-        video.pause();
-        video.srcObject = null;
-        video.remove();
-
-        // Store the image (Supabase or IndexedDB)
-        let finalUrl = dataUrl;
-        let displayUrl = dataUrl;
-        let isCloud = false;
-
-        if (window.navigator.onLine && window.SupabaseClient) {
-            try {
-                if (!window.SupabaseClient.isInitialized) {
-                    await new Promise(r => setTimeout(r, 1000));
-                }
-                if (window.SupabaseClient.isInitialized) {
-                    // Convert DataURL to Blob (CSP-safe, no fetch on data: URLs)
-                    const b64 = dataUrl.split(',')[1];
-                    const byteStr = atob(b64);
-                    const ab = new ArrayBuffer(byteStr.length);
-                    const ia = new Uint8Array(ab);
-                    for (let bi = 0; bi < byteStr.length; bi++) ia[bi] = byteStr.charCodeAt(bi);
-                    const blob = new Blob([ab], { type: 'image/jpeg' });
-                    const uploadFile = new File([blob], 'screen-capture-' + Date.now() + '.jpg', { type: 'image/jpeg' });
-                    const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-sc-' + Date.now());
-                    if (result && result.url) {
-                        finalUrl = result.url;
-                        displayUrl = result.url;
-                        isCloud = true;
+                (d.report.ncrs || []).forEach(function (ncr) {
+                    if (ncr.evidenceImage) {
+                        evidenceItems.push({ clause: ncr.clause, title: ncr.type + ' Non-Conformity', img: ncr.evidenceImage, status: 'nc' });
                     }
+                });
+                if (evidenceItems.length === 0) return '';
+                var cards = evidenceItems.map(function (ev) {
+                    var borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
+                    return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
+                }).join('');
+                return '<div id="sec-evidence" class="sh page-break" style="background:linear-gradient(135deg,#7c2d12,#c2410c);"><span class="sn"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
+            })()
+            // SECTION 7
+            + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh" style="background:linear-gradient(135deg,#312e81,#4338ca);"><span class="sn">10</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
+                + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
+                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatText(editedConclusion) + '</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
+            + '</div>'
+            // FOOTER
+            + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
+            + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;font-style:italic;max-width:340px;">This report has been prepared in accordance with ' + standard + ' requirements. Distribution is limited to authorized personnel only.</div>'
+            + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>'
+            // CHARTS SCRIPT
+            + '<script>'
+            + 'function rc(){'
+            + 'var c1=document.getElementById("chart-doughnut");'
+            + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#22c55e","#f59e0b","#ef4444","#3b82f6"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'var c2=document.getElementById("chart-clause");'
+            + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#2563eb",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
+            + 'var c3=document.getElementById("chart-findings");'
+            + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.ncCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.height="auto";cv.parentNode.replaceChild(im,cv);}catch(e){}});},1200);'
+            + '}rc();'
+            + '<\/script></body></html>';
+
+        printWindow.document.write(reportHtml);
+        printWindow.document.close();
+        setTimeout(function () { printWindow.print(); }, 1800);
+        var overlay = document.getElementById('report-preview-overlay');
+        if (overlay) overlay.remove();
+    };
+
+    window.openCreateReportModal = openCreateReportModal;
+    window.openEditReportModal = openEditReportModal;
+
+    // Persistent stream for remote audits
+    window.activeAuditScreenStream = null;
+
+    window.captureScreenEvidence = async function (uniqueId) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+            return;
+        }
+
+        try {
+            let stream = window.activeAuditScreenStream;
+            let isNew = false;
+
+            // Check active stream
+            if (!stream || !stream.active) {
+                window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: false
+                });
+                window.activeAuditScreenStream = stream;
+                isNew = true;
+
+                // Handle stop sharing
+                stream.getVideoTracks()[0].onended = () => {
+                    window.activeAuditScreenStream = null;
+                    window.showNotification('Screen sharing session ended.', 'info');
+                };
+            }
+
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.muted = true;
+            video.play();
+
+            // Wait for buffer
+            await new Promise(r => setTimeout(r, isNew ? 500 : 200));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Cleanup video element (keep stream alive for reuse)
+            video.pause();
+            video.srcObject = null;
+            video.remove();
+
+            // Store the image (Supabase or IndexedDB)
+            let finalUrl = dataUrl;
+            let displayUrl = dataUrl;
+            let isCloud = false;
+
+            if (window.navigator.onLine && window.SupabaseClient) {
+                try {
+                    if (!window.SupabaseClient.isInitialized) {
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    if (window.SupabaseClient.isInitialized) {
+                        // Convert DataURL to Blob (CSP-safe, no fetch on data: URLs)
+                        const b64 = dataUrl.split(',')[1];
+                        const byteStr = atob(b64);
+                        const ab = new ArrayBuffer(byteStr.length);
+                        const ia = new Uint8Array(ab);
+                        for (let bi = 0; bi < byteStr.length; bi++) ia[bi] = byteStr.charCodeAt(bi);
+                        const blob = new Blob([ab], { type: 'image/jpeg' });
+                        const uploadFile = new File([blob], 'screen-capture-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                        const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-sc-' + Date.now());
+                        if (result && result.url) {
+                            finalUrl = result.url;
+                            displayUrl = result.url;
+                            isCloud = true;
+                        }
+                    }
+                } catch (uploadErr) {
+                    console.error('[Screen Capture] Cloud upload failed:', uploadErr.message);
                 }
-            } catch (uploadErr) {
-                console.error('[Screen Capture] Cloud upload failed:', uploadErr.message);
             }
-        }
 
-        // Fallback to IndexedDB
-        if (!isCloud) {
-            try {
-                const idbKey = 'idb://evidence-' + uniqueId + '-sc-' + Date.now();
-                await EvidenceDB.put(idbKey, dataUrl);
-                finalUrl = idbKey;
-                console.log('[Screen Capture] Stored in IndexedDB:', idbKey);
-            } catch (idbErr) {
-                console.error('[Screen Capture] IndexedDB store failed:', idbErr);
-                finalUrl = dataUrl;
+            // Fallback to IndexedDB
+            if (!isCloud) {
+                try {
+                    const idbKey = 'idb://evidence-' + uniqueId + '-sc-' + Date.now();
+                    await EvidenceDB.put(idbKey, dataUrl);
+                    finalUrl = idbKey;
+                    console.log('[Screen Capture] Stored in IndexedDB:', idbKey);
+                } catch (idbErr) {
+                    console.error('[Screen Capture] IndexedDB store failed:', idbErr);
+                    finalUrl = dataUrl;
+                }
             }
-        }
 
-        // Append thumbnail to multi-image preview strip
-        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-        if (previewDiv) {
-            previewDiv.style.display = 'flex';
-            // Remove any loading spinner if present
-            const spinner = previewDiv.querySelector('.fa-spinner');
-            if (spinner) spinner.closest('div')?.remove();
+            // Append thumbnail to multi-image preview strip
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            if (previewDiv) {
+                previewDiv.style.display = 'flex';
+                // Remove any loading spinner if present
+                const spinner = previewDiv.querySelector('.fa-spinner');
+                if (spinner) spinner.closest('div')?.remove();
 
-            const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
-            const newIdx = existingThumbs.length;
-            const safeDisplay = displayUrl.replace(/'/g, "\\'");
-            const thumb = document.createElement('div');
-            thumb.className = 'ev-thumb';
-            thumb.dataset.idx = newIdx;
-            thumb.dataset.saveUrl = finalUrl;
-            thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
-            thumb.innerHTML = `
+                const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
+                const newIdx = existingThumbs.length;
+                const safeDisplay = displayUrl.replace(/'/g, "\\'");
+                const thumb = document.createElement('div');
+                thumb.className = 'ev-thumb';
+                thumb.dataset.idx = newIdx;
+                thumb.dataset.saveUrl = finalUrl;
+                thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
+                thumb.innerHTML = `
                     <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeDisplay}')"/>
                     <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${newIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
                 `;
-            previewDiv.appendChild(thumb);
+                previewDiv.appendChild(thumb);
+            }
+
+            // Update hidden input
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+            if (evidenceData) evidenceData.value = 'attached';
+
+            window.showNotification(isCloud ? 'Screen captured & uploaded to cloud' : 'Screen captured & saved locally', 'success');
+
+        } catch (err) {
+            if (err.name !== 'NotAllowedError') {
+                console.error(err);
+                window.showNotification('Capture failed: ' + err.message, 'error');
+            }
+        }
+    };
+    window.renderExecutionDetail = renderExecutionDetail;
+
+    // Toggle selection of all items in a section
+    // toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
+
+    // ============================================
+    // Webcam Handling for Desktop 'Camera' Button
+    // ============================================
+    window.activeWebcamStream = null;
+
+    window.handleCameraButton = function (uniqueId) {
+        // Check if mobile device (simple check)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            // Use the native input for mobile (file picker / camera app)
+            const inp = document.getElementById('cam-' + uniqueId);
+            if (inp) inp.click();
+        } else {
+            // Use Webcam Modal for desktop
+            window.openWebcamModal(uniqueId);
+        }
+    };
+
+    window.openWebcamModal = async function (uniqueId) {
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        // Cleanup any existing stream first
+        if (window.activeWebcamStream) {
+            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
         }
 
-        // Update hidden input
-        const evidenceData = document.getElementById('evidence-data-' + uniqueId);
-        if (evidenceData) evidenceData.value = 'attached';
+        modalTitle.textContent = 'Capture from Webcam';
 
-        window.showNotification(isCloud ? 'Screen captured & uploaded to cloud' : 'Screen captured & saved locally', 'success');
-
-    } catch (err) {
-        if (err.name !== 'NotAllowedError') {
-            console.error(err);
-            window.showNotification('Capture failed: ' + err.message, 'error');
-        }
-    }
-};
-window.renderExecutionDetail = renderExecutionDetail;
-
-// Toggle selection of all items in a section
-// toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
-
-// ============================================
-// Webcam Handling for Desktop 'Camera' Button
-// ============================================
-window.activeWebcamStream = null;
-
-window.handleCameraButton = function (uniqueId) {
-    // Check if mobile device (simple check)
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    if (isMobile) {
-        // Use the native input for mobile (file picker / camera app)
-        const inp = document.getElementById('cam-' + uniqueId);
-        if (inp) inp.click();
-    } else {
-        // Use Webcam Modal for desktop
-        window.openWebcamModal(uniqueId);
-    }
-};
-
-window.openWebcamModal = async function (uniqueId) {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    // Cleanup any existing stream first
-    if (window.activeWebcamStream) {
-        window.activeWebcamStream.getTracks().forEach(track => track.stop());
-        window.activeWebcamStream = null;
-    }
-
-    modalTitle.textContent = 'Capture from Webcam';
-
-    modalBody.innerHTML = `
+        modalBody.innerHTML = `
             < div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
                 <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                     <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
@@ -5070,208 +5070,208 @@ window.openWebcamModal = async function (uniqueId) {
             </div >
             `;
 
-    // Configure "Capture" button
-    modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
-    modalSave.onclick = () => window.captureWebcam(uniqueId);
+        // Configure "Capture" button
+        modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+        modalSave.onclick = () => window.captureWebcam(uniqueId);
 
-    // Show modal BEFORE requesting media
-    if (window.openModal) window.openModal();
+        // Show modal BEFORE requesting media
+        if (window.openModal) window.openModal();
 
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        window.activeWebcamStream = stream;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            window.activeWebcamStream = stream;
 
+            const video = document.getElementById('webcam-video');
+            const loading = document.getElementById('webcam-loading');
+
+            if (video) {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    if (loading) loading.style.display = 'none';
+                };
+            }
+        } catch (err) {
+            const errDiv = document.getElementById('webcam-error');
+            const loading = document.getElementById('webcam-loading');
+            if (loading) loading.style.display = 'none';
+
+            if (errDiv) {
+                errDiv.style.display = 'block';
+                errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+            }
+            console.error("Webcam error:", err);
+        }
+    };
+
+    window.captureWebcam = function (uniqueId) {
         const video = document.getElementById('webcam-video');
-        const loading = document.getElementById('webcam-loading');
+        if (!video || !window.activeWebcamStream) return;
 
-        if (video) {
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                if (loading) loading.style.display = 'none';
-            };
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const ctx = canvas.getContext('2d');
+            // Mirror the capture if the video was mirrored
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Stop stream
+            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
+
+            // Update UI
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            const imgElem = document.getElementById('evidence-img-' + uniqueId);
+            const dataInput = document.getElementById('evidence-data-' + uniqueId);
+            const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+
+            if (imgElem) imgElem.src = dataUrl;
+            if (previewDiv) previewDiv.style.display = 'block';
+            if (dataInput) dataInput.value = 'attached';
+            if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+
+            // Close modal
+            if (window.closeModal) window.closeModal();
+        } catch (e) {
+            console.error("Capture failed:", e);
+            window.showNotification("Failed to capture image", "error");
         }
-    } catch (err) {
-        const errDiv = document.getElementById('webcam-error');
-        const loading = document.getElementById('webcam-loading');
-        if (loading) loading.style.display = 'none';
+    };
 
-        if (errDiv) {
-            errDiv.style.display = 'block';
-            errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
-        }
-        console.error("Webcam error:", err);
-    }
-};
+    // Global event delegation for section checkboxes (works with dynamically rendered content)
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('section-checkbox')) {
+            e.stopPropagation();
+            const sectionId = e.target.getAttribute('data-section-id');
+            const isChecked = e.target.checked;
+            console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
 
-window.captureWebcam = function (uniqueId) {
-    const video = document.getElementById('webcam-video');
-    if (!video || !window.activeWebcamStream) return;
-
-    try {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const ctx = canvas.getContext('2d');
-        // Mirror the capture if the video was mirrored
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-
-        // Stop stream
-        window.activeWebcamStream.getTracks().forEach(track => track.stop());
-        window.activeWebcamStream = null;
-
-        // Update UI
-        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
-        const imgElem = document.getElementById('evidence-img-' + uniqueId);
-        const dataInput = document.getElementById('evidence-data-' + uniqueId);
-        const sizeElem = document.getElementById('evidence-size-' + uniqueId);
-
-        if (imgElem) imgElem.src = dataUrl;
-        if (previewDiv) previewDiv.style.display = 'block';
-        if (dataInput) dataInput.value = 'attached';
-        if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
-
-        // Close modal
-        if (window.closeModal) window.closeModal();
-    } catch (e) {
-        console.error("Capture failed:", e);
-        window.showNotification("Failed to capture image", "error");
-    }
-};
-
-// Global event delegation for section checkboxes (works with dynamically rendered content)
-document.addEventListener('click', function (e) {
-    if (e.target.classList.contains('section-checkbox')) {
-        e.stopPropagation();
-        const sectionId = e.target.getAttribute('data-section-id');
-        const isChecked = e.target.checked;
-        console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
-
-        // Find all items in this section and toggle selection
-        const section = document.getElementById(sectionId);
-        if (!section) {
-            console.error('Section not found:', sectionId);
-            return;
-        }
-
-        const items = section.querySelectorAll('.checklist-item');
-        console.log('Found', items.length, 'items in section');
-
-        items.forEach((item, idx) => {
-            // Toggle the individual checkbox too
-            const itemCheckbox = item.querySelector('.item-checkbox');
-            if (itemCheckbox) {
-                itemCheckbox.checked = isChecked;
+            // Find all items in this section and toggle selection
+            const section = document.getElementById(sectionId);
+            if (!section) {
+                console.error('Section not found:', sectionId);
+                return;
             }
 
-            if (isChecked) {
-                item.classList.add('selected-item');
-                item.style.background = '#eff6ff';
-                item.style.borderLeft = '4px solid var(--primary-color)';
-            } else {
-                item.classList.remove('selected-item');
-                item.style.background = '';
-                item.style.borderLeft = '4px solid #e2e8f0';
+            const items = section.querySelectorAll('.checklist-item');
+            console.log('Found', items.length, 'items in section');
+
+            items.forEach((item, idx) => {
+                // Toggle the individual checkbox too
+                const itemCheckbox = item.querySelector('.item-checkbox');
+                if (itemCheckbox) {
+                    itemCheckbox.checked = isChecked;
+                }
+
+                if (isChecked) {
+                    item.classList.add('selected-item');
+                    item.style.background = '#eff6ff';
+                    item.style.borderLeft = '4px solid var(--primary-color)';
+                } else {
+                    item.classList.remove('selected-item');
+                    item.style.background = '';
+                    item.style.borderLeft = '4px solid #e2e8f0';
+                }
+            });
+
+            console.log('Selection complete for', items.length, 'items');
+        }
+    });
+
+    // Global event delegation for individual item checkboxes
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('item-checkbox')) {
+            const checkbox = e.target;
+            const uniqueId = checkbox.getAttribute('data-unique-id');
+            const row = document.getElementById('row-' + uniqueId);
+
+            if (row) {
+                if (checkbox.checked) {
+                    row.classList.add('selected-item');
+                    row.style.background = '#eff6ff';
+                    row.style.borderLeft = '4px solid var(--primary-color)';
+                } else {
+                    row.classList.remove('selected-item');
+                    row.style.background = '';
+                    row.style.borderLeft = '4px solid #e2e8f0';
+                }
             }
-        });
+        }
+    });
 
-        console.log('Selection complete for', items.length, 'items');
-    }
-});
+    // Global event delegation for bulk action buttons
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.bulk-action-btn');
+        if (btn) {
+            const action = btn.getAttribute('data-action');
+            const reportId = btn.getAttribute('data-report-id');
+            console.log('Bulk action button clicked:', action, 'for report:', reportId);
 
-// Global event delegation for individual item checkboxes
-document.addEventListener('click', function (e) {
-    if (e.target.classList.contains('item-checkbox')) {
-        const checkbox = e.target;
-        const uniqueId = checkbox.getAttribute('data-unique-id');
-        const row = document.getElementById('row-' + uniqueId);
+            if (action && reportId) {
+                window.bulkUpdateStatus(parseInt(reportId), action);
 
-        if (row) {
-            if (checkbox.checked) {
-                row.classList.add('selected-item');
-                row.style.background = '#eff6ff';
-                row.style.borderLeft = '4px solid var(--primary-color)';
-            } else {
-                row.classList.remove('selected-item');
-                row.style.background = '';
-                row.style.borderLeft = '4px solid #e2e8f0';
+                // Close menu
+                const menu = document.getElementById('bulk-menu-' + reportId);
+                if (menu) menu.classList.add('hidden');
             }
         }
-    }
-});
+    });
 
-// Global event delegation for bulk action buttons
-document.addEventListener('click', function (e) {
-    const btn = e.target.closest('.bulk-action-btn');
-    if (btn) {
-        const action = btn.getAttribute('data-action');
-        const reportId = btn.getAttribute('data-report-id');
-        console.log('Bulk action button clicked:', action, 'for report:', reportId);
+    // Global event delegation for status buttons (OK, NC, N/A) - using capture phase
+    document.addEventListener('click', function (e) {
+        // Check if clicked element or any parent has status-btn class
+        let btn = e.target;
 
-        if (action && reportId) {
-            window.bulkUpdateStatus(parseInt(reportId), action);
-
-            // Close menu
-            const menu = document.getElementById('bulk-menu-' + reportId);
-            if (menu) menu.classList.add('hidden');
+        // Log all clicks for debugging
+        if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+            console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
         }
-    }
-});
 
-// Global event delegation for status buttons (OK, NC, N/A) - using capture phase
-document.addEventListener('click', function (e) {
-    // Check if clicked element or any parent has status-btn class
-    let btn = e.target;
-
-    // Log all clicks for debugging
-    if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-        console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
-    }
-
-    while (btn && btn.classList && !btn.classList.contains('status-btn')) {
-        btn = btn.parentElement;
-        if (!btn || btn === document.body) {
-            btn = null;
-            break;
+        while (btn && btn.classList && !btn.classList.contains('status-btn')) {
+            btn = btn.parentElement;
+            if (!btn || btn === document.body) {
+                btn = null;
+                break;
+            }
         }
-    }
 
-    if (btn && btn.classList && btn.classList.contains('status-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
+        if (btn && btn.classList && btn.classList.contains('status-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
 
-        const uniqueId = btn.getAttribute('data-unique-id');
-        const status = btn.getAttribute('data-status');
-        console.log('Status button clicked:', status, 'for item:', uniqueId);
+            const uniqueId = btn.getAttribute('data-unique-id');
+            const status = btn.getAttribute('data-status');
+            console.log('Status button clicked:', status, 'for item:', uniqueId);
 
-        if (uniqueId && status) {
-            window.setChecklistStatus(uniqueId, status);
+            if (uniqueId && status) {
+                window.setChecklistStatus(uniqueId, status);
+            }
         }
-    }
-}, true); // true = capture phase
+    }, true); // true = capture phase
 
-// Helper to update meeting records (Opening/Closing)
-window.updateMeetingData = function (reportId, meetingType, field, value) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
+    // Helper to update meeting records (Opening/Closing)
+    window.updateMeetingData = function (reportId, meetingType, field, value) {
+        const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+        if (!report) return;
 
-    if (!report[meetingType + 'Meeting']) {
-        report[meetingType + 'Meeting'] = {};
-    }
+        if (!report[meetingType + 'Meeting']) {
+            report[meetingType + 'Meeting'] = {};
+        }
 
-    if (field === 'attendees') {
-        // Split by comma and clean up
-        report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
-    } else {
-        report[meetingType + 'Meeting'][field] = value;
-    }
+        if (field === 'attendees') {
+            // Split by comma and clean up
+            report[meetingType + 'Meeting'][field] = value.split(',').map(s => s.trim()).filter(s => s);
+        } else {
+            report[meetingType + 'Meeting'][field] = value;
+        }
 
-    window.saveData();
-    window.saveChecklist(reportId);
-};
+        window.saveData();
+        window.saveChecklist(reportId);
+    };
 
 }
