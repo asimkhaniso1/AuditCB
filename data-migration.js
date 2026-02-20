@@ -204,12 +204,6 @@ const DataMigration = {
                 }];
             }
 
-            // 3. Save to localStorage - Force immediate save
-            console.log('Clearing data - new state:', {
-                clients: window.state.clients.length,
-                auditors: window.state.auditors.length,
-                auditPlans: window.state.auditPlans.length
-            });
 
             // Directly write to IndexedDB to ensure immediate persistence
             try {

@@ -129,7 +129,6 @@ window.KB_HELPERS = {
             normStd.includes(window.KB_HELPERS.normalizeStdName(s.name))
         );
         if (!stdDoc) {
-            console.log(`[KB Lookup] No standard for "${standardName}". Available:`, kb.standards.map(s => `${s.name}(${s.status})`).join(', '));
             return null;
         }
 
@@ -154,7 +153,6 @@ window.KB_HELPERS = {
         }
 
         if (kbClause) {
-            console.log(`[KB Lookup] MATCH ${clauseNum} → ${kbClause.clause}: "${(kbClause.requirement || '').substring(0, 120)}..."`);
             return {
                 clause: kbClause.clause || '',
                 title: kbClause.title || '',
@@ -162,7 +160,6 @@ window.KB_HELPERS = {
                 standardName: stdDoc.name || standardName
             };
         }
-        console.log(`[KB Lookup] NO MATCH for "${clauseNum}". KB clauses: ${stdDoc.clauses.map(c => c.clause).join(', ')}`);
         return null;
     },
 
@@ -302,11 +299,9 @@ const AI_SERVICE = {
         );
 
         if (!stdDoc) {
-            console.log('[KB] No matching standard found in KB for:', standardName);
             return '';
         }
 
-        console.log(`[KB] Found ${stdDoc.clauses.length} clauses for ${stdDoc.name}`);
 
         // Return concise clause reference (saves tokens vs full text)
         // Limit to ~8000 chars for balanced context without overwhelming prompt
@@ -428,7 +423,6 @@ Return a raw JSON array with 'id' and 'refined' fields only:
                     };
                 }
             });
-            console.log(`[AI] Refined ${refined.length} audit notes into professional language`);
             return result;
         } catch (error) {
             console.error("AI Note Refinement Error:", error);
@@ -510,7 +504,6 @@ Return a raw JSON array with 'id' and 'text' fields only:
                     };
                 }
             });
-            console.log(`[AI] Generated conformance text for ${generated.length} findings`);
             return result;
         } catch (error) {
             console.error("AI Conformance Text Error:", error);
@@ -685,7 +678,6 @@ Example:
         // First, try the serverless proxy (for Vercel deployment)
         for (const model of models) {
             try {
-                console.log(`Attempting AI generation with model: ${model} via proxy (maxTokens: ${maxTokens})`);
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -747,7 +739,6 @@ Example:
 
         // FALLBACK: If proxy failed or errored (and we have a key), try direct API call
         if (shouldTryDirect) {
-            console.log('Proxy unavailable. Attempting direct Gemini API call...');
 
             // Get API key from settings
             const apiKey = window.state?.settings?.geminiApiKey || localStorage.getItem('geminiApiKey');
@@ -762,7 +753,6 @@ Example:
             // Try direct API call
             for (const model of models) {
                 try {
-                    console.log(`Attempting direct Gemini API with model: ${model} `);
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
                     const response = await fetch(url, {
@@ -793,7 +783,6 @@ Example:
                         });
                     }
 
-                    console.log('Direct Gemini API call successful!');
                     return AI_SERVICE.extractTextFromResponse(data);
 
                 } catch (error) {
@@ -806,7 +795,6 @@ Example:
 
         // If all hardcoded models fail, try to dynamically fetch available models
         try {
-            console.log('Standard models failed. Fetching available models from API...');
             const availableModels = await AI_SERVICE.getAvailableModels();
 
             // Filter for content generation models and sort by preference (Gemini 2.0 > 1.5 > Pro)
@@ -815,7 +803,6 @@ Example:
                 .map(m => m.name.replace('models/', '')) // Remove prefix if present
                 .filter(name => !models.includes(name)); // Avoid re-trying failed ones
 
-            console.log('Found viable models:', viableModels);
 
             if (viableModels.length === 0) {
                 throw new Error('No compatible AI models found for your API Key.');
@@ -824,7 +811,6 @@ Example:
             // Try the dynamically found models
             for (const model of viableModels) {
                 try {
-                    console.log(`Attempting dynamic model: ${model}`);
                     const response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1012,12 +998,10 @@ window.runFollowUpAIAnalysis = async function (reportId) {
 
         // Apply suggestions using originalIdx to update the right item
         let updateCount = 0;
-        console.log('[AI Classify] Suggestions:', suggestions);
         suggestions.forEach(s => {
             if (s.type && ['major', 'minor', 'observation'].includes(s.type.toLowerCase())) {
                 const finding = findings.find(f => f.id === s.id);
                 if (finding && report.checklistProgress[finding.originalIdx]) {
-                    console.log(`[AI Classify] Setting item ${finding.originalIdx} (${finding.clause}) to ${s.type}`);
                     report.checklistProgress[finding.originalIdx].ncrType = s.type.toLowerCase();
                     updateCount++;
                 }
@@ -1032,7 +1016,6 @@ window.runFollowUpAIAnalysis = async function (reportId) {
                 const idx = window.state.auditReports.findIndex(r => String(r.id) === String(reportId));
                 if (idx >= 0) {
                     localStorage.setItem('auditReports', JSON.stringify(window.state.auditReports));
-                    console.log('[AI Classify] Persisted to localStorage directly (bypassed saveChecklist DOM read)');
                 }
                 // Also try Supabase
                 if (window.SupabaseClient?.isInitialized) {

@@ -54,7 +54,6 @@ window.ApiCache = (function () {
             return pendingRequests.get(key);
         }
 
-        console.log(`[Cache] FETCH: ${key} - fetching fresh data...`);
 
         try {
             const promise = fetchFn().then(data => {
@@ -105,13 +104,11 @@ window.ApiCache = (function () {
 
         // 3. HIT (Valid) -> Return immediately
         if (cached && !isExpired) {
-            console.log(`[Cache] HIT: ${key} (Valid)`);
             return cached.data;
         }
 
         // 4. STALE (Expired but exists) -> Return stale, update in background
         if (cached && isExpired) {
-            console.log(`[Cache] STALE: ${key} - returning stale data, fetching background update`);
             // Trigger background update (no await)
             fetchAndCache(key, fetchFn, ttl).catch(e => {
                 console.warn(`[Cache] Background update failed for ${key}`, e);
@@ -121,7 +118,6 @@ window.ApiCache = (function () {
 
         // 5. MISS (No data) -> Must wait for fetch
         // If fetch fails, we have no data to return, so we throw
-        console.log(`[Cache] MISS: ${key} - waiting for fetch`);
         return fetchAndCache(key, fetchFn, ttl);
     }
 
@@ -131,7 +127,6 @@ window.ApiCache = (function () {
     function invalidate(key) {
         cache.delete(key);
         removeFromStorage(key);
-        console.log(`[Cache] INVALIDATED: ${key}`);
     }
 
     /**
@@ -153,7 +148,6 @@ window.ApiCache = (function () {
                 localStorage.removeItem(key);
             }
         }
-        console.log(`[Cache] INVALIDATED pattern: ${pattern}`);
     }
 
     /**
@@ -170,7 +164,6 @@ window.ApiCache = (function () {
             }
         }
         keysToRemove.forEach(k => localStorage.removeItem(k));
-        console.log('[Cache] CLEARED all entries');
     }
 
     /**
@@ -322,4 +315,3 @@ window.CachedData = {
     }
 };
 
-console.log('[ApiCache] Module loaded - use window._cacheStats() to view cache');

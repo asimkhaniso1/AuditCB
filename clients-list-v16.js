@@ -357,7 +357,6 @@ window.deleteClient = async function (clientId) {
                     window.showNotification('Warning: Failed to delete from database', 'warning');
                 } else {
                     Logger.info(`✅ Client ${clientId} deleted from Supabase`);
-                    console.log(`[DELETE SUCCESS] Removed from database`);
                 }
             } catch (error) {
                 Logger.error('Exception during deletion:', error);
@@ -383,7 +382,6 @@ window.deleteClient = async function (clientId) {
             localStorage.setItem('auditCB360State', JSON.stringify(window.state));
         }
 
-        console.log('[deleteClient] Deletion Stats:', deleteStats);
         window.showNotification(`Client '${clientName}' deleted. (Removed: ${deleteStats.programs} Programs, ${deleteStats.plans} Plans, ${deleteStats.reports} Reports)`, 'success');
 
         // Refresh UI
