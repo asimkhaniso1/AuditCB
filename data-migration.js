@@ -300,11 +300,11 @@ const DataMigration = {
                                 </label>
                             </div>
 
-                            <button class="btn btn-danger" data-action="DataMigration_handleClearData">
+                            <button class="btn btn-danger" data-action="DataMigration_handleClearData" aria-label="Delete">
                                 <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i> Clear Local Data
                             </button>
                             
-                            <button class="btn btn-secondary" data-action="DataMigration_reloadFromCloud" style="margin-left: 0.5rem;">
+                            <button class="btn btn-secondary" data-action="DataMigration_reloadFromCloud" style="margin-left: 0.5rem;" aria-label="Download from cloud">
                                 <i class="fa-solid fa-cloud-arrow-down" style="margin-right: 0.5rem;"></i> Reload from Cloud
                             </button>
                         </div>

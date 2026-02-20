@@ -376,26 +376,26 @@ function addExportButtons(moduleName) {
     const exportButtons = {
         'clients': `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary" data-action="exportClientsToCSV">
+                <button class="btn btn-secondary" data-action="exportClientsToCSV" aria-label="Export Excel">
                     <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
                 </button>
-                <button class="btn btn-secondary" data-action="exportClientsToPDF">
+                <button class="btn btn-secondary" data-action="exportClientsToPDF" aria-label="Export PDF">
                     <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export to PDF
                 </button>
             </div>
         `,
         'auditors': `
-            <button class="btn btn-secondary" data-action="exportAuditorsToCSV">
+            <button class="btn btn-secondary" data-action="exportAuditorsToCSV" aria-label="Export Excel">
                 <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
             </button>
         `,
         'audit-programs': `
-            <button class="btn btn-secondary" data-action="exportAuditProgramsToCSV">
+            <button class="btn btn-secondary" data-action="exportAuditProgramsToCSV" aria-label="Export Excel">
                 <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
             </button>
         `,
         'dashboard': `
-            <button class="btn btn-secondary" data-action="exportDashboardToPDF">
+            <button class="btn btn-secondary" data-action="exportDashboardToPDF" aria-label="Export PDF">
                 <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Summary
             </button>
         `

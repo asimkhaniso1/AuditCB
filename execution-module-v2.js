@@ -79,9 +79,9 @@ function renderAuditExecutionEnhanced() {
                         report.status === 'In Review' ? 'var(--warning-color)' :
                             '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
             <td>
-                <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report"><i class="fa-solid fa-eye"></i></button>
-                <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report"><i class="fa-solid fa-edit"></i></button>
-                <button class="btn btn-sm delete-execution" data-report-id="${report.id}" style="color: var(--danger-color);" title="Delete Report"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report" aria-label="View"><i class="fa-solid fa-eye"></i></button>
+                <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn btn-sm delete-execution" data-report-id="${report.id}" style="color: var(--danger-color);" title="Delete Report" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>
     `;
@@ -650,7 +650,7 @@ function renderExecutionDetail(reportId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" data-action="handleBackToExecutionList">
+                <button class="btn btn-secondary" data-action="handleBackToExecutionList" aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reports
                 </button>
             </div>
@@ -661,7 +661,7 @@ function renderExecutionDetail(reportId) {
                         <h2 style="margin-bottom: 0.5rem;">Audit Execution: ${report.client}</h2>
                         <p style="color: var(--text-secondary);">Audit Date: ${report.date} | Status: ${report.status}</p>
                     </div>
-                    <button class="btn btn-primary" data-action="generateAuditReport" data-id="${report.id}">
+                    <button class="btn btn-primary" data-action="generateAuditReport" data-id="${report.id}" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report
                     </button>
                 </div>
@@ -824,10 +824,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <p style="color:#64748b;font-size:0.85rem;margin:0;">Choose which items to auto-assign</p>
                             </div>
                             <div style="display:flex;flex-direction:column;gap:0.75rem;">
-                                <button id="am-unfilled" class="btn" style="padding:0.75rem;border:2px solid #8b5cf6;background:#f5f3ff;border-radius:8px;cursor:pointer;font-weight:600;color:#6d28d9;">
+                                <button id="am-unfilled" class="btn" style="padding:0.75rem;border:2px solid #8b5cf6;background:#f5f3ff;border-radius:8px;cursor:pointer;font-weight:600;color:#6d28d9;" aria-label="Filter">
                                     <i class="fa-solid fa-filter" style="margin-right:0.5rem;"></i> Unfilled Items Only
                                 </button>
-                                <button id="am-all" class="btn" style="padding:0.75rem;border:2px solid #e2e8f0;background:white;border-radius:8px;cursor:pointer;font-weight:500;color:#334155;">
+                                <button id="am-all" class="btn" style="padding:0.75rem;border:2px solid #e2e8f0;background:white;border-radius:8px;cursor:pointer;font-weight:500;color:#334155;" aria-label="Refresh">
                                     <i class="fa-solid fa-arrows-rotate" style="margin-right:0.5rem;"></i> Re-map All Items
                                 </button>
                                 <button id="am-cancel" style="padding:0.5rem;border:none;background:none;cursor:pointer;color:#94a3b8;font-size:0.85rem;">Cancel</button>
@@ -979,8 +979,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                                 <button type="button" class="btn-icon btn-na status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NA}" title="Not Applicable">N/A</button>
-                                <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity"><i class="fa fa-check"></i></button>
-                                <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity"><i class="fa fa-flag"></i></button>
+                                <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity" aria-label="Confirm"><i class="fa fa-check"></i></button>
+                                <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity" aria-label="Flag"><i class="fa fa-flag"></i></button>
                             </div>
                          </div>
                          
@@ -1222,22 +1222,22 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <button class="btn btn-outline-secondary" id="toggle-all-accordions" data-action="toggleAllAccordions" title="Collapse/Expand all sections">
                                 <i class="fa-solid fa-compress-alt" style="margin-right: 0.5rem;"></i> <span>Collapse All</span>
                             </button>
-                            <button class="btn btn-secondary" data-action="addCustomQuestion" data-id="${report.id}">
+                            <button class="btn btn-secondary" data-action="addCustomQuestion" data-id="${report.id}" aria-label="Add">
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
                             <div style="position: relative;">
-                                <button class="btn btn-outline-secondary" data-action="toggleHidden" data-id="bulk-menu-${report.id}">
+                                <button class="btn btn-outline-secondary" data-action="toggleHidden" data-id="bulk-menu-${report.id}" aria-label="Checklist">
                                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i> Bulk Actions
                                 </button>
                                 <div id="bulk-menu-${report.id}" class="hidden" style="position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 220px; z-index: 1000;">
                                     <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
                                         <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Items As:</div>
                                     </div>
-                                    <button class="bulk-action-btn" data-action="conform" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
+                                    <button class="bulk-action-btn" data-action="conform" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" aria-label="Confirm">
                                         <i class="fa-solid fa-check" style="color: var(--success-color); width: 18px;"></i>
                                         <span>Conform</span>
                                     </button>
-                                    <button class="bulk-action-btn" data-action="nc" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
+                                    <button class="bulk-action-btn" data-action="nc" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" aria-label="Flag">
                                         <i class="fa-solid fa-flag" style="color: var(--danger-color); width: 18px;"></i>
                                         <span>Non-Conform</span>
                                     </button>
@@ -1252,10 +1252,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-outline-secondary" data-action="autoMapPersonnel" data-id="${report.id}" title="AI auto-assign personnel, designation & department to items" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;">
+                            <button class="btn btn-outline-secondary" data-action="autoMapPersonnel" data-id="${report.id}" title="AI auto-assign personnel, designation & department to items" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;" aria-label="Auto-generate">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto Map
                             </button>
-                            <button class="btn btn-primary" data-action="saveChecklist" data-id="${report.id}" id="save-progress-btn">
+                            <button class="btn btn-primary" data-action="saveChecklist" data-id="${report.id}" id="save-progress-btn" aria-label="Save">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                             </button>
                             ${(report.checklistRevisions && report.checklistRevisions.length > 0) ? `
@@ -1407,7 +1407,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 Showing ${allNCRs.length} finding(s) - ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
                             </p>
                         </div>
-                        <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}">
+                        <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create NCR
                         </button>
                     </div>
@@ -1435,7 +1435,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.description || '-')}">${window.UTILS.escapeHtml(ncr.description || '-')}</td>
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
                                         <td>${ncr.source === 'manual'
-                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}"><i class="fa-solid fa-edit"></i></button>`
+                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>`
                     : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Edit in Checklist tab" data-action="showNotification" data-arg1="Edit this NCR in the Checklist tab where it was raised" data-arg2="info"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
                 }</td>
                                     </tr>
@@ -1460,7 +1460,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                         <h3>Corrective & Preventive Actions (CAPA)</h3>
-                        <button class="btn btn-primary" data-action="createCAPA" data-id="${report.id}">
+                        <button class="btn btn-primary" data-action="createCAPA" data-id="${report.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create CAPA
                         </button>
                     </div>
@@ -1579,7 +1579,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             if (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED) {
                 primaryActionBtn = `
-                    <button class="btn btn-secondary" data-action="generateAuditReport" data-id="${report.id}">
+                    <button class="btn btn-secondary" data-action="generateAuditReport" data-id="${report.id}" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
                     </button>
                 `;
@@ -1591,7 +1591,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 `;
             } else {
                 primaryActionBtn = `
-                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''}>
+                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''} aria-label="Send">
                         <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit for Review
                     </button>
                 `;
@@ -1608,7 +1608,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-size: 0.95rem;">Review findings, generate AI summaries, and finalize the report.</p>
                         </div>
                         <div style="display: flex; gap: 0.75rem;">
-                             <button class="btn btn-outline-secondary" data-action="saveChecklist" data-id="${report.id}">
+                             <button class="btn btn-outline-secondary" data-action="saveChecklist" data-id="${report.id}" aria-label="Save">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Draft
                             </button>
                             ${primaryActionBtn}
@@ -1639,7 +1639,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="margin-bottom: 2rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Findings & Classification</h4>
-                            <button id="btn-ai-classify" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" data-action="runFollowUpAIAnalysis" data-id="${report.id}">
+                            <button id="btn-ai-classify" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" data-action="runFollowUpAIAnalysis" data-id="${report.id}" aria-label="Auto-generate">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify & Polish
                             </button>
                         </div>
@@ -1713,7 +1713,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
                                 <i class="fa-solid fa-pen-nib" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Executive Summary & Reporting
                             </h4>
-                             <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none;" data-action="runAutoSummary" data-id="${report.id}">
+                             <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none;" data-action="runAutoSummary" data-id="${report.id}" aria-label="AI assist">
                                 <i class="fa-solid fa-robot" style="margin-right: 0.5rem;"></i> AI Draft Summary
                             </button>
                         </div>
@@ -1742,7 +1742,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                                 <h4 style="font-size: 0.95rem; margin: 0; color: var(--text-secondary); text-transform: uppercase;">Meeting Records</h4>
-                                <button class="btn btn-sm btn-outline-primary" data-action="clickTab" data-id="meetings">
+                                <button class="btn btn-sm btn-outline-primary" data-action="clickTab" data-id="meetings" aria-label="Edit">
                                     <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i>Edit in Meetings Tab
                                 </button>
                             </div>
@@ -1914,7 +1914,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 html += `<input type="text" id="${prefix}-custom-name" class="form-control form-control-sm" placeholder="Name" style="flex: 2; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
                 html += `<input type="text" id="${prefix}-custom-role" class="form-control form-control-sm" placeholder="Role" style="flex: 1.5; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
                 html += `<input type="text" id="${prefix}-custom-org" class="form-control form-control-sm" placeholder="Organization" style="flex: 1.5; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
-                html += `<button class="btn btn-sm btn-outline-primary" data-action="addCustomMeetingAttendee" data-id="${prefix}" style="padding: 0.25rem 0.5rem;"><i class="fa-solid fa-plus"></i></button>`;
+                html += `<button class="btn btn-sm btn-outline-primary" data-action="addCustomMeetingAttendee" data-id="${prefix}" style="padding: 0.25rem 0.5rem;" aria-label="Add"><i class="fa-solid fa-plus"></i></button>`;
                 html += '</div>';
                 // Custom attendees list
                 html += `<div id="${prefix}-custom-list" style="margin-top: 0.35rem;"></div>`;
@@ -2018,7 +2018,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
                 
                 <div style="margin-top: 1.5rem; text-align: right;">
-                    <button class="btn btn-primary" data-action="saveMeetingRecords" data-id="${report.id}">
+                    <button class="btn btn-primary" data-action="saveMeetingRecords" data-id="${report.id}" aria-label="Save">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>Save Meeting Records
                     </button>
                 </div>
@@ -3264,7 +3264,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             div.dataset.role = role;
             div.dataset.org = org;
             div.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; background: #eff6ff; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.25rem;';
-            div.innerHTML = `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${name}</strong>${role ? ' – ' + role : ''}${org ? ' (' + org + ')' : ''}<button class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" data-action="removeSelf"><i class="fa-solid fa-times"></i></button>`;
+            div.innerHTML = `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${name}</strong>${role ? ' – ' + role : ''}${org ? ' (' + org + ')' : ''}<button class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" data-action="removeSelf" aria-label="Close"><i class="fa-solid fa-times"></i></button>`;
             list.appendChild(div);
         }
         nameEl.value = ''; if (roleEl) roleEl.value = ''; if (orgEl) orgEl.value = '';
@@ -3642,7 +3642,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         overlay.innerHTML = `
         <div style="position: relative; max-width: 90%; max-height: 90%;">
             <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
-            <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
+            <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
@@ -3667,7 +3667,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         overlay.innerHTML = `
             <div style="position: relative; max-width: 90%; max-height: 80vh;" data-action="stopProp">
                 <img id="ev-gallery-main" src="${srcs[0]}" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
-                <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
+                <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -3951,7 +3951,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <h2 style="margin:0 0 4px;font-size:1.25rem;"><i class="fa-solid fa-file-pdf" style="margin-right:8px;"></i>Report Preview & Edit</h2>
                         <div style="opacity:0.8;font-size:0.88rem;">${d.report.client} — ${d.report.standard || 'ISO Standard'}</div>
                     </div>
-                    <button data-action="removeElement" data-id="report-preview-overlay" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;"><i class="fa-solid fa-times"></i></button>
+                    <button data-action="removeElement" data-id="report-preview-overlay" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;" aria-label="Close"><i class="fa-solid fa-times"></i></button>
                 </div>
             </div>
             <div class="rp-pills">
@@ -4681,8 +4681,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
                 <div style="display:flex;gap:10px;">
                     <button data-action="removeElement" data-id="report-preview-overlay" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
-                    <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
-                    <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
+                    <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;" aria-label="Auto-generate"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
+                    <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
             </div>
         </div>`;
@@ -5547,7 +5547,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div>') + '<span>' + (cbName || 'Certification Body') + '</span></div><div class="rpt-hdr-center">' + standard + ' Audit Report</div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
-            + '<button data-action="print" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
+            + '<button data-action="print" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
             + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
             // COVER PAGE
             + '<div class="cover">'

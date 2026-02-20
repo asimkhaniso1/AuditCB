@@ -303,7 +303,7 @@ function renderDashboardEnhanced() {
                         <span style="font-size: 0.85rem;">Clients</span>
                     </button>
                     <!-- 2. Plan Audit -->
-                    <button class="btn" data-action="renderModule" data-id="audit-planning" style="background: white; color: #667eea; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
+                    <button class="btn" data-action="renderModule" data-id="audit-planning" style="background: white; color: #667eea; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;" aria-label="Checklist">
                         <i class="fa-solid fa-clipboard-list" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                         <span style="font-size: 0.85rem;">Plan Audit</span>
                     </button>

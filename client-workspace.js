@@ -469,7 +469,7 @@ function renderClientOverview(client) {
                     </div>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                         <span style="background: ${client.status === 'Active' ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)'}; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 500;">${window.UTILS.escapeHtml(client.status || 'Active')}</span>
-                        <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: none;" data-hash="client/${client.id}/settings" title="Settings">
+                        <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: none;" data-hash="client/${client.id}/settings" title="Settings" aria-label="Settings">
                             <i class="fa-solid fa-cog"></i>
                         </button>
                     </div>
@@ -478,10 +478,10 @@ function renderClientOverview(client) {
 
             <!-- Quick Actions Bar -->
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <button class="btn btn-outline-primary" data-hash="client/${client.id}/plans">
+                <button class="btn btn-outline-primary" data-hash="client/${client.id}/plans" aria-label="Checklist">
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>View Audit Plans
                 </button>
-                <button class="btn btn-primary" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}">
+                <button class="btn btn-primary" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
                 </button>
                 <button class="btn btn-outline-primary" data-hash="client/${client.id}/execution">
@@ -708,7 +708,7 @@ function renderClientOverview(client) {
                 <div class="card">
                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Client Contacts</h3>
-                        <button class="btn btn-sm btn-primary" data-action="addContactPerson" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add Contact</button>
+                        <button class="btn btn-sm btn-primary" data-action="addContactPerson" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i> Add Contact</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -743,7 +743,7 @@ function renderClientOverview(client) {
                     <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Departments</h3>
-                            <button class="btn btn-sm btn-outline-primary" data-action="addDepartment" data-id="${client.id}"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" data-action="addDepartment" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${departments.map(dept => `
@@ -757,7 +757,7 @@ function renderClientOverview(client) {
                      <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Designations</h3>
-                            <button class="btn btn-sm btn-outline-primary" data-action="addClientDesignation" data-id="${client.id}"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" data-action="addClientDesignation" data-id="${client.id}" aria-label="Add"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${designations.map(desig => `
@@ -818,7 +818,7 @@ function renderCertificationCycleWidget(client) {
                             <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">No certification cycle started yet</p>
                         </div>
                     </div>
-                    <button class="btn btn-primary" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" style="white-space: nowrap;">
+                    <button class="btn btn-primary" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" style="white-space: nowrap;" aria-label="Settings">
                         <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Set Up Cycle
                     </button>
                 </div>
@@ -948,7 +948,7 @@ function renderAuditCycleTimeline(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
                     Go to Settings → Certification Scopes & History to set the Initial Date.
                 </p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes">
+                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" aria-label="Settings">
                     <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
                 </button>
             </div>
@@ -986,7 +986,7 @@ function renderAuditCycleTimeline(client) {
             <!-- Quick Link to Settings -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;"><i class="fa-solid fa-timeline" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Certification Cycle</h3>
-                <button class="btn btn-sm btn-outline-primary" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" title="Edit certification dates in Settings">
+                <button class="btn btn-sm btn-outline-primary" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" title="Edit certification dates in Settings" aria-label="Settings">
                     <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Edit Dates
                 </button>
             </div>
@@ -1112,7 +1112,7 @@ function renderClientPlans(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Plans</h3>
-                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
+                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
                     </button>
                 </div>
@@ -1137,7 +1137,7 @@ function renderClientPlans(client) {
                                     <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
                                     <td>${(p.team && p.team[0]) || p.lead || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" data-action="viewAuditPlan" data-id="${p.id}"><i class="fa-solid fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-icon" data-action="viewAuditPlan" data-id="${p.id}" aria-label="View"><i class="fa-solid fa-eye"></i></button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1199,7 +1199,7 @@ function renderClientExecution(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Execution & Reports</h3>
-                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
+                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Plan New Audit
                     </button>
                 </div>
@@ -1277,13 +1277,13 @@ function renderClientExecution(client) {
                                     </td>
                                     <td>${r.recommendation || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" data-action="renderExecutionDetail" data-id="${r.id}" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;">
+                                        <button class="btn btn-sm btn-icon" data-action="renderExecutionDetail" data-id="${r.id}" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;" aria-label="View">
                                             <i class="fa-solid fa-eye"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" data-action="openEditReportModal" data-id="${r.id}" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;">
+                                        <button class="btn btn-sm btn-icon" data-action="openEditReportModal" data-id="${r.id}" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;" aria-label="Edit">
                                             <i class="fa-solid fa-edit"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" data-action="deleteAuditReport" data-id="${r.id}" title="Delete Report" style="color: var(--danger-color);">
+                                        <button class="btn btn-sm btn-icon" data-action="deleteAuditReport" data-id="${r.id}" title="Delete Report" style="color: var(--danger-color);" aria-label="Delete">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>

@@ -39,13 +39,13 @@ function renderAuditPlanningEnhanced() {
             <td><span class="status-badge status-${(plan.status || 'draft').toLowerCase()}">${window.UTILS.escapeHtml(plan.status)}</span></td>
             <td>
                 <div style="display: flex; gap: 0.5rem;">
-                    ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
+                    ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan" aria-label="Edit">
                         <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
                     </button>` : ''}
-                    <button class="btn btn-sm" data-action="viewAuditPlan" data-id="${plan.id}" title="View Details">
+                    <button class="btn btn-sm" data-action="viewAuditPlan" data-id="${plan.id}" title="View Details" aria-label="View">
                         <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                     </button>
-                    ${isManager ? `<button class="btn btn-sm delete-plan-btn" data-plan-id="${plan.id}" title="Delete Plan">
+                    ${isManager ? `<button class="btn btn-sm delete-plan-btn" data-plan-id="${plan.id}" title="Delete Plan" aria-label="Delete">
                         <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                     </button>` : ''}
                 </div>
@@ -61,7 +61,7 @@ function renderAuditPlanningEnhanced() {
                     <button class="btn btn-sm btn-outline-secondary" data-action="togglePlanningAnalytics" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showPlanningAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showPlanningAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
-                    ${isManager ? `<button id="btn-create-plan" class="btn btn-primary">
+                    ${isManager ? `<button id="btn-create-plan" class="btn btn-primary" aria-label="Add">
                         <i class="fa-solid fa-plus"></i> Create Audit Plan
                     </button>` : ''}
                 </div>
@@ -228,7 +228,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
         <div class="fade-in">
              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary btn-sm" data-action="renderAuditPlanningEnhanced">
+                    <button class="btn btn-secondary btn-sm" data-action="renderAuditPlanningEnhanced" aria-label="Back">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <h2 id="plan-form-title" style="margin: 0; font-size: 1.5rem;">Create Audit Plan</h2>
@@ -325,10 +325,10 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     <i class="fa-solid fa-calendar-days"></i> Audit Agenda
                                 </h3>
                                 <div style="display: flex; gap: 0.5rem;">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="generateAIAgenda" id="btn-ai-generate">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="generateAIAgenda" id="btn-ai-generate" aria-label="Auto-generate">
                                         <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-secondary" data-action="addAgendaRow">
+                                    <button type="button" class="btn btn-sm btn-secondary" data-action="addAgendaRow" aria-label="Add">
                                         <i class="fa-solid fa-plus"></i> Add Row
                                     </button>
                                 </div>
@@ -384,7 +384,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                             </div>
 
-                            <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1.25rem; height: 36px;" data-action="autoCalculateDays" disabled>
+                            <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1.25rem; height: 36px;" data-action="autoCalculateDays" disabled aria-label="Auto-generate">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.4rem;"></i>Calculate Days
                             </button>
 
@@ -444,10 +444,10 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
                         <!-- Main Actions -->
                         <div style="display: grid; gap: 0.75rem; padding: 1rem; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);">
-                            <button type="button" id="btn-plan-save" class="btn btn-primary" style="height: 48px; font-weight: 600;">
+                            <button type="button" id="btn-plan-save" class="btn btn-primary" style="height: 48px; font-weight: 600;" aria-label="Save">
                                 <i class="fa-solid fa-floppy-disk" style="margin-right: 0.5rem;"></i> Save Audit Plan
                             </button>
-                            <button type="button" id="btn-plan-save-print" class="btn btn-outline-primary" style="height: 42px;">
+                            <button type="button" id="btn-plan-save-print" class="btn btn-outline-primary" style="height: 42px;" aria-label="Print">
                                 <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Save & Print Draft
                             </button>
                             <button type="button" id="btn-plan-cancel" class="btn btn-link" style="color: #6b7280; text-decoration: none;">Cancel</button>
@@ -857,7 +857,7 @@ function viewAuditPlan(id) {
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${itemCount} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
                 </div>
-                <button class="btn btn-sm" data-action="viewChecklistDetail" data-id="${cl.id}">
+                <button class="btn btn-sm" data-action="viewChecklistDetail" data-id="${cl.id}" aria-label="View">
                     <i class="fa-solid fa-eye"></i>
                 </button>
             </div>
@@ -907,7 +907,7 @@ function viewAuditPlan(id) {
             <!--Header-->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary" data-action="renderAuditPlanningEnhanced">
+                    <button class="btn btn-secondary" data-action="renderAuditPlanningEnhanced" aria-label="Back">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <div>
@@ -916,9 +916,9 @@ function viewAuditPlan(id) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                     ${report ? `<button class="btn btn-secondary" data-action="printAuditPlan" data-id="${plan.id}"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
-                     <button class="btn btn-secondary" data-action="printAuditPlanDetails" data-id="${plan.id}"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
-                     <button class="btn btn-primary" data-action="editAuditPlan" data-id="${plan.id}"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
+                     ${report ? `<button class="btn btn-secondary" data-action="printAuditPlan" data-id="${plan.id}" aria-label="Print"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
+                     <button class="btn btn-secondary" data-action="printAuditPlanDetails" data-id="${plan.id}" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
+                     <button class="btn btn-primary" data-action="editAuditPlan" data-id="${plan.id}" aria-label="Edit"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
                 </div>
             </div>
 
@@ -1035,7 +1035,7 @@ function viewAuditPlan(id) {
                             <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
                         </div>
                         <div>
-                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" data-action="printAuditChecklist" data-id="${plan.id}"><i class="fa-solid fa-print"></i> Print</button>
+                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" data-action="printAuditChecklist" data-id="${plan.id}" aria-label="Print"><i class="fa-solid fa-print"></i> Print</button>
                             <button class="btn btn-sm btn-secondary" style="width: 100%;" data-action="renderConfigureChecklist" data-id="${plan.id}">Configure</button>
                         </div>
                     </div>
@@ -1450,7 +1450,7 @@ window.renderConfigureChecklist = async function (planId) {
                                             <small style="color: var(--text-secondary);">${items.length} items • ${cl.standard || 'General'}</small>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-secondary" data-action="toggleCardItems">
+                                    <button class="btn btn-sm btn-outline-secondary" data-action="toggleCardItems" aria-label="Collapse">
                                         <i class="fa-solid fa-chevron-down"></i> Expand / Edit
                                     </button>
                                 </div>
@@ -1488,7 +1488,7 @@ window.renderConfigureChecklist = async function (planId) {
                                                     ${isOverridden ? '<span style="margin-left: 8px; font-size: 0.7rem; background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 4px;">Overridden</span>' : ''}
                                                 </td>
                                                 <td style="padding: 10px; text-align: center; vertical-align: top;">
-                                                    <button class="btn btn-xs btn-icon" data-action="editConfigItemRequirement" data-arg1="${cl.id}" data-arg2="${item.id}" title="Override requirement text" style="background: none; border: none; cursor: pointer;">
+                                                    <button class="btn btn-xs btn-icon" data-action="editConfigItemRequirement" data-arg1="${cl.id}" data-arg2="${item.id}" title="Override requirement text" style="background: none; border: none; cursor: pointer;" aria-label="Edit">
                                                         <i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i>
                                                     </button>
                                                 </td>
@@ -1509,7 +1509,7 @@ window.renderConfigureChecklist = async function (planId) {
     const headerHtml = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
             <div>
-                <button class="btn btn-sm btn-outline-secondary" data-action="viewAuditPlan" data-id="${planId}" style="margin-bottom: 0.5rem;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="viewAuditPlan" data-id="${planId}" style="margin-bottom: 0.5rem;" aria-label="Back">
                     <i class="fa-solid fa-arrow-left"></i> Back to Plan
                 </button>
                 <h2 style="margin: 0;">Configure Checklists</h2>
@@ -1520,7 +1520,7 @@ window.renderConfigureChecklist = async function (planId) {
                 <button class="btn" style="background: #7c3aed; color: white; border: none;" data-action="reviewMergedQuestions" data-id="${planId}">
                     <i class="fa-solid fa-magnifying-glass-chart"></i> Review & Merge Questions
                 </button>
-                <button class="btn btn-primary" data-action="saveChecklistConfiguration" data-id="${planId}" style="padding: 0.5rem 1.5rem;">
+                <button class="btn btn-primary" data-action="saveChecklistConfiguration" data-id="${planId}" style="padding: 0.5rem 1.5rem;" aria-label="Save">
                     <i class="fa-solid fa-save"></i> Save Configuration
                 </button>
             </div>
@@ -1545,7 +1545,7 @@ window.renderConfigureChecklist = async function (planId) {
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${plan.client} &mdash; No Custom Checklists Yet</h4>
                         <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Create a tailored checklist from the Knowledge Base for this client</p>
-                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" data-action="_goToKB">
+                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" data-action="_goToKB" aria-label="Auto-generate">
                             <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Create from Knowledge Base
                         </button>
                     </div>
@@ -1555,7 +1555,7 @@ window.renderConfigureChecklist = async function (planId) {
             </div>
             
             <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
-                 <button class="btn btn-primary btn-lg" data-action="saveChecklistConfiguration" data-id="${planId}" style="min-width: 250px;">
+                 <button class="btn btn-primary btn-lg" data-action="saveChecklistConfiguration" data-id="${planId}" style="min-width: 250px;" aria-label="Save">
                     <i class="fa-solid fa-save"></i> Save & Return to Plan
                  </button>
             </div>
@@ -1765,7 +1765,7 @@ window.reviewMergedQuestions = function (planId) {
         <div class="fade-in" style="max-width: 1200px; margin: 0 auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
                 <div>
-                    <button class="btn btn-sm btn-outline-secondary" data-action="configureChecklists" data-id="${planId}" style="margin-bottom: 0.5rem;">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="configureChecklists" data-id="${planId}" style="margin-bottom: 0.5rem;" aria-label="Back">
                         <i class="fa-solid fa-arrow-left"></i> Back to Configure
                     </button>
                     <h2 style="margin: 0;">Review & Merge Questions</h2>
@@ -1932,7 +1932,7 @@ function addAgendaRow(data = {}) {
             </select>
         </td>
         <td style="text-align: center;">
-            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="removeClosestTR"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="removeClosestTR" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
         </td>
     `;
 
@@ -2824,7 +2824,7 @@ window.renderPreAuditReview = function (planId) {
             <!-- Header -->
             <div class="pre-audit-header" style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
                 <div>
-                    <button class="btn btn-secondary" data-action="viewAuditPlan" data-id="${plan.id}">
+                    <button class="btn btn-secondary" data-action="viewAuditPlan" data-id="${plan.id}" aria-label="Back">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Audit Plan
                     </button>
                     <h2 style="margin: 1rem 0 0.5rem 0;">Pre-Audit Review (Stage 1)</h2>
@@ -2837,10 +2837,10 @@ window.renderPreAuditReview = function (planId) {
                     </p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                    <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}">
+                    <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export PDF
                     </button>
-                    <button class="btn btn-primary" data-action="savePreAuditReview" data-id="${plan.id}">
+                    <button class="btn btn-primary" data-action="savePreAuditReview" data-id="${plan.id}" aria-label="Save">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                     </button>
                 </div>
@@ -2959,10 +2959,10 @@ window.renderPreAuditReview = function (planId) {
                 <button class="btn btn-secondary" data-action="viewAuditPlan" data-id="${plan.id}">
                     Cancel
                 </button>
-                <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}">
+                <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}" aria-label="Export PDF">
                     <i class="fa-solid fa-file-pdf"></i> Export PDF
                 </button>
-                <button class="btn btn-success" data-action="completePreAuditReview" data-id="${plan.id}">
+                <button class="btn btn-success" data-action="completePreAuditReview" data-id="${plan.id}" aria-label="Confirm">
                     <i class="fa-solid fa-check-circle"></i> Complete Review
                 </button>
             </div>

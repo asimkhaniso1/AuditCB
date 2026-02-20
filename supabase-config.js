@@ -264,11 +264,11 @@ const SupabaseConfig = {
                         <button type="button" data-action="SupabaseConfig_handleTest" class="btn btn-secondary">
                             <i class="fa-solid fa-plug"></i> Test Connection
                         </button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" aria-label="Save">
                             <i class="fa-solid fa-save"></i> Save Configuration
                         </button>
                         ${status.configured ? `
-                            <button type="button" data-action="SupabaseConfig_handleClear" class="btn btn-danger">
+                            <button type="button" data-action="SupabaseConfig_handleClear" class="btn btn-danger" aria-label="Delete">
                                 <i class="fa-solid fa-trash"></i> Clear
                             </button>
                         ` : ''}

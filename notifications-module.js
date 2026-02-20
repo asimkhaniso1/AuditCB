@@ -208,7 +208,7 @@ const NotificationManager = {
                         <button data-action="NotificationManager_markAllAsRead" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
                             Mark all read
                         </button>
-                        <button data-action="toggleNotificationPanel" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem;">
+                        <button data-action="toggleNotificationPanel" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem;" aria-label="Close">
                             <i class="fa-solid fa-times"></i>
                         </button>
                     </div>

@@ -222,10 +222,10 @@ function renderAppealsComplaintsModule() {
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">ISO 17021-1 Clause 9.10 & 9.11 - Internal tracking for accreditation compliance</p>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-primary" data-action="openNewAppealModal">
+                    <button class="btn btn-primary" data-action="openNewAppealModal" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Appeal
                     </button>
-                    <button class="btn btn-secondary" data-action="openNewComplaintModal">
+                    <button class="btn btn-secondary" data-action="openNewComplaintModal" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Complaint
                     </button>
                 </div>
@@ -281,7 +281,7 @@ function renderAppealsComplaintsModule() {
                         <i class="fa-solid fa-comment-dots" style="margin-right: 0.5rem;"></i>Complaints Register
                     </button>
                     <div style="flex: 1;"></div>
-                    <button class="btn btn-sm btn-outline-secondary" data-action="printACRegister" data-id="${activeTab}">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="printACRegister" data-id="${activeTab}" aria-label="Print">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Print Register
                     </button>
                 </div>
@@ -345,13 +345,13 @@ function renderAppealsTab(appeals) {
                             <td><span class="badge" style="background: ${getStatusColor(a.status)}; color: white;">${window.UTILS.escapeHtml(a.status)}</span></td>
                             <td>
                                 <div style="display: flex; gap: 0.25rem;">
-                                    <button class="btn btn-sm btn-icon" data-action="viewAppealDetail" data-id="${a.id}" title="View Details">
+                                    <button class="btn btn-sm btn-icon" data-action="viewAppealDetail" data-id="${a.id}" title="View Details" aria-label="View">
                                         <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" data-action="editAppeal" data-id="${a.id}" title="Edit Appeal">
+                                    <button class="btn btn-sm btn-icon" data-action="editAppeal" data-id="${a.id}" title="Edit Appeal" aria-label="Edit">
                                         <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" data-action="deleteAppeal" data-id="${a.id}" title="Delete Appeal">
+                                    <button class="btn btn-sm btn-icon" data-action="deleteAppeal" data-id="${a.id}" title="Delete Appeal" aria-label="Delete">
                                         <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                     </button>
                                 </div>
@@ -413,13 +413,13 @@ function renderComplaintsTab(complaints) {
                             <td><span class="badge" style="background: ${getStatusColor(c.status)}; color: white;">${window.UTILS.escapeHtml(c.status)}</span></td>
                             <td>
                                 <div style="display: flex; gap: 0.25rem;">
-                                    <button class="btn btn-sm btn-icon" data-action="viewComplaintDetail" data-id="${c.id}" title="View Details">
+                                    <button class="btn btn-sm btn-icon" data-action="viewComplaintDetail" data-id="${c.id}" title="View Details" aria-label="View">
                                         <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" data-action="editComplaint" data-id="${c.id}" title="Edit Complaint">
+                                    <button class="btn btn-sm btn-icon" data-action="editComplaint" data-id="${c.id}" title="Edit Complaint" aria-label="Edit">
                                         <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" data-action="deleteComplaint" data-id="${c.id}" title="Delete Complaint">
+                                    <button class="btn btn-sm btn-icon" data-action="deleteComplaint" data-id="${c.id}" title="Delete Complaint" aria-label="Delete">
                                         <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                     </button>
                                 </div>
@@ -683,7 +683,7 @@ window.viewAppealDetail = function (id) {
     // (Re-implementing viewAppealDetail for safety)
     const html = `
         <div class="fade-in">
-            <button class="btn btn-secondary" data-action="renderAppealsComplaintsModule"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <button class="btn btn-secondary" data-action="renderAppealsComplaintsModule" aria-label="Back"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <div class="card" style="margin-top:1rem;">
                 <h2>APP-${String(appeal.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(appeal.subject)}</h2>
                 <span class="badge" style="background:${getStatusColor(appeal.status)};color:white;">${window.UTILS.escapeHtml(appeal.status)}</span>
@@ -712,7 +712,7 @@ window.viewComplaintDetail = function (id) {
 
     const html = `
         <div class="fade-in">
-            <button class="btn btn-secondary" data-action="renderAppealsComplaintsModule"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <button class="btn btn-secondary" data-action="renderAppealsComplaintsModule" aria-label="Back"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <div class="card" style="margin-top:1rem;">
                 <h2>CMP-${String(complaint.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(complaint.subject)}</h2>
                 <span class="badge" style="background:#8b5cf6;color:white;">${window.UTILS.escapeHtml(complaint.status)}</span>

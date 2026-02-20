@@ -31,8 +31,8 @@ function renderCertificationModule() {
                     <p style="color: var(--text-secondary);">Manage issuance, surveillance, and renewal of ISO certificates.</p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                    <button class="btn btn-secondary" data-action="printCertificateRegister"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Register</button>
-                    <button class="btn btn-primary" data-action="openIssueCertificateModal"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Manual Issue</button>
+                    <button class="btn btn-secondary" data-action="printCertificateRegister" aria-label="Print"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Register</button>
+                    <button class="btn btn-primary" data-action="openIssueCertificateModal" aria-label="Add"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Manual Issue</button>
                 </div>
             </div>
 
@@ -107,10 +107,10 @@ function renderCertificationModule() {
                                         <td>${window.UTILS.escapeHtml(cert.expiryDate)}</td>
                                         <td><span class="badge bg-green">${window.UTILS.escapeHtml(cert.status)}</span></td>
                                         <td  style="text-align: right;">
-                                            <button class="btn btn-sm btn-icon" data-action="viewCertificate" data-id="${cert.id}" title="View/Print"><i class="fa-solid fa-eye"></i></button>
-                                            <button class="btn btn-sm btn-icon" data-action="editCertificate" data-id="${cert.id}" title="Edit Details"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="btn btn-sm btn-icon" data-action="viewCertificate" data-id="${cert.id}" title="View/Print" aria-label="View"><i class="fa-solid fa-eye"></i></button>
+                                            <button class="btn btn-sm btn-icon" data-action="editCertificate" data-id="${cert.id}" title="Edit Details" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
                                             <button class="btn btn-sm btn-icon" data-action="openCertActionModal" data-id="${cert.id}" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
-                                            <button class="btn btn-sm btn-icon btn-danger" data-action="deleteCertificate" data-id="${cert.id}" title="Delete Permanent"><i class="fa-solid fa-trash"></i></button>
+                                            <button class="btn btn-sm btn-icon btn-danger" data-action="deleteCertificate" data-id="${cert.id}" title="Delete Permanent" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join('') || '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">No active certificates found.</td></tr>'}
@@ -143,7 +143,7 @@ function renderCertificationModule() {
                                         <td>${window.UTILS.escapeHtml(r.date)}</td>
                                         <td><span style="color: var(--success-color); font-weight: 600;">${window.UTILS.escapeHtml(r.recommendation)}</span></td>
                                         <td>
-                                            <button class="btn btn-primary btn-sm" data-action="openIssueCertificateModal" data-id="${r.id}">
+                                            <button class="btn btn-primary btn-sm" data-action="openIssueCertificateModal" data-id="${r.id}" aria-label="Certificate">
                                                 <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Issue Certificate
                                             </button>
                                         </td>
@@ -179,7 +179,7 @@ function renderCertificationModule() {
                                         <td><span class="badge" style="background: ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? 'orange' : 'red'}; color: white;">${window.UTILS.escapeHtml(cert.status)}</span></td>
                                         <td>${window.UTILS.escapeHtml(cert.statusReason || 'N/A')}</td>
                                         <td style="text-align: right;">
-                                            <button class="btn btn-sm btn-icon" data-action="viewCertificate" data-id="${cert.id}" title="View History"><i class="fa-solid fa-history"></i></button>
+                                            <button class="btn btn-sm btn-icon" data-action="viewCertificate" data-id="${cert.id}" title="View History" aria-label="History"><i class="fa-solid fa-history"></i></button>
                                             ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? `<button class="btn btn-sm btn-success" data-action="restoreCertificate" data-id="${cert.id}" title="Restore"><i class="fa-solid fa-undo"></i> Restore</button>` : ''}
                                         </td>
                                     </tr>
@@ -198,7 +198,7 @@ function renderCertificationModule() {
                              <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">ISO 17021-1 Clause 9.3 - Publicly accessible directory of certified clients</p>
                          </div>
                          <div style="display: flex; gap: 0.5rem;">
-                             <button class="btn btn-secondary btn-sm" data-action="exportPublicDirectory">
+                             <button class="btn btn-secondary btn-sm" data-action="exportPublicDirectory" aria-label="Download">
                                  <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>Export CSV
                              </button>
                              <button class="btn btn-primary btn-sm" data-action="generateEmbedCode">
@@ -1088,7 +1088,7 @@ window.generateEmbedCode = function () {
     document.getElementById('modal-body').innerHTML = `
         <p style="margin-bottom: 1rem; color: var(--text-secondary);">Copy the HTML code below and paste it into your website:</p>
         <textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 0.85rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 4px;">${embedHTML}</textarea>
-        <button class="btn btn-secondary" data-action="copyCertEmbed" style="margin-top: 1rem;">
+        <button class="btn btn-secondary" data-action="copyCertEmbed" style="margin-top: 1rem;" aria-label="Copy">
             <i class="fa-solid fa-copy" style="margin-right: 0.5rem;"></i>Copy to Clipboard
         </button>
     `;

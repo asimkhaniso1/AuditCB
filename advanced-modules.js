@@ -51,9 +51,9 @@ function renderAuditorsEnhanced() {
             <td><span style="background: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${window.UTILS.escapeHtml(auditor.role)}</span></td>
             <td>${(auditor.standards || []).map(s => window.UTILS.escapeHtml(s)).join(', ')}</td>
             <td>
-                ${isAuthorized ? `<button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);" title="Edit"><i class="fa-solid fa-edit"></i></button>` : ''}
-                <button class="btn btn-sm view-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);" title="View"><i class="fa-solid fa-eye"></i></button>
-                ${isAuthorized ? `<button class="btn btn-sm delete-auditor" data-auditor-id="${auditor.id}" style="color: var(--danger-color);" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
+                ${isAuthorized ? `<button class="btn btn-sm edit-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);" title="Edit" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>` : ''}
+                <button class="btn btn-sm view-auditor" data-auditor-id="${auditor.id}" style="color: var(--primary-color);" title="View" aria-label="View"><i class="fa-solid fa-eye"></i></button>
+                ${isAuthorized ? `<button class="btn btn-sm delete-auditor" data-auditor-id="${auditor.id}" style="color: var(--danger-color);" title="Delete" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
             </td>
         </tr>
     `).join('');
@@ -66,7 +66,7 @@ function renderAuditorsEnhanced() {
                      <button class="btn btn-sm btn-outline-secondary" data-action="toggleAuditorAnalytics" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showAuditorAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showAuditorAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
-                    ${isAuthorized ? `<button id="btn-add-auditor" class="btn btn-primary" style="white-space: nowrap;"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>` : ''}
+                    ${isAuthorized ? `<button id="btn-add-auditor" class="btn btn-primary" style="white-space: nowrap;" aria-label="Add"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>` : ''}
                 </div>
             </div>
 
@@ -157,7 +157,7 @@ function renderAuditorsEnhanced() {
                     Showing ${startIndex + 1} to ${Math.min(startIndex + state.auditorPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" data-action="changeAuditorPage" data-id="${state.auditorPagination.currentPage - 1}" ${state.auditorPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeAuditorPage" data-id="${state.auditorPagination.currentPage - 1}" ${state.auditorPagination.currentPage === 1 ? 'disabled' : ''} aria-label="Previous">
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
                     <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${state.auditorPagination.currentPage} of ${totalPages}</span>
@@ -285,7 +285,7 @@ function renderAuditorDetail(auditorId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" data-action="renderAuditorsEnhanced">
+                <button class="btn btn-secondary" data-action="renderAuditorsEnhanced" aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Auditors
                 </button>
             </div>
@@ -318,7 +318,7 @@ function renderAuditorDetail(auditorId) {
                         </div>
                     </div>
                     <div style="text-align: right;">
-                        <button class="btn btn-primary edit-auditor" data-auditor-id="${auditor.id}" style="margin-bottom: 0.5rem;">
+                        <button class="btn btn-primary edit-auditor" data-auditor-id="${auditor.id}" style="margin-bottom: 0.5rem;" aria-label="Edit">
                             <i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit Auditor
                         </button>
                         ${auditor.customerRating ? `
@@ -346,7 +346,7 @@ function renderAuditorDetail(auditorId) {
                 <button class="tab-btn" data-tab="performance">
                     <i class="fa-solid fa-chart-line" style="margin-right: 0.25rem;"></i>Performance
                 </button>
-                <button class="tab-btn" data-tab="complaints">
+                <button class="tab-btn" data-tab="complaints" aria-label="Warning">
                     <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.25rem;"></i>Complaints
                 </button>
                 <button class="tab-btn" data-tab="documents">
@@ -623,7 +623,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-eye" style="margin-right: 0.5rem; color: #3b82f6;"></i>
                             Witness Audits
                         </h3>
-                        <button class="btn btn-sm btn-primary" data-action="addWitnessAudit" data-id="${auditor.id}">
+                        <button class="btn btn-sm btn-primary" data-action="addWitnessAudit" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Record Witness Audit
                         </button>
                     </div>
@@ -676,7 +676,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
                             Performance Reviews
                         </h3>
-                        <button class="btn btn-sm btn-secondary" data-action="addPerformanceReview" data-id="${auditor.id}">
+                        <button class="btn btn-sm btn-secondary" data-action="addPerformanceReview" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
                         </button>
                     </div>
@@ -738,7 +738,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
                             Report Reviews
                         </h3>
-                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" data-action="addReportReview" data-id="${auditor.id}">
+                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" data-action="addReportReview" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Report Review
                         </button>
                     </div>
@@ -863,7 +863,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
                             Performance Reviews
                         </h3>
-                        <button class="btn btn-sm btn-secondary" data-action="addPerformanceReview" data-id="${auditor.id}">
+                        <button class="btn btn-sm btn-secondary" data-action="addPerformanceReview" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
                         </button>
                     </div>
@@ -910,7 +910,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
                             Report Reviews
                         </h3>
-                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" data-action="addReportReview" data-id="${auditor.id}">
+                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" data-action="addReportReview" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Report Review
                         </button>
                     </div>
@@ -994,7 +994,7 @@ function renderAuditorTab(auditor, tabName) {
                                             <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
                                             <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary" data-action="viewComplaintDetail" data-id="${c.complaintId}">
+                                                <button class="btn btn-sm btn-outline-primary" data-action="viewComplaintDetail" data-id="${c.complaintId}" aria-label="View">
                                                     <i class="fa-solid fa-eye" style="margin-right: 0.25rem;"></i>View
                                                 </button>
                                             </td>
@@ -1061,7 +1061,7 @@ function renderAuditorTab(auditor, tabName) {
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Qualifications & Certifications</h3>
-                        <button class="btn btn-sm btn-primary" data-action="openAddQualificationModal" data-id="${auditor.id}">
+                        <button class="btn btn-sm btn-primary" data-action="openAddQualificationModal" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Qualification
                         </button>
                     </div>
@@ -1121,7 +1121,7 @@ function renderAuditorTab(auditor, tabName) {
                 <div class="card" style="margin-top: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;"><i class="fa-solid fa-book-open" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Training Records</h3>
-                        <button class="btn btn-sm btn-primary" data-action="openAddTrainingModal" data-id="${auditor.id}">
+                        <button class="btn btn-sm btn-primary" data-action="openAddTrainingModal" data-id="${auditor.id}" aria-label="Add">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Training
                         </button>
                     </div>
@@ -1170,15 +1170,15 @@ function renderAuditorTab(auditor, tabName) {
                                     </div>
                                     <div style="display: flex; gap: 0.5rem;">
                                         ${d.cloudUrl ? `
-                                            <button class="btn btn-sm btn-outline-primary" data-action="open" data-arg1="${d.cloudUrl}" data-arg2="_blank" title="View/Download">
+                                            <button class="btn btn-sm btn-outline-primary" data-action="open" data-arg1="${d.cloudUrl}" data-arg2="_blank" title="View/Download" aria-label="Download">
                                                 <i class="fa-solid fa-download"></i>
                                             </button>
                                         ` : `
-                                            <button class="btn btn-sm btn-outline-secondary" disabled title="No cloud file">
+                                            <button class="btn btn-sm btn-outline-secondary" disabled title="No cloud file" aria-label="Download">
                                                 <i class="fa-solid fa-download"></i>
                                             </button>
                                         `}
-                                        <button class="btn btn-sm btn-outline-danger" data-action="deleteAuditorDocument" data-arg1="${auditor.id}" data-arg2="${idx}" title="Delete">
+                                        <button class="btn btn-sm btn-outline-danger" data-action="deleteAuditorDocument" data-arg1="${auditor.id}" data-arg2="${idx}" title="Delete" aria-label="Delete">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </div>
@@ -1186,7 +1186,7 @@ function renderAuditorTab(auditor, tabName) {
                             `).join('')}
                         </div>
                     ` : '<p style="color: var(--text-secondary);">No documents uploaded.</p>'}
-                    <button class="btn btn-primary" style="margin-top: 1rem;" data-action="openAuditorUploadModal" data-id="${auditor.id}">
+                    <button class="btn btn-primary" style="margin-top: 1rem;" data-action="openAuditorUploadModal" data-id="${auditor.id}" aria-label="Upload to cloud">
                         <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                     </button>
                     <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
@@ -1291,10 +1291,10 @@ function renderCompetenceMatrix() {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary" data-action="renderAuditorsEnhanced">
+                <button class="btn btn-secondary" data-action="renderAuditorsEnhanced" aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Auditors
                 </button>
-                <button class="btn btn-primary" data-action="exportCompetenceMatrix">
+                <button class="btn btn-primary" data-action="exportCompetenceMatrix" aria-label="Export PDF">
                     <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export Matrix
                 </button>
             </div>
@@ -1655,7 +1655,7 @@ function renderManDayCalculator() {
         <div class="fade-in">
             <!-- Back Button -->
             <div style="margin-bottom: 1rem;">
-                <button class="btn btn-secondary" data-hash="dashboard">
+                <button class="btn btn-secondary" data-hash="dashboard" aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to Dashboard
                 </button>
             </div>
@@ -1761,11 +1761,11 @@ function renderManDayCalculator() {
                     </div>
 
                     <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                        <button class="btn btn-primary" data-action="saveCalculationToPlan">
+                        <button class="btn btn-primary" data-action="saveCalculationToPlan" aria-label="Save">
                             <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
                             Save to Audit Plan
                         </button>
-                        <button class="btn btn-secondary" data-action="printCalculation">
+                        <button class="btn btn-secondary" data-action="printCalculation" aria-label="Print">
                             <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>
                             Print Results
                         </button>
@@ -1948,7 +1948,7 @@ window.openMultiSiteSamplingCalculatorModal = function () {
                 </div>
 
                 <div style="display:flex; gap: 0.75rem; justify-content: center;">
-                    <button class="btn btn-sm btn-primary" data-action="applySamplingToPlan" style="padding: 6px 16px;">
+                    <button class="btn btn-sm btn-primary" data-action="applySamplingToPlan" style="padding: 6px 16px;" aria-label="Confirm">
                         <i class="fa-solid fa-check" style="margin-right: 0.25rem;"></i> Apply to Plan
                     </button>
                     ${sitesContainer ? `

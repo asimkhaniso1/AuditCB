@@ -33,7 +33,7 @@ function renderAuditorForm(auditorId = null) {
         <div class="dashboard-header">
             <h2><i class="fa-solid fa-user-tie"></i> ${title}</h2>
             <div style="display: flex; gap: 1rem;">
-                <button class="btn btn-secondary" data-hash="#auditors-list">
+                <button class="btn btn-secondary" data-hash="#auditors-list" aria-label="Back">
                     <i class="fa-solid fa-arrow-left"></i> Back to List
                 </button>
             </div>
@@ -51,7 +51,7 @@ function renderAuditorForm(auditorId = null) {
                 <button class="form-tab-btn" data-tab="capabilities" style="padding: 1rem 1.5rem; border: none; background: none; font-weight: 500; color: var(--text-secondary); cursor: pointer;">
                     <i class="fa-solid fa-briefcase" style="margin-right: 0.5rem;"></i>Industry Scopes
                 </button>
-                <button class="form-tab-btn" data-tab="skills" style="padding: 1rem 1.5rem; border: none; background: none; font-weight: 500; color: var(--text-secondary); cursor: pointer;">
+                <button class="form-tab-btn" data-tab="skills" style="padding: 1rem 1.5rem; border: none; background: none; font-weight: 500; color: var(--text-secondary); cursor: pointer;" aria-label="Favorite">
                     <i class="fa-solid fa-star" style="margin-right: 0.5rem;"></i>Soft Skills
                 </button>
             </div>
@@ -207,7 +207,7 @@ function renderAuditorForm(auditorId = null) {
                      <button type="button" class="btn btn-secondary btn-lg" data-hash="#auditors-list" style="min-width: 150px;">
                         Cancel
                     </button>
-                    <button type="button" class="btn btn-primary btn-lg" data-action="saveAuditorForm" data-id="${auditorId || ''}" style="min-width: 200px;">
+                    <button type="button" class="btn btn-primary btn-lg" data-action="saveAuditorForm" data-id="${auditorId || ''}" style="min-width: 200px;" aria-label="Save">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> ${btnText}
                     </button>
                 </div>

@@ -55,9 +55,9 @@ function renderClientsEnhanced() {
 
             <td>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
-                <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);"><i class="fa-solid fa-eye"></i></button>
+                <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" aria-label="View"><i class="fa-solid fa-eye"></i></button>
             </td>
         </tr >
     `).join('');
@@ -69,7 +69,7 @@ function renderClientsEnhanced() {
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
-                        <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" title="Restricted to Cert Managers">
+                        <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" title="Restricted to Cert Managers" aria-label="Export">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
                          <button class="btn btn-sm btn-outline-secondary" data-action="clickElement" data-id="client-import-file" style="white-space: nowrap;" title="Restricted to Cert Managers">
@@ -80,7 +80,7 @@ function renderClientsEnhanced() {
                     <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                 </button>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button id="btn-new-client" class="btn btn-primary" data-action="renderAddClient" style="white-space: nowrap;">
+                    <button id="btn-new-client" class="btn btn-primary" data-action="renderAddClient" style="white-space: nowrap;" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                     ` : ''}
@@ -171,7 +171,7 @@ function renderClientsEnhanced() {
                     Showing ${startIndex + 1} to ${Math.min(startIndex + window.state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage - 1}" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage - 1}" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''} aria-label="Previous">
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
                     <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${window.state.clientPagination.currentPage} of ${totalPages}</span>
@@ -276,7 +276,7 @@ function renderClientDetail(clientId, options = {}) {
     const html = `
     <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" data-action="renderClientsEnhanced">
+                <button class="btn btn-secondary" data-action="renderClientsEnhanced" aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Clients
                 </button>
             </div>
@@ -302,7 +302,7 @@ function renderClientDetail(clientId, options = {}) {
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
-                    <button class="btn btn-primary" data-action="renderEditClient" data-id="${client.id}">
+                    <button class="btn btn-primary" data-action="renderEditClient" data-id="${client.id}" aria-label="Edit">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
                     ` : ''}
@@ -340,10 +340,10 @@ function renderClientDetail(clientId, options = {}) {
                 <button class="tab-btn" data-tab="audit_team">
                     <i class="fa-solid fa-user-shield" style="margin-right: 0.25rem;"></i>Audit Team
                 </button>
-                <button class="tab-btn" data-tab="scopes">
+                <button class="tab-btn" data-tab="scopes" aria-label="Certificate">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.25rem;"></i>Scopes & Certs
                 </button>
-                <button class="tab-btn" data-tab="settings">
+                <button class="tab-btn" data-tab="settings" aria-label="Settings">
                     <i class="fa-solid fa-cog" style="margin-right: 0.25rem;"></i>Settings
                 </button>
             </div>
@@ -497,10 +497,10 @@ function getClientSitesHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadSites" data-id="${client.id}">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadSites" data-id="${client.id}" aria-label="Upload">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" data-action="addSite" data-id="${client.id}">
+                    <button class="btn btn-sm btn-secondary" data-action="addSite" data-id="${client.id}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
                     </button>
                 </div>
@@ -541,10 +541,10 @@ function getClientSitesHTML(client) {
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
-                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editSite" data-arg1="${client.id}" data-arg2="${index}">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editSite" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit">
                                                 <i class="fa-solid fa-pen"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteSite" data-arg1="${client.id}" data-arg2="${index}">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteSite" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </div>
@@ -560,7 +560,7 @@ function getClientSitesHTML(client) {
                     <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">No sites or branch locations added yet.</p>
                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" data-action="addSite" data-id="${client.id}">
+                    <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" data-action="addSite" data-id="${client.id}" aria-label="Add">
                         <i class="fa-solid fa-plus"></i> Add First Site
                     </button>
                     ` : ''}
@@ -595,7 +595,7 @@ function getClientProfileHTML(client) {
                                 <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate
                             </button>
                         ` : ''}
-                        <button class="btn btn-sm btn-secondary" data-action="editCompanyProfile" data-id="${client.id}">
+                        <button class="btn btn-sm btn-secondary" data-action="editCompanyProfile" data-id="${client.id}" aria-label="Edit">
                             <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i> Edit Manually
                         </button>
                     ` : ''}
@@ -611,7 +611,7 @@ function getClientProfileHTML(client) {
                     <span style="font-size: 0.8rem; color: #22c55e; margin-left: 0.5rem;">(Uploaded ${new Date(client.profileDocument.uploadedAt).toLocaleDateString()})</span>
                 </div>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" data-action="removeProfileDocument" data-id="${client.id}" title="Remove document">
+                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" data-action="removeProfileDocument" data-id="${client.id}" title="Remove document" aria-label="Close">
                     <i class="fa-solid fa-times"></i>
                 </button>
                 ` : ''}
@@ -641,7 +641,7 @@ function getClientProfileHTML(client) {
                                     <i class="fa-solid fa-sparkles"></i> AI Generate
                                 </button>
                             ` : ''}
-                            <button class="btn btn-outline-secondary btn-sm" data-action="editCompanyProfile" data-id="${client.id}">
+                            <button class="btn btn-outline-secondary btn-sm" data-action="editCompanyProfile" data-id="${client.id}" aria-label="Edit">
                                 <i class="fa-solid fa-pen"></i> Write Manually
                             </button>
                         ` : ''}
@@ -665,10 +665,10 @@ function getClientContactsHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-secondary" data-action="addContactPerson" data-id="${client.id}">
+                    <button class="btn btn-sm btn-secondary" data-action="addContactPerson" data-id="${client.id}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadContacts" data-id="${client.id}">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadContacts" data-id="${client.id}" aria-label="Upload">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
                 </div>
@@ -695,10 +695,10 @@ function getClientContactsHTML(client) {
                                     <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editContact" data-arg1="${client.id}" data-arg2="${index}">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editContact" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${index}">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                         ` : ''}
@@ -723,10 +723,10 @@ function getClientDepartmentsHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}" aria-label="Upload">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" data-action="addDepartment" data-id="${client.id}">
+                    <button class="btn btn-sm btn-secondary" data-action="addDepartment" data-id="${client.id}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Department
                     </button>
                     ` : ''}
@@ -749,10 +749,10 @@ function getClientDepartmentsHTML(client) {
                                     <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${index}">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${index}">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                         ` : ''}
@@ -792,10 +792,10 @@ function getClientGoodsServicesHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" data-action="addGoodsService" data-id="${client.id}">
+                <button class="btn btn-sm btn-secondary" data-action="addGoodsService" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadGoodsServices" data-id="${client.id}">
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadGoodsServices" data-id="${client.id}" aria-label="Upload">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -820,8 +820,8 @@ function getClientGoodsServicesHTML(client) {
                                 <td style="font-size: 0.9rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.description || '-')}</td>
                                 <td>
                                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
                                 </td>
                             </tr>
@@ -852,10 +852,10 @@ function getClientKeyProcessesHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" data-action="addKeyProcess" data-id="${client.id}">
+                <button class="btn btn-sm btn-secondary" data-action="addKeyProcess" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadKeyProcesses" data-id="${client.id}">
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadKeyProcesses" data-id="${client.id}" aria-label="Upload">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -880,8 +880,8 @@ function getClientKeyProcessesHTML(client) {
                                 <td>${window.UTILS.escapeHtml(proc.owner || '-')}</td>
                                 <td>
                                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
                                 </td>
                             </tr>
@@ -912,10 +912,10 @@ function getClientDesignationsHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" data-action="addClientDesignation" data-id="${client.id}">
+                <button class="btn btn-sm btn-secondary" data-action="addClientDesignation" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDesignations" data-id="${client.id}">
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDesignations" data-id="${client.id}" aria-label="Upload">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -929,7 +929,7 @@ function getClientDesignationsHTML(client) {
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-times"></i></button>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${index}" aria-label="Close"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
                 `).join('')}
@@ -966,7 +966,7 @@ function getClientAuditTeamHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">CB auditors assigned to audit this organization</p>
             </div>
             ${canManage ? `
-            <button class="btn btn-primary" data-action="openClientAuditorAssignmentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(client.name)}">
+            <button class="btn btn-primary" data-action="openClientAuditorAssignmentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(client.name)}" aria-label="Add user">
                 <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
             </button>
             ` : ''}
@@ -1003,7 +1003,7 @@ function getClientAuditTeamHTML(client) {
                                 ${assignment?.assignedAt ? '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Assigned: ' + new Date(assignment.assignedAt).toLocaleDateString() + '</div>' : ''}
                             </div>
                         </div>
-                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" data-action="removeClientAuditorAssignment" data-arg1="${client.id}" data-arg2="${auditor.id}" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
+                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" data-action="removeClientAuditorAssignment" data-arg1="${client.id}" data-arg2="${auditor.id}" title="Remove assignment" aria-label="Remove user"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
                     </div>
                     `;
     }).join('')}
@@ -1105,7 +1105,7 @@ function getClientAuditsHTML(client) {
                                 <div style="display: flex; align-items: center; gap: 1rem;">
                                     ${ncrCount > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${ncrCount} Findings</span>` : ''}
                                     <span class="badge" style="background: ${plan.status === 'Completed' ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
-                                    ${report ? `<button class="btn btn-sm btn-outline-primary" data-action="openReportingDetail" data-id="${report.id}"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
+                                    ${report ? `<button class="btn btn-sm btn-outline-primary" data-action="openReportingDetail" data-id="${report.id}" aria-label="Document"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
                                 </div>
                             </div>
                         `;
@@ -1181,7 +1181,7 @@ function getClientDocumentsHTML(client) {
                 <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">System manuals, procedures, and documents provided by the client for audit preparation</p>
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}">
+                <button class="btn btn-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}" aria-label="Upload to cloud">
                     <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Add Document
                 </button>
                 ` : ''}
@@ -1212,9 +1212,9 @@ function getClientDocumentsHTML(client) {
                                     <td style="font-size: 0.85rem;">${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes"><i class="fa-solid fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
                                 </tr>
@@ -1295,7 +1295,7 @@ function getClientComplianceHTML(client) {
                     </div>
                 `}
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" data-action="editClientContract" data-id="${client.id}">
+                <button class="btn btn-sm btn-secondary" data-action="editClientContract" data-id="${client.id}" aria-label="Edit">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
                 </button>
                 ` : ''}
@@ -1321,7 +1321,7 @@ function getClientComplianceHTML(client) {
                     </div>
                 `}
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" data-action="editClientNDA" data-id="${client.id}">
+                <button class="btn btn-sm btn-secondary" data-action="editClientNDA" data-id="${client.id}" aria-label="Edit">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
                 </button>
                 ` : ''}
@@ -1336,7 +1336,7 @@ function getClientComplianceHTML(client) {
                     Client Changes Log (ISO 9.6)
                 </h4>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" data-action="addClientChangeLog" data-id="${client.id}">
+                <button class="btn btn-sm btn-secondary" data-action="addClientChangeLog" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
                 </button>
                 ` : ''}
@@ -1478,7 +1478,7 @@ window.renderAddClient = function () {
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
             <div>
-                <button class="btn btn-link" data-action="renderClientsEnhanced" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
+                <button class="btn btn-link" data-action="renderClientsEnhanced" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;" aria-label="Back">
                     <i class="fa-solid fa-arrow-left"></i> Back to Clients
                 </button>
                 <h1 style="font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, #1e293b 0%, #334155 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
@@ -1487,7 +1487,7 @@ window.renderAddClient = function () {
             </div>
             <div style="display: flex; gap: 1rem;">
                 <button class="btn btn-secondary" data-action="renderClientsEnhanced">Cancel</button>
-                <button class="btn btn-primary" data-action="saveNewClient" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                <button class="btn btn-primary" data-action="saveNewClient" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);" aria-label="Confirm">
                     <i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Create Client
                 </button>
             </div>
@@ -1870,7 +1870,7 @@ window.renderEditClient = function (clientId) {
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
             <div>
-                <button class="btn btn-link" data-action="renderClientsEnhanced" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
+                <button class="btn btn-link" data-action="renderClientsEnhanced" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;" aria-label="Back">
                     <i class="fa-solid fa-arrow-left"></i> Back to Clients
                 </button>
                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -1882,7 +1882,7 @@ window.renderEditClient = function (clientId) {
             </div>
             <div style="display: flex; gap: 1rem;">
                 <button class="btn btn-secondary" data-action="renderClientsEnhanced">Cancel</button>
-                <button class="btn btn-primary" data-action="saveAuditClient" data-id="${client.id}" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                <button class="btn btn-primary" data-action="saveAuditClient" data-id="${client.id}" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);" aria-label="Save">
                     <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
                 </button>
             </div>
@@ -4153,7 +4153,7 @@ CFO," style="font-family: monospace;"></textarea>
 
             <!-- Wizard Footer / Navigation -->
             <div style="padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary" data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${currentStep - 1}" ${currentStep === 1 ? 'disabled' : ''}>
+                <button class="btn btn-secondary" data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${currentStep - 1}" ${currentStep === 1 ? 'disabled' : ''} aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Previous
                 </button>
                 
@@ -4235,7 +4235,7 @@ CFO," style="font-family: monospace;"></textarea>
                     Detected standards: ${Array.from(allStandards).join(', ')}.<br>
                     Click below to generate certificate records for these standards to manage scopes and revisions.
                 </p>
-                <button class="btn btn-primary" data-action="generateCertificatesFromStandards" data-id="${client.id}">
+                <button class="btn btn-primary" data-action="generateCertificatesFromStandards" data-id="${client.id}" aria-label="Auto-generate">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Records
                 </button>
             </div>
@@ -4248,7 +4248,7 @@ CFO," style="font-family: monospace;"></textarea>
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
                 </h3>
-                <button class="btn btn-secondary btn-sm" data-action="generateCertificatesFromStandards" data-id="${client.id}">
+                <button class="btn btn-secondary btn-sm" data-action="generateCertificatesFromStandards" data-id="${client.id}" aria-label="Sync">
                     <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Sync Standards
                 </button>
             </div>
@@ -4272,10 +4272,10 @@ CFO," style="font-family: monospace;"></textarea>
                             </div>
                         </div>
                         <div style="text-align: right;">
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" data-action="viewCertRevisionHistory" data-arg1="${client.id}" data-arg2="${index}" title="View revision history for this certification">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" data-action="viewCertRevisionHistory" data-arg1="${client.id}" data-arg2="${index}" title="View revision history for this certification" aria-label="History">
                                 <i class="fa-solid fa-history"></i> Revision History
                              </button>
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" data-action="deleteCertificationScope" data-arg1="${client.id}" data-arg2="${index}" title="Remove this certification scope">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" data-action="deleteCertificationScope" data-arg1="${client.id}" data-arg2="${index}" title="Remove this certification scope" aria-label="Delete">
                                 <i class="fa-solid fa-trash"></i>
                              </button>
                              <div style="font-size: 0.85rem; color: var(--text-secondary);">
@@ -4357,7 +4357,7 @@ CFO," style="font-family: monospace;"></textarea>
                             </div>
                          </div>
                          <div style="display: flex; align-items: flex-end;">
-                            <button class="btn btn-primary" data-action="saveCertificateDetails" data-id="${client.id}">
+                            <button class="btn btn-primary" data-action="saveCertificateDetails" data-id="${client.id}" aria-label="Save">
                                 <i class="fa-solid fa-save"></i> Save Changes
                             </button>
                          </div>
@@ -4952,7 +4952,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <i class="fa-solid fa-file-excel" style="font-size: 2rem; color: #10b981; margin-bottom: 1rem;"></i>
                     <h4 style="margin-bottom: 0.5rem;">Step 1: Get Template</h4>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Download valid Excel structure</p>
-                    <button class="btn btn-outline-primary btn-sm" data-action="downloadAccountSetupTemplate" data-id="${window.UTILS.escapeHtml(client.name)}">
+                    <button class="btn btn-outline-primary btn-sm" data-action="downloadAccountSetupTemplate" data-id="${window.UTILS.escapeHtml(client.name)}" aria-label="Download">
                         <i class="fa-solid fa-download"></i> Download Template
                     </button>
                 </div>
@@ -5453,7 +5453,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
                             <strong style="color: #dc2626;">Delete Client</strong>
                             <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Permanently remove this client and ALL associated data. This cannot be undone.</p>
                         </div>
-                        <button class="btn btn-sm btn-danger" data-action="deleteClient" data-id="${client.id}">
+                        <button class="btn btn-sm btn-danger" data-action="deleteClient" data-id="${client.id}" aria-label="Delete">
                             <i class="fa-solid fa-trash"></i> Delete
                         </button>
                     </div>
@@ -5465,7 +5465,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
                  <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
                     <p style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong>Unique Client ID:</strong> <code>${client.id}</code></p>
                     <p style="margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);">This ID is used for linking data in the database.</p>
-                    <button class="btn btn-sm btn-secondary" data-action="copyToClipboard" data-id="${client.id}" data-arg1="ID Copied">
+                    <button class="btn btn-sm btn-secondary" data-action="copyToClipboard" data-id="${client.id}" data-arg1="ID Copied" aria-label="Copy">
                         <i class="fa-solid fa-copy"></i> Copy ID
                     </button>
                 </div>

@@ -160,7 +160,7 @@ function renderManagementReviewModule() {
                     </h2>
                     <p style="color: var(--text-secondary); margin: 0;">ISO 17021-1 Clause 8.5 - Management System Review</p>
                 </div>
-                <button class="btn btn-primary" data-action="openNewManagementReviewModal">
+                <button class="btn btn-primary" data-action="openNewManagementReviewModal" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Review
                 </button>
             </div>
@@ -230,16 +230,16 @@ function renderManagementReviewModule() {
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" data-action="viewManagementReview" data-id="${review.id}" title="View Details">
+                                            <button class="btn btn-sm btn-icon" data-action="viewManagementReview" data-id="${review.id}" title="View Details" aria-label="View">
                                                 <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="editManagementReview" data-id="${review.id}" title="Edit Review">
+                                            <button class="btn btn-sm btn-icon" data-action="editManagementReview" data-id="${review.id}" title="Edit Review" aria-label="Edit">
                                                 <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="deleteManagementReview" data-id="${review.id}" title="Delete Review">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteManagementReview" data-id="${review.id}" title="Delete Review" aria-label="Delete">
                                                 <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="printManagementReview" data-id="${review.id}" title="Print Minutes">
+                                            <button class="btn btn-sm btn-icon" data-action="printManagementReview" data-id="${review.id}" title="Print Minutes" aria-label="Print">
                                                 <i class="fa-solid fa-print"></i>
                                             </button>
                                         </td>
@@ -393,7 +393,7 @@ window.openNewManagementReviewModal = function (editData = null) {
                 <strong style="color: #0369a1;">AI-Powered Review Generation</strong>
                 <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #0284c7;">Automatically analyze clients, auditors, appeals, and complaints data</p>
             </div>
-            <button class="btn btn-primary btn-sm" data-action="generateManagementReviewInputs" id="ai-generate-btn">
+            <button class="btn btn-primary btn-sm" data-action="generateManagementReviewInputs" id="ai-generate-btn" aria-label="Auto-generate">
                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i>AI Generate
             </button>
         </div>

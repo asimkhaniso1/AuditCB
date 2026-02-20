@@ -87,7 +87,7 @@ function getDefaultsHTML() {
                                value="${s.sessionTimeout || 30}" min="5">
                     </div>
 
-                    <button type="button" class="btn btn-primary" data-action="saveDefaultSettings">
+                    <button type="button" class="btn btn-primary" data-action="saveDefaultSettings" aria-label="Save">
                         <i class="fa-solid fa-save"></i> Save Settings
                     </button>
                 </form>

@@ -454,7 +454,7 @@ window.renderCertificates = function () {
                                         </span>
                                     </td>
                                     <td style="padding: 1rem; text-align: center;">
-                                        <button class="btn btn-sm btn-outline-primary" data-action="exportCertificatePDF" data-id="${cert.id}" title="Export PDF">
+                                        <button class="btn btn-sm btn-outline-primary" data-action="exportCertificatePDF" data-id="${cert.id}" title="Export PDF" aria-label="Export PDF">
                                             <i class="fa-solid fa-file-pdf"></i>
                                         </button>
                                         ${cert.status !== 'Revoked' && cert.displayStatus !== 'Expired' ? `

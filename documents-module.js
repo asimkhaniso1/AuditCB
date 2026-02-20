@@ -178,21 +178,21 @@ function renderDocuments() {
                 <button class="btn btn-sm btn-icon" data-action="viewDocumentHistory" data-id="${doc.id}" title="Revision History">
                     <i class="fa-solid fa-clock-rotate-left" style="color: #7c3aed;"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" data-action="viewDocumentDetails" data-id="${doc.id}" title="Document Details">
+                <button class="btn btn-sm btn-icon" data-action="viewDocumentDetails" data-id="${doc.id}" title="Document Details" aria-label="View">
                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                 </button>
                 ${doc.status === 'Draft' ? `
-                    <button class="btn btn-sm btn-success" data-action="approveDocument" data-id="${doc.id}" title="Approve">
+                    <button class="btn btn-sm btn-success" data-action="approveDocument" data-id="${doc.id}" title="Approve" aria-label="Confirm">
                         <i class="fa-solid fa-check"></i>
                     </button>
                 ` : ''}
                 <button class="btn btn-sm btn-icon" data-action="createNewRevision" data-id="${doc.id}" title="New Revision">
                     <i class="fa-solid fa-code-branch" style="color: #0284c7;"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" data-action="downloadDocument" data-id="${doc.id}" title="Download">
+                <button class="btn btn-sm btn-icon" data-action="downloadDocument" data-id="${doc.id}" title="Download" aria-label="Download">
                     <i class="fa-solid fa-download" style="color: var(--primary-color);"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" data-action="deleteDocument" data-id="${doc.id}" title="Delete">
+                <button class="btn btn-sm btn-icon" data-action="deleteDocument" data-id="${doc.id}" title="Delete" aria-label="Delete">
                     <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                 </button>
             </td>
@@ -285,11 +285,11 @@ function renderDocuments() {
                     <button class="btn ${activeTab === 'library' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="library">
                         <i class="fa-solid fa-folder-open" style="margin-right: 0.5rem;"></i>Document Library
                     </button>
-                    <button class="btn ${activeTab === 'masterlist' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="masterlist">
+                    <button class="btn ${activeTab === 'masterlist' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="masterlist" aria-label="Checklist">
                         <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Master Document List
                     </button>
                     <div style="flex: 1;"></div>
-                    <button class="btn btn-sm btn-outline-secondary" data-action="printMasterDocumentList">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="printMasterDocumentList" aria-label="Print">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Print MDL
                     </button>
                     <button class="btn btn-sm btn-outline-secondary" data-action="exportMasterDocumentList">

@@ -740,7 +740,7 @@ async function renderModule(moduleName, syncHash = true) {
                             <i class="fa-solid fa-lock" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
                             <h3>Access Restricted</h3>
                             <p style="color: var(--text-secondary);">Settings are only accessible to Admins and Certification Managers.</p>
-                            <button class="btn btn-primary" data-hash="dashboard">
+                            <button class="btn btn-primary" data-hash="dashboard" aria-label="Back">
                                 <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Return to Dashboard
                             </button>
                         </div>
@@ -776,7 +776,7 @@ async function renderModule(moduleName, syncHash = true) {
                 <i class="fa-solid fa-exclamation-triangle" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
                 <h3>Error Loading Module</h3>
                 <p style="color: var(--text-secondary);">${error.message}</p>
-                <button class="btn btn-primary" data-action="renderModule" data-id="${moduleName}">
+                <button class="btn btn-primary" data-action="renderModule" data-id="${moduleName}" aria-label="Sync">
                     <i class="fa-solid fa-sync"></i> Retry
                 </button>
             </div>
@@ -942,7 +942,7 @@ function renderCertification() {
             <td>${window.UTILS.escapeHtml(decision.date)}</td>
             <td><span class="status-badge status-${window.UTILS.escapeHtml(decision.decision || '').toLowerCase().replace(' ', '-')}">${window.UTILS.escapeHtml(decision.decision)}</span></td>
             <td>
-                <button class="btn btn-sm" style="color: var(--primary-color);"><i class="fa-solid fa-file-certificate"></i></button>
+                <button class="btn btn-sm" style="color: var(--primary-color);" aria-label="Certificate"><i class="fa-solid fa-file-certificate"></i></button>
             </td>
         </tr>
     `).join('');
@@ -1178,7 +1178,7 @@ function renderRoleSwitcher() {
         switcher.innerHTML = `
             <div style="padding: 0.5rem 0;">
                 <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem;">Please login to access the system.</p>
-                <button data-action="renderLoginModal" class="btn btn-sm btn-primary" style="width: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                <button data-action="renderLoginModal" class="btn btn-sm btn-primary" style="width: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);" aria-label="Lock">
                     <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> Login
                 </button>
             </div>

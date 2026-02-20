@@ -30,10 +30,10 @@ function renderRecordRetentionModule() {
                     <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">ISO 17021-1 Clause 8.4 - Control of Records</p>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-secondary" data-action="exportRetentionReport">
+                    <button class="btn btn-secondary" data-action="exportRetentionReport" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Report
                     </button>
-                    <button class="btn btn-primary" data-action="openRetentionPolicyModal">
+                    <button class="btn btn-primary" data-action="openRetentionPolicyModal" aria-label="Settings">
                         <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Configure Policy
                     </button>
                 </div>

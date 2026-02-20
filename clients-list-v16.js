@@ -58,13 +58,13 @@ function renderClientsEnhanced() {
             <td>
                 <div style="display: flex; gap: 4px; align-items: center;">
                 ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
-                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="Edit"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="Edit" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
                 ${(window.state.currentUser?.role === 'Admin') ? `
                 <button class="btn btn-sm" data-action="archiveClient" data-id="${client.id}" data-stop-prop="true" style="color: #f59e0b;" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
-                <button class="btn btn-sm" data-action="deleteClient" data-id="${client.id}" data-stop-prop="true" style="color: #ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn btn-sm" data-action="deleteClient" data-id="${client.id}" data-stop-prop="true" style="color: #ef4444;" title="Delete" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                 ` : ''}
-                <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="View"><i class="fa-solid fa-eye"></i></button>
+                <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="View" aria-label="View"><i class="fa-solid fa-eye"></i></button>
                 </div>
             </td>
         </tr>
@@ -77,7 +77,7 @@ function renderClientsEnhanced() {
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
-                        <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;">
+                        <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" aria-label="Export">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" data-action="clickElement" data-id="client-import-file" style="white-space: nowrap;">
@@ -88,7 +88,7 @@ function renderClientsEnhanced() {
                         <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                     </button>
                     ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
-                    <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;">
+                    <button id="btn-new-client" class="btn btn-primary" style="white-space: nowrap;" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                     ` : ''}
@@ -171,7 +171,7 @@ function renderClientsEnhanced() {
                     Showing ${startIndex + 1} to ${Math.min(startIndex + window.state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage - 1}" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage - 1}" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''} aria-label="Previous">
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
                     <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${window.state.clientPagination.currentPage} of ${totalPages}</span>

@@ -114,7 +114,7 @@
                     <!-- Client Settings Icon (visible only in Client Workspace) -->
                     <button id="client-settings-btn" class="btn btn-icon" data-action="navigateClientSettings"
                         style="display: none; border: none; background: transparent; color: var(--text-secondary); font-size: 1.1rem; padding: 0.5rem; cursor: pointer;"
-                        title="Client Settings">
+                        title="Client Settings" aria-label="Settings">
                         <i class="fa-solid fa-cog"></i>
                     </button>
                     <button class="btn btn-outline-primary" data-hash="manday-calculator"
@@ -130,7 +130,7 @@
                     <!-- Notification Bell -->
                     <button id="notification-bell" class="btn btn-icon" data-action="toggleNotificationPanel"
                         style="border: none; background: transparent; color: var(--text-secondary); font-size: 1.1rem; padding: 0.5rem; cursor: pointer; position: relative;"
-                        title="Notifications">
+                        title="Notifications" aria-label="Notifications">
                         <i class="fa-solid fa-bell"></i>
                         <span id="notification-badge"
                             style="display: none; position: absolute; top: 2px; right: 2px; background: #ef4444; color: white; font-size: 0.65rem; font-weight: bold; padding: 2px 5px; border-radius: 10px; min-width: 16px; text-align: center;">0</span>
@@ -187,7 +187,7 @@
                 <!-- Populated by JS -->
             </div>
             <div class="client-sidebar-footer">
-                <button class="btn btn-sm btn-primary" data-action="renderAddClient" style="width: 100%;">
+                <button class="btn btn-sm btn-primary" data-action="renderAddClient" style="width: 100%;" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add Client
                 </button>
             </div>

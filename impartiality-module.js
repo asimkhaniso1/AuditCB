@@ -195,7 +195,7 @@ function renderImpartialityModule() {
                     </h2>
                     <p style="color: var(--text-secondary); margin: 0;">ISO 17021-1 Clause 5.2 - Safeguarding Impartiality</p>
                 </div>
-                <button class="btn btn-primary" data-action="openAddCommitteeMemberModal">
+                <button class="btn btn-primary" data-action="openAddCommitteeMemberModal" aria-label="Add user">
                     <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i>Add Member
                 </button>
             </div>
@@ -253,10 +253,10 @@ function renderImpartialityModule() {
                                         <td>${window.UTILS.escapeHtml(m.appointedDate)} - ${window.UTILS.escapeHtml(m.termEnd)}</td>
                                         <td><span class="badge ${m.status === 'Active' ? 'bg-green' : 'bg-gray'}">${window.UTILS.escapeHtml(m.status)}</span></td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" data-action="editCommitteeMember" data-id="${m.id}" title="Edit">
+                                            <button class="btn btn-sm btn-icon" data-action="editCommitteeMember" data-id="${m.id}" title="Edit" aria-label="Edit">
                                                 <i class="fa-solid fa-edit"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="deleteCommitteeMember" data-id="${m.id}" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteCommitteeMember" data-id="${m.id}" title="Delete" aria-label="Delete">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </td>
@@ -272,7 +272,7 @@ function renderImpartialityModule() {
             <div id="meetings" class="impartiality-tab-content" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Committee Meetings</h3>
-                    <button class="btn btn-primary btn-sm" data-action="openAddMeetingModal">
+                    <button class="btn btn-primary btn-sm" data-action="openAddMeetingModal" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Record Meeting
                     </button>
                 </div>
@@ -298,13 +298,13 @@ function renderImpartialityModule() {
                                         <td>${mtg.decisions.length} decisions</td>
                                         <td>${window.UTILS.escapeHtml(mtg.nextMeetingDate || 'TBD')}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" data-action="viewMeeting" data-id="${mtg.id}" title="View Details">
+                                            <button class="btn btn-sm btn-icon" data-action="viewMeeting" data-id="${mtg.id}" title="View Details" aria-label="View">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="editMeeting" data-id="${mtg.id}" title="Edit">
+                                            <button class="btn btn-sm btn-icon" data-action="editMeeting" data-id="${mtg.id}" title="Edit" aria-label="Edit">
                                                 <i class="fa-solid fa-edit"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="deleteMeeting" data-id="${mtg.id}" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteMeeting" data-id="${mtg.id}" title="Delete" aria-label="Delete">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </td>
@@ -320,7 +320,7 @@ function renderImpartialityModule() {
             <div id="threats" class="impartiality-tab-content" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Impartiality Threat Register</h3>
-                    <button class="btn btn-primary btn-sm" data-action="openAddThreatModal">
+                    <button class="btn btn-primary btn-sm" data-action="openAddThreatModal" aria-label="Warning">
                         <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>Log Threat
                     </button>
                 </div>
@@ -350,10 +350,10 @@ function renderImpartialityModule() {
                                         <td><span class="badge ${t.status === 'Resolved' ? 'bg-green' : 'bg-red'}">${window.UTILS.escapeHtml(t.status)}</span></td>
                                         <td>${t.reviewedByCommittee ? '<i class="fa-solid fa-check" style="color: green;"></i> Yes' : '<i class="fa-solid fa-times" style="color: red;"></i> No'}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-icon" data-action="editThreat" data-id="${t.id}" title="Edit">
+                                            <button class="btn btn-sm btn-icon" data-action="editThreat" data-id="${t.id}" title="Edit" aria-label="Edit">
                                                 <i class="fa-solid fa-edit"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" data-action="deleteThreat" data-id="${t.id}" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteThreat" data-id="${t.id}" title="Delete" aria-label="Delete">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </td>

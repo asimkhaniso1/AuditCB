@@ -261,11 +261,11 @@ function getNCRRegisterHTML() {
                     NCR Register
                 </h3>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-primary" data-action="printNCRRegister">
+                    <button class="btn btn-primary" data-action="printNCRRegister" aria-label="Print">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>
                         Print Register
                     </button>
-                    <button class="btn btn-primary" data-action="openNewNCRModal">
+                    <button class="btn btn-primary" data-action="openNewNCRModal" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                         New NCR
                     </button>
@@ -377,21 +377,21 @@ function renderNCRTable(ncrs) {
                                 </span>
                             </td>
                             <td style="white-space: nowrap;">
-                                <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View Details">
+                                <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View Details" aria-label="View">
                                     <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit">
+                                <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit" aria-label="Edit">
                                     <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Delete">
+                                <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Delete" aria-label="Delete">
                                     <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                 </button>
                                 ${ncr.status === 'Open' ? `
-                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA">
+                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA" aria-label="Add">
                                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA
                                 </button>` : ''}
                                 ${ncr.status === 'In Progress' && ncr.capaImplementedDate ? `
-                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA">
+                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA" aria-label="Confirm">
                                     <i class="fa-solid fa-check"></i> Verify
                                 </button>` : ''}
                             </td>
@@ -491,7 +491,7 @@ function getCAPATrackerHTML() {
                                 <td>${window.UTILS.escapeHtml(ncr.capaResponsible || 'Not assigned')}</td>
                                 <td>${ncr.dueDate || '-'}</td>
                                 <td>
-                                    <button class="btn btn-sm" data-action="updateCAPAProgress" data-id="${ncr.id}">
+                                    <button class="btn btn-sm" data-action="updateCAPAProgress" data-id="${ncr.id}" aria-label="Edit">
                                         <i class="fa-solid fa-edit"></i> Update
                                     </button>
                                 </td>
@@ -546,7 +546,7 @@ function getVerificationHTML() {
                                 <td>${ncr.capaImplementedDate || 'Not yet implemented'}</td>
                                 <td>${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-primary" data-action="verifyCAPA" data-id="${ncr.id}">
+                                    <button class="btn btn-sm btn-primary" data-action="verifyCAPA" data-id="${ncr.id}" aria-label="Confirm">
                                         <i class="fa-solid fa-check"></i> Verify
                                     </button>
                                 </td>

@@ -81,7 +81,7 @@ function renderChecklistLibrary() {
                     <button id="btn-import-checklist" class="btn btn-secondary">
                         <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import Checklist
                     </button>
-                    <button id="btn-new-checklist" class="btn btn-primary">
+                    <button id="btn-new-checklist" class="btn btn-primary" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Checklist
                     </button>
                 </div>
@@ -145,17 +145,17 @@ function renderChecklistLibrary() {
                                         <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
                                         <td>${_fmtDate(c.updatedAt || c.createdAt)}</td>
                                         <td>
-                                            <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
+                                            <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="View">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print">
+                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print" aria-label="Print">
                                                 <i class="fa-solid fa-print"></i>
                                             </button>
                                             ${canEditGlobal ? `
-                                                <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
+                                                <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="Edit">
                                                     <i class="fa-solid fa-edit"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger delete-checklist" data-id="${c.id}">
+                                                <button class="btn btn-sm btn-danger delete-checklist" data-id="${c.id}" aria-label="Delete">
                                                     <i class="fa-solid fa-trash"></i>
                                                 </button>
                                             ` : ''}
@@ -199,16 +199,16 @@ function renderChecklistLibrary() {
                                         <td>${c.clauses ? c.clauses.reduce((acc, cl) => acc + (cl.subClauses || []).reduce((s2, sub) => s2 + (sub.items ? sub.items.length : 1), 0), 0) : (c.items?.length || 0)}</td>
                                         <td>${window.UTILS.escapeHtml(c.createdBy || 'Unknown')}</td>
                                         <td>
-                                            <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
+                                            <button class="btn btn-sm view-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="View">
                                                 <i class="fa-solid fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print">
+                                            <button class="btn btn-sm" data-action="printChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Print" aria-label="Print">
                                                 <i class="fa-solid fa-print"></i>
                                             </button>
-                                            <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;">
+                                            <button class="btn btn-sm edit-checklist" data-id="${c.id}" style="margin-right: 0.25rem;" aria-label="Edit">
                                                 <i class="fa-solid fa-edit"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-danger delete-checklist" data-id="${c.id}">
+                                            <button class="btn btn-sm btn-danger delete-checklist" data-id="${c.id}" aria-label="Delete">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </td>
@@ -251,10 +251,10 @@ function renderChecklistLibrary() {
                                     <td>${_fmtDate(c.archivedAt)}</td>
                                     <td>${window.UTILS.escapeHtml(c.archivedBy || 'Unknown')}</td>
                                     <td>
-                                        <button class="btn btn-sm" data-action="restoreChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Restore">
+                                        <button class="btn btn-sm" data-action="restoreChecklist" data-id="${c.id}" style="margin-right: 0.25rem;" title="Restore" aria-label="Undo">
                                             <i class="fa-solid fa-rotate-left"></i> Restore
                                         </button>
-                                        <button class="btn btn-sm btn-danger" data-action="permanentDeleteChecklist" data-id="${c.id}" title="Permanently Delete">
+                                        <button class="btn btn-sm btn-danger" data-action="permanentDeleteChecklist" data-id="${c.id}" title="Permanently Delete" aria-label="Delete">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>
@@ -402,7 +402,7 @@ function openImportChecklistModal() {
                     Upload a CSV file with audit checklist items. The file should have columns: <strong>Clause, Requirement</strong>
                 </span>
             </div>
-            <button type="button" class="btn btn-outline-primary btn-sm" data-action="downloadChecklistTemplate">
+            <button type="button" class="btn btn-outline-primary btn-sm" data-action="downloadChecklistTemplate" aria-label="Download">
                 <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>Download Template
             </button>
         </div>
@@ -692,7 +692,7 @@ function setupCSVUpload() {
                             <td><input type="text" class="form-control item-main-title" value="${window.UTILS.escapeHtml(mainTitle)}" style="margin: 0;"></td>
                             <td><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(clause)}" style="margin: 0;"></td>
                             <td><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(requirement)}" style="margin: 0;"></td>
-                            <td><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                            <td><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
                         `;
                         tbody.appendChild(newRow);
                         addedCount++;
@@ -757,7 +757,7 @@ function renderChecklistEditor(checklistId) {
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
-                    <button class="btn btn-secondary" data-action="renderChecklistLibrary">
+                    <button class="btn btn-secondary" data-action="renderChecklistLibrary" aria-label="Back">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to Library
                     </button>
                 </div>
@@ -814,13 +814,13 @@ function renderChecklistEditor(checklistId) {
                         <h4 style="margin: 0;"><i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Checklist Items</h4>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="file" id="csv-upload-input" accept=".csv" style="display: none;">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="downloadChecklistTemplate">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="downloadChecklistTemplate" aria-label="Download">
                                 <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Template
                             </button>
                             <button type="button" class="btn btn-sm btn-info" id="btn-import-csv" style="color: white;">
                                 <i class="fa-solid fa-file-csv" style="margin-right: 0.25rem;"></i>Import CSV
                             </button>
-                            <button type="button" class="btn btn-sm btn-secondary" id="add-item-row">
+                            <button type="button" class="btn btn-sm btn-secondary" id="add-item-row" aria-label="Add">
                                 <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Row
                             </button>
                         </div>
@@ -842,14 +842,14 @@ function renderChecklistEditor(checklistId) {
                                         <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" value="${window.UTILS.escapeHtml(item.clause || '')}" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" value="${window.UTILS.escapeHtml(item.requirement || '')}" style="margin: 0;"></td>
-                                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
                                 `).join('') : `
                                     <tr class="checklist-item-row" draggable="true">
                                         <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
                                         <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement..." style="margin: 0;"></td>
-                                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+                                        <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
                                     </tr>
                                 `}
                             </tbody>
@@ -866,7 +866,7 @@ function renderChecklistEditor(checklistId) {
 
                 <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
                     <button type="button" class="btn btn-secondary" data-action="renderChecklistLibrary">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-checklist-btn">
+                    <button type="button" class="btn btn-primary" id="save-checklist-btn" aria-label="Save">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>${isEdit ? 'Update' : 'Create'} Checklist
                     </button>
                 </div>
@@ -892,7 +892,7 @@ function attachChecklistEditorListeners(checklistId) {
             <td style="padding: 0.5rem 0.25rem; text-align: center; cursor: grab;" class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical" style="color:#94a3b8;"></i></td>
             <td style="padding: 0.5rem;"><input type="text" class="form-control item-clause" placeholder="4.1" style="margin: 0;"></td>
             <td style="padding: 0.5rem;"><input type="text" class="form-control item-requirement" placeholder="Requirement" style="margin: 0;"></td>
-            <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row"><i class="fa-solid fa-times"></i></button></td>
+            <td style="padding: 0.5rem;"><button type="button" class="btn btn-sm btn-danger remove-item-row" aria-label="Close"><i class="fa-solid fa-times"></i></button></td>
         `;
         tbody.appendChild(newRow);
         attachRemoveRowListeners();
@@ -1178,16 +1178,16 @@ function viewChecklistDetail(id) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary" data-action="renderChecklistLibrary">
+                <button class="btn btn-secondary" data-action="renderChecklistLibrary" aria-label="Back">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Library
                 </button>
                 <div style="display: flex; gap: 0.5rem;">
                     ${typeof window.exportChecklistPDF === 'function' ? `
-                        <button class="btn btn-secondary" data-action="exportChecklistPDF" data-id="${id}" title="Export as PDF">
+                        <button class="btn btn-secondary" data-action="exportChecklistPDF" data-id="${id}" title="Export as PDF" aria-label="Export PDF">
                             <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem; color: #ef4444;"></i> Export PDF
                         </button>
                     ` : ''}
-                    <button class="btn btn-secondary" data-action="printChecklist" data-id="${id}" title="Print Checklist">
+                    <button class="btn btn-secondary" data-action="printChecklist" data-id="${id}" title="Print Checklist" aria-label="Print">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print
                     </button>
                 </div>

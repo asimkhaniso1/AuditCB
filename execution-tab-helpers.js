@@ -36,8 +36,8 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                 </div>
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                     <button type="button" class="btn-icon btn-na status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NA}" title="Not Applicable">N/A</button>
-                    <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity"><i class="fa fa-check"></i></button>
-                    <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity"><i class="fa fa-times"></i></button>
+                    <button type="button" class="btn-icon btn-ok status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.CONFORM}" title="Conformity" aria-label="Confirm"><i class="fa fa-check"></i></button>
+                    <button type="button" class="btn-icon btn-nc status-btn" data-unique-id="${uniqueId}" data-status="${window.CONSTANTS.STATUS.NC}" title="Non-Conformity" aria-label="Close"><i class="fa fa-times"></i></button>
                 </div>
              </div>
              
@@ -114,7 +114,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                              <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;"><i class="fa-solid fa-check-circle"></i> Image attached</p>
                              <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">${saved.evidenceSize || ''}</p>
                          </div>
-                         <button type="button" class="btn btn-sm" data-action="removeEvidence" data-id="${uniqueId}" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                         <button type="button" class="btn btn-sm" data-action="removeEvidence" data-id="${uniqueId}" style="color: var(--danger-color);" title="Remove" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                      </div>
                  </div>
                  <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">
