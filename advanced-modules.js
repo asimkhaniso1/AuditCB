@@ -63,7 +63,7 @@ function renderAuditorsEnhanced() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Auditor Management</h2>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                     <button class="btn btn-sm btn-outline-secondary" onclick="toggleAuditorAnalytics()" style="white-space: nowrap;">
+                     <button class="btn btn-sm btn-outline-secondary" data-action="toggleAuditorAnalytics" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showAuditorAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showAuditorAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
                     ${isAuthorized ? `<button id="btn-add-auditor" class="btn btn-primary" style="white-space: nowrap;"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Add Auditor</button>` : ''}
@@ -130,7 +130,7 @@ function renderAuditorsEnhanced() {
                         <option value="Auditor" ${filterRole === 'Auditor' ? 'selected' : ''}>Auditor</option>
                         <option value="Technical Expert" ${filterRole === 'Technical Expert' ? 'selected' : ''}>Technical Expert</option>
                     </select>
-                    <button class="btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none;" onclick="renderCompetenceMatrix()">
+                    <button class="btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none;" data-action="renderCompetenceMatrix">
                         <i class="fa-solid fa-table" style="margin-right: 0.5rem;"></i> Competence Matrix
                     </button>
                 </div>
@@ -157,14 +157,14 @@ function renderAuditorsEnhanced() {
                     Showing ${startIndex + 1} to ${Math.min(startIndex + state.auditorPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeAuditorPage(${state.auditorPagination.currentPage - 1})" ${state.auditorPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeAuditorPage" data-id="${state.auditorPagination.currentPage - 1}" ${state.auditorPagination.currentPage === 1 ? 'disabled' : ''}>
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
                     <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${state.auditorPagination.currentPage} of ${totalPages}</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeAuditorPage(${state.auditorPagination.currentPage + 1})" ${state.auditorPagination.currentPage === totalPages ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeAuditorPage" data-id="${state.auditorPagination.currentPage + 1}" ${state.auditorPagination.currentPage === totalPages ? 'disabled' : ''}>
                         Next <i class="fa-solid fa-chevron-right"></i>
                     </button>
-                     <select onchange="window.changeAuditorItemsPerPage(this.value)" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
+                     <select data-action-change="changeAuditorItemsPerPage" data-id="this.value" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
                         <option value="10" ${state.auditorPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
                         <option value="25" ${state.auditorPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
                          <option value="50" ${state.auditorPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
@@ -285,7 +285,7 @@ function renderAuditorDetail(auditorId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" onclick="renderAuditorsEnhanced()">
+                <button class="btn btn-secondary" data-action="renderAuditorsEnhanced">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Auditors
                 </button>
             </div>
@@ -498,7 +498,7 @@ function renderAuditorTab(auditor, tabName) {
                             <input type="text" id="upcoming-location-filter" class="form-control form-control-sm" placeholder="City or country..." style="margin-top: 0.25rem;">
                         </div>
                         <div style="display: flex; align-items: flex-end;">
-                            <button class="btn btn-sm btn-secondary" onclick="window.clearAuditorUpcomingFilters(${auditor.id})">Clear</button>
+                            <button class="btn btn-sm btn-secondary" data-action="clearAuditorUpcomingFilters" data-id="${auditor.id}">Clear</button>
                         </div>
                     </div>
                     
@@ -623,7 +623,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-eye" style="margin-right: 0.5rem; color: #3b82f6;"></i>
                             Witness Audits
                         </h3>
-                        <button class="btn btn-sm btn-primary" onclick="window.addWitnessAudit(${auditor.id})">
+                        <button class="btn btn-sm btn-primary" data-action="addWitnessAudit" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Record Witness Audit
                         </button>
                     </div>
@@ -676,7 +676,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
                             Performance Reviews
                         </h3>
-                        <button class="btn btn-sm btn-secondary" onclick="window.addPerformanceReview(${auditor.id})">
+                        <button class="btn btn-sm btn-secondary" data-action="addPerformanceReview" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
                         </button>
                     </div>
@@ -738,7 +738,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
                             Report Reviews
                         </h3>
-                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" onclick="window.addReportReview(${auditor.id})">
+                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" data-action="addReportReview" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Report Review
                         </button>
                     </div>
@@ -810,7 +810,7 @@ function renderAuditorTab(auditor, tabName) {
                                             <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
                                             <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="window.viewComplaintDetail(${c.complaintId})">
+                                                <button class="btn btn-sm btn-outline-primary" data-action="viewComplaintDetail" data-id="${c.complaintId}">
                                                     View
                                                 </button>
                                             </td>
@@ -863,7 +863,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem; color: #10b981;"></i>
                             Performance Reviews
                         </h3>
-                        <button class="btn btn-sm btn-secondary" onclick="window.addPerformanceReview(${auditor.id})">
+                        <button class="btn btn-sm btn-secondary" data-action="addPerformanceReview" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Review
                         </button>
                     </div>
@@ -910,7 +910,7 @@ function renderAuditorTab(auditor, tabName) {
                             <i class="fa-solid fa-file-signature" style="margin-right: 0.5rem; color: #8b5cf6;"></i>
                             Report Reviews
                         </h3>
-                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" onclick="window.addReportReview(${auditor.id})">
+                        <button class="btn btn-sm" style="background: #8b5cf6; color: white; border: none;" data-action="addReportReview" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Report Review
                         </button>
                     </div>
@@ -994,7 +994,7 @@ function renderAuditorTab(auditor, tabName) {
                                             <td><span class="badge" style="background: ${c.severity === 'Critical' || c.severity === 'High' ? '#fee2e2' : '#fef3c7'}; color: ${c.severity === 'Critical' || c.severity === 'High' ? '#991b1b' : '#92400e'};">${c.severity || 'Medium'}</span></td>
                                             <td><span class="badge" style="background: #f3f4f6; color: #374151;">${c.status}</span></td>
                                             <td>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="window.viewComplaintDetail(${c.complaintId})">
+                                                <button class="btn btn-sm btn-outline-primary" data-action="viewComplaintDetail" data-id="${c.complaintId}">
                                                     <i class="fa-solid fa-eye" style="margin-right: 0.25rem;"></i>View
                                                 </button>
                                             </td>
@@ -1061,7 +1061,7 @@ function renderAuditorTab(auditor, tabName) {
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Qualifications & Certifications</h3>
-                        <button class="btn btn-sm btn-primary" onclick="window.openAddQualificationModal(${auditor.id})">
+                        <button class="btn btn-sm btn-primary" data-action="openAddQualificationModal" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Qualification
                         </button>
                     </div>
@@ -1121,7 +1121,7 @@ function renderAuditorTab(auditor, tabName) {
                 <div class="card" style="margin-top: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;"><i class="fa-solid fa-book-open" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Training Records</h3>
-                        <button class="btn btn-sm btn-primary" onclick="window.openAddTrainingModal(${auditor.id})">
+                        <button class="btn btn-sm btn-primary" data-action="openAddTrainingModal" data-id="${auditor.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Add Training
                         </button>
                     </div>
@@ -1170,7 +1170,7 @@ function renderAuditorTab(auditor, tabName) {
                                     </div>
                                     <div style="display: flex; gap: 0.5rem;">
                                         ${d.cloudUrl ? `
-                                            <button class="btn btn-sm btn-outline-primary" onclick="window.open('${d.cloudUrl}', '_blank')" title="View/Download">
+                                            <button class="btn btn-sm btn-outline-primary" data-action="open" data-arg1="${d.cloudUrl}" data-arg2="_blank" title="View/Download">
                                                 <i class="fa-solid fa-download"></i>
                                             </button>
                                         ` : `
@@ -1178,7 +1178,7 @@ function renderAuditorTab(auditor, tabName) {
                                                 <i class="fa-solid fa-download"></i>
                                             </button>
                                         `}
-                                        <button class="btn btn-sm btn-outline-danger" onclick="window.deleteAuditorDocument(${auditor.id}, ${idx})" title="Delete">
+                                        <button class="btn btn-sm btn-outline-danger" data-action="deleteAuditorDocument" data-arg1="${auditor.id}" data-arg2="${idx}" title="Delete">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </div>
@@ -1186,7 +1186,7 @@ function renderAuditorTab(auditor, tabName) {
                             `).join('')}
                         </div>
                     ` : '<p style="color: var(--text-secondary);">No documents uploaded.</p>'}
-                    <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.openAuditorUploadModal(${auditor.id})">
+                    <button class="btn btn-primary" style="margin-top: 1rem;" data-action="openAuditorUploadModal" data-id="${auditor.id}">
                         <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Upload Document
                     </button>
                     <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
@@ -1236,7 +1236,7 @@ function getAuditorClientsTabHTML(auditor) {
                                 <td>${window.UTILS.escapeHtml(client.city || '-')}</td>
                                 <td>${window.UTILS.escapeHtml(client.standard || '-')}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="window.renderClientDetail('${client.id}')">
+                                    <button class="btn btn-sm btn-outline-primary" data-action="renderClientDetail" data-id="${client.id}">
                                         View Dashboard
                                     </button>
                                 </td>
@@ -1291,10 +1291,10 @@ function renderCompetenceMatrix() {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary" onclick="renderAuditorsEnhanced()">
+                <button class="btn btn-secondary" data-action="renderAuditorsEnhanced">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Auditors
                 </button>
-                <button class="btn btn-primary" onclick="window.exportCompetenceMatrix()">
+                <button class="btn btn-primary" data-action="exportCompetenceMatrix">
                     <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export Matrix
                 </button>
             </div>
@@ -1655,7 +1655,7 @@ function renderManDayCalculator() {
         <div class="fade-in">
             <!-- Back Button -->
             <div style="margin-bottom: 1rem;">
-                <button class="btn btn-secondary" onclick="window.location.hash = 'dashboard'">
+                <button class="btn btn-secondary" data-hash="dashboard">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to Dashboard
                 </button>
             </div>
@@ -1761,11 +1761,11 @@ function renderManDayCalculator() {
                     </div>
 
                     <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                        <button class="btn btn-primary" onclick="saveCalculationToPlan()">
+                        <button class="btn btn-primary" data-action="saveCalculationToPlan">
                             <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
                             Save to Audit Plan
                         </button>
-                        <button class="btn btn-secondary" onclick="printCalculation()">
+                        <button class="btn btn-secondary" data-action="printCalculation">
                             <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>
                             Print Results
                         </button>
@@ -1901,7 +1901,7 @@ function renderMultiSiteSamplingCalculator() {
         <div class="fade-in">
             <!-- Back Button -->
             <div style="margin-bottom: 1rem;">
-                <button class="btn btn-secondary" onclick="window.location.hash = 'dashboard'">
+                <button class="btn btn-secondary" data-hash="dashboard">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to Dashboard
                 </button>
             </div>
@@ -2034,11 +2034,11 @@ function renderMultiSiteSamplingCalculator() {
                     </div>
 
                     <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                        <button class="btn btn-primary" onclick="saveSamplingToPlan()">
+                        <button class="btn btn-primary" data-action="saveSamplingToPlan">
                             <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>
                             Save to Audit Plan
                         </button>
-                        <button class="btn btn-secondary" onclick="window.print()">
+                        <button class="btn btn-secondary" data-action="print">
                             <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>
                             Print Results
                         </button>
@@ -2225,11 +2225,11 @@ window.openMultiSiteSamplingCalculatorModal = function () {
                 </div>
 
                 <div style="display:flex; gap: 0.75rem; justify-content: center;">
-                    <button class="btn btn-sm btn-primary" onclick="window.applySamplingToPlan()" style="padding: 6px 16px;">
+                    <button class="btn btn-sm btn-primary" data-action="applySamplingToPlan" style="padding: 6px 16px;">
                         <i class="fa-solid fa-check" style="margin-right: 0.25rem;"></i> Apply to Plan
                     </button>
                     ${sitesContainer ? `
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.randomlySelectSites()" style="padding: 6px 16px;">
+                    <button class="btn btn-sm btn-outline-primary" data-action="randomlySelectSites" style="padding: 6px 16px;">
                         <i class="fa-solid fa-shuffle" style="margin-right: 0.25rem;"></i> Random Select
                     </button>
                     ` : ''}

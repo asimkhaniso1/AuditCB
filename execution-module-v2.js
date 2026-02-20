@@ -92,10 +92,10 @@ function renderAuditExecutionEnhanced() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Execution & Reports</h2>
                  <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleExecutionAnalytics()" style="white-space: nowrap;">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="toggleExecutionAnalytics" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showExecutionAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showExecutionAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
-                    <button class="btn btn-primary" onclick="window.openCreateReportModal()">
+                    <button class="btn btn-primary" data-action="openCreateReportModal">
                         <i class="fa-solid fa-play" style="margin-right: 0.5rem;"></i> Start Audit Execution
                     </button>
                 </div>
@@ -279,7 +279,7 @@ function openCreateReportModal() {
                 <td style="padding: 8px;">${window.UTILS.escapeHtml(p.date)}</td>
                 <td style="padding: 8px; text-align: center;">
                     <button class="btn btn-sm btn-outline-primary select-plan-btn" 
-                        onclick="window.selectAuditPlan('${p.id}')">
+                        data-action="selectAuditPlan" data-id="${p.id}">
                         Select
                     </button>
                 </td>
@@ -293,7 +293,7 @@ function openCreateReportModal() {
     modalBody.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filter by Company:</label>
-            <select class="form-control" id="start-audit-client-filter" onchange="window.filterAuditPlansStart(this.value)" style="margin-bottom: 1rem; border-color: var(--primary-color);" ${activeClient ? 'disabled' : ''}>
+            <select class="form-control" id="start-audit-client-filter" data-action-change="filterAuditPlansStart" data-id="this.value" style="margin-bottom: 1rem; border-color: var(--primary-color);" ${activeClient ? 'disabled' : ''}>
                 <option value="">-- All Companies with Open Plans --</option>
                 ${uniqueClients.map(c => `<option value="${c}" ${c === initialClientName ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
@@ -650,7 +650,7 @@ function renderExecutionDetail(reportId) {
     const html = `
         <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" onclick="window.handleBackToExecutionList()">
+                <button class="btn btn-secondary" data-action="handleBackToExecutionList">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reports
                 </button>
             </div>
@@ -661,7 +661,7 @@ function renderExecutionDetail(reportId) {
                         <h2 style="margin-bottom: 0.5rem;">Audit Execution: ${report.client}</h2>
                         <p style="color: var(--text-secondary);">Audit Date: ${report.date} | Status: ${report.status}</p>
                     </div>
-                    <button class="btn btn-primary" onclick="window.generateAuditReport('${report.id}')">
+                    <button class="btn btn-primary" data-action="generateAuditReport" data-id="${report.id}">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report
                     </button>
                 </div>
@@ -963,7 +963,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(requirementText)}</div>
                                 <div style="position: relative;">
                                     <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.comment || '')}" style="margin-bottom: 0; padding-right: 35px;">
-                                    <button type="button" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
+                                    <button type="button" id="mic-btn-${uniqueId}" data-action="startDictation" data-id="${uniqueId}" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
                                         <i class="fa-solid fa-microphone"></i>
                                     </button>
                                 </div>
@@ -993,10 +993,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                      <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #6366f1; color: white; border: none; border-radius: 4px;" onclick="document.getElementById('img-${uniqueId}').click()" title="Upload image">
                                          <i class="fa-solid fa-file-image"></i> Upload
                                      </button>
-                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #0ea5e9; color: white; border: none; border-radius: 4px;" onclick="window.handleCameraButton('${uniqueId}')" title="Camera">
+                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #0ea5e9; color: white; border: none; border-radius: 4px;" data-action="handleCameraButton" data-id="${uniqueId}" title="Camera">
                                          <i class="fa-solid fa-camera"></i>
                                      </button>
-                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #8b5cf6; color: white; border: none; border-radius: 4px;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Screen capture">
+                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #8b5cf6; color: white; border: none; border-radius: 4px;" data-action="captureScreenEvidence" data-id="${uniqueId}" title="Screen capture">
                                          <i class="fa-solid fa-desktop"></i>
                                      </button>
                                  </div>
@@ -1012,14 +1012,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             return `
                                          <div class="ev-thumb" data-idx="${imgIdx}" data-save-url="${window.UTILS.escapeHtml(src)}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
                                              <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" onclick="window.viewEvidenceImageByUrl(this.src || '${safeSrc}')"/>
-                                             <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${imgIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
+                                             <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${imgIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
                                          </div>
                                      `;
                         }).join('');
                     })()}
                              </div>
-                             <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
-                             <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
+                             <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" data-action-change="handleEvidenceUpload" data-arg1="${uniqueId}" data-arg2="this">
+                             <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" data-action-change="handleEvidenceUpload" data-arg1="${uniqueId}" data-arg2="this">
                              <input type="hidden" id="evidence-data-${uniqueId}" value="${(saved.evidenceImage || (saved.evidenceImages && saved.evidenceImages.length)) ? 'attached' : ''}">
                          </div>
                          
@@ -1147,13 +1147,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                                 <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
                                                     <span class="clause-drag-handle" style="cursor: grab; color: #94a3b8; padding: 0 4px; font-size: 1rem;" title="Drag to reorder section"><i class="fa-solid fa-grip-vertical"></i></span>
                                                     <input type="checkbox" class="section-checkbox" data-section-id="${sectionId}" style="width: 18px; height: 18px; cursor: pointer;" title="Select all items in this section">
-                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')">${clause.mainClause}</span>
-                                                    <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" onclick="window.toggleAccordion('${sectionId}')">${clause.title}</span>
+                                                    <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer;" data-action="toggleAccordion" data-id="${sectionId}">${clause.mainClause}</span>
+                                                    <span style="font-weight: 600; color: #1e293b; cursor: pointer; flex: 1;" data-action="toggleAccordion" data-id="${sectionId}">${clause.title}</span>
                                                     <span style="color: var(--text-secondary); font-size: 0.85rem;">(${total} items)</span>
                                                 </div>
                                                 <div style="display: flex; align-items: center; gap: 1rem;">
                                                     <span style="font-size: 0.8rem; color: var(--text-secondary);">${completed}/${total}</span>
-                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer;" onclick="window.toggleAccordion('${sectionId}')"></i>
+                                                    <i class="fa-solid fa-chevron-down accordion-icon" id="icon-${sectionId}" style="transition: transform 0.3s; cursor: pointer;" data-action="toggleAccordion" data-id="${sectionId}"></i>
                                                 </div>
                                             </div>
                                             <div class="accordion-content" id="${sectionId}" style="display: ${clauseIdx === 0 ? 'block' : 'none'}; padding: 1rem; background: white;">
@@ -1220,10 +1220,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
 
                         <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-outline-secondary" id="toggle-all-accordions" onclick="window.toggleAllAccordions()" title="Collapse/Expand all sections">
+                            <button class="btn btn-outline-secondary" id="toggle-all-accordions" data-action="toggleAllAccordions" title="Collapse/Expand all sections">
                                 <i class="fa-solid fa-compress-alt" style="margin-right: 0.5rem;"></i> <span>Collapse All</span>
                             </button>
-                            <button class="btn btn-secondary" onclick="window.addCustomQuestion('${report.id}')">
+                            <button class="btn btn-secondary" data-action="addCustomQuestion" data-id="${report.id}">
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
                             <div style="position: relative;">
@@ -1234,15 +1234,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
                                         <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Mark Items As:</div>
                                     </div>
-                                    <button class="bulk-action-btn" data-action="conform" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                    <button class="bulk-action-btn" data-action="conform" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
                                         <i class="fa-solid fa-check" style="color: var(--success-color); width: 18px;"></i>
                                         <span>Conform</span>
                                     </button>
-                                    <button class="bulk-action-btn" data-action="nc" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                    <button class="bulk-action-btn" data-action="nc" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
                                         <i class="fa-solid fa-flag" style="color: var(--danger-color); width: 18px;"></i>
                                         <span>Non-Conform</span>
                                     </button>
-                                    <button class="bulk-action-btn" data-action="na" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                                    <button class="bulk-action-btn" data-action="na" data-report-id="${report.id}" style="width: 100%; text-align: left; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 0.75rem;">
                                         <i class="fa-solid fa-ban" style="color: #9ca3af; width: 18px;"></i>
                                         <span>Not Applicable</span>
                                     </button>
@@ -1253,10 +1253,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-outline-secondary" onclick="window.autoMapPersonnel('${report.id}')" title="AI auto-assign personnel, designation & department to items" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;">
+                            <button class="btn btn-outline-secondary" data-action="autoMapPersonnel" data-id="${report.id}" title="AI auto-assign personnel, designation & department to items" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto Map
                             </button>
-                            <button class="btn btn-primary" onclick="window.saveChecklist('${report.id}')" id="save-progress-btn">
+                            <button class="btn btn-primary" data-action="saveChecklist" data-id="${report.id}" id="save-progress-btn">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                             </button>
                             ${(report.checklistRevisions && report.checklistRevisions.length > 0) ? `
@@ -1269,7 +1269,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     ${checklistHTML}
                     
                     <div style="text-align: center; margin-top: 2rem; padding: 2rem; background: #f8fafc; border-radius: 8px;">
-                        <button class="btn btn-primary btn-lg" onclick="window.saveChecklist('${report.id}')">
+                        <button class="btn btn-primary btn-lg" data-action="saveChecklist" data-id="${report.id}">
                             <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Save All Progress
                         </button>
                     </div>
@@ -1408,7 +1408,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 Showing ${allNCRs.length} finding(s) - ${manualNCRs.length} manual, ${checklistNCRs.length} from checklist
                             </p>
                         </div>
-                        <button class="btn btn-primary" onclick="createNCR('${report.id}')">
+                        <button class="btn btn-primary" data-action="createNCR" data-id="${report.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create NCR
                         </button>
                     </div>
@@ -1436,8 +1436,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${window.UTILS.escapeHtml(ncr.description || '-')}">${window.UTILS.escapeHtml(ncr.description || '-')}</td>
                                         <td><span style="background: ${ncr.status === window.CONSTANTS.STATUS.CLOSED ? 'var(--success-color)' : 'var(--warning-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${ncr.status || 'Open'}</span></td>
                                         <td>${ncr.source === 'manual'
-                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" onclick="window.editNCR('${report.id}', ${idx - checklistNCRs.length < 0 ? idx : idx})"><i class="fa-solid fa-edit"></i></button>`
-                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Edit in Checklist tab" onclick="window.showNotification('Edit this NCR in the Checklist tab where it was raised', 'info')"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
+                    ? `<button class="btn btn-sm" style="color: var(--primary-color);" data-action="editNCR" data-arg1="${report.id}" data-arg2="${idx - checklistNCRs.length < 0 ? idx : idx}"><i class="fa-solid fa-edit"></i></button>`
+                    : `<button class="btn btn-sm" style="color: #8b5cf6;" title="Edit in Checklist tab" data-action="showNotification" data-arg1="Edit this NCR in the Checklist tab where it was raised" data-arg2="info"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
                 }</td>
                                     </tr>
                                 `).join('') : `
@@ -1461,7 +1461,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                         <h3>Corrective & Preventive Actions (CAPA)</h3>
-                        <button class="btn btn-primary" onclick="createCAPA('${report.id}')">
+                        <button class="btn btn-primary" data-action="createCAPA" data-id="${report.id}">
                             <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Create CAPA
                         </button>
                     </div>
@@ -1581,19 +1581,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             if (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED) {
                 primaryActionBtn = `
-                    <button class="btn btn-secondary" onclick="window.generateAuditReport('${report.id}')">
+                    <button class="btn btn-secondary" data-action="generateAuditReport" data-id="${report.id}">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Download PDF
                     </button>
                 `;
             } else if (canOneClickFinalize) {
                 primaryActionBtn = `
-                    <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" onclick="window.finalizeAndPublish('${report.id}')" ${!isReadyToSubmit ? 'disabled' : ''}>
+                    <button class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);" data-action="finalizeAndPublish" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''}>
                         <i class="fa-solid fa-check-double" style="margin-right: 0.5rem;"></i> Finalize & Publish
                     </button>
                 `;
             } else {
                 primaryActionBtn = `
-                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" onclick="window.submitToLeadAuditor('${report.id}')" ${!isReadyToSubmit ? 'disabled' : ''}>
+                   <button class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-action="submitToLeadAuditor" data-id="${report.id}" ${!isReadyToSubmit ? 'disabled' : ''}>
                         <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i> Submit for Review
                     </button>
                 `;
@@ -1610,7 +1610,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <p style="margin: 0.5rem 0 0 0; color: var(--text-secondary); font-size: 0.95rem;">Review findings, generate AI summaries, and finalize the report.</p>
                         </div>
                         <div style="display: flex; gap: 0.75rem;">
-                             <button class="btn btn-outline-secondary" onclick="window.saveChecklist('${report.id}')">
+                             <button class="btn btn-outline-secondary" data-action="saveChecklist" data-id="${report.id}">
                                 <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Draft
                             </button>
                             ${primaryActionBtn}
@@ -1641,7 +1641,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="margin-bottom: 2rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Findings & Classification</h4>
-                            <button id="btn-ai-classify" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" onclick="window.runFollowUpAIAnalysis('${report.id}')">
+                            <button id="btn-ai-classify" class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;" data-action="runFollowUpAIAnalysis" data-id="${report.id}">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.5rem;"></i> AI Auto-Classify & Polish
                             </button>
                         </div>
@@ -1656,7 +1656,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                             <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
                                                 <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${f.source}</span>
                                                 <span style="font-weight: 700; color: #1e293b;">#${idx + 1}</span>
-                                                ${f.hasEvidence ? `<span onclick="window.viewEvidenceImageDirect('${f.id}')" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
+                                                ${f.hasEvidence ? `<span data-action="viewEvidenceImageDirect" data-id="${f.id}" style="cursor: pointer; color: var(--primary-color); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-image"></i> View Evidence</span>` : ''}
                                             </div>
                                             ${f.clause || f.requirement ? `
                                                 <div style="font-size: 0.85rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 0.75rem;">
@@ -1715,7 +1715,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">
                                 <i class="fa-solid fa-pen-nib" style="margin-right: 0.5rem; color: var(--primary-color);"></i> Executive Summary & Reporting
                             </h4>
-                             <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none;" onclick="window.runAutoSummary('${report.id}')">
+                             <button class="btn btn-sm btn-info" style="color: white; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none;" data-action="runAutoSummary" data-id="${report.id}">
                                 <i class="fa-solid fa-robot" style="margin-right: 0.5rem;"></i> AI Draft Summary
                             </button>
                         </div>
@@ -1916,7 +1916,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 html += `<input type="text" id="${prefix}-custom-name" class="form-control form-control-sm" placeholder="Name" style="flex: 2; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
                 html += `<input type="text" id="${prefix}-custom-role" class="form-control form-control-sm" placeholder="Role" style="flex: 1.5; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
                 html += `<input type="text" id="${prefix}-custom-org" class="form-control form-control-sm" placeholder="Organization" style="flex: 1.5; font-size: 0.8rem; padding: 0.3rem 0.5rem;">`;
-                html += `<button class="btn btn-sm btn-outline-primary" onclick="window.addCustomMeetingAttendee('${prefix}')" style="padding: 0.25rem 0.5rem;"><i class="fa-solid fa-plus"></i></button>`;
+                html += `<button class="btn btn-sm btn-outline-primary" data-action="addCustomMeetingAttendee" data-id="${prefix}" style="padding: 0.25rem 0.5rem;"><i class="fa-solid fa-plus"></i></button>`;
                 html += '</div>';
                 // Custom attendees list
                 html += `<div id="${prefix}-custom-list" style="margin-top: 0.35rem;"></div>`;
@@ -2020,7 +2020,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
                 
                 <div style="margin-top: 1.5rem; text-align: right;">
-                    <button class="btn btn-primary" onclick="window.saveMeetingRecords('${report.id}')">
+                    <button class="btn btn-primary" data-action="saveMeetingRecords" data-id="${report.id}">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i>Save Meeting Records
                     </button>
                 </div>
@@ -3538,8 +3538,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         thumb.dataset.saveUrl = finalUrl; // store URL/idb-key for saving
                         thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                         thumb.innerHTML = `
-                            <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeDisplay}')"/>
-                            <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${newIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
+                            <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
+                            <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${newIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
                         `;
                         previewDiv.appendChild(thumb);
                     }
@@ -3897,13 +3897,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         window._reportSectionState = {};
         sections.forEach(s => { window._reportSectionState[s.id] = !s.hide; });
 
-        const pill = (s) => `<label class="rp-pill ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="${s.hide ? 'background:white;color:#94a3b8;border-color:#cbd5e1;' : 'background:' + s.color + ';border-color:' + s.color + ';color:white;'}" onclick="window.toggleReportSection('${s.id}','${s.color}')"><i class="fa-solid ${s.icon}"></i> ${s.label}</label>`;
+        const pill = (s) => `<label class="rp-pill ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="${s.hide ? 'background:white;color:#94a3b8;border-color:#cbd5e1;' : 'background:' + s.color + ';border-color:' + s.color + ';color:white;'}" data-action="toggleReportSection" data-arg1="${s.id}" data-arg2="${s.color}"><i class="fa-solid ${s.icon}"></i> ${s.label}</label>`;
 
         // Helper: render all evidence images for a checklist item (preview mode)
         const renderEvThumbs = (item) => {
             const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
             if (!imgs.length) return '';
-            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" onclick="window.open('${url}','_blank')">`).join('')}</div>`;
+            return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="open" data-arg1="${url}" data-arg2="_blank">`).join('')}</div>`;
         };
 
         const ncRows = d.hydratedProgress.filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').map((item, idx) => {
@@ -4695,8 +4695,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
                 <div style="display:flex;gap:10px;">
                     <button onclick="document.getElementById('report-preview-overlay').remove()" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
-                    <button id="ai-polish-btn" onclick="window.polishNotesWithAI()" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
-                    <button onclick="window.exportReportPDF()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
+                    <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
+                    <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
             </div>
         </div>`;
@@ -5563,8 +5563,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div>') + '<span>' + (cbName || 'Certification Body') + '</span></div><div class="rpt-hdr-center">' + standard + ' Audit Report</div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
-            + '<button onclick="window.print()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
-            + '<button onclick="window.close()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
+            + '<button data-action="print" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
+            + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
             // COVER PAGE
             + '<div class="cover">'
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
@@ -5864,8 +5864,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 thumb.dataset.saveUrl = finalUrl;
                 thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                 thumb.innerHTML = `
-                    <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="window.viewEvidenceImageByUrl('${safeDisplay}')"/>
-                    <button type="button" onclick="window.removeEvidenceByIdx('${uniqueId}', ${newIdx})" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
+                    <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
+                    <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${newIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
                 `;
                 previewDiv.appendChild(thumb);
             }

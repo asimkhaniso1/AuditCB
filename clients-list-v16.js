@@ -77,14 +77,14 @@ function renderClientsEnhanced() {
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="downloadImportTemplate()" style="white-space: nowrap;">
+                        <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
                         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('client-import-file').click()" style="white-space: nowrap;">
                             <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
                         </button>
                     ` : ''}
-                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="toggleClientAnalytics" style="white-space: nowrap;">
                         <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                     </button>
                     ${(window.state.currentUser?.role === 'Certification Manager' || window.state.currentUser?.role === 'Admin') ? `
@@ -171,14 +171,14 @@ function renderClientsEnhanced() {
                     Showing ${startIndex + 1} to ${Math.min(startIndex + window.state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${window.state.clientPagination.currentPage - 1})" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage - 1}" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
                     <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${window.state.clientPagination.currentPage} of ${totalPages}</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${window.state.clientPagination.currentPage + 1})" ${window.state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage + 1}" ${window.state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
                         Next <i class="fa-solid fa-chevron-right"></i>
                     </button>
-                    <select onchange="window.changeClientItemsPerPage(this.value)" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <select data-action-change="changeClientItemsPerPage" data-id="this.value" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
                         <option value="10" ${window.state.clientPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
                         <option value="25" ${window.state.clientPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
                         <option value="50" ${window.state.clientPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>

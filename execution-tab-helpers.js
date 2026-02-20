@@ -29,7 +29,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                     <div style="font-weight: 500; margin-bottom: 0.25rem;">${window.UTILS.escapeHtml(item.requirement)}</div>
                     <div style="position: relative;">
                         <input type="text" id="comment-${uniqueId}" placeholder="Auditor remarks..." class="form-control form-control-sm" value="${window.UTILS.escapeHtml(saved.comment || '')}" style="margin-bottom: 0; padding-right: 35px;">
-                        <button type="button" id="mic-btn-${uniqueId}" onclick="window.startDictation('${uniqueId}')" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
+                        <button type="button" id="mic-btn-${uniqueId}" data-action="startDictation" data-id="${uniqueId}" style="position: absolute; right: 0; top: 0; height: 100%; width: 35px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="Dictate to Remarks">
                             <i class="fa-solid fa-microphone"></i>
                         </button>
                     </div>
@@ -78,15 +78,15 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                              <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
                                  <i class="fa-solid fa-file-image"></i> Upload
                              </button>
-                             <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" onclick="window.handleCameraButton('${uniqueId}')" title="Capture photo from mobile camera or webcam">
+                             <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" data-action="handleCameraButton" data-id="${uniqueId}" title="Capture photo from mobile camera or webcam">
                                  <i class="fa-solid fa-camera"></i> Camera
                              </button>
-                             <button type="button" class="btn btn-sm btn-outline-primary" style="flex: 1;" onclick="window.captureScreenEvidence('${uniqueId}')" title="Capture from Zoom/Teams Screen Share">
+                             <button type="button" class="btn btn-sm btn-outline-primary" style="flex: 1;" data-action="captureScreenEvidence" data-id="${uniqueId}" title="Capture from Zoom/Teams Screen Share">
                                  <i class="fa-solid fa-desktop"></i> Screen
                              </button>
                          </div>
-                         <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
-                         <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" onchange="window.handleEvidenceUpload('${uniqueId}', this)">
+                         <input type="file" id="img-${uniqueId}" accept="image/*" style="display: none;" data-action-change="handleEvidenceUpload" data-arg1="${uniqueId}" data-arg2="this">
+                         <input type="file" id="cam-${uniqueId}" accept="image/*" capture="environment" style="display: none;" data-action-change="handleEvidenceUpload" data-arg1="${uniqueId}" data-arg2="this">
                      </div>
                  </div>
                  
@@ -109,12 +109,12 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                  <!-- Evidence Image Preview -->
                  <div id="evidence-preview-${uniqueId}" style="display: ${saved.evidenceImage ? 'block' : 'none'}; margin-bottom: 0.5rem;">
                      <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm);">
-                         <img id="evidence-img-${uniqueId}" src="${saved.evidenceImage || ''}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="window.viewEvidenceImage('${uniqueId}')" title="Click to enlarge">
+                         <img id="evidence-img-${uniqueId}" src="${saved.evidenceImage || ''}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer;" data-action="viewEvidenceImage" data-id="${uniqueId}" title="Click to enlarge">
                          <div style="flex: 1;">
                              <p style="margin: 0; font-size: 0.8rem; color: var(--success-color); font-weight: 500;"><i class="fa-solid fa-check-circle"></i> Image attached</p>
                              <p id="evidence-size-${uniqueId}" style="margin: 0; font-size: 0.7rem; color: var(--text-secondary);">${saved.evidenceSize || ''}</p>
                          </div>
-                         <button type="button" class="btn btn-sm" onclick="window.removeEvidence('${uniqueId}')" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                         <button type="button" class="btn btn-sm" data-action="removeEvidence" data-id="${uniqueId}" style="color: var(--danger-color);" title="Remove"><i class="fa-solid fa-trash"></i></button>
                      </div>
                  </div>
                  <input type="hidden" id="evidence-data-${uniqueId}" value="${saved.evidenceImage ? 'attached' : ''}">

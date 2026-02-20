@@ -30,10 +30,10 @@ function renderRecordRetentionModule() {
                     <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">ISO 17021-1 Clause 8.4 - Control of Records</p>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-secondary" onclick="window.exportRetentionReport()">
+                    <button class="btn btn-secondary" data-action="exportRetentionReport">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Report
                     </button>
-                    <button class="btn btn-primary" onclick="window.openRetentionPolicyModal()">
+                    <button class="btn btn-primary" data-action="openRetentionPolicyModal">
                         <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Configure Policy
                     </button>
                 </div>
@@ -111,7 +111,7 @@ function renderRecordRetentionModule() {
                         <i class="fa-solid fa-exclamation-circle" style="margin-right: 0.5rem; color: #f59e0b;"></i>
                         Records Requiring Attention
                     </h3>
-                    <select id="retention-filter" class="form-control" style="width: auto;" onchange="window.filterRetentionRecords(this.value)">
+                    <select id="retention-filter" class="form-control" style="width: auto;" data-action-change="filterRetentionRecords" data-id="this.value">
                         <option value="all">All Records</option>
                         <option value="expiring" selected>Approaching Expiry</option>
                         <option value="expired">Past Retention</option>
@@ -270,7 +270,7 @@ function renderRetentionRecordsList(records) {
         }
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-secondary" onclick="window.showArchiveOptions('${r.type}', decodeURIComponent('${encodeURIComponent(r.name)}'))">
+                                <button class="btn btn-sm btn-secondary" data-action="showArchiveOptions" data-arg1="${r.type}" data-arg2="decodeURIComponent('${encodeURIComponent(r.name)}')">
                                     <i class="fa-solid fa-archive"></i>
                                 </button>
                             </td>

@@ -34,7 +34,7 @@ function renderClientsEnhanced() {
     const paginatedClients = filteredClients.slice(startIndex, startIndex + window.state.clientPagination.itemsPerPage);
 
     const rows = paginatedClients.map(client => `
-    <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;" onclick="renderClientDetail('${client.id}')">
+    <tr class="client-row" data-client-id="${client.id}" style="cursor: pointer;" data-action="renderClientDetail" data-id="${client.id}">
             <td>
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 6px; overflow: hidden; background: #fff; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;">
@@ -69,18 +69,18 @@ function renderClientsEnhanced() {
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="downloadImportTemplate()" style="white-space: nowrap;" title="Restricted to Cert Managers">
+                        <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" title="Restricted to Cert Managers">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
                          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('client-import-file').click()" style="white-space: nowrap;" title="Restricted to Cert Managers">
                             <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
                         </button>
                     ` : ''}
-                <button class="btn btn-sm btn-outline-secondary" onclick="toggleClientAnalytics()" style="white-space: nowrap;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="toggleClientAnalytics" style="white-space: nowrap;">
                     <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                 </button>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button id="btn-new-client" class="btn btn-primary" onclick="window.renderAddClient()" style="white-space: nowrap;">
+                    <button id="btn-new-client" class="btn btn-primary" data-action="renderAddClient" style="white-space: nowrap;">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
                     ` : ''}
@@ -171,14 +171,14 @@ function renderClientsEnhanced() {
                     Showing ${startIndex + 1} to ${Math.min(startIndex + window.state.clientPagination.itemsPerPage, totalItems)} of ${totalItems} entries
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${window.state.clientPagination.currentPage - 1})" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage - 1}" ${window.state.clientPagination.currentPage === 1 ? 'disabled' : ''}>
                         <i class="fa-solid fa-chevron-left"></i> Previous
                     </button>
                     <span style="font-size: 0.9rem; min-width: 80px; text-align: center;">Page ${window.state.clientPagination.currentPage} of ${totalPages}</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.changeClientPage(${window.state.clientPagination.currentPage + 1})" ${window.state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="changeClientPage" data-id="${window.state.clientPagination.currentPage + 1}" ${window.state.clientPagination.currentPage === totalPages ? 'disabled' : ''}>
                         Next <i class="fa-solid fa-chevron-right"></i>
                     </button>
-                    <select onchange="window.changeClientItemsPerPage(this.value)" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <select data-action-change="changeClientItemsPerPage" data-id="this.value" style="margin-left: 1rem; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color);">
                         <option value="10" ${window.state.clientPagination.itemsPerPage === 10 ? 'selected' : ''}>10 / page</option>
                         <option value="25" ${window.state.clientPagination.itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
                         <option value="50" ${window.state.clientPagination.itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
@@ -276,7 +276,7 @@ function renderClientDetail(clientId, options = {}) {
     const html = `
     <div class="fade-in">
             <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" onclick="renderClientsEnhanced()">
+                <button class="btn btn-secondary" data-action="renderClientsEnhanced">
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Clients
                 </button>
             </div>
@@ -302,7 +302,7 @@ function renderClientDetail(clientId, options = {}) {
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
-                    <button class="btn btn-primary" onclick="window.renderEditClient('${client.id}')">
+                    <button class="btn btn-primary" data-action="renderEditClient" data-id="${client.id}">
                         <i class="fa-solid fa-pen"></i> Edit
                     </button>
                     ` : ''}
@@ -404,7 +404,7 @@ function getClientInfoHTML(client) {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Company Information</h3>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-outline-primary" onclick="window.openImportAccountSetupModal('${client.id}')">
+                <button class="btn btn-sm btn-outline-primary" data-action="openImportAccountSetupModal" data-id="${client.id}">
                     <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Bulk Import Setup
                 </button>
                 ` : ''}
@@ -497,10 +497,10 @@ function getClientSitesHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites('${client.id}')">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadSites" data-id="${client.id}">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="window.addSite('${client.id}')">
+                    <button class="btn btn-sm btn-secondary" data-action="addSite" data-id="${client.id}">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Site
                     </button>
                 </div>
@@ -541,10 +541,10 @@ function getClientSitesHTML(client) {
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                                         <div style="display: flex; gap: 0.25rem;">
-                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editSite('${client.id}', ${index})">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editSite" data-arg1="${client.id}" data-arg2="${index}">
                                                 <i class="fa-solid fa-pen"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteSite('${client.id}', ${index})">
+                                            <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteSite" data-arg1="${client.id}" data-arg2="${index}">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </div>
@@ -560,7 +560,7 @@ function getClientSitesHTML(client) {
                     <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">No sites or branch locations added yet.</p>
                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" onclick="addSite('${client.id}')">
+                    <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" data-action="addSite" data-id="${client.id}">
                         <i class="fa-solid fa-plus"></i> Add First Site
                     </button>
                     ` : ''}
@@ -591,11 +591,11 @@ function getClientProfileHTML(client) {
                             <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc('${client.id}', this.files[0])">
                         </label>
                         ${client.website ? `
-                            <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile('${client.id}')">
+                            <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" data-action="generateCompanyProfile" data-id="${client.id}">
                                 <i class="fa-solid fa-sparkles" style="margin-right: 0.25rem;"></i> AI Generate
                             </button>
                         ` : ''}
-                        <button class="btn btn-sm btn-secondary" onclick="window.editCompanyProfile('${client.id}')">
+                        <button class="btn btn-sm btn-secondary" data-action="editCompanyProfile" data-id="${client.id}">
                             <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i> Edit Manually
                         </button>
                     ` : ''}
@@ -611,7 +611,7 @@ function getClientProfileHTML(client) {
                     <span style="font-size: 0.8rem; color: #22c55e; margin-left: 0.5rem;">(Uploaded ${new Date(client.profileDocument.uploadedAt).toLocaleDateString()})</span>
                 </div>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" onclick="window.removeProfileDocument('${client.id}')" title="Remove document">
+                <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" data-action="removeProfileDocument" data-id="${client.id}" title="Remove document">
                     <i class="fa-solid fa-times"></i>
                 </button>
                 ` : ''}
@@ -637,11 +637,11 @@ function getClientProfileHTML(client) {
                                 <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc('${client.id}', this.files[0])">
                             </label>
                             ${client.website ? `
-                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" onclick="window.generateCompanyProfile('${client.id}')">
+                                <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" data-action="generateCompanyProfile" data-id="${client.id}">
                                     <i class="fa-solid fa-sparkles"></i> AI Generate
                                 </button>
                             ` : ''}
-                            <button class="btn btn-outline-secondary btn-sm" onclick="window.editCompanyProfile('${client.id}')">
+                            <button class="btn btn-outline-secondary btn-sm" data-action="editCompanyProfile" data-id="${client.id}">
                                 <i class="fa-solid fa-pen"></i> Write Manually
                             </button>
                         ` : ''}
@@ -665,10 +665,10 @@ function getClientContactsHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-secondary" onclick="addContactPerson('${client.id}')">
+                    <button class="btn btn-sm btn-secondary" data-action="addContactPerson" data-id="${client.id}">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts('${client.id}')">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadContacts" data-id="${client.id}">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
                 </div>
@@ -695,10 +695,10 @@ function getClientContactsHTML(client) {
                                     <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editContact('${client.id}', ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editContact" data-arg1="${client.id}" data-arg2="${index}">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteContact('${client.id}', ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${index}">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                         ` : ''}
@@ -723,10 +723,10 @@ function getClientDepartmentsHTML(client) {
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments('${client.id}')">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="window.addDepartment('${client.id}')">
+                    <button class="btn btn-sm btn-secondary" data-action="addDepartment" data-id="${client.id}">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Department
                     </button>
                     ` : ''}
@@ -749,10 +749,10 @@ function getClientDepartmentsHTML(client) {
                                     <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                     <td>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editDepartment('${client.id}', ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${index}">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteDepartment('${client.id}', ${index})">
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${index}">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                         ` : ''}
@@ -768,8 +768,8 @@ function getClientDepartmentsHTML(client) {
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                        <button class="btn btn-outline-primary btn-sm" onclick="window.addDepartment('${client.id}')">Add Manually</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="window.bulkUploadDepartments('${client.id}')">Bulk Upload</button>
+                        <button class="btn btn-outline-primary btn-sm" data-action="addDepartment" data-id="${client.id}">Add Manually</button>
+                        <button class="btn btn-outline-secondary btn-sm" data-action="bulkUploadDepartments" data-id="${client.id}">Bulk Upload</button>
                         ` : ''}
                     </div>
                 </div>
@@ -792,10 +792,10 @@ function getClientGoodsServicesHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addGoodsService('${client.id}')">
+                <button class="btn btn-sm btn-secondary" data-action="addGoodsService" data-id="${client.id}">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices('${client.id}')">
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadGoodsServices" data-id="${client.id}">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -820,8 +820,8 @@ function getClientGoodsServicesHTML(client) {
                                 <td style="font-size: 0.9rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.description || '-')}</td>
                                 <td>
                                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editGoodsService('${client.id}', ${index})"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteGoodsService('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
                                 </td>
                             </tr>
@@ -852,10 +852,10 @@ function getClientKeyProcessesHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addKeyProcess('${client.id}')">
+                <button class="btn btn-sm btn-secondary" data-action="addKeyProcess" data-id="${client.id}">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses('${client.id}')">
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadKeyProcesses" data-id="${client.id}">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -880,8 +880,8 @@ function getClientKeyProcessesHTML(client) {
                                 <td>${window.UTILS.escapeHtml(proc.owner || '-')}</td>
                                 <td>
                                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="window.editKeyProcess('${client.id}', ${index})"><i class="fa-solid fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="window.deleteKeyProcess('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
                                 </td>
                             </tr>
@@ -912,10 +912,10 @@ function getClientDesignationsHTML(client) {
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.addClientDesignation('${client.id}')">
+                <button class="btn btn-sm btn-secondary" data-action="addClientDesignation" data-id="${client.id}">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations('${client.id}')">
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDesignations" data-id="${client.id}">
                     <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                 </button>
             </div>
@@ -929,7 +929,7 @@ function getClientDesignationsHTML(client) {
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
-                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" onclick="window.deleteClientDesignation('${client.id}', ${index})"><i class="fa-solid fa-times"></i></button>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
                 `).join('')}
@@ -966,7 +966,7 @@ function getClientAuditTeamHTML(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">CB auditors assigned to audit this organization</p>
             </div>
             ${canManage ? `
-            <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal('${client.id}', '${window.UTILS.escapeHtml(client.name)}')">
+            <button class="btn btn-primary" data-action="openClientAuditorAssignmentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(client.name)}">
                 <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
             </button>
             ` : ''}
@@ -1003,7 +1003,7 @@ function getClientAuditTeamHTML(client) {
                                 ${assignment?.assignedAt ? '<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Assigned: ' + new Date(assignment.assignedAt).toLocaleDateString() + '</div>' : ''}
                             </div>
                         </div>
-                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment('${client.id}', ${auditor.id})" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
+                        ${canManage ? `<button class="btn btn-sm btn-outline-danger" data-action="removeClientAuditorAssignment" data-arg1="${client.id}" data-arg2="${auditor.id}" title="Remove assignment"><i class="fa-solid fa-user-minus"></i> Remove</button>` : ''}
                     </div>
                     `;
     }).join('')}
@@ -1105,7 +1105,7 @@ function getClientAuditsHTML(client) {
                                 <div style="display: flex; align-items: center; gap: 1rem;">
                                     ${ncrCount > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">${ncrCount} Findings</span>` : ''}
                                     <span class="badge" style="background: ${plan.status === 'Completed' ? '#10b981' : plan.status === 'Draft' ? '#94a3b8' : '#3b82f6'};">${plan.status}</span>
-                                    ${report ? `<button class="btn btn-sm btn-outline-primary" onclick="window.openReportingDetail(${report.id})"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
+                                    ${report ? `<button class="btn btn-sm btn-outline-primary" data-action="openReportingDetail" data-id="${report.id}"><i class="fa-solid fa-file-lines"></i> View Report</button>` : ''}
                                 </div>
                             </div>
                         `;
@@ -1181,7 +1181,7 @@ function getClientDocumentsHTML(client) {
                 <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">System manuals, procedures, and documents provided by the client for audit preparation</p>
             </div>
             ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-primary btn-sm" onclick="openClientDocumentModal('${client.id}')">
+                <button class="btn btn-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}">
                     <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Add Document
                 </button>
                 ` : ''}
@@ -1212,9 +1212,9 @@ function getClientDocumentsHTML(client) {
                                     <td style="font-size: 0.85rem;">${doc.linkedClauses ? '<span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-size:0.78rem;">' + window.UTILS.escapeHtml(doc.linkedClauses) + '</span>' : '<span style="color:#94a3b8;">—</span>'}</td>
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" onclick="viewDocumentNotes('${client.id}', '${window.UTILS.escapeHtml(doc.id)}')" title="View Notes"><i class="fa-solid fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes"><i class="fa-solid fa-eye"></i></button>
                                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="deleteDocument('${client.id}', '${window.UTILS.escapeHtml(doc.id)}')"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
                                 </tr>
@@ -1229,7 +1229,7 @@ function getClientDocumentsHTML(client) {
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">No documents uploaded for this client yet.</p>
                     <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 1rem;">Upload system manuals, procedures, org charts and other documents to help prepare custom checklists.</p>
                     ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                    <button class="btn btn-outline-primary btn-sm" onclick="openClientDocumentModal('${client.id}')">Add First Document</button>
+                    <button class="btn btn-outline-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}">Add First Document</button>
                     ` : ''}
                 </div>
             `}
@@ -1266,7 +1266,7 @@ function getClientComplianceHTML(client) {
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
                         background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
                         color: ${appStatus === s ? 'white' : '#64748b'};"
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `onclick="window.updateClientApplicationStatus('${client.id}', '${s}')"` : ''}>
+                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `data-action="updateClientApplicationStatus" data-arg1="${client.id}" data-arg2="${s}"` : ''}>
                         ${s}
                     </span>
                 `).join('')}
@@ -1295,7 +1295,7 @@ function getClientComplianceHTML(client) {
                     </div>
                 `}
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="window.editClientContract('${client.id}')">
+                <button class="btn btn-sm btn-secondary" data-action="editClientContract" data-id="${client.id}">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
                 </button>
                 ` : ''}
@@ -1321,7 +1321,7 @@ function getClientComplianceHTML(client) {
                     </div>
                 `}
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="window.editClientNDA('${client.id}')">
+                <button class="btn btn-sm btn-secondary" data-action="editClientNDA" data-id="${client.id}">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
                 </button>
                 ` : ''}
@@ -1336,7 +1336,7 @@ function getClientComplianceHTML(client) {
                     Client Changes Log (ISO 9.6)
                 </h4>
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
-                <button class="btn btn-sm btn-secondary" onclick="window.addClientChangeLog('${client.id}')">
+                <button class="btn btn-sm btn-secondary" data-action="addClientChangeLog" data-id="${client.id}">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
                 </button>
                 ` : ''}
@@ -1483,7 +1483,7 @@ window.renderAddClient = function () {
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
             <div>
-                <button class="btn btn-link" onclick="renderClientsEnhanced()" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
+                <button class="btn btn-link" data-action="renderClientsEnhanced" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
                     <i class="fa-solid fa-arrow-left"></i> Back to Clients
                 </button>
                 <h1 style="font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, #1e293b 0%, #334155 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
@@ -1491,8 +1491,8 @@ window.renderAddClient = function () {
                 </h1>
             </div>
             <div style="display: flex; gap: 1rem;">
-                <button class="btn btn-secondary" onclick="renderClientsEnhanced()">Cancel</button>
-                <button class="btn btn-primary" onclick="window.saveNewClient()" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                <button class="btn btn-secondary" data-action="renderClientsEnhanced">Cancel</button>
+                <button class="btn btn-primary" data-action="saveNewClient" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
                     <i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i> Create Client
                 </button>
             </div>
@@ -1524,7 +1524,7 @@ window.renderAddClient = function () {
 
                         <div class="form-group">
                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector</label>
-                            <select class="form-control" id="client-industry" style="background-image: none;" onchange="window.handleIndustryChange(this)">
+                            <select class="form-control" id="client-industry" style="background-image: none;" data-action-change="handleIndustryChange" data-id="this">
                                 <option value="">Select Industry...</option>
                                 ${['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'].map(i => `<option>${i}</option>`).join('')}
                                 <option value="Other">Other (Please Specify)</option>
@@ -1609,7 +1609,7 @@ window.renderAddClient = function () {
                          <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
                             <i class="fa-solid fa-cloud-arrow-up"></i> Upload Logo
                          </label>
-                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleLogoUpload(this)">
+                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" data-action-change="handleLogoUpload" data-id="this">
                          <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
                     </div>
                  </div>
@@ -1875,7 +1875,7 @@ window.renderEditClient = function (clientId) {
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
             <div>
-                <button class="btn btn-link" onclick="renderClientsEnhanced()" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
+                <button class="btn btn-link" data-action="renderClientsEnhanced" style="color: var(--text-secondary); padding: 0; margin-bottom: 0.5rem; text-decoration: none;">
                     <i class="fa-solid fa-arrow-left"></i> Back to Clients
                 </button>
                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -1886,8 +1886,8 @@ window.renderEditClient = function (clientId) {
                 </div>
             </div>
             <div style="display: flex; gap: 1rem;">
-                <button class="btn btn-secondary" onclick="renderClientsEnhanced()">Cancel</button>
-                <button class="btn btn-primary" onclick="window.saveAuditClient('${client.id}')" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                <button class="btn btn-secondary" data-action="renderClientsEnhanced">Cancel</button>
+                <button class="btn btn-primary" data-action="saveAuditClient" data-id="${client.id}" style="padding: 0.6rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
                     <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Changes
                 </button>
             </div>
@@ -1917,7 +1917,7 @@ window.renderEditClient = function (clientId) {
 
                         <div class="form-group">
                              <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">Industry Sector</label>
-                            <select class="form-control" id="client-industry" style="background-image: none;" onchange="window.handleIndustryChange(this)">
+                            <select class="form-control" id="client-industry" style="background-image: none;" data-action-change="handleIndustryChange" data-id="this">
                                 <option value="">Select Industry...</option>
                                 ${['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'].map(i => `<option ${client.industry === i ? 'selected' : ''}>${i}</option>`).join('')}
                                 <option value="Other" ${!['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education', ''].includes(client.industry) ? 'selected' : ''}>Other (Please Specify)</option>
@@ -2013,7 +2013,7 @@ window.renderEditClient = function (clientId) {
                          <label for="client-logo-upload" class="btn btn-outline-primary btn-sm" style="cursor: pointer;">
                             <i class="fa-solid fa-cloud-arrow-up"></i> Change Logo
                          </label>
-                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" onchange="window.handleClientLogoUpload(this, '${client.id}')">
+                         <input type="file" id="client-logo-upload" accept="image/*" style="display: none;" data-action-change="handleClientLogoUpload" data-arg1="this" data-arg2="${client.id}">
                          <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">PNG, JPG up to 1MB</p>
                     </div>
                  </div>
@@ -4143,7 +4143,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <div style="position: absolute; top: 24px; left: 0; width: ${progressWidth}%; height: 3px; background: var(--primary-color); z-index: 2; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);"></div>
                     
                     ${steps.map(step => `
-                        <div style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; cursor: pointer;" onclick="window.setSetupWizardStep('${client.id}', ${step.id})">
+                        <div style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; cursor: pointer;" data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${step.id}">
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: ${currentStep >= step.id ? 'var(--primary-color)' : '#fff'}; border: 3px solid ${currentStep >= step.id ? 'var(--primary-color)' : '#e2e8f0'}; color: ${currentStep >= step.id ? '#fff' : '#94a3b8'}; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: ${currentStep === step.id ? '0 0 0 4px rgba(79, 70, 229, 0.2)' : 'none'};">
                                 <i class="fa-solid ${step.icon}"></i>
                             </div>
@@ -4167,7 +4167,7 @@ CFO," style="font-family: monospace;"></textarea>
 
             <!-- Wizard Footer / Navigation -->
             <div style="padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn btn-secondary" onclick="window.setSetupWizardStep('${client.id}', ${currentStep - 1})" ${currentStep === 1 ? 'disabled' : ''}>
+                <button class="btn btn-secondary" data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${currentStep - 1}" ${currentStep === 1 ? 'disabled' : ''}>
                     <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Previous
                 </button>
                 
@@ -4176,7 +4176,7 @@ CFO," style="font-family: monospace;"></textarea>
                         ${currentStep === steps.length ? '<i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i> Setup Complete' : `Next: ${steps[currentStep]?.title || ''}`}
                     </span>
                     ${currentStep < steps.length ? `
-                        <button class="btn btn-primary" onclick="window.setSetupWizardStep('${client.id}', ${currentStep + 1})">
+                        <button class="btn btn-primary" data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${currentStep + 1}">
                             Next Stage <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
                         </button>
                     ` : `
@@ -4249,7 +4249,7 @@ CFO," style="font-family: monospace;"></textarea>
                     Detected standards: ${Array.from(allStandards).join(', ')}.<br>
                     Click below to generate certificate records for these standards to manage scopes and revisions.
                 </p>
-                <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards('${client.id}')">
+                <button class="btn btn-primary" data-action="generateCertificatesFromStandards" data-id="${client.id}">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Records
                 </button>
             </div>
@@ -4262,7 +4262,7 @@ CFO," style="font-family: monospace;"></textarea>
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Certification Scopes & History
                 </h3>
-                <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards('${client.id}')">
+                <button class="btn btn-secondary btn-sm" data-action="generateCertificatesFromStandards" data-id="${client.id}">
                     <i class="fa-solid fa-sync" style="margin-right: 0.25rem;"></i> Sync Standards
                 </button>
             </div>
@@ -4282,14 +4282,14 @@ CFO," style="font-family: monospace;"></textarea>
                             <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
                                 Cert #: <input type="text" value="${cert.certificateNo || ''}" 
                                     style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;"
-                                    onchange="window.updateCertField('${client.id}', ${index}, 'certificateNo', this.value)">
+                                    data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="certificateNo" data-arg4="this.value">
                             </div>
                         </div>
                         <div style="text-align: right;">
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" onclick="window.viewCertRevisionHistory('${client.id}', ${index})" title="View revision history for this certification">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" data-action="viewCertRevisionHistory" data-arg1="${client.id}" data-arg2="${index}" title="View revision history for this certification">
                                 <i class="fa-solid fa-history"></i> Revision History
                              </button>
-                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope('${client.id}', ${index})" title="Remove this certification scope">
+                             <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" data-action="deleteCertificationScope" data-arg1="${client.id}" data-arg2="${index}" title="Remove this certification scope">
                                 <i class="fa-solid fa-trash"></i>
                              </button>
                              <div style="font-size: 0.85rem; color: var(--text-secondary);">
@@ -4303,7 +4303,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <div style="margin-bottom: 1.5rem;">
                         <label style="font-weight: 600; color: var(--text-secondary); font-size: 0.85rem;">Global / Main Scope Text (Fallback)</label>
                         <textarea class="form-control" rows="2" 
-                            onchange="window.updateCertField('${client.id}', ${index}, 'scope', this.value)"
+                            data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="scope" data-arg4="this.value"
                             placeholder="Enter the main scope statement...">${cert.scope || ''}</textarea>
                     </div> 
                     -->
@@ -4335,7 +4335,7 @@ CFO," style="font-family: monospace;"></textarea>
                                         <td style="padding: 0.75rem 0.5rem;">
                                             <textarea class="form-control" rows="2" 
                                                 style="font-size: 0.9rem;"
-                                                onchange="window.updateSiteScope('${client.id}', ${index}, '${site.name}', this.value)"
+                                                data-action-change="updateSiteScope" data-arg1="${client.id}" data-arg2="${index}" data-arg3="${site.name}" data-arg4="this.value"
                                                 placeholder="Define specific scope for this site...">${siteScope}</textarea>
                                         </td>
                                     </tr>
@@ -4351,7 +4351,7 @@ CFO," style="font-family: monospace;"></textarea>
                             <div>
                                 <label style="font-size: 0.8rem;">Initial Date</label>
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-control" value="${cert.initialDate || ''}" placeholder="e.g. 15-Mar-2024" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'initialDate', this.value)">
+                                    <input type="text" class="form-control" value="${cert.initialDate || ''}" placeholder="e.g. 15-Mar-2024" style="flex: 1;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="initialDate" data-arg4="this.value">
                                     <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
                                 </div>
                             </div>
@@ -4365,13 +4365,13 @@ CFO," style="font-family: monospace;"></textarea>
                             <div>
                                 <label style="font-size: 0.8rem;">Expiry Date</label>
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-control cert-expiry" value="${cert.expiryDate || ''}" placeholder="e.g. 14-Mar-2027" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
+                                    <input type="text" class="form-control cert-expiry" value="${cert.expiryDate || ''}" placeholder="e.g. 14-Mar-2027" style="flex: 1;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="expiryDate" data-arg4="this.value">
                                     <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
                                 </div>
                             </div>
                          </div>
                          <div style="display: flex; align-items: flex-end;">
-                            <button class="btn btn-primary" onclick="window.saveCertificateDetails('${client.id}')">
+                            <button class="btn btn-primary" data-action="saveCertificateDetails" data-id="${client.id}">
                                 <i class="fa-solid fa-save"></i> Save Changes
                             </button>
                          </div>
@@ -4574,7 +4574,7 @@ CFO," style="font-family: monospace;"></textarea>
                 \u003clabel\u003eChange Description\u003c/label\u003e
                 \u003ctextarea id="new-revision-description" class="form-control" rows="2" placeholder="Describe what changed in this revision..."\u003e\u003c/textarea\u003e
             \u003c/div\u003e
-            \u003cbutton class="btn btn-primary btn-sm" onclick="window.addCertRevision(${clientId}, ${certIndex})"\u003e
+            \u003cbutton class="btn btn-primary btn-sm" data-action="addCertRevision" data-arg1="${clientId}" data-arg2="${certIndex}"\u003e
                 \u003ci class="fa-solid fa-plus" style="margin-right: 0.5rem;"\u003e\u003c/i\u003eAdd Revision
             \u003c/button\u003e
         \u003c/div\u003e
@@ -4968,7 +4968,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <i class="fa-solid fa-file-excel" style="font-size: 2rem; color: #10b981; margin-bottom: 1rem;"></i>
                     <h4 style="margin-bottom: 0.5rem;">Step 1: Get Template</h4>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Download valid Excel structure</p>
-                    <button class="btn btn-outline-primary btn-sm" onclick="window.downloadAccountSetupTemplate('${window.UTILS.escapeHtml(client.name)}')">
+                    <button class="btn btn-outline-primary btn-sm" data-action="downloadAccountSetupTemplate" data-id="${window.UTILS.escapeHtml(client.name)}">
                         <i class="fa-solid fa-download"></i> Download Template
                     </button>
                 </div>
@@ -4979,7 +4979,7 @@ CFO," style="font-family: monospace;"></textarea>
                     <h4 style="margin-bottom: 0.5rem;">Step 2: Upload File</h4>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Select filled Excel file</p>
                     <label class="btn btn-primary btn-sm">
-                        <input type="file" accept=".xlsx, .xls" style="display: none;" onchange="window.processAccountSetupImport(${clientId}, this)">
+                        <input type="file" accept=".xlsx, .xls" style="display: none;" data-action-change="processAccountSetupImport" data-arg1="${clientId}" data-arg2="this">
                         <i class="fa-solid fa-folder-open"></i> Select File
                     </label>
                 </div>
@@ -5483,7 +5483,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
                             <strong style="color: #991b1b;">Archive Client</strong>
                             <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Move this client to archives. Data is preserved but hidden from active lists.</p>
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.archiveClient('${client.id}')">
+                        <button class="btn btn-sm btn-outline-secondary" data-action="archiveClient" data-id="${client.id}">
                             <i class="fa-solid fa-box-archive"></i> Archive
                         </button>
                     </div>
@@ -5493,7 +5493,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
                             <strong style="color: #dc2626;">Delete Client</strong>
                             <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Permanently remove this client and ALL associated data. This cannot be undone.</p>
                         </div>
-                        <button class="btn btn-sm btn-danger" onclick="window.deleteClient('${client.id}')">
+                        <button class="btn btn-sm btn-danger" data-action="deleteClient" data-id="${client.id}">
                             <i class="fa-solid fa-trash"></i> Delete
                         </button>
                     </div>

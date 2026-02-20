@@ -15,6 +15,27 @@
 (function () {
     'use strict';
 
+    /**
+     * Extract positional arguments from data-id / data-arg1..data-argN attributes.
+     * Returns array of args if found, empty array if none.
+     */
+    function extractArgs(el) {
+        // Check for data-arg1, data-arg2, ... (multi-arg pattern)
+        var args = [];
+        for (var i = 1; i <= 10; i++) {
+            var val = el.getAttribute('data-arg' + i);
+            if (val === null) break;
+            args.push(val);
+        }
+        if (args.length > 0) return args;
+
+        // Check for data-id (single-arg pattern)
+        var id = el.getAttribute('data-id');
+        if (id !== null) return [id];
+
+        return [];
+    }
+
     // ─── Click Delegation ────────────────────────────────────────────
     document.addEventListener('click', function (e) {
         // 1. data-hash: simple hash navigation
@@ -31,8 +52,14 @@
             var action = actionTarget.dataset.action;
             var fn = window[action];
             if (typeof fn === 'function') {
-                // Pass the element and all data-* values so handlers can read context
-                fn.call(actionTarget, actionTarget, actionTarget.dataset, e);
+                // Build argument list from data-* attributes
+                var args = extractArgs(actionTarget);
+                if (args.length > 0) {
+                    fn.apply(null, args);
+                } else {
+                    // No args — pass element context (for toggleNavGroup-like handlers)
+                    fn.call(actionTarget, actionTarget, actionTarget.dataset, e);
+                }
             } else if (window.Logger) {
                 window.Logger.warn('EventDelegator', 'Unknown action: ' + action);
             }

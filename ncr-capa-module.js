@@ -206,10 +206,10 @@ function renderNCRCAPAModuleContent(clientId) {
             <div class="card" style="margin-bottom: 2rem;">
                 <!-- Internal Navigation Tabs -->
                 <div class="tab-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                    <button class="tab-btn active" onclick="switchNCRTab('register', this)">NCR Register</button>
-                    <button class="tab-btn" onclick="switchNCRTab('capa', this)">CAPA Tracker</button>
-                    <button class="tab-btn" onclick="switchNCRTab('verification', this)">Verification</button>
-                    <button class="tab-btn" onclick="switchNCRTab('analytics', this)">Analytics</button>
+                    <button class="tab-btn active" data-action="switchNCRTab" data-arg1="register" data-arg2="this">NCR Register</button>
+                    <button class="tab-btn" data-action="switchNCRTab" data-arg1="capa" data-arg2="this">CAPA Tracker</button>
+                    <button class="tab-btn" data-action="switchNCRTab" data-arg1="verification" data-arg2="this">Verification</button>
+                    <button class="tab-btn" data-action="switchNCRTab" data-arg1="analytics" data-arg2="this">Analytics</button>
                 </div>
 
                 <div id="ncr-content">
@@ -261,11 +261,11 @@ function getNCRRegisterHTML() {
                     NCR Register
                 </h3>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-primary" onclick="window.printNCRRegister()">
+                    <button class="btn btn-primary" data-action="printNCRRegister">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>
                         Print Register
                     </button>
-                    <button class="btn btn-primary" onclick="openNewNCRModal()">
+                    <button class="btn btn-primary" data-action="openNewNCRModal">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                         New NCR
                     </button>
@@ -277,7 +277,7 @@ function getNCRRegisterHTML() {
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
                     <div class="form-group" style="margin: 0;">
                         <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Level</label>
-                        <select class="form-control" id="filter-level" onchange="filterNCRs()" style="font-size: 0.9rem;">
+                        <select class="form-control" id="filter-level" data-action-change="filterNCRs" style="font-size: 0.9rem;">
                             <option value="all">All</option>
                             <option value="client">Client</option>
                             <option value="cb-internal">Internal</option>
@@ -285,7 +285,7 @@ function getNCRRegisterHTML() {
                     </div>
                     <div class="form-group" style="margin: 0;">
                         <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Severity</label>
-                        <select class="form-control" id="filter-severity" onchange="filterNCRs()" style="font-size: 0.9rem;">
+                        <select class="form-control" id="filter-severity" data-action-change="filterNCRs" style="font-size: 0.9rem;">
                             <option value="all">All</option>
                             <option value="Major">Major</option>
                             <option value="Minor">Minor</option>
@@ -294,7 +294,7 @@ function getNCRRegisterHTML() {
                     </div>
                     <div class="form-group" style="margin: 0;">
                         <label style="font-size: 0.85rem; margin-bottom: 0.3rem;">Status</label>
-                        <select class="form-control" id="filter-status" onchange="filterNCRs()" style="font-size: 0.9rem;">
+                        <select class="form-control" id="filter-status" data-action-change="filterNCRs" style="font-size: 0.9rem;">
                             <option value="all">All</option>
                             <option value="Open">Open</option>
                             <option value="In Progress">In Progress</option>
@@ -377,21 +377,21 @@ function renderNCRTable(ncrs) {
                                 </span>
                             </td>
                             <td style="white-space: nowrap;">
-                                <button class="btn btn-sm btn-icon" onclick="viewNCRDetails('${ncr.id}')" title="View Details">
+                                <button class="btn btn-sm btn-icon" data-action="viewNCRDetails" data-id="${ncr.id}" title="View Details">
                                     <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon" onclick="editNCR('${ncr.id}')" title="Edit">
+                                <button class="btn btn-sm btn-icon" data-action="editNCR" data-id="${ncr.id}" title="Edit">
                                     <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                 </button>
-                                <button class="btn btn-sm btn-icon" onclick="deleteNCR('${ncr.id}')" title="Delete">
+                                <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Delete">
                                     <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                 </button>
                                 ${ncr.status === 'Open' ? `
-                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" onclick="openAddCAPAModal('${ncr.id}')" title="Add CAPA">
+                                <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA">
                                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA
                                 </button>` : ''}
                                 ${ncr.status === 'In Progress' && ncr.capaImplementedDate ? `
-                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" onclick="verifyCAPA('${ncr.id}')" title="Verify CAPA">
+                                <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA">
                                     <i class="fa-solid fa-check"></i> Verify
                                 </button>` : ''}
                             </td>
@@ -491,7 +491,7 @@ function getCAPATrackerHTML() {
                                 <td>${window.UTILS.escapeHtml(ncr.capaResponsible || 'Not assigned')}</td>
                                 <td>${ncr.dueDate || '-'}</td>
                                 <td>
-                                    <button class="btn btn-sm" onclick="updateCAPAProgress('${ncr.id}')">
+                                    <button class="btn btn-sm" data-action="updateCAPAProgress" data-id="${ncr.id}">
                                         <i class="fa-solid fa-edit"></i> Update
                                     </button>
                                 </td>
@@ -546,7 +546,7 @@ function getVerificationHTML() {
                                 <td>${ncr.capaImplementedDate || 'Not yet implemented'}</td>
                                 <td>${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-primary" onclick="verifyCAPA('${ncr.id}')">
+                                    <button class="btn btn-sm btn-primary" data-action="verifyCAPA" data-id="${ncr.id}">
                                         <i class="fa-solid fa-check"></i> Verify
                                     </button>
                                 </td>
@@ -806,7 +806,7 @@ window.openNewNCRModal = function () {
         <form id="ncr-form">
             <div class="form-group">
                 <label>Client <span style="color: var(--danger-color);">*</span></label>
-                <select class="form-control" id="ncr-client" required ${contextClientId ? 'disabled' : ''} onchange="window.updateNCRAuditPlanOptions()">
+                <select class="form-control" id="ncr-client" required ${contextClientId ? 'disabled' : ''} data-action-change="updateNCRAuditPlanOptions">
                     <option value="">Select Client...</option>
                     ${window.state.clients.map(c => `<option value="${c.id}" ${String(c.id) === String(contextClientId) ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                 </select>

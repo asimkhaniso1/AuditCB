@@ -34,7 +34,7 @@ window.getClientOrgSetupHTML = function (client) {
             ${steps.map(step => `
                 <div class="wizard-step ${step.id <= currentStep ? 'active' : ''}" 
                      style="z-index: 3; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;"
-                     onclick="window.setSetupWizardStep('${client.id}', ${step.id})">
+                     data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${step.id}">
                     <div style="width: 40px; height: 40px; border-radius: 50%; background: ${step.id <= currentStep ? step.color : '#fff'}; border: 2px solid ${step.id <= currentStep ? step.color : '#e2e8f0'}; color: ${step.id <= currentStep ? '#fff' : '#94a3b8'}; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; transition: all 0.2s; box-shadow: ${step.id === currentStep ? '0 0 0 4px rgba(99, 102, 241, 0.2)' : 'none'};">
                         <i class="fa-solid ${step.icon}"></i>
                     </div>
@@ -51,10 +51,10 @@ window.getClientOrgSetupHTML = function (client) {
         ${window.getClientOrgSetupHTML.renderWizardStep(client, currentStep)}
     </div>
     <div style="padding: 1.5rem 2rem; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">
-        <button class="btn btn-secondary" ${currentStep === 1 ? 'disabled' : ''} onclick="window.setSetupWizardStep('${client.id}', ${currentStep - 1})">
+        <button class="btn btn-secondary" ${currentStep === 1 ? 'disabled' : ''} data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${currentStep - 1}">
             <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Previous
         </button>
-        <button class="btn btn-primary" onclick="window.setSetupWizardStep('${client.id}', ${currentStep < 7 ? currentStep + 1 : 1})">
+        <button class="btn btn-primary" data-action="setSetupWizardStep" data-arg1="${client.id}" data-arg2="${currentStep < 7 ? currentStep + 1 : 1}">
             ${currentStep < 7 ? 'Next Step <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>' : 'Finish <i class="fa-solid fa-check" style="margin-left: 0.5rem;"></i>'}
         </button>
     </div>
@@ -102,7 +102,7 @@ window.getClientCertificatesHTML = function (client) {
     <div class="fade-in" style="text-align: center; padding: 3rem;">
         <i class="fa-solid fa-certificate" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
         <h3>Initialize Certification Records</h3>
-        <button class="btn btn-primary" onclick="window.generateCertificatesFromStandards('${client.id}')">Generate Records</button>
+        <button class="btn btn-primary" data-action="generateCertificatesFromStandards" data-id="${client.id}">Generate Records</button>
     </div>`;
     }
 
@@ -110,7 +110,7 @@ window.getClientCertificatesHTML = function (client) {
 <div class="fade-in">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h3 style="color: var(--primary-color); margin: 0;"><i class="fa-solid fa-certificate"></i> Certification Scopes & History</h3>
-        <button class="btn btn-secondary btn-sm" onclick="window.generateCertificatesFromStandards('${client.id}')"><i class="fa-solid fa-sync"></i> Sync Standards</button>
+        <button class="btn btn-secondary btn-sm" data-action="generateCertificatesFromStandards" data-id="${client.id}"><i class="fa-solid fa-sync"></i> Sync Standards</button>
     </div>
     ${certs.map((cert, index) => {
         const relevantSites = (client.sites || []).filter(s => (s.standards && s.standards.includes(cert.standard)) || (!s.standards && client.standard && client.standard.includes(cert.standard)));
@@ -120,43 +120,43 @@ window.getClientCertificatesHTML = function (client) {
                 <div>
                     <span class="badge" style="background: var(--primary-color); color: white;">${cert.standard}</span>
                     <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem;">
-                        Cert #: <input type="text" value="${cert.certificateNo || ''}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" onchange="window.updateCertField('${client.id}', ${index}, 'certificateNo', this.value)">
+                        Cert #: <input type="text" value="${cert.certificateNo || ''}" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; width: 150px;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="certificateNo" data-arg4="this.value">
                     </div>
                 </div>
                 <div style="text-align: right;">
-                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;" onclick="window.viewCertRevisionHistory('${client.id}', ${index})">History</button>
-                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="window.deleteCertificationScope('${client.id}', ${index})"><i class="fa-solid fa-trash"></i></button>
+                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem;" data-action="viewCertRevisionHistory" data-arg1="${client.id}" data-arg2="${index}">History</button>
+                     <button class="btn btn-sm btn-outline" style="margin-bottom: 0.5rem; color: var(--danger-color); border-color: var(--danger-color);" data-action="deleteCertificationScope" data-arg1="${client.id}" data-arg2="${index}"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
             <div style="background: #f8fafc; padding: 1rem; border-radius: 6px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h4 style="margin: 0; font-size: 1rem; color: var(--primary-color);">Site-Specific Scopes</h4>
-                    <button class="btn btn-sm" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer;" onclick="window.aiGenerateScope('${client.id}', ${index})">
+                    <button class="btn btn-sm" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer;" data-action="aiGenerateScope" data-arg1="${client.id}" data-arg2="${index}">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> AI Gen Scope
                     </button>
                 </div>
                 ${relevantSites.map(site => {
             const siteScope = (cert.siteScopes && cert.siteScopes[site.name]) ? cert.siteScopes[site.name] : (cert.scope || '');
-            return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" onchange="window.updateSiteScope('${client.id}', ${index}, '${site.name}', this.value)">${siteScope}</textarea></div>`;
+            return `<div style="margin-bottom: 0.5rem;"><strong>${site.name}:</strong><br><textarea class="form-control" rows="2" data-action-change="updateSiteScope" data-arg1="${client.id}" data-arg2="${index}" data-arg3="${site.name}" data-arg4="this.value">${siteScope}</textarea></div>`;
         }).join('')}
             </div>
             <div style="margin-top: 1rem; display: flex; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
                  <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                     <div>
                         <label style="font-size: 0.8rem;">Initial Date</label>
-                        <input type="date" class="form-control" value="${cert.initialDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'initialDate', this.value)">
+                        <input type="date" class="form-control" value="${cert.initialDate || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="initialDate" data-arg4="this.value">
                     </div>
                     <div>
                         <label style="font-size: 0.8rem;">Current Issue</label>
-                        <input type="date" class="form-control" value="${cert.currentIssue || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value)">
+                        <input type="date" class="form-control" value="${cert.currentIssue || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="currentIssue" data-arg4="this.value">
                     </div>
                     <div>
                         <label style="font-size: 0.8rem;">Expiry Date</label>
-                        <input type="date" class="form-control" value="${cert.expiryDate || ''}" onchange="window.updateCertField('${client.id}', ${index}, 'expiryDate', this.value)">
+                        <input type="date" class="form-control" value="${cert.expiryDate || ''}" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="expiryDate" data-arg4="this.value">
                     </div>
                  </div>
                  <div style="display: flex; align-items: flex-end;">
-                    <button class="btn btn-primary" onclick="window.saveCertificateDetails('${client.id}')">
+                    <button class="btn btn-primary" data-action="saveCertificateDetails" data-id="${client.id}">
                         <i class="fa-solid fa-save"></i> Save Changes
                     </button>
                  </div>
@@ -201,7 +201,7 @@ window.getClientSettingsHTML = function (client) {
                         <strong style="color: #991b1b;">Archive Client</strong>
                         <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Move to archives. Data is preserved but hidden from active lists.</p>
                     </div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.archiveClient('${client.id}')">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="archiveClient" data-id="${client.id}">
                         <i class="fa-solid fa-box-archive"></i> Archive
                     </button>
                 </div>
@@ -210,7 +210,7 @@ window.getClientSettingsHTML = function (client) {
                         <strong style="color: #dc2626;">Delete Client</strong>
                         <p style="margin: 0; font-size: 0.85rem; color: #7f1d1d;">Permanently remove this client and ALL data. Cannot be undone.</p>
                     </div>
-                    <button class="btn btn-sm btn-danger" onclick="window.deleteClient('${client.id}')">
+                    <button class="btn btn-sm btn-danger" data-action="deleteClient" data-id="${client.id}">
                         <i class="fa-solid fa-trash"></i> Delete
                     </button>
                 </div>
@@ -348,8 +348,8 @@ window.getClientProfileHTML = function (client) {
                 <p style="margin:0.3rem 0 0 0;color:rgba(255,255,255,0.8);font-size:0.8rem">Last updated: ${lastUpdated}</p>
             </div>
             <div style="display:flex;gap:0.5rem">
-                <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);font-size:0.8rem" onclick="window.editCompanyProfile('${client.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
-                <button class="btn btn-sm" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border:none;font-size:0.8rem" onclick="window.generateCompanyProfile('${client.id}')"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate</button>
+                <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);font-size:0.8rem" data-action="editCompanyProfile" data-id="${client.id}"><i class="fa-solid fa-pen"></i> Edit</button>
+                <button class="btn btn-sm" style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border:none;font-size:0.8rem" data-action="generateCompanyProfile" data-id="${client.id}"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate</button>
             </div>
         </div>
         <div style="padding:1.5rem">
@@ -369,8 +369,8 @@ window.getClientSitesHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-map-location-dot" style="color: #3b82f6;"></i> Sites & Locations <span class="count-badge">${sites.length}</span></h3>
             ${isAdmin ? `<div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadSites('${client.id}')"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
-                <button class="btn btn-sm" style="background: #3b82f6; color: white; border: none; border-radius: 8px;" onclick="window.addSite('${client.id}')"><i class="fa-solid fa-plus"></i> Add Site</button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadSites" data-id="${client.id}"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
+                <button class="btn btn-sm" style="background: #3b82f6; color: white; border: none; border-radius: 8px;" data-action="addSite" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add Site</button>
             </div>` : ''}
         </div>
         ${sites.length > 0 ? `
@@ -388,16 +388,16 @@ window.getClientSitesHTML = function (client) {
                 <td>${s.employees ? '<span class="badge-tag badge-green"><i class="fa-solid fa-users" style="margin-right:3px"></i>' + s.employees + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Site',{Name:'${_esc(s.name)}',Standards:'${_esc(s.standards)}',Address:'${_esc(s.address)}',City:'${_esc(s.city)}',Employees:'${s.employees || '-'}'})"><i class="fa-solid fa-eye"></i></button>
-                    ${isAdmin ? `<button class="action-btn edit" title="Edit" onclick="window.editSite('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>` : ''}
+                    ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editSite" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>` : ''}
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Site',{Name:'${_esc(s.name)}',Address:'${_esc(s.address)}',City:'${_esc(s.city)}'})"><i class="fa-solid fa-print"></i></button>
-                    ${isAdmin ? `<button class="action-btn delete" title="Delete" onclick="window.deleteSite('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteSite" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : `
         <div class="org-table-empty">
             <i class="fa-solid fa-map-location-dot"></i>
             <p>No sites or locations added yet.</p>
-            ${isAdmin ? `<button class="btn btn-sm" style="background:#3b82f6;color:white;border:none;border-radius:8px;margin-top:0.75rem" onclick="window.addSite('${client.id}')"><i class="fa-solid fa-plus"></i> Add First Site</button>` : ''}
+            ${isAdmin ? `<button class="btn btn-sm" style="background:#3b82f6;color:white;border:none;border-radius:8px;margin-top:0.75rem" data-action="addSite" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add First Site</button>` : ''}
         </div>`}
     </div>`;
 };
@@ -409,8 +409,8 @@ window.getClientContactsHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-address-book" style="color: #8b5cf6;"></i> Personnel / Contacts <span class="count-badge">${contacts.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadContacts('${client.id}')"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
-                <button class="btn btn-sm" style="background:#8b5cf6;color:white;border:none;border-radius:8px" onclick="window.addContactPerson('${client.id}')"><i class="fa-solid fa-plus"></i> Add</button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadContacts" data-id="${client.id}"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
+                <button class="btn btn-sm" style="background:#8b5cf6;color:white;border:none;border-radius:8px" data-action="addContactPerson" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
         </div>
         ${contacts.length > 0 ? `
@@ -426,9 +426,9 @@ window.getClientContactsHTML = function (client) {
                 <td>${window.UTILS.escapeHtml(c.email || '-')}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}',Phone:'${_esc(c.phone)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.editContact('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" data-action="editContact" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}'})"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" onclick="window.deleteContact('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="action-btn delete" title="Delete" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-address-book"></i><p>No contacts added yet.</p></div>'}
@@ -443,8 +443,8 @@ window.getClientDepartmentsHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-sitemap" style="color: #f59e0b;"></i> Departments <span class="count-badge">${departments.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDepartments('${client.id}')"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
-                <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;border-radius:8px" onclick="window.addDepartment('${client.id}')"><i class="fa-solid fa-plus"></i> Add</button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
+                <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;border-radius:8px" data-action="addDepartment" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
         </div>
         ${departments.length > 0 ? `
@@ -460,9 +460,9 @@ window.getClientDepartmentsHTML = function (client) {
                 <td>${deptHead !== '-' ? '<span class="badge-tag badge-blue">' + window.UTILS.escapeHtml(deptHead) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.editDepartment('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" onclick="window.deleteDepartment('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="action-btn delete" title="Delete" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`;
     }).join('')}</tbody></table>
@@ -477,8 +477,8 @@ window.getClientGoodsServicesHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-boxes-stacked" style="color: #10b981;"></i> Goods & Services <span class="count-badge">${items.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadGoodsServices('${client.id}')"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
-                <button class="btn btn-sm" style="background:#10b981;color:white;border:none;border-radius:8px" onclick="window.addGoodsService('${client.id}')"><i class="fa-solid fa-plus"></i> Add</button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadGoodsServices" data-id="${client.id}"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
+                <button class="btn btn-sm" style="background:#10b981;color:white;border:none;border-radius:8px" data-action="addGoodsService" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
         </div>
         ${items.length > 0 ? `
@@ -492,9 +492,9 @@ window.getClientGoodsServicesHTML = function (client) {
                 <td><span class="badge-tag badge-green">${window.UTILS.escapeHtml(item.category || '-')}</span></td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.editGoodsService('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" onclick="window.deleteGoodsService('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="action-btn delete" title="Delete" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-boxes-stacked"></i><p>No goods or services added yet.</p></div>'}
@@ -508,8 +508,8 @@ window.getClientKeyProcessesHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-gears" style="color: #6366f1;"></i> Key Processes <span class="count-badge">${processes.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadKeyProcesses('${client.id}')"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
-                <button class="btn btn-sm" style="background:#6366f1;color:white;border:none;border-radius:8px" onclick="window.addKeyProcess('${client.id}')"><i class="fa-solid fa-plus"></i> Add</button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadKeyProcesses" data-id="${client.id}"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
+                <button class="btn btn-sm" style="background:#6366f1;color:white;border:none;border-radius:8px" data-action="addKeyProcess" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
         </div>
         ${processes.length > 0 ? `
@@ -523,9 +523,9 @@ window.getClientKeyProcessesHTML = function (client) {
                 <td><span class="badge-tag badge-amber">${window.UTILS.escapeHtml(proc.category || '-')}</span></td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.editKeyProcess('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" onclick="window.deleteKeyProcess('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="action-btn delete" title="Delete" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
         </div>` : '<div class="org-table-empty"><i class="fa-solid fa-gears"></i><p>No key processes added yet.</p></div>'}
@@ -540,8 +540,8 @@ window.getClientDesignationsHTML = function (client) {
         <div class="org-table-header">
             <h3><i class="fa-solid fa-id-badge" style="color: #ec4899;"></i> Designations <span class="count-badge">${designations.length}</span></h3>
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.bulkUploadDesignations('${client.id}')"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
-                <button class="btn btn-sm" style="background:#ec4899;color:white;border:none;border-radius:8px" onclick="window.addClientDesignation('${client.id}')"><i class="fa-solid fa-plus"></i> Add</button>
+                <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDesignations" data-id="${client.id}"><i class="fa-solid fa-upload"></i> Bulk Upload</button>
+                <button class="btn btn-sm" style="background:#ec4899;color:white;border:none;border-radius:8px" data-action="addClientDesignation" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
         </div>
         ${designations.length > 0 ? `
@@ -558,9 +558,9 @@ window.getClientDesignationsHTML = function (client) {
                 <td>${desDept ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(desDept) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
                     <button class="action-btn view" title="View" onclick="window._orgViewItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})"><i class="fa-solid fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit" onclick="window.editClientDesignation('${client.id}', ${i})"><i class="fa-solid fa-pen"></i></button>
+                    <button class="action-btn edit" title="Edit" data-action="editClientDesignation" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
                     <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})"><i class="fa-solid fa-print"></i></button>
-                    <button class="action-btn delete" title="Delete" onclick="window.deleteClientDesignation('${client.id}', ${i})"><i class="fa-solid fa-trash"></i></button>
+                    <button class="action-btn delete" title="Delete" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`;
     }).join('')}</tbody></table>
@@ -580,7 +580,7 @@ window.getClientAuditTeamHTML = function (client) {
     <div class="card" id="client-audit-team-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-user-shield" style="margin-right: 0.5rem; color: #0ea5e9;"></i>Audit Team</h3>
-             <button class="btn btn-primary" onclick="window.openClientAuditorAssignmentModal('${client.id}', '${window.UTILS.escapeHtml(client.name)}')">
+             <button class="btn btn-primary" data-action="openClientAuditorAssignmentModal" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(client.name)}">
                 <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i> Assign Auditor
             </button>
         </div>
@@ -592,7 +592,7 @@ window.getClientAuditTeamHTML = function (client) {
                             <div style="font-weight: 600;">${window.UTILS.escapeHtml(auditor.name)}</div>
                             <div style="font-size: 0.85rem; color: #64748b;">${window.UTILS.escapeHtml(auditor.role || 'Auditor')}</div>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClientAuditorAssignment('${client.id}', ${auditor.id})"><i class="fa-solid fa-user-minus"></i> Remove</button>
+                        <button class="btn btn-sm btn-outline-danger" data-action="removeClientAuditorAssignment" data-arg1="${client.id}" data-arg2="${auditor.id}"><i class="fa-solid fa-user-minus"></i> Remove</button>
                     </div>`).join('')}
             </div>` : `<div style="text-align: center; padding: 2rem;"><p>No auditors assigned.</p></div>`}
     </div>`;

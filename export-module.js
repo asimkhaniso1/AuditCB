@@ -376,26 +376,26 @@ function addExportButtons(moduleName) {
     const exportButtons = {
         'clients': `
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary" onclick="exportClientsToCSV()">
+                <button class="btn btn-secondary" data-action="exportClientsToCSV">
                     <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
                 </button>
-                <button class="btn btn-secondary" onclick="exportClientsToPDF()">
+                <button class="btn btn-secondary" data-action="exportClientsToPDF">
                     <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export to PDF
                 </button>
             </div>
         `,
         'auditors': `
-            <button class="btn btn-secondary" onclick="exportAuditorsToCSV()">
+            <button class="btn btn-secondary" data-action="exportAuditorsToCSV">
                 <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
             </button>
         `,
         'audit-programs': `
-            <button class="btn btn-secondary" onclick="exportAuditProgramsToCSV()">
+            <button class="btn btn-secondary" data-action="exportAuditProgramsToCSV">
                 <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
             </button>
         `,
         'dashboard': `
-            <button class="btn btn-secondary" onclick="exportDashboardToPDF()">
+            <button class="btn btn-secondary" data-action="exportDashboardToPDF">
                 <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Summary
             </button>
         `

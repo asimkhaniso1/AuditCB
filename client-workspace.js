@@ -114,7 +114,7 @@ function populateClientSidebar() {
         const escapedName = window.UTILS?.escapeHtml ? window.UTILS.escapeHtml(client.name) : client.name;
 
         return `
-            <div class="client-list-item ${isActive ? 'active' : ''}" data-client-id="${client.id}" onclick="window.location.hash = 'client/${client.id}/overview'">
+            <div class="client-list-item ${isActive ? 'active' : ''}" data-client-id="${client.id}" data-hash="client/${client.id}/overview">
                 <div class="client-avatar">${initials}</div>
                 <div class="client-info">
                     <div class="client-name">${escapedName}</div>
@@ -215,37 +215,37 @@ function renderClientSidebarMenu(clientId) {
 
     // Client Menu Items
     navList.innerHTML = `
-        <li style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);" onclick="window.location.hash = 'dashboard'">
+        <li style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);" data-hash="dashboard">
             <i class="fa-solid fa-arrow-left" style="color: var(--text-secondary);"></i> <span style="font-weight: 500;">Back to Global</span>
         </li>
         
-        <li class="active" onclick="window.location.hash = 'client/${clientId}/overview'">
+        <li class="active" data-hash="client/${clientId}/overview">
             <i class="fa-solid fa-house"></i> Overview
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/account-setup'">
+        <li data-hash="client/${clientId}/account-setup">
             <i class="fa-solid fa-wand-magic-sparkles" style="color: #a21caf;"></i> Account Setup
         </li>
 
         <!-- Section: Audit Workflow -->
         <li style="padding: 0.5rem 1rem 0.25rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; pointer-events: none; margin-top: 0.5rem; border-top: 1px solid var(--border-color);">Audit Workflow</li>
-        <li onclick="window.location.hash = 'client/${clientId}/plans'">
+        <li data-hash="client/${clientId}/plans">
             <i class="fa-solid fa-clipboard-list"></i> Plans & Audits
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/execution'">
+        <li data-hash="client/${clientId}/execution">
             <i class="fa-solid fa-tasks"></i> Execution
         </li>
 
-        <li onclick="window.location.hash = 'client/${clientId}/ncr-capa'">
+        <li data-hash="client/${clientId}/ncr-capa">
             <i class="fa-solid fa-clipboard-check"></i> NCR & CAPA
         </li>
 
         <!-- Section: Records -->
         <li style="padding: 0.5rem 1rem 0.25rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; pointer-events: none; margin-top: 0.5rem; border-top: 1px solid var(--border-color);">Records & Compliance</li>
 
-        <li onclick="window.location.hash = 'client/${clientId}/compliance'">
+        <li data-hash="client/${clientId}/compliance">
             <i class="fa-solid fa-shield-halved"></i> Compliance
         </li>
-        <li onclick="window.location.hash = 'client/${clientId}/docs'">
+        <li data-hash="client/${clientId}/docs">
             <i class="fa-solid fa-folder-open"></i> Documents
         </li>
     `;
@@ -484,7 +484,7 @@ function renderClientOverview(client) {
                     </div>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                         <span style="background: ${client.status === 'Active' ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)'}; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 500;">${window.UTILS.escapeHtml(client.status || 'Active')}</span>
-                        <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/settings'" title="Settings">
+                        <button class="btn" style="background: rgba(255,255,255,0.2); color: white; border: none;" data-hash="client/${client.id}/settings" title="Settings">
                             <i class="fa-solid fa-cog"></i>
                         </button>
                     </div>
@@ -493,16 +493,16 @@ function renderClientOverview(client) {
 
             <!-- Quick Actions Bar -->
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/plans'">
+                <button class="btn btn-outline-primary" data-hash="client/${client.id}/plans">
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>View Audit Plans
                 </button>
                 <button class="btn btn-primary" onclick="window.renderCreateAuditPlanForm('${window.UTILS.escapeHtml(client.name).replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
                 </button>
-                <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/execution'">
+                <button class="btn btn-outline-primary" data-hash="client/${client.id}/execution">
                     <i class="fa-solid fa-play" style="margin-right: 0.5rem;"></i>Start Execution
                 </button>
-                <button class="btn btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">
+                <button class="btn btn-outline-primary" data-hash="client/${client.id}/ncr-capa">
                     <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Raise NCR
                 </button>
 
@@ -514,18 +514,18 @@ function renderClientOverview(client) {
                 ${openNCs > 0 ? `
                 <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <div><i class="fa-solid fa-exclamation-triangle" style="color: #f59e0b; margin-right: 0.5rem;"></i><strong>${openNCs} Open NC${openNCs !== 1 ? 's' : ''}</strong> - Action required</div>
-                    <button class="btn btn-sm" style="background: #f59e0b; color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">View</button>
+                    <button class="btn btn-sm" style="background: #f59e0b; color: white; border: none;" data-hash="client/${client.id}/ncr-capa">View</button>
                 </div>` : ''}
                 ${upcomingAudits > 0 ? `
                 <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; display: flex; justify-content: space-between; align-items: center;">
                     <div><i class="fa-solid fa-calendar-alt" style="color: #3b82f6; margin-right: 0.5rem;"></i><strong>${upcomingAudits} Upcoming Audit${upcomingAudits !== 1 ? 's' : ''}</strong></div>
-                    <button class="btn btn-sm" style="background: #3b82f6; color: white; border: none;" onclick="window.location.hash = 'client/${client.id}/plans'">View</button>
+                    <button class="btn btn-sm" style="background: #3b82f6; color: white; border: none;" data-hash="client/${client.id}/plans">View</button>
                 </div>` : ''}
             </div>` : ''}
 
             <!-- Stats Cards Row -->
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/plans'">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6; cursor: pointer;" data-hash="client/${client.id}/plans">
                     <i class="fa-solid fa-clipboard-list" style="font-size: 1.25rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
@@ -535,7 +535,7 @@ function renderClientOverview(client) {
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${validCerts}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Valid Certs</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/ncr-capa'">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid ${openNCs > 0 ? '#f59e0b' : '#10b981'}; cursor: pointer;" data-hash="client/${client.id}/ncr-capa">
                     <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.25rem; color: ${openNCs > 0 ? '#f59e0b' : '#10b981'}; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${openNCs}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Open NCs</p>
@@ -585,7 +585,7 @@ function renderClientOverview(client) {
                     <!-- Recent Reports Card -->
                     <div class="card">
                         <h4 style="margin: 0 0 1rem 0;"><i class="fa-solid fa-file-alt" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Recent Reports</h4>
-                        ${clientReports.length > 0 ? `<div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">${clientReports.slice(0, 3).map(r => `<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f8fafc; border-radius: 6px;"><span>${r.date || 'N/A'}</span><span class="badge" style="background: ${r.status === 'Finalized' ? '#d1fae5' : '#fef3c7'}; color: ${r.status === 'Finalized' ? '#065f46' : '#92400e'}; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${r.status || 'Draft'}</span></div>`).join('')}</div><button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-top: 0.75rem;" onclick="window.location.hash = 'client/${client.id}/execution'">View All</button>` : '<p style="color: var(--text-secondary); text-align: center; margin: 1rem 0; font-size: 0.9rem;">No reports yet</p>'}
+                        ${clientReports.length > 0 ? `<div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">${clientReports.slice(0, 3).map(r => `<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f8fafc; border-radius: 6px;"><span>${r.date || 'N/A'}</span><span class="badge" style="background: ${r.status === 'Finalized' ? '#d1fae5' : '#fef3c7'}; color: ${r.status === 'Finalized' ? '#065f46' : '#92400e'}; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${r.status || 'Draft'}</span></div>`).join('')}</div><button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-top: 0.75rem;" data-hash="client/${client.id}/execution">View All</button>` : '<p style="color: var(--text-secondary); text-align: center; margin: 1rem 0; font-size: 0.9rem;">No reports yet</p>'}
                     </div>
                     <!-- Key Contacts Card -->
                     <div class="card">
@@ -723,7 +723,7 @@ function renderClientOverview(client) {
                 <div class="card">
                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Client Contacts</h3>
-                        <button class="btn btn-sm btn-primary" onclick="window.addContactPerson('${client.id}')"><i class="fa-solid fa-plus"></i> Add Contact</button>
+                        <button class="btn btn-sm btn-primary" data-action="addContactPerson" data-id="${client.id}"><i class="fa-solid fa-plus"></i> Add Contact</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -758,7 +758,7 @@ function renderClientOverview(client) {
                     <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Departments</h3>
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.addDepartment('${client.id}')"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" data-action="addDepartment" data-id="${client.id}"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${departments.map(dept => `
@@ -772,7 +772,7 @@ function renderClientOverview(client) {
                      <div class="card">
                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">Designations</h3>
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.addClientDesignation('${client.id}')"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" data-action="addClientDesignation" data-id="${client.id}"><i class="fa-solid fa-plus"></i></button>
                         </div>
                         <ul style="list-style: none; padding: 0;">
                             ${designations.map(desig => `
@@ -1091,7 +1091,7 @@ function renderClientPlans(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-clipboard-list" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit plans for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.renderCreateAuditPlanForm('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
                     Create First Audit Plan
                 </button>
             </div>
@@ -1127,7 +1127,7 @@ function renderClientPlans(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Plans</h3>
-                    <button class="btn btn-sm btn-primary" onclick="window.renderCreateAuditPlanForm('${client.name}')">
+                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>New Plan
                     </button>
                 </div>
@@ -1146,13 +1146,13 @@ function renderClientPlans(client) {
                         <tbody>
                             ${plans.sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => `
                                 <tr>
-                                    <td><a href="#" onclick="event.preventDefault(); window.viewAuditPlan('${p.id}')" style="color: var(--primary-color); text-decoration: none; font-weight: 500;">${p.date || '-'}</a></td>
+                                    <td><a href="#" data-action="viewAuditPlan" data-id="${p.id}" style="color: var(--primary-color); text-decoration: none; font-weight: 500;">${p.date || '-'}</a></td>
                                     <td>${p.type || 'Audit'}</td>
                                     <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${p.standard || 'ISO'}</span></td>
                                     <td><span class="status-badge status-${(p.status || 'planned').toLowerCase().replace(' ', '-')}">${p.status || 'Planned'}</span></td>
                                     <td>${(p.team && p.team[0]) || p.lead || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.viewAuditPlan('${p.id}')"><i class="fa-solid fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-icon" data-action="viewAuditPlan" data-id="${p.id}"><i class="fa-solid fa-eye"></i></button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1178,7 +1178,7 @@ function renderClientExecution(client) {
             <div class="card" style="text-align: center; padding: 3rem;">
                 <i class="fa-solid fa-tasks" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                 <p style="color: var(--text-secondary);">No audit execution records for this client yet.</p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.renderCreateAuditPlanForm('${client.name}')">
+                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
                     Start First Audit
                 </button>
             </div>
@@ -1214,7 +1214,7 @@ function renderClientExecution(client) {
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">Audit Execution & Reports</h3>
-                    <button class="btn btn-sm btn-primary" onclick="window.renderCreateAuditPlanForm('${client.name}')">
+                    <button class="btn btn-sm btn-primary" data-action="renderCreateAuditPlanForm" data-id="${client.name}">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Plan New Audit
                     </button>
                 </div>
@@ -1250,7 +1250,7 @@ function renderClientExecution(client) {
                                         <td>${p.standard}</td>
                                         <td>${p.type}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-success" onclick="window.navigateToAuditExecution('${p.id}')">
+                                            <button class="btn btn-sm btn-success" data-action="navigateToAuditExecution" data-id="${p.id}">
                                                 <i class="fa-solid fa-play" style="margin-right: 0.25rem;"></i> Start Audit
                                             </button>
                                         </td>

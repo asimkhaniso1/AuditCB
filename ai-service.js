@@ -975,7 +975,7 @@ window.runFollowUpAIAnalysis = async function (reportId) {
     const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
-    const btn = document.querySelector(`button[onclick="window.runFollowUpAIAnalysis('${reportId}')"]`);
+    const btn = document.querySelector(`button[data-action="runFollowUpAIAnalysis" data-id="${reportId}"]`);
     if (!btn) return;
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
@@ -1063,7 +1063,7 @@ window.runAutoSummary = async function (reportId) {
     const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
-    const btn = document.querySelector(`button[onclick="window.runAutoSummary('${reportId}')"]`);
+    const btn = document.querySelector(`button[data-action="runAutoSummary" data-id="${reportId}"]`);
     if (!btn) return;
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Drafting...';

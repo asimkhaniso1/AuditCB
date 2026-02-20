@@ -744,7 +744,7 @@ async function renderModule(moduleName, syncHash = true) {
                             <i class="fa-solid fa-lock" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
                             <h3>Access Restricted</h3>
                             <p style="color: var(--text-secondary);">Settings are only accessible to Admins and Certification Managers.</p>
-                            <button class="btn btn-primary" onclick="window.location.hash = 'dashboard'">
+                            <button class="btn btn-primary" data-hash="dashboard">
                                 <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i>Return to Dashboard
                             </button>
                         </div>
@@ -780,7 +780,7 @@ async function renderModule(moduleName, syncHash = true) {
                 <i class="fa-solid fa-exclamation-triangle" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
                 <h3>Error Loading Module</h3>
                 <p style="color: var(--text-secondary);">${error.message}</p>
-                <button class="btn btn-primary" onclick="renderModule('${moduleName}')">
+                <button class="btn btn-primary" data-action="renderModule" data-id="${moduleName}">
                     <i class="fa-solid fa-sync"></i> Retry
                 </button>
             </div>
@@ -1182,7 +1182,7 @@ function renderRoleSwitcher() {
         switcher.innerHTML = `
             <div style="padding: 0.5rem 0;">
                 <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem;">Please login to access the system.</p>
-                <button onclick="window.renderLoginModal()" class="btn btn-sm btn-primary" style="width: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                <button data-action="renderLoginModal" class="btn btn-sm btn-primary" style="width: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
                     <i class="fa-solid fa-lock" style="margin-right: 0.5rem;"></i> Login
                 </button>
             </div>
@@ -1201,7 +1201,7 @@ window.renderLoginModal = function () {
             <h3 style="margin: 0; color: #1e293b;">Admin Login</h3>
             <p style="color: #64748b; margin-top: 0.5rem;">Secure Access Portal</p>
         </div>
-        <form onsubmit="event.preventDefault(); window.loginUser(this);">
+        <form data-action-submit="loginUser" data-id="this">
             <div class="form-group" style="margin-bottom: 1rem;">
                 <label>Email</label>
                 <input type="email" name="email" class="form-control" placeholder="admin@auditcb.com" required>
@@ -1598,7 +1598,7 @@ function showLoginOverlay() {
                         <p>Sign in to your account</p>
                     </div>
 
-                    <form id="login-form" onsubmit="event.preventDefault(); window.handleLoginSubmit(this);">
+                    <form id="login-form" data-action-submit="handleLoginSubmit" data-id="this">
                         <div class="form-group">
                             <label><i class="fa-solid fa-envelope" style="margin-right: 0.35rem; color: #64748b;"></i>Email</label>
                             <input type="email" name="email" placeholder="you@company.com" required autofocus>
@@ -1613,7 +1613,7 @@ function showLoginOverlay() {
                     </form>
 
                     <div style="text-align: center; margin-top: 1rem;">
-                        <a href="#" onclick="event.preventDefault(); window.showForgotPassword();"
+                        <a href="#" data-action="showForgotPassword"
                            style="color: #0d9488; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
                             <i class="fa-solid fa-key" style="margin-right: 0.25rem;"></i>
                             Forgot Password?

@@ -146,19 +146,19 @@ function renderSettings() {
                     <button class="tab-btn ${window.state.settingsMainTab === 'cb-profile' ? 'active' : ''}" onclick="switchSettingsMainTab('cb-profile', this)">
                         <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>CB Profile
                     </button>
-                    <button class="tab-btn ${window.state.settingsMainTab === 'organization' ? 'active' : ''}" onclick="switchSettingsMainTab('organization', this)">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'organization' ? 'active' : ''}" data-action="switchSettingsMainTab" data-arg1="organization" data-arg2="this">
                         <i class="fa-solid fa-users" style="margin-right: 0.5rem;"></i>Organization
                     </button>
-                    <button class="tab-btn ${window.state.settingsMainTab === 'policies' ? 'active' : ''}" onclick="switchSettingsMainTab('policies', this)">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'policies' ? 'active' : ''}" data-action="switchSettingsMainTab" data-arg1="policies" data-arg2="this">
                         <i class="fa-solid fa-clipboard-check" style="margin-right: 0.5rem;"></i>Policies
                     </button>
-                    <button class="tab-btn ${window.state.settingsMainTab === 'knowledge' ? 'active' : ''}" onclick="switchSettingsMainTab('knowledge', this)">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'knowledge' ? 'active' : ''}" data-action="switchSettingsMainTab" data-arg1="knowledge" data-arg2="this">
                         <i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>Knowledge Base
                     </button>
-                    <button class="tab-btn ${window.state.settingsMainTab === 'users' ? 'active' : ''}" onclick="switchSettingsMainTab('users', this)">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'users' ? 'active' : ''}" data-action="switchSettingsMainTab" data-arg1="users" data-arg2="this">
                         <i class="fa-solid fa-users-cog" style="margin-right: 0.5rem;"></i>Users
                     </button>
-                    <button class="tab-btn ${window.state.settingsMainTab === 'system' ? 'active' : ''}" onclick="switchSettingsMainTab('system', this)">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'system' ? 'active' : ''}" data-action="switchSettingsMainTab" data-arg1="system" data-arg2="this">
                         <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>System
                     </button>
                 </div>
@@ -214,7 +214,7 @@ function getSettingsSubTabs(mainTab) {
     return tabs.map(tab => `
         <button class="btn btn-sm ${currentSubTab === tab.id ? 'btn-primary' : 'btn-outline-secondary'}" 
             style="margin-right: 0.5rem;" 
-            onclick="switchSettingsSubTab('${mainTab}', '${tab.id}')">
+            data-action="switchSettingsSubTab" data-arg1="${mainTab}" data-arg2="${tab.id}">
             <i class="fa-solid ${tab.icon}" style="margin-right: 0.25rem;"></i>${tab.label}
         </button>
     `).join('');
@@ -252,7 +252,7 @@ function getSettingsContent(mainTab, subTab) {
                         </h3>
                         <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);">
                             <p style="margin-bottom: 1rem;">Use this tool to identify why data is not saving.</p>
-                            <button class="btn btn-primary" onclick="window.runSupabaseDiagnostics()">
+                            <button class="btn btn-primary" data-action="runSupabaseDiagnostics">
                                 <i class="fa-solid fa-stethoscope" style="margin-right: 0.5rem;"></i> Run Diagnostics
                             </button>
                             <div id="diagnostics-output" style="margin-top: 1.5rem; background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 6px; font-family: monospace; display: none; white-space: pre-wrap;"></div>
@@ -432,7 +432,7 @@ function getCBProfileHTML() {
                 <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>
                 CB Profile & Branding
             </h3>
-            <form id="profile-form" onsubmit="event.preventDefault(); saveCBProfile();">
+            <form id="profile-form" data-action-submit="saveCBProfile">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                     <div class="form-group">
                         <label>Certification Body Name <span style="color: var(--danger-color);">*</span></label>
@@ -461,7 +461,7 @@ function getCBProfileHTML() {
                         </div>
                         <div class="form-group">
                             <label>Or Upload Logo</label>
-                            <input type="file" class="form-control" id="logo-upload" accept="image/*" onchange="handleLogoUpload(this)">
+                            <input type="file" class="form-control" id="logo-upload" accept="image/*" data-action-change="handleLogoUpload" data-id="this">
                             <small style="color: var(--text-secondary);">Max 2MB, PNG/JPG/SVG</small>
                         </div>
                     </div>
@@ -492,11 +492,11 @@ function getCBProfileHTML() {
                                     <td>${window.UTILS.escapeHtml(site.country || '')}</td>
                                     <td>${window.UTILS.escapeHtml(site.phone || '')}</td>
                                     <td>
-                                        <button type="button" class="btn btn-sm btn-icon" onclick="window.editCBSite(${idx})" title="Edit">
+                                        <button type="button" class="btn btn-sm btn-icon" data-action="editCBSite" data-id="${idx}" title="Edit">
                                             <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                         </button>
                                         ${sites.length > 1 ? `
-                                            <button type="button" class="btn btn-sm btn-icon" onclick="window.deleteCBSite(${idx})" title="Delete">
+                                            <button type="button" class="btn btn-sm btn-icon" data-action="deleteCBSite" data-id="${idx}" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         ` : ''}
@@ -506,7 +506,7 @@ function getCBProfileHTML() {
                         </tbody>
                     </table>
                 </div>
-                <button type="button" class="btn btn-secondary" onclick="window.addCBSite()" style="margin-top: 0.5rem;">
+                <button type="button" class="btn btn-secondary" data-action="addCBSite" style="margin-top: 0.5rem;">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                     Add Office Location
                 </button>
@@ -627,11 +627,11 @@ function updateSettingsFormFields() {
                 <td>${window.UTILS.escapeHtml(site.country || '')}</td>
                 <td>${window.UTILS.escapeHtml(site.phone || '')}</td>
                 <td>
-                    <button type="button" class="btn btn-sm btn-icon" onclick="window.editCBSite(${idx})" title="Edit">
+                    <button type="button" class="btn btn-sm btn-icon" data-action="editCBSite" data-id="${idx}" title="Edit">
                         <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                     </button>
                     ${settings.cbSites.length > 1 ? `
-                        <button type="button" class="btn btn-sm btn-icon" onclick="window.deleteCBSite(${idx})" title="Delete">
+                        <button type="button" class="btn btn-sm btn-icon" data-action="deleteCBSite" data-id="${idx}" title="Delete">
                             <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                         </button>
                     ` : ''}
@@ -683,7 +683,7 @@ function getAccreditationHTML() {
                 <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i>
                 Accreditation & Scope
             </h3>
-            <form id="accreditation-form" onsubmit="event.preventDefault(); saveAccreditation();">
+            <form id="accreditation-form" data-action-submit="saveAccreditation">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                     <div class="form-group">
                         <label>Accreditation Body</label>
@@ -707,7 +707,7 @@ function getAccreditationHTML() {
                 
                 <h4 style="margin: 2rem 0 1rem; color: #0369a1; display: flex; align-items: center; justify-content: space-between;">
                     Standards Masterlist
-                    <button class="btn btn-sm btn-secondary" onclick="addStandardToMasterlist()" title="Add new standard to masterlist">
+                    <button class="btn btn-sm btn-secondary" data-action="addStandardToMasterlist" title="Add new standard to masterlist">
                         <i class="fa-solid fa-plus"></i> Add New
                     </button>
                 </h4>
@@ -718,7 +718,7 @@ function getAccreditationHTML() {
                             <input type="checkbox" class="standard-checkbox" value="${std}" ${standardsOffered.includes(std) ? 'checked' : ''}>
                                 <span style="font-size: 0.9rem;">${std}</span>
                             </label>
-                            <button type="button" class="btn btn-sm btn-icon" onclick="deleteStandardFromMasterlist('${std}')" title="Remove from Masterlist" style="color: #cbd5e1; padding: 0;">
+                            <button type="button" class="btn btn-sm btn-icon" data-action="deleteStandardFromMasterlist" data-id="${std}" title="Remove from Masterlist" style="color: #cbd5e1; padding: 0;">
                                 <i class="fa-solid fa-times hover-danger"></i>
                             </button>
                         </div>
@@ -813,7 +813,7 @@ function getOrganizationHTML() {
                     Organization Structure
                 </h3>
                 ${window.state.currentUser?.role === 'Admin' ? `
-                <button class="btn btn-primary" onclick="addGlobalDesignation()">
+                <button class="btn btn-primary" data-action="addGlobalDesignation">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                     Add Designation
                 </button>
@@ -838,10 +838,10 @@ function getOrganizationHTML() {
                                 <td>${pos.reportsTo ? window.UTILS.escapeHtml(pos.reportsTo) : '<em>Top Level</em>'}</td>
                                 <td>
                                     ${window.state.currentUser?.role === 'Admin' ? `
-                                    <button class="btn btn-sm btn-icon" onclick="editGlobalDesignation(${pos.id})" title="Edit">
+                                    <button class="btn btn-sm btn-icon" data-action="editGlobalDesignation" data-id="${pos.id}" title="Edit">
                                         <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" onclick="deleteGlobalDesignation(${pos.id})" title="Delete">
+                                    <button class="btn btn-sm btn-icon" data-action="deleteGlobalDesignation" data-id="${pos.id}" title="Delete">
                                         <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                     </button>
                                     ` : '<span style="color:var(--text-secondary); font-size:0.8rem;">View Only</span>'}
@@ -970,7 +970,7 @@ function getUsersHTML() {
                 </h3>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                    <button class="btn btn-primary" onclick="openAddUserModal()">
+                    <button class="btn btn-primary" data-action="openAddUserModal">
                         <i class="fa-solid fa-user-plus"></i> Add User
                     </button>
                     ` : ''}
@@ -1084,27 +1084,27 @@ function renderUsersList(users) {
                         </td>
                         <td>
                             ${user.status === 'Pending' && window.state.currentUser?.role === 'Admin' ? `
-                            <button class="btn btn-sm btn-success" onclick="approveUser('${user.id}')" title="Approve User" style="margin-right: 0.25rem;">
+                            <button class="btn btn-sm btn-success" data-action="approveUser" data-id="${user.id}" title="Approve User" style="margin-right: 0.25rem;">
                                 <i class="fa-solid fa-check"></i> Approve
                             </button>
                             ` : ''}
                             ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                            <button class="btn btn-sm btn-icon" onclick="editUser('${user.id}')" title="Edit">
+                            <button class="btn btn-sm btn-icon" data-action="editUser" data-id="${user.id}" title="Edit">
                                 <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                             </button>
                             ` : ''}
                             ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                            <button class="btn btn-sm btn-icon" onclick="toggleUserStatus('${user.id}')" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
+                            <button class="btn btn-sm btn-icon" data-action="toggleUserStatus" data-id="${user.id}" title="${user.status === 'Active' ? 'Deactivate' : 'Activate'}">
                                 <i class="fa-solid ${user.status === 'Active' ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color: ${user.status === 'Active' ? '#16a34a' : '#cbd5e1'}; font-size: 1.2rem;"></i>
                             </button>
                             ` : ''}
                             ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
-                            <button class="btn btn-sm btn-icon" onclick="sendPasswordReset('${user.email}')" title="Send Password Reset">
+                            <button class="btn btn-sm btn-icon" data-action="sendPasswordReset" data-id="${user.email}" title="Send Password Reset">
                                 <i class="fa-solid fa-key" style="color: #f59e0b;"></i>
                             </button>
                             ` : ''}
                             ${window.state.currentUser?.role === 'Admin' ? `
-                            <button class="btn btn-sm btn-icon" onclick="deleteUser('${user.id}')" title="Delete User">
+                            <button class="btn btn-sm btn-icon" data-action="deleteUser" data-id="${user.id}" title="Delete User">
                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                             </button>
                             ` : ''}
@@ -1702,7 +1702,7 @@ window.inviteUser = async function () {
 window.openInviteUserModal = function () {
     document.getElementById('modal-title').textContent = 'Invite User';
     document.getElementById('modal-body').innerHTML = `
-        <form id="invite-form" onsubmit="event.preventDefault(); inviteUser();">
+        <form id="invite-form" data-action-submit="inviteUser">
             <div class="form-group">
                 <label>Email Address <span style="color: var(--danger-color);">*</span></label>
                 <input type="email" class="form-control" id="invite-email" placeholder="user@example.com" required>
@@ -1826,7 +1826,7 @@ function getPermissionsHTML() {
         const isLast = idx === modules.length - 1;
         return `<td class="perm-cell" style="border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; ${isLast ? 'border-right: 1px solid #f1f5f9; border-radius: 0 8px 8px 0;' : ''}">
                                         <span class="perm-badge" 
-                                            onclick="cyclePermission('${role}', '${module}')" 
+                                            data-action="cyclePermission" data-arg1="${role}" data-arg2="${module}" 
                                             style="background: ${style.color};"
                                             title="Current: ${style.label}\nClick to cycle permission">
                                             <i class="fa-solid ${style.icon}" style="width: 16px; text-align: center;"></i>
@@ -1846,7 +1846,7 @@ function getPermissionsHTML() {
                         <i class="fa-solid fa-circle-info" style="color: var(--primary-color);"></i>
                         Permission Levels Legend
                     </h4>
-                    <button class="btn btn-sm btn-outline-danger" onclick="resetPermissions()">
+                    <button class="btn btn-sm btn-outline-danger" data-action="resetPermissions">
                         <i class="fa-solid fa-rotate-left" style="margin-right: 0.5rem;"></i> Reset Defaults
                     </button>
                 </div>
@@ -1911,7 +1911,7 @@ function getRetentionHTML() {
                     <i class="fa-solid fa-archive" style="margin-right: 0.5rem;"></i>
                     Record Retention Policy
                 </h3>
-                <button class="btn btn-primary" onclick="addRetentionPolicy()">
+                <button class="btn btn-primary" data-action="addRetentionPolicy">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                     Add Policy
                 </button>
@@ -1934,10 +1934,10 @@ function getRetentionHTML() {
                                 <td><span class="badge bg-blue">${window.UTILS.escapeHtml(policy.period)}</span></td>
                                 <td>${window.UTILS.escapeHtml(policy.basis)}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-icon" onclick="editRetentionPolicy(${policy.id})" title="Edit">
+                                    <button class="btn btn-sm btn-icon" data-action="editRetentionPolicy" data-id="${policy.id}" title="Edit">
                                         <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" onclick="deleteRetentionPolicy(${policy.id})" title="Delete">
+                                    <button class="btn btn-sm btn-icon" data-action="deleteRetentionPolicy" data-id="${policy.id}" title="Delete">
                                         <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                     </button>
                                 </td>
@@ -1970,7 +1970,7 @@ function getQualityPolicyHTML() {
                 Quality Policy & Objectives (ISO 17021 Clause 8.1)
             </h3>
             
-            <form id="policy-form" onsubmit="event.preventDefault(); saveQualityPolicy();">
+            <form id="policy-form" data-action-submit="saveQualityPolicy">
                 <div class="form-group">
                     <label>Quality Policy Statement</label>
                     <textarea class="form-control" id="quality-policy" rows="4">${window.UTILS.escapeHtml(settings.qualityPolicy)}</textarea>
@@ -2038,7 +2038,7 @@ function getDefaultsHTML() {
                 System Defaults
             </h3>
             
-            <form id="defaults-form" onsubmit="event.preventDefault(); saveDefaults();">
+            <form id="defaults-form" data-action-submit="saveDefaults">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                     <div class="form-group">
                         <label>Certificate Number Format</label>
@@ -2117,7 +2117,7 @@ function getDataManagementHTML() {
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
                         Download a complete backup of your application data as JSON.
                     </p>
-                    <button class="btn btn-primary" onclick="backupData()">
+                    <button class="btn btn-primary" data-action="backupData">
                         <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>
                         Download Backup
                     </button>
@@ -2131,7 +2131,7 @@ function getDataManagementHTML() {
                         Upload a backup file to restore data. 
                         <strong style="color: var(--danger-color);">Warning: Replaces all current data.</strong>
                     </p>
-                    <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreData(this)">
+                    <input type="file" id="restore-file" accept=".json" style="display: none;" data-action-change="restoreData" data-id="this">
                     <button class="btn btn-secondary" onclick="document.getElementById('restore-file').click()">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>
                         Select Backup File
@@ -2238,7 +2238,7 @@ function getCBPoliciesHTML() {
                         <ul style="font-size: 0.85rem; padding-left: 1.2rem; margin: 0;">
                             ${policies.ncrCriteria.major.map(c => `<li style="margin-bottom: 0.3rem;">${window.UTILS.escapeHtml(c)}</li>`).join('')}
                         </ul>
-                        <button class="btn btn-sm" onclick="editNCRCriteria('major')" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        <button class="btn btn-sm" data-action="editNCRCriteria" data-id="major" style="margin-top: 0.5rem; font-size: 0.75rem;">
                             <i class="fa-solid fa-edit"></i> Edit
                         </button>
                     </div>
@@ -2251,7 +2251,7 @@ function getCBPoliciesHTML() {
                         <ul style="font-size: 0.85rem; padding-left: 1.2rem; margin: 0;">
                             ${policies.ncrCriteria.minor.map(c => `<li style="margin-bottom: 0.3rem;">${window.UTILS.escapeHtml(c)}</li>`).join('')}
                         </ul>
-                        <button class="btn btn-sm" onclick="editNCRCriteria('minor')" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        <button class="btn btn-sm" data-action="editNCRCriteria" data-id="minor" style="margin-top: 0.5rem; font-size: 0.75rem;">
                             <i class="fa-solid fa-edit"></i> Edit
                         </button>
                     </div>
@@ -2264,7 +2264,7 @@ function getCBPoliciesHTML() {
                         <ul style="font-size: 0.85rem; padding-left: 1.2rem; margin: 0;">
                             ${policies.ncrCriteria.observation.map(c => `<li style="margin-bottom: 0.3rem;">${window.UTILS.escapeHtml(c)}</li>`).join('')}
                         </ul>
-                        <button class="btn btn-sm" onclick="editNCRCriteria('observation')" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        <button class="btn btn-sm" data-action="editNCRCriteria" data-id="observation" style="margin-top: 0.5rem; font-size: 0.75rem;">
                             <i class="fa-solid fa-edit"></i> Edit
                         </button>
                     </div>
@@ -2292,7 +2292,7 @@ function getCBPoliciesHTML() {
                                     <td><span class="badge" style="background: ${key === 'grant' || key === 'expand' ? '#059669' : key === 'deny' || key === 'withdraw' ? '#dc2626' : '#f59e0b'}; color: white; text-transform: capitalize;">${key}</span></td>
                                     <td>${window.UTILS.escapeHtml(value)}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="editCertDecision('${key}')" title="Edit">
+                                        <button class="btn btn-sm btn-icon" data-action="editCertDecision" data-id="${key}" title="Edit">
                                             <i class="fa-solid fa-edit" style="color: var(--primary-color);"></i>
                                         </button>
                                     </td>
@@ -2322,7 +2322,7 @@ function getCBPoliciesHTML() {
                         <label>Verification Timing</label>
                         <input type="text" class="form-control" id="capa-verify" value="${window.UTILS.escapeHtml(policies.capaTimelines.capaVerification)}">
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="saveCAPATimelines()">
+                    <button class="btn btn-primary btn-sm" data-action="saveCAPATimelines">
                         <i class="fa-solid fa-save"></i> Save Timelines
                     </button>
                 </div>
@@ -2344,7 +2344,7 @@ function getCBPoliciesHTML() {
                         <label>Transfer Audit Timing</label>
                         <input type="text" class="form-control" id="freq-transfer" value="${window.UTILS.escapeHtml(policies.auditFrequency.transferAudit)}">
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="saveAuditFrequency()">
+                    <button class="btn btn-primary btn-sm" data-action="saveAuditFrequency">
                         <i class="fa-solid fa-save"></i> Save Frequency
                     </button>
                 </div>
@@ -2830,7 +2830,7 @@ function getKnowledgeBaseHTML() {
                     <i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>
                     Knowledge Base
                 </h3>
-                <button class="btn btn-sm" onclick="window.reSyncKnowledgeBase()" title="Pull latest documents from cloud">
+                <button class="btn btn-sm" data-action="reSyncKnowledgeBase" title="Pull latest documents from cloud">
                     <i class="fa-solid fa-sync"></i> Re-sync Cloud Data
                 </button>
             </div>
@@ -2839,7 +2839,7 @@ function getKnowledgeBaseHTML() {
             <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h5 style="margin: 0; color: #475569;"><i class="fa-solid fa-stethoscope"></i> AI Connection Diagnostics</h5>
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.testAIConnection()">
+                    <button class="btn btn-sm btn-outline-primary" data-action="testAIConnection">
                         Test API Connection
                     </button>
                 </div>
@@ -2865,7 +2865,7 @@ function getKnowledgeBaseHTML() {
                         <i class="fa-solid fa-book" style="margin-right: 0.5rem;"></i>
                         ISO Standards
                     </h4>
-                    <button class="btn btn-primary btn-sm" onclick="window.uploadKnowledgeDoc('standard')">
+                    <button class="btn btn-primary btn-sm" data-action="uploadKnowledgeDoc" data-id="standard">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload Standard
                     </button>
                 </div>
@@ -2903,7 +2903,7 @@ function getKnowledgeBaseHTML() {
                                                     <span class="badge" style="background: #f59e0b; color: white;">
                                                         <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
                                                     </span>
-                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeStandard('${doc.id}')">
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" data-action="analyzeStandard" data-id="${doc.id}">
                                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze Now
                                                     </button>
                                                 </div>
@@ -2911,11 +2911,11 @@ function getKnowledgeBaseHTML() {
                                         </td>
                                         <td>
                                             ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
-                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                <button class="btn btn-sm btn-icon" data-action="viewKBAnalysis" data-id="${doc.id}" title="View Analysis">
                                                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                                                 </button>
                                             ` : ''}
-                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('standard', '${doc.id}')" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteKnowledgeDoc" data-arg1="standard" data-arg2="${doc.id}" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         </td>
@@ -2939,7 +2939,7 @@ function getKnowledgeBaseHTML() {
                         <i class="fa-solid fa-file-lines" style="margin-right: 0.5rem;"></i>
                         Standard Operating Procedures
                     </h4>
-                    <button class="btn btn-primary btn-sm" style="background: #059669; border-color: #059669;" onclick="window.uploadKnowledgeDoc('sop')">
+                    <button class="btn btn-primary btn-sm" style="background: #059669; border-color: #059669;" data-action="uploadKnowledgeDoc" data-id="sop">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload SOP
                     </button>
                 </div>
@@ -2977,7 +2977,7 @@ function getKnowledgeBaseHTML() {
                                                     <span class="badge" style="background: #f59e0b; color: white;">
                                                         <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
                                                     </span>
-                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeDocument('sop', '${doc.id}')">
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" data-action="analyzeDocument" data-arg1="sop" data-arg2="${doc.id}">
                                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze
                                                     </button>
                                                 </div>
@@ -2985,11 +2985,11 @@ function getKnowledgeBaseHTML() {
                                         </td>
                                         <td>
                                             ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
-                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                <button class="btn btn-sm btn-icon" data-action="viewKBAnalysis" data-id="${doc.id}" title="View Analysis">
                                                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                                                 </button>
                                             ` : ''}
-                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('sop', '${doc.id}')" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteKnowledgeDoc" data-arg1="sop" data-arg2="${doc.id}" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         </td>
@@ -3013,7 +3013,7 @@ function getKnowledgeBaseHTML() {
                         <i class="fa-solid fa-shield" style="margin-right: 0.5rem;"></i>
                         CB Policies
                     </h4>
-                    <button class="btn btn-primary btn-sm" style="background: #7c3aed; border-color: #7c3aed;" onclick="window.uploadKnowledgeDoc('policy')">
+                    <button class="btn btn-primary btn-sm" style="background: #7c3aed; border-color: #7c3aed;" data-action="uploadKnowledgeDoc" data-id="policy">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload Policy
                     </button>
                 </div>
@@ -3051,7 +3051,7 @@ function getKnowledgeBaseHTML() {
                                                     <span class="badge" style="background: #f59e0b; color: white;">
                                                         <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
                                                     </span>
-                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeDocument('policy', '${doc.id}')">
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" data-action="analyzeDocument" data-arg1="policy" data-arg2="${doc.id}">
                                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze
                                                     </button>
                                                 </div>
@@ -3059,11 +3059,11 @@ function getKnowledgeBaseHTML() {
                                         </td>
                                         <td>
                                             ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
-                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                <button class="btn btn-sm btn-icon" data-action="viewKBAnalysis" data-id="${doc.id}" title="View Analysis">
                                                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                                                 </button>
                                             ` : ''}
-                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('policy', '${doc.id}')" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteKnowledgeDoc" data-arg1="policy" data-arg2="${doc.id}" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         </td>
@@ -3087,7 +3087,7 @@ function getKnowledgeBaseHTML() {
                         <i class="fa-solid fa-bullhorn" style="margin-right: 0.5rem;"></i>
                         Company Brochure & Marketing
                     </h4>
-                    <button class="btn btn-primary btn-sm" style="background: #db2777; border-color: #db2777;" onclick="window.uploadKnowledgeDoc('marketing')">
+                    <button class="btn btn-primary btn-sm" style="background: #db2777; border-color: #db2777;" data-action="uploadKnowledgeDoc" data-id="marketing">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>Upload
                     </button>
                 </div>
@@ -3125,7 +3125,7 @@ function getKnowledgeBaseHTML() {
                                                     <span class="badge" style="background: #f59e0b; color: white;">
                                                         <i class="fa-solid fa-clock" style="margin-right: 4px;"></i>Waiting
                                                     </span>
-                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" onclick="window.analyzeDocument('marketing', '${doc.id}')">
+                                                    <button class="btn btn-sm" style="margin-left: 8px; font-size: 0.75rem;" data-action="analyzeDocument" data-arg1="marketing" data-arg2="${doc.id}">
                                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Analyze
                                                     </button>
                                                 </div>
@@ -3133,11 +3133,11 @@ function getKnowledgeBaseHTML() {
                                         </td>
                                         <td>
                                             ${doc.status === 'ready' && doc.clauses && doc.clauses.length > 0 ? `
-                                                <button class="btn btn-sm btn-icon" onclick="window.viewKBAnalysis('${doc.id}')" title="View Analysis">
+                                                <button class="btn btn-sm btn-icon" data-action="viewKBAnalysis" data-id="${doc.id}" title="View Analysis">
                                                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                                                 </button>
                                             ` : ''}
-                                            <button class="btn btn-sm btn-icon" onclick="window.deleteKnowledgeDoc('marketing', '${doc.id}')" title="Delete">
+                                            <button class="btn btn-sm btn-icon" data-action="deleteKnowledgeDoc" data-arg1="marketing" data-arg2="${doc.id}" title="Delete">
                                                 <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                                             </button>
                                         </td>
@@ -3309,11 +3309,11 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
         <div style="margin-bottom:1rem;">
             <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Audit Type</label>
             <div id="audit-type-toggle" style="display:flex;gap:0;border:2px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-                <div id="at-initial" onclick="window._setAuditType('initial')" 
+                <div id="at-initial" data-action="_setAuditType" data-id="initial" 
                      style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:#3b82f6;color:white;font-weight:600;font-size:0.85rem;transition:all 0.2s;">
                     🏁 Initial / Recertification
                 </div>
-                <div id="at-surveillance" onclick="window._setAuditType('surveillance')"
+                <div id="at-surveillance" data-action="_setAuditType" data-id="surveillance"
                      style="flex:1;padding:0.6rem;text-align:center;cursor:pointer;background:#fff;color:#64748b;font-weight:600;font-size:0.85rem;transition:all 0.2s;">
                     🔄 Surveillance
                 </div>
@@ -3337,10 +3337,8 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
         <!-- Analysis Depth Cards -->
         <label style="font-size:0.8rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:block;">Analysis Depth</label>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
-            <div onclick="window._startAnalysis('${docId}', 'short', ${isReanalyze})" 
-                 style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;"
-                 onmouseover="this.style.borderColor='#f59e0b';this.style.background='#fffbeb';this.style.transform='translateY(-2px)'"
-                 onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff';this.style.transform='none'">
+            <div data-action="_startAnalysis" data-arg1="${docId}" data-arg2="short" data-arg3="${isReanalyze}" 
+                 style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;">
                 <div style="font-size:1.5rem;margin-bottom:0.5rem;">⚡</div>
                 <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Short</div>
                 <div style="font-size:0.75rem;color:#64748b;line-height:1.5;">
@@ -3349,10 +3347,8 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                     <div style="color:#f59e0b;font-weight:600;">~10 seconds</div>
                 </div>
             </div>
-            <div onclick="window._startAnalysis('${docId}', 'standard', ${isReanalyze})" 
-                 style="cursor:pointer;border:2px solid #3b82f6;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#eff6ff;position:relative;"
-                 onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(59,130,246,0.3)'"
-                 onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+            <div data-action="_startAnalysis" data-arg1="${docId}" data-arg2="standard" data-arg3="${isReanalyze}" 
+                 style="cursor:pointer;border:2px solid #3b82f6;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#eff6ff;position:relative;">
                 <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;font-size:0.65rem;padding:2px 8px;border-radius:4px;font-weight:600;">RECOMMENDED</div>
                 <div style="font-size:1.5rem;margin-bottom:0.5rem;">📋</div>
                 <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Standard</div>
@@ -3362,10 +3358,8 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
                     <div style="color:#3b82f6;font-weight:600;">~35 seconds</div>
                 </div>
             </div>
-            <div onclick="window._startAnalysis('${docId}', 'comprehensive', ${isReanalyze})" 
-                 style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;"
-                 onmouseover="this.style.borderColor='#8b5cf6';this.style.background='#f5f3ff';this.style.transform='translateY(-2px)'"
-                 onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff';this.style.transform='none'">
+            <div data-action="_startAnalysis" data-arg1="${docId}" data-arg2="comprehensive" data-arg3="${isReanalyze}" 
+                 style="cursor:pointer;border:2px solid #e2e8f0;border-radius:12px;padding:1.25rem 0.75rem;text-align:center;transition:all 0.2s;background:#fff;">
                 <div style="font-size:1.5rem;margin-bottom:0.5rem;">🔬</div>
                 <div style="font-weight:700;font-size:0.95rem;color:#1e293b;margin-bottom:0.5rem;">Comprehensive</div>
                 <div style="font-size:0.75rem;color:#64748b;line-height:1.5;">
@@ -4803,11 +4797,11 @@ window.viewKBAnalysis = function (docId) {
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     ${docType === 'standard' && doc.generatedChecklist && doc.generatedChecklist.length > 0 ? `
-                        <button class="btn btn-sm btn-primary" onclick="window.createChecklistFromKB('${doc.id}')" title="Create audit checklist from extracted questions">
+                        <button class="btn btn-sm btn-primary" data-action="createChecklistFromKB" data-id="${doc.id}" title="Create audit checklist from extracted questions">
                             <i class="fa-solid fa-list-check" style="margin-right: 0.25rem;"></i>Create Checklist
                         </button>
                     ` : ''}
-                    <button class="btn btn-sm btn-secondary" onclick="window.handleReanalyze('${doc.id}', '${docType}')" title="${docType === 'standard' ? 'Re-analyze with AI' : 'Reset Analysis Template'}">
+                    <button class="btn btn-sm btn-secondary" data-action="handleReanalyze" data-arg1="${doc.id}" data-arg2="${docType}" title="${docType === 'standard' ? 'Re-analyze with AI' : 'Reset Analysis Template'}">
                         <i class="fa-solid fa-rotate" style="margin-right: 0.25rem;"></i>${docType === 'standard' ? 'Re-analyze' : 'Reset'}
                     </button>
                     ${docType === 'standard' ? `<span class="badge" style="background: #dcfce7; color: #166534;">Ready for NCR</span>` : ''}
@@ -5053,7 +5047,7 @@ function getAssignmentsHTML() {
                         Assign auditors to specific clients. Auditors will only see their assigned clients in the dashboard, planning, and reports.
                     </p>
                 </div>
-                <button class="btn btn-primary" onclick="openAddAssignmentModal()">
+                <button class="btn btn-primary" data-action="openAddAssignmentModal">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>
                     New Assignment
                 </button>
@@ -5104,7 +5098,7 @@ function getAssignmentsHTML() {
                                     <span style="display: inline-flex; align-items: center; gap: 0.5rem; background: #f1f5f9; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
                                         <i class="fa-solid fa-building" style="color: var(--text-secondary);"></i>
                                         ${window.UTILS.escapeHtml(client.name)}
-                                        <button onclick="removeAssignment('${auditor.id}', '${client.id}')" style="background: none; border: none; cursor: pointer; color: #94a3b8; padding: 0 0 0 4px;" title="Remove assignment">
+                                        <button data-action="removeAssignment" data-arg1="${auditor.id}" data-arg2="${client.id}" style="background: none; border: none; cursor: pointer; color: #94a3b8; padding: 0 0 0 4px;" title="Remove assignment">
                                             <i class="fa-solid fa-times-circle" style="font-size: 0.9rem;"></i>
                                         </button>
                                     </span>
@@ -5114,7 +5108,7 @@ function getAssignmentsHTML() {
                                         No clients assigned - auditor won't see any client data
                                     </span>
                                 `}
-                                <button onclick="openQuickAssignModal(${auditor.id}, '${window.UTILS.escapeHtml(auditor.name)}')" 
+                                <button data-action="openQuickAssignModal" data-arg1="${auditor.id}" data-arg2="${window.UTILS.escapeHtml(auditor.name)}" 
                                     style="background: #e0f2fe; border: 1px dashed #0284c7; color: #0284c7; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 0.85rem;">
                                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add Client
                                 </button>
@@ -5392,7 +5386,7 @@ function getUsageAnalyticsHTML() {
                     <button class="btn btn-outline-secondary btn-sm" onclick="window.APIUsageTracker.exportData()">
                         <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Export
                     </button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="resetUsageData()">
+                    <button class="btn btn-outline-danger btn-sm" data-action="resetUsageData">
                         <i class="fa-solid fa-trash" style="margin-right: 0.25rem;"></i>Reset
                     </button>
                 </div>

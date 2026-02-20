@@ -22,7 +22,7 @@ function renderAuditPlanningEnhanced() {
     const rows = filteredPlans.map(plan => `
         <tr class="plan-row" style="cursor: pointer;">
             <td>
-                <a href="javascript:void(0)" onclick="window.viewAuditPlan('${plan.id}')" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(plan.client)}</a>
+                <a href="javascript:void(0)" data-action="viewAuditPlan" data-id="${plan.id}" style="font-weight: 500; color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(plan.client)}</a>
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(plan.standard) || 'ISO 9001:2015'}</div>
             </td>
             <td>${window.UTILS.escapeHtml(plan.type) || 'Surveillance'}</td>
@@ -42,7 +42,7 @@ function renderAuditPlanningEnhanced() {
                     ${isManager ? `<button class="btn btn-sm edit-plan-btn" data-plan-id="${plan.id}" title="Edit Plan">
                         <i class="fa-solid fa-pen" style="color: var(--primary-color);"></i>
                     </button>` : ''}
-                    <button class="btn btn-sm" onclick="window.viewAuditPlan('${plan.id}')" title="View Details">
+                    <button class="btn btn-sm" data-action="viewAuditPlan" data-id="${plan.id}" title="View Details">
                         <i class="fa-solid fa-eye" style="color: var(--text-secondary);"></i>
                     </button>
                     ${isManager ? `<button class="btn btn-sm delete-plan-btn" data-plan-id="${plan.id}" title="Delete Plan">
@@ -58,7 +58,7 @@ function renderAuditPlanningEnhanced() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Audit Planning <span style="font-size: 0.8rem; color: var(--text-secondary);">(v5.2)</span></h2>
                  <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanningAnalytics()" style="white-space: nowrap;">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="togglePlanningAnalytics" style="white-space: nowrap;">
                         <i class="fa-solid ${state.showPlanningAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showPlanningAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
                     </button>
                     ${isManager ? `<button id="btn-create-plan" class="btn btn-primary">
@@ -229,7 +229,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
         <div class="fade-in">
              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary btn-sm" onclick="renderAuditPlanningEnhanced()">
+                    <button class="btn btn-secondary btn-sm" data-action="renderAuditPlanningEnhanced">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <h2 id="plan-form-title" style="margin: 0; font-size: 1.5rem;">Create Audit Plan</h2>
@@ -250,7 +250,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
                                 <div class="form-group" style="margin: 0;">
                                     <label>Client <span style="color: var(--danger-color);">*</span></label>
-                                    <select class="form-control" id="plan-client" required onchange="updateClientDetails(this.value)" ${window.state.activeClientId ? 'disabled' : ''}>
+                                    <select class="form-control" id="plan-client" required data-action-change="updateClientDetails" data-id="this.value" ${window.state.activeClientId ? 'disabled' : ''}>
                                         <option value="">-- Select Client --</option>
                                         ${state.clients.map(c => `<option value="${c.name}" ${window.state.activeClientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
                                     </select>
@@ -278,7 +278,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
                                     <i class="fa-solid fa-location-dot"></i> Audit Scope & Sites
                                 </h3>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.openMultiSiteSamplingCalculatorModal()" style="font-size: 0.75rem; padding: 2px 8px;">
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-action="openMultiSiteSamplingCalculatorModal" style="font-size: 0.75rem; padding: 2px 8px;">
                                     <i class="fa-solid fa-calculator" style="margin-right: 0.25rem;"></i>Sampling Tool
                                 </button>
                             </div>
@@ -326,10 +326,10 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                     <i class="fa-solid fa-calendar-days"></i> Audit Agenda
                                 </h3>
                                 <div style="display: flex; gap: 0.5rem;">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="generateAIAgenda()" id="btn-ai-generate">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="generateAIAgenda" id="btn-ai-generate">
                                         <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addAgendaRow()">
+                                    <button type="button" class="btn btn-sm btn-secondary" data-action="addAgendaRow">
                                         <i class="fa-solid fa-plus"></i> Add Row
                                     </button>
                                 </div>
@@ -385,7 +385,7 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                             </div>
 
-                            <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1.25rem; height: 36px;" onclick="autoCalculateDays()" disabled>
+                            <button type="button" id="btn-calculate-mandays" class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 1.25rem; height: 36px;" data-action="autoCalculateDays" disabled>
                                 <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.4rem;"></i>Calculate Days
                             </button>
 
@@ -859,7 +859,7 @@ function viewAuditPlan(id) {
                     <p style="font-weight: 500; margin: 0;">${cl.name}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">${itemCount} items • ${cl.type === 'global' ? 'Global' : 'Custom'}</p>
                 </div>
-                <button class="btn btn-sm" onclick="viewChecklistDetail(${cl.id})">
+                <button class="btn btn-sm" data-action="viewChecklistDetail" data-id="${cl.id}">
                     <i class="fa-solid fa-eye"></i>
                 </button>
             </div>
@@ -909,7 +909,7 @@ function viewAuditPlan(id) {
             <!--Header-->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-secondary" onclick="renderAuditPlanningEnhanced()">
+                    <button class="btn btn-secondary" data-action="renderAuditPlanningEnhanced">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Plans
                     </button>
                     <div>
@@ -918,9 +918,9 @@ function viewAuditPlan(id) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                     ${report ? `<button class="btn btn-secondary" onclick="printAuditPlan('${plan.id}')"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
-                     <button class="btn btn-secondary" onclick="printAuditPlanDetails('${plan.id}')"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
-                     <button class="btn btn-primary" onclick="editAuditPlan('${plan.id}')"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
+                     ${report ? `<button class="btn btn-secondary" data-action="printAuditPlan" data-id="${plan.id}"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Checklist</button>` : ''}
+                     <button class="btn btn-secondary" data-action="printAuditPlanDetails" data-id="${plan.id}"><i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Print Plan</button>
+                     <button class="btn btn-primary" data-action="editAuditPlan" data-id="${plan.id}"><i class="fa-solid fa-edit" style="margin-right: 0.5rem;"></i> Edit</button>
                 </div>
             </div>
 
@@ -1037,8 +1037,8 @@ function viewAuditPlan(id) {
                             <div style="font-weight: bold; font-size: 1.25rem; margin-top: 0.5rem;">${totalItems} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-secondary);">Items</span></div>
                         </div>
                         <div>
-                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="window.printAuditChecklist('${plan.id}')"><i class="fa-solid fa-print"></i> Print</button>
-                            <button class="btn btn-sm btn-secondary" style="width: 100%;" onclick="window.renderConfigureChecklist('${plan.id}')">Configure</button>
+                            <button class="btn btn-sm btn-outline-primary" style="width: 100%; margin-bottom: 0.5rem;" data-action="printAuditChecklist" data-id="${plan.id}"><i class="fa-solid fa-print"></i> Print</button>
+                            <button class="btn btn-sm btn-secondary" style="width: 100%;" data-action="renderConfigureChecklist" data-id="${plan.id}">Configure</button>
                         </div>
                     </div>
 
@@ -1054,7 +1054,7 @@ function viewAuditPlan(id) {
                                 ${plan.preAudit?.completedDate ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;"><i class="fa-solid fa-calendar-check"></i> ${plan.preAudit.completedDate}</div>` : ''}
                             </div>
                         </div>
-                        <button class="btn ${plan.preAudit?.status === 'Complete' ? 'btn-secondary' : 'btn-primary'}" style="width: 100%;" onclick="window.renderPreAuditReview('${plan.id}')">
+                        <button class="btn ${plan.preAudit?.status === 'Complete' ? 'btn-secondary' : 'btn-primary'}" style="width: 100%;" data-action="renderPreAuditReview" data-id="${plan.id}">
                             ${plan.preAudit?.status === 'Complete' ? '<i class="fa-solid fa-eye"></i> View Review' : '<i class="fa-solid fa-play"></i> Start Review'}
                         </button>
                     </div>
@@ -1075,7 +1075,7 @@ function viewAuditPlan(id) {
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-primary" style="width: 100%;" onclick="window.navigateToAuditExecution('${plan.id}')">
+                        <button class="btn btn-primary" style="width: 100%;" data-action="navigateToAuditExecution" data-id="${plan.id}">
                             ${report ? 'Continue Audit' : 'Start Audit'}
                         </button>
                     </div>
@@ -1096,7 +1096,7 @@ function viewAuditPlan(id) {
                             </div>
                         </div>
                         ${report ? `
-                    <button class="${report.status === 'Finalized' ? 'btn btn-secondary' : 'btn btn-primary'}" style="width: 100%;" onclick="window.navigateToReporting('${plan.id}')">
+                    <button class="${report.status === 'Finalized' ? 'btn btn-secondary' : 'btn btn-primary'}" style="width: 100%;" data-action="navigateToReporting" data-id="${plan.id}">
                         ${report.status === 'Finalized' ? 'View Final Report' :
                 report.status === 'Approved' ? 'Publish Report' :
                     report.status === 'In Review' ? 'Review / Approve' : 'Draft Report'}
@@ -1113,7 +1113,7 @@ function viewAuditPlan(id) {
             '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>'
         }
                         </div>
-                        <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} onclick="closeAuditPlan('${plan.id}')" style="width: 100%;">
+                        <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} data-action="closeAuditPlan" data-id="${plan.id}" style="width: 100%;">
                             ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
                         </button>
                     </div>
@@ -1459,8 +1459,8 @@ window.renderConfigureChecklist = async function (planId) {
                                 <div class="items-list hidden" style="margin-top: 1rem; padding: 1.5rem; background: #f8fafc; border-radius: 8px; border: 1px inset #e2e8f0;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                                         <div style="display: flex; gap: 0.5rem;">
-                                            <button class="btn btn-xs btn-outline-primary" onclick="window.bulkSelectConfigItems('${cl.id}', true)">Select All</button>
-                                            <button class="btn btn-xs btn-outline-secondary" onclick="window.bulkSelectConfigItems('${cl.id}', false)">Deselect All</button>
+                                            <button class="btn btn-xs btn-outline-primary" data-action="bulkSelectConfigItems" data-arg1="${cl.id}" data-arg2="true">Select All</button>
+                                            <button class="btn btn-xs btn-outline-secondary" data-action="bulkSelectConfigItems" data-arg1="${cl.id}" data-arg2="false">Deselect All</button>
                                         </div>
                                         <span style="font-size: 0.8rem; color: var(--text-secondary);">Toggle items to include in audit scope</span>
                                     </div>
@@ -1490,7 +1490,7 @@ window.renderConfigureChecklist = async function (planId) {
                                                     ${isOverridden ? '<span style="margin-left: 8px; font-size: 0.7rem; background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 4px;">Overridden</span>' : ''}
                                                 </td>
                                                 <td style="padding: 10px; text-align: center; vertical-align: top;">
-                                                    <button class="btn btn-xs btn-icon" onclick="window.editConfigItemRequirement('${cl.id}', '${item.id}')" title="Override requirement text" style="background: none; border: none; cursor: pointer;">
+                                                    <button class="btn btn-xs btn-icon" data-action="editConfigItemRequirement" data-arg1="${cl.id}" data-arg2="${item.id}" title="Override requirement text" style="background: none; border: none; cursor: pointer;">
                                                         <i class="fa-solid fa-pen-to-square" style="color: var(--primary-color);"></i>
                                                     </button>
                                                 </td>
@@ -1511,18 +1511,18 @@ window.renderConfigureChecklist = async function (planId) {
     const headerHtml = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
             <div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="window.viewAuditPlan('${planId}')" style="margin-bottom: 0.5rem;">
+                <button class="btn btn-sm btn-outline-secondary" data-action="viewAuditPlan" data-id="${planId}" style="margin-bottom: 0.5rem;">
                     <i class="fa-solid fa-arrow-left"></i> Back to Plan
                 </button>
                 <h2 style="margin: 0;">Configure Checklists</h2>
                 <p style="color: var(--text-secondary); margin: 0;">Tailor the audit scope and requirements for <strong>${plan.client}</strong></p>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <button class="btn btn-outline-secondary" onclick="window.viewAuditPlan('${planId}')">Cancel</button>
-                <button class="btn" style="background: #7c3aed; color: white; border: none;" onclick="window.reviewMergedQuestions('${planId}')">
+                <button class="btn btn-outline-secondary" data-action="viewAuditPlan" data-id="${planId}">Cancel</button>
+                <button class="btn" style="background: #7c3aed; color: white; border: none;" data-action="reviewMergedQuestions" data-id="${planId}">
                     <i class="fa-solid fa-magnifying-glass-chart"></i> Review & Merge Questions
                 </button>
-                <button class="btn btn-primary" onclick="window.saveChecklistConfiguration('${planId}')" style="padding: 0.5rem 1.5rem;">
+                <button class="btn btn-primary" data-action="saveChecklistConfiguration" data-id="${planId}" style="padding: 0.5rem 1.5rem;">
                     <i class="fa-solid fa-save"></i> Save Configuration
                 </button>
             </div>
@@ -1547,7 +1547,7 @@ window.renderConfigureChecklist = async function (planId) {
                         <i class="fa-solid fa-building" style="font-size: 2rem; color: #7c3aed; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0 0 0.25rem; color: #7c3aed;">${plan.client} &mdash; No Custom Checklists Yet</h4>
                         <p style="margin: 0 0 1rem; font-size: 0.85rem; color: #6b7280;">Create a tailored checklist from the Knowledge Base for this client</p>
-                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" onclick="window._goToKB()">
+                        <button class="btn btn-sm" style="background: #7c3aed; color: white; border: none;" data-action="_goToKB">
                             <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 0.25rem;"></i>Create from Knowledge Base
                         </button>
                     </div>
@@ -1557,7 +1557,7 @@ window.renderConfigureChecklist = async function (planId) {
             </div>
             
             <div style="margin-top: 3rem; padding: 2rem; border-top: 1px solid #e2e8f0; text-align: center;">
-                 <button class="btn btn-primary btn-lg" onclick="window.saveChecklistConfiguration('${planId}')" style="min-width: 250px;">
+                 <button class="btn btn-primary btn-lg" data-action="saveChecklistConfiguration" data-id="${planId}" style="min-width: 250px;">
                     <i class="fa-solid fa-save"></i> Save & Return to Plan
                  </button>
             </div>
@@ -1767,7 +1767,7 @@ window.reviewMergedQuestions = function (planId) {
         <div class="fade-in" style="max-width: 1200px; margin: 0 auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
                 <div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.configureChecklists('${planId}')" style="margin-bottom: 0.5rem;">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="configureChecklists" data-id="${planId}" style="margin-bottom: 0.5rem;">
                         <i class="fa-solid fa-arrow-left"></i> Back to Configure
                     </button>
                     <h2 style="margin: 0;">Review & Merge Questions</h2>
@@ -1779,8 +1779,8 @@ window.reviewMergedQuestions = function (planId) {
                     </p>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-outline-secondary" onclick="window.configureChecklists('${planId}')">Cancel</button>
-                    <button class="btn" style="background: #059669; color: white; border: none;" onclick="window._applyMergedSelections('${planId}')">
+                    <button class="btn btn-outline-secondary" data-action="configureChecklists" data-id="${planId}">Cancel</button>
+                    <button class="btn" style="background: #059669; color: white; border: none;" data-action="_applyMergedSelections" data-id="${planId}">
                         <i class="fa-solid fa-check-double"></i> Apply & Save
                     </button>
                 </div>
@@ -1842,7 +1842,7 @@ window.reviewMergedQuestions = function (planId) {
             </div>
 
             <div style="margin-top: 2rem; text-align: center;">
-                <button class="btn btn-lg" style="background: #059669; color: white; border: none; min-width: 250px;" onclick="window._applyMergedSelections('${planId}')">
+                <button class="btn btn-lg" style="background: #059669; color: white; border: none; min-width: 250px;" data-action="_applyMergedSelections" data-id="${planId}">
                     <i class="fa-solid fa-check-double"></i> Apply & Save Configuration
                 </button>
             </div>
@@ -2592,12 +2592,12 @@ function renderMultiSiteSamplingCalculator() {
                     <div>
                         <div class="form-group">
                             <label>Total Number of Sites (n)</label>
-                            <input type="number" id="ms-total-sites" class="form-control" min="1" value="1" oninput="calculateSampling()">
+                            <input type="number" id="ms-total-sites" class="form-control" min="1" value="1" data-action-input="calculateSampling">
                         </div>
 
                         <div class="form-group">
                             <label>Audit Stage</label>
-                            <select id="ms-stage" class="form-control" onchange="calculateSampling()">
+                            <select id="ms-stage" class="form-control" data-action-change="calculateSampling">
                                 <option value="initial">Initial Audit (Stage 2)</option>
                                 <option value="surveillance">Surveillance Audit</option>
                                 <option value="recertification">Recertification Audit</option>
@@ -2606,7 +2606,7 @@ function renderMultiSiteSamplingCalculator() {
 
                         <div class="form-group">
                             <label>Risk Complexity</label>
-                            <select id="ms-risk" class="form-control" onchange="calculateSampling()">
+                            <select id="ms-risk" class="form-control" data-action-change="calculateSampling">
                                 <option value="low">Low Risk (Standard Multiplier)</option>
                                 <option value="medium">Medium Risk (+25% sample)</option>
                                 <option value="high">High Risk (All Sites / Higher Sample)</option>
@@ -2826,7 +2826,7 @@ window.renderPreAuditReview = function (planId) {
             <!-- Header -->
             <div class="pre-audit-header" style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
                 <div>
-                    <button class="btn btn-secondary" onclick="viewAuditPlan('${plan.id}')">
+                    <button class="btn btn-secondary" data-action="viewAuditPlan" data-id="${plan.id}">
                         <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Audit Plan
                     </button>
                     <h2 style="margin: 1rem 0 0.5rem 0;">Pre-Audit Review (Stage 1)</h2>
@@ -2839,10 +2839,10 @@ window.renderPreAuditReview = function (planId) {
                     </p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                    <button class="btn btn-outline-primary" onclick="window.exportPreAuditPDF('${plan.id}')">
+                    <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Export PDF
                     </button>
-                    <button class="btn btn-primary" onclick="window.savePreAuditReview('${plan.id}')">
+                    <button class="btn btn-primary" data-action="savePreAuditReview" data-id="${plan.id}">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> Save Progress
                     </button>
                 </div>
@@ -2902,7 +2902,7 @@ window.renderPreAuditReview = function (planId) {
                                                 id="review-${item.id}" 
                                                 class="pre-audit-status"
                                                 style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: var(--radius-sm);"
-                                                onchange="window.updatePreAuditItem('${planId}', '${item.id}', this.value)">
+                                                data-action-change="updatePreAuditItem" data-arg1="${planId}" data-arg2="${item.id}" data-arg3="this.value">
                                                 <option value="">Not Reviewed</option>
                                                 <option value="ok" ${review.status === 'ok' ? 'selected' : ''}>✓ OK</option>
                                                 <option value="minor" ${review.status === 'minor' ? 'selected' : ''}>⚠ Minor</option>
@@ -2914,7 +2914,7 @@ window.renderPreAuditReview = function (planId) {
                                                 id="notes-${item.id}"
                                                 placeholder="Notes, findings, or recommendations..."
                                                 style="width: 100%; min-height: 60px; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: var(--radius-sm); resize: vertical; font-size: 0.9rem;"
-                                                onchange="window.updatePreAuditNotes('${planId}', '${item.id}', this.value)"
+                                                data-action-change="updatePreAuditNotes" data-arg1="${planId}" data-arg2="${item.id}" data-arg3="this.value"
                                             >${review.notes || ''}</textarea>
                                         </div>
                                     </div>
@@ -2937,7 +2937,7 @@ window.renderPreAuditReview = function (planId) {
                         <select 
                             id="readiness-decision"
                             style="width: 100%; padding: 0.75rem; border: 2px solid #cbd5e1; border-radius: var(--radius-md); font-weight: 600; font-size: 1rem;"
-                            onchange="window.updateReadinessDecision('${planId}', this.value)">
+                            data-action-change="updateReadinessDecision" data-arg1="${planId}" data-arg2="this.value">
                             <option value="">-- Select --</option>
                             <option value="Ready" ${plan.preAudit.readinessDecision === 'Ready' ? 'selected' : ''} style="color: #059669;">✓ Ready for Stage 2</option>
                             <option value="Conditional" ${plan.preAudit.readinessDecision === 'Conditional' ? 'selected' : ''} style="color: #f59e0b;">⚠ Conditionally Ready</option>
@@ -2950,7 +2950,7 @@ window.renderPreAuditReview = function (planId) {
                             id="readiness-notes"
                             placeholder="Overall assessment, key findings, and recommendations for the client..."
                             style="width: 100%; min-height: 120px; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: var(--radius-md); resize: vertical;"
-                            onchange="window.updateReadinessNotes('${planId}', this.value)"
+                            data-action-change="updateReadinessNotes" data-arg1="${planId}" data-arg2="this.value"
                         >${plan.preAudit.notes || ''}</textarea>
                     </div>
                 </div>
@@ -2958,13 +2958,13 @@ window.renderPreAuditReview = function (planId) {
 
             <!-- Action Buttons -->
             <div style="display: flex; justify-content: flex-end; gap: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-                <button class="btn btn-secondary" onclick="viewAuditPlan('${plan.id}')">
+                <button class="btn btn-secondary" data-action="viewAuditPlan" data-id="${plan.id}">
                     Cancel
                 </button>
-                <button class="btn btn-outline-primary" onclick="window.exportPreAuditPDF('${plan.id}')">
+                <button class="btn btn-outline-primary" data-action="exportPreAuditPDF" data-id="${plan.id}">
                     <i class="fa-solid fa-file-pdf"></i> Export PDF
                 </button>
-                <button class="btn btn-success" onclick="window.completePreAuditReview('${plan.id}')">
+                <button class="btn btn-success" data-action="completePreAuditReview" data-id="${plan.id}">
                     <i class="fa-solid fa-check-circle"></i> Complete Review
                 </button>
             </div>

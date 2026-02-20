@@ -454,14 +454,14 @@ window.renderCertificates = function () {
                                         </span>
                                     </td>
                                     <td style="padding: 1rem; text-align: center;">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="window.exportCertificatePDF('${cert.id}')" title="Export PDF">
+                                        <button class="btn btn-sm btn-outline-primary" data-action="exportCertificatePDF" data-id="${cert.id}" title="Export PDF">
                                             <i class="fa-solid fa-file-pdf"></i>
                                         </button>
                                         ${cert.status !== 'Revoked' && cert.displayStatus !== 'Expired' ? `
-                                            <button class="btn btn-sm btn-outline-secondary" onclick="window.suspendCertificate('${cert.id}')" title="${cert.status === 'Suspended' ? 'Reinstate' : 'Suspend'}">
+                                            <button class="btn btn-sm btn-outline-secondary" data-action="suspendCertificate" data-id="${cert.id}" title="${cert.status === 'Suspended' ? 'Reinstate' : 'Suspend'}">
                                                 <i class="fa-solid fa-${cert.status === 'Suspended' ? 'play' : 'pause'}"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="window.revokeCertificate('${cert.id}')" title="Revoke">
+                                            <button class="btn btn-sm btn-outline-danger" data-action="revokeCertificate" data-id="${cert.id}" title="Revoke">
                                                 <i class="fa-solid fa-ban"></i>
                                             </button>
                                         ` : ''}

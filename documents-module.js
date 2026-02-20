@@ -175,24 +175,24 @@ function renderDocuments() {
             </td>
             <td><span class="status-badge status-${(doc.status || '').toLowerCase()}">${window.UTILS.escapeHtml(doc.status)}</span></td>
             <td>
-                <button class="btn btn-sm btn-icon" onclick="viewDocumentHistory('${doc.id}')" title="Revision History">
+                <button class="btn btn-sm btn-icon" data-action="viewDocumentHistory" data-id="${doc.id}" title="Revision History">
                     <i class="fa-solid fa-clock-rotate-left" style="color: #7c3aed;"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" onclick="viewDocumentDetails('${doc.id}')" title="Document Details">
+                <button class="btn btn-sm btn-icon" data-action="viewDocumentDetails" data-id="${doc.id}" title="Document Details">
                     <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
                 </button>
                 ${doc.status === 'Draft' ? `
-                    <button class="btn btn-sm btn-success" onclick="approveDocument('${doc.id}')" title="Approve">
+                    <button class="btn btn-sm btn-success" data-action="approveDocument" data-id="${doc.id}" title="Approve">
                         <i class="fa-solid fa-check"></i>
                     </button>
                 ` : ''}
-                <button class="btn btn-sm btn-icon" onclick="createNewRevision('${doc.id}')" title="New Revision">
+                <button class="btn btn-sm btn-icon" data-action="createNewRevision" data-id="${doc.id}" title="New Revision">
                     <i class="fa-solid fa-code-branch" style="color: #0284c7;"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" onclick="downloadDocument('${doc.id}')" title="Download">
+                <button class="btn btn-sm btn-icon" data-action="downloadDocument" data-id="${doc.id}" title="Download">
                     <i class="fa-solid fa-download" style="color: var(--primary-color);"></i>
                 </button>
-                <button class="btn btn-sm btn-icon" onclick="deleteDocument('${doc.id}')" title="Delete">
+                <button class="btn btn-sm btn-icon" data-action="deleteDocument" data-id="${doc.id}" title="Delete">
                     <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
                 </button>
             </td>
@@ -234,7 +234,7 @@ function renderDocuments() {
                     <h2 style="margin: 0;">Document Control</h2>
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">ISO 17021-1 Clause 8.3 - Control of Documents</p>
                 </div>
-                <button class="btn btn-primary" onclick="openUploadModal()">
+                <button class="btn btn-primary" data-action="openUploadModal">
                     <i class="fa-solid fa-cloud-upload-alt" style="margin-right: 0.5rem;"></i> Upload Document
                 </button>
             </div>
@@ -282,17 +282,17 @@ function renderDocuments() {
             <!-- Tab Buttons -->
             <div class="card">
                 <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 1rem;">
-                    <button class="btn ${activeTab === 'library' ? 'btn-primary' : 'btn-secondary'}" onclick="switchDocumentTab('library')">
+                    <button class="btn ${activeTab === 'library' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="library">
                         <i class="fa-solid fa-folder-open" style="margin-right: 0.5rem;"></i>Document Library
                     </button>
-                    <button class="btn ${activeTab === 'masterlist' ? 'btn-primary' : 'btn-secondary'}" onclick="switchDocumentTab('masterlist')">
+                    <button class="btn ${activeTab === 'masterlist' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="masterlist">
                         <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Master Document List
                     </button>
                     <div style="flex: 1;"></div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="printMasterDocumentList()">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="printMasterDocumentList">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Print MDL
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="exportMasterDocumentList()">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="exportMasterDocumentList">
                         <i class="fa-solid fa-file-csv" style="margin-right: 0.5rem;"></i>Export CSV
                     </button>
                 </div>
@@ -316,7 +316,7 @@ function renderDocuments() {
                         <i class="fa-solid fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 0.5rem;"></i>
                         <h3 style="font-size: 1rem; margin-bottom: 0.25rem;">Drag and drop files here</h3>
                         <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Supported formats: PDF, DOCX, XLSX, JPG (Max 10MB)</p>
-                        <button class="btn btn-sm btn-secondary" onclick="openUploadModal()">Browse Files</button>
+                        <button class="btn btn-sm btn-secondary" data-action="openUploadModal">Browse Files</button>
                     </div>
 
                     <div class="table-container">

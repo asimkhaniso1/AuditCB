@@ -222,10 +222,10 @@ function renderAppealsComplaintsModule() {
                     <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">ISO 17021-1 Clause 9.10 & 9.11 - Internal tracking for accreditation compliance</p>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-primary" onclick="window.openNewAppealModal()">
+                    <button class="btn btn-primary" data-action="openNewAppealModal">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Appeal
                     </button>
-                    <button class="btn btn-secondary" onclick="window.openNewComplaintModal()">
+                    <button class="btn btn-secondary" data-action="openNewComplaintModal">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Complaint
                     </button>
                 </div>
@@ -274,14 +274,14 @@ function renderAppealsComplaintsModule() {
             <!-- Tab Buttons -->
             <div class="card">
                 <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 1rem;">
-                    <button class="btn ${activeTab === 'appeals' ? 'btn-primary' : 'btn-secondary'}" onclick="window.switchACTab('appeals')">
+                    <button class="btn ${activeTab === 'appeals' ? 'btn-primary' : 'btn-secondary'}" data-action="switchACTab" data-id="appeals">
                         <i class="fa-solid fa-gavel" style="margin-right: 0.5rem;"></i>Appeals Register
                     </button>
-                    <button class="btn ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}" onclick="window.switchACTab('complaints')">
+                    <button class="btn ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}" data-action="switchACTab" data-id="complaints">
                         <i class="fa-solid fa-comment-dots" style="margin-right: 0.5rem;"></i>Complaints Register
                     </button>
                     <div style="flex: 1;"></div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.printACRegister('${activeTab}')">
+                    <button class="btn btn-sm btn-outline-secondary" data-action="printACRegister" data-id="${activeTab}">
                         <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Print Register
                     </button>
                 </div>
@@ -345,13 +345,13 @@ function renderAppealsTab(appeals) {
                             <td><span class="badge" style="background: ${getStatusColor(a.status)}; color: white;">${window.UTILS.escapeHtml(a.status)}</span></td>
                             <td>
                                 <div style="display: flex; gap: 0.25rem;">
-                                    <button class="btn btn-sm btn-icon" onclick="window.viewAppealDetail(${a.id})" title="View Details">
+                                    <button class="btn btn-sm btn-icon" data-action="viewAppealDetail" data-id="${a.id}" title="View Details">
                                         <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" onclick="window.editAppeal(${a.id})" title="Edit Appeal">
+                                    <button class="btn btn-sm btn-icon" data-action="editAppeal" data-id="${a.id}" title="Edit Appeal">
                                         <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" onclick="window.deleteAppeal(${a.id})" title="Delete Appeal">
+                                    <button class="btn btn-sm btn-icon" data-action="deleteAppeal" data-id="${a.id}" title="Delete Appeal">
                                         <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                     </button>
                                 </div>
@@ -413,13 +413,13 @@ function renderComplaintsTab(complaints) {
                             <td><span class="badge" style="background: ${getStatusColor(c.status)}; color: white;">${window.UTILS.escapeHtml(c.status)}</span></td>
                             <td>
                                 <div style="display: flex; gap: 0.25rem;">
-                                    <button class="btn btn-sm btn-icon" onclick="window.viewComplaintDetail(${c.id})" title="View Details">
+                                    <button class="btn btn-sm btn-icon" data-action="viewComplaintDetail" data-id="${c.id}" title="View Details">
                                         <i class="fa-solid fa-eye" style="color: var(--primary-color);"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" onclick="window.editComplaint(${c.id})" title="Edit Complaint">
+                                    <button class="btn btn-sm btn-icon" data-action="editComplaint" data-id="${c.id}" title="Edit Complaint">
                                         <i class="fa-solid fa-edit" style="color: #f59e0b;"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-icon" onclick="window.deleteComplaint(${c.id})" title="Delete Complaint">
+                                    <button class="btn btn-sm btn-icon" data-action="deleteComplaint" data-id="${c.id}" title="Delete Complaint">
                                         <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                     </button>
                                 </div>
@@ -683,7 +683,7 @@ window.viewAppealDetail = function (id) {
     // (Re-implementing viewAppealDetail for safety)
     const html = `
         <div class="fade-in">
-            <button class="btn btn-secondary" onclick="renderAppealsComplaintsModule()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <button class="btn btn-secondary" data-action="renderAppealsComplaintsModule"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <div class="card" style="margin-top:1rem;">
                 <h2>APP-${String(appeal.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(appeal.subject)}</h2>
                 <span class="badge" style="background:${getStatusColor(appeal.status)};color:white;">${window.UTILS.escapeHtml(appeal.status)}</span>
@@ -692,8 +692,8 @@ window.viewAppealDetail = function (id) {
                 <p>${window.UTILS.escapeHtml(appeal.description)}</p>
                 <hr>
                 <div style="display:flex;gap:1rem;">
-                    <button class="btn btn-primary" onclick="window.updateAppealStatus(${appeal.id})">Update Status</button>
-                    <button class="btn btn-outline-primary" onclick="window.managePanelRecords(${appeal.id})">Panel Records</button>
+                    <button class="btn btn-primary" data-action="updateAppealStatus" data-id="${appeal.id}">Update Status</button>
+                    <button class="btn btn-outline-primary" data-action="managePanelRecords" data-id="${appeal.id}">Panel Records</button>
                 </div>
             </div>
             <!-- History section -->
@@ -712,7 +712,7 @@ window.viewComplaintDetail = function (id) {
 
     const html = `
         <div class="fade-in">
-            <button class="btn btn-secondary" onclick="renderAppealsComplaintsModule()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <button class="btn btn-secondary" data-action="renderAppealsComplaintsModule"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <div class="card" style="margin-top:1rem;">
                 <h2>CMP-${String(complaint.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(complaint.subject)}</h2>
                 <span class="badge" style="background:#8b5cf6;color:white;">${window.UTILS.escapeHtml(complaint.status)}</span>
@@ -720,7 +720,7 @@ window.viewComplaintDetail = function (id) {
                 <hr>
                 <p>${window.UTILS.escapeHtml(complaint.description)}</p>
                 <hr>
-                <button class="btn btn-primary" onclick="window.updateComplaintStatus(${complaint.id})">Update Status</button>
+                <button class="btn btn-primary" data-action="updateComplaintStatus" data-id="${complaint.id}">Update Status</button>
             </div>
              <div class="card" style="margin-top:1rem;">
                 <h4>History</h4>

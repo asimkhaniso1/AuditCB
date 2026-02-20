@@ -24,15 +24,15 @@ function renderCertificationModule() {
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <div>
-                    <h2 style="margin-bottom: 0.5rem;" onclick="toggleCertAnalytics()" style="cursor: pointer;">
+                    <h2 style="margin-bottom: 0.5rem;" data-action="toggleCertAnalytics" style="cursor: pointer;">
                         Certification Management
                          <i class="fa-solid ${window.state.showCertAnalytics !== false ? 'fa-angle-down' : 'fa-angle-right'}" style="font-size: 0.8em; color: var(--text-secondary); margin-left: 0.5rem;"></i>
                     </h2>
                     <p style="color: var(--text-secondary);">Manage issuance, surveillance, and renewal of ISO certificates.</p>
                 </div>
                 <div style="display: flex; gap: 1rem;">
-                    <button class="btn btn-secondary" onclick="window.printCertificateRegister()"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Register</button>
-                    <button class="btn btn-primary" onclick="openIssueCertificateModal()"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Manual Issue</button>
+                    <button class="btn btn-secondary" data-action="printCertificateRegister"><i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i> Print Register</button>
+                    <button class="btn btn-primary" data-action="openIssueCertificateModal"><i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> Manual Issue</button>
                 </div>
             </div>
 
@@ -107,10 +107,10 @@ function renderCertificationModule() {
                                         <td>${window.UTILS.escapeHtml(cert.expiryDate)}</td>
                                         <td><span class="badge bg-green">${window.UTILS.escapeHtml(cert.status)}</span></td>
                                         <td  style="text-align: right;">
-                                            <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View/Print"><i class="fa-solid fa-eye"></i></button>
-                                            <button class="btn btn-sm btn-icon" onclick="editCertificate('${cert.id}')" title="Edit Details"><i class="fa-solid fa-pen"></i></button>
-                                            <button class="btn btn-sm btn-icon" onclick="openCertActionModal('${cert.id}')" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
-                                            <button class="btn btn-sm btn-icon btn-danger" onclick="deleteCertificate('${cert.id}')" title="Delete Permanent"><i class="fa-solid fa-trash"></i></button>
+                                            <button class="btn btn-sm btn-icon" data-action="viewCertificate" data-id="${cert.id}" title="View/Print"><i class="fa-solid fa-eye"></i></button>
+                                            <button class="btn btn-sm btn-icon" data-action="editCertificate" data-id="${cert.id}" title="Edit Details"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="btn btn-sm btn-icon" data-action="openCertActionModal" data-id="${cert.id}" title="Suspend/Withdraw"><i class="fa-solid fa-gavel"></i></button>
+                                            <button class="btn btn-sm btn-icon btn-danger" data-action="deleteCertificate" data-id="${cert.id}" title="Delete Permanent"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join('') || '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">No active certificates found.</td></tr>'}
@@ -143,7 +143,7 @@ function renderCertificationModule() {
                                         <td>${window.UTILS.escapeHtml(r.date)}</td>
                                         <td><span style="color: var(--success-color); font-weight: 600;">${window.UTILS.escapeHtml(r.recommendation)}</span></td>
                                         <td>
-                                            <button class="btn btn-primary btn-sm" onclick="openIssueCertificateModal('${r.id}')">
+                                            <button class="btn btn-primary btn-sm" data-action="openIssueCertificateModal" data-id="${r.id}">
                                                 <i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i> Issue Certificate
                                             </button>
                                         </td>
@@ -179,8 +179,8 @@ function renderCertificationModule() {
                                         <td><span class="badge" style="background: ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? 'orange' : 'red'}; color: white;">${window.UTILS.escapeHtml(cert.status)}</span></td>
                                         <td>${window.UTILS.escapeHtml(cert.statusReason || 'N/A')}</td>
                                         <td style="text-align: right;">
-                                            <button class="btn btn-sm btn-icon" onclick="viewCertificate('${cert.id}')" title="View History"><i class="fa-solid fa-history"></i></button>
-                                            ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? `<button class="btn btn-sm btn-success" onclick="restoreCertificate('${cert.id}')" title="Restore"><i class="fa-solid fa-undo"></i> Restore</button>` : ''}
+                                            <button class="btn btn-sm btn-icon" data-action="viewCertificate" data-id="${cert.id}" title="View History"><i class="fa-solid fa-history"></i></button>
+                                            ${cert.status === window.CONSTANTS.CERT_STATUS.SUSPENDED ? `<button class="btn btn-sm btn-success" data-action="restoreCertificate" data-id="${cert.id}" title="Restore"><i class="fa-solid fa-undo"></i> Restore</button>` : ''}
                                         </td>
                                     </tr>
                                 `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">No suspended or withdrawn certificates.</td></tr>'}
@@ -198,10 +198,10 @@ function renderCertificationModule() {
                              <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">ISO 17021-1 Clause 9.3 - Publicly accessible directory of certified clients</p>
                          </div>
                          <div style="display: flex; gap: 0.5rem;">
-                             <button class="btn btn-secondary btn-sm" onclick="window.exportPublicDirectory()">
+                             <button class="btn btn-secondary btn-sm" data-action="exportPublicDirectory">
                                  <i class="fa-solid fa-download" style="margin-right: 0.5rem;"></i>Export CSV
                              </button>
-                             <button class="btn btn-primary btn-sm" onclick="window.generateEmbedCode()">
+                             <button class="btn btn-primary btn-sm" data-action="generateEmbedCode">
                                  <i class="fa-solid fa-code" style="margin-right: 0.5rem;"></i>Generate Embed
                              </button>
                          </div>
@@ -214,31 +214,31 @@ function renderCertificationModule() {
                          </h4>
                          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-cert-id" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-cert-id" checked data-action-change="updatePublicDirectory">
                                  <span>Certificate ID</span>
                              </label>
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-client" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-client" checked data-action-change="updatePublicDirectory">
                                  <span>Client Name</span>
                              </label>
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-standard" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-standard" checked data-action-change="updatePublicDirectory">
                                  <span>Standard</span>
                              </label>
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-scope" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-scope" checked data-action-change="updatePublicDirectory">
                                  <span>Scope</span>
                              </label>
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-issue-date" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-issue-date" checked data-action-change="updatePublicDirectory">
                                  <span>Issue Date</span>
                              </label>
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-expiry-date" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-expiry-date" checked data-action-change="updatePublicDirectory">
                                  <span>Expiry Date</span>
                              </label>
                              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                                 <input type="checkbox" id="show-active-only" checked onchange="window.updatePublicDirectory()">
+                                 <input type="checkbox" id="show-active-only" checked data-action-change="updatePublicDirectory">
                                  <span>Active Only</span>
                              </label>
                          </div>

@@ -33,7 +33,7 @@ function renderAuditorForm(auditorId = null) {
         <div class="dashboard-header">
             <h2><i class="fa-solid fa-user-tie"></i> ${title}</h2>
             <div style="display: flex; gap: 1rem;">
-                <button class="btn btn-secondary" onclick="window.location.hash='#auditors-list'">
+                <button class="btn btn-secondary" data-hash="#auditors-list">
                     <i class="fa-solid fa-arrow-left"></i> Back to List
                 </button>
             </div>
@@ -204,10 +204,10 @@ function renderAuditorForm(auditorId = null) {
 
                 <!-- Form Footer -->
                 <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid #f1f5f9; display: flex; gap: 1rem; justify-content: flex-end;">
-                     <button type="button" class="btn btn-secondary btn-lg" onclick="window.location.hash='#auditors-list'" style="min-width: 150px;">
+                     <button type="button" class="btn btn-secondary btn-lg" data-hash="#auditors-list" style="min-width: 150px;">
                         Cancel
                     </button>
-                    <button type="button" class="btn btn-primary btn-lg" onclick="window.saveAuditorForm('${auditorId || ''}')" style="min-width: 200px;">
+                    <button type="button" class="btn btn-primary btn-lg" data-action="saveAuditorForm" data-id="${auditorId || }" style="min-width: 200px;">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> ${btnText}
                     </button>
                 </div>
