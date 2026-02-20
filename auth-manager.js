@@ -139,9 +139,34 @@ const AuthManager = {
     },
 
     /**
-     * Granular permission check: action on resource
-     * @param {string} action - e.g., 'delete', 'create', 'edit', 'view', 'finalize'
-     * @param {string} resource - e.g., 'user', 'client', 'report', 'audit'
+     * Get module-level access for the current user from the configurable permissions matrix.
+     * Reads from state.rolePermissions (configured in Settings → Organization → Permissions).
+     * @param {string} module - The rolePermissions key: 'dashboard','clients','auditors','audits','certs','reports','settings'
+     * @returns {string} Permission level: 'full','view','partial','assigned','own','none'
+     */
+    hasModuleAccess: function (module) {
+        const user = window.state?.currentUser;
+        if (!user) return 'none';
+
+        const userRole = user.role || '';
+        // Admin always has full access
+        if (userRole === 'Admin') return 'full';
+
+        const perms = window.state?.rolePermissions;
+        if (!perms) return 'none';
+
+        // Try exact match first, then case-insensitive
+        const rolePerms = perms[userRole] || perms[Object.keys(perms).find(k => k.toLowerCase() === userRole.toLowerCase())];
+        if (!rolePerms) return 'none';
+
+        return rolePerms[module] || 'none';
+    },
+
+    /**
+     * Granular permission check: action on resource.
+     * Now dynamically reads from state.rolePermissions instead of hardcoded matrix.
+     * @param {string} action - e.g., 'delete', 'create', 'edit', 'view', 'finalize', 'assign', 'download'
+     * @param {string} resource - e.g., 'client', 'auditor', 'audit', 'report', 'cert', 'user', 'setting'
      * @returns {boolean}
      */
     canPerform: function (action, resource) {
@@ -149,48 +174,35 @@ const AuthManager = {
         if (!user) return false;
 
         // Admin bypass
-        const userRole = (user.role || '').toLowerCase();
-        if (userRole === 'admin') return true;
+        if ((user.role || '') === 'Admin') return true;
 
-        // Role-based permission matrix (keys normalized to lowercase)
-        const matrix = {
-            'certification manager': {
-                client: ['view', 'create', 'edit', 'delete'],
-                audit: ['view', 'create', 'edit', 'finalize'],
-                report: ['view', 'create', 'edit', 'finalize', 'download'],
-                user: ['view'],
-                auditor: ['view', 'assign']
-            },
-            'lead auditor': {
-                client: ['view'],
-                audit: ['view', 'edit'],
-                report: ['view', 'create', 'edit'],
-                user: [],
-                auditor: ['view']
-            },
-            'auditor': {
-                client: ['view'],
-                audit: ['view'],
-                report: ['view'],
-                user: [],
-                auditor: []
-            },
-            'technical expert': {
-                client: ['view'],
-                audit: ['view'],
-                report: ['view'],
-                user: [],
-                auditor: []
-            }
+        // Map resource names to rolePermissions module keys
+        const resourceToModule = {
+            client: 'clients', clients: 'clients',
+            auditor: 'auditors', auditors: 'auditors',
+            audit: 'audits', audits: 'audits',
+            checklist: 'audits', checklists: 'audits',
+            report: 'reports', reports: 'reports',
+            cert: 'certs', certificate: 'certs', certs: 'certs',
+            user: 'settings', setting: 'settings', settings: 'settings',
+            dashboard: 'dashboard'
         };
 
-        const rolePerms = matrix[userRole];
-        if (!rolePerms) return false;
+        const moduleKey = resourceToModule[resource] || resource;
+        const level = this.hasModuleAccess(moduleKey);
 
-        const resourcePerms = rolePerms[resource];
-        if (!resourcePerms) return false;
+        // Map permission levels to allowed actions
+        const levelActions = {
+            'full': ['view', 'create', 'edit', 'delete', 'finalize', 'assign', 'download', 'export'],
+            'view': ['view', 'download', 'export'],
+            'partial': ['view', 'edit', 'download', 'export'],
+            'assigned': ['view', 'edit', 'download', 'export'],  // scoped to assigned items
+            'own': ['view', 'edit', 'download', 'export'],       // scoped to own items
+            'none': []
+        };
 
-        return resourcePerms.includes(action);
+        const allowedActions = levelActions[level] || [];
+        return allowedActions.includes(action);
     },
 
 

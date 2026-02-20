@@ -54,7 +54,7 @@ function renderClientsEnhanced() {
             <td><span class="status-badge status-${(client.status || '').toLowerCase()}">${window.UTILS.escapeHtml(client.status)}</span></td>
 
             <td>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color); margin-right: 0.5rem;" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" aria-label="View"><i class="fa-solid fa-eye"></i></button>
@@ -67,7 +67,7 @@ function renderClientsEnhanced() {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 style="margin: 0;">Client Management</h2>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                         <input type="file" id="client-import-file" style="display: none;" accept=".xlsx, .xls">
                         <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" title="Restricted to Cert Managers" aria-label="Export">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
@@ -79,7 +79,7 @@ function renderClientsEnhanced() {
                 <button class="btn btn-sm btn-outline-secondary" data-action="toggleClientAnalytics" style="white-space: nowrap;">
                     <i class="fa-solid ${window.state.showClientAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${window.state.showClientAnalytics !== false ? 'Hide' : 'Show'} Analytics
                 </button>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                     <button id="btn-new-client" class="btn btn-primary" data-action="renderAddClient" style="white-space: nowrap;" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i> New Client
                     </button>
@@ -403,7 +403,7 @@ function getClientInfoHTML(client) {
     <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;">Company Information</h3>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-sm btn-outline-primary" data-action="openImportAccountSetupModal" data-id="${client.id}">
                     <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Bulk Import Setup
                 </button>
@@ -495,7 +495,7 @@ function getClientSitesHTML(client) {
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-map-location-dot" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Sites & Locations</h3>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadSites" data-id="${client.id}" aria-label="Upload">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
@@ -539,7 +539,7 @@ function getClientSitesHTML(client) {
                                         ${s.geotag ? `<a href="https://maps.google.com/?q=${window.UTILS.escapeHtml(s.geotag)}" target="_blank" style="color: var(--primary-color); text-decoration: none;"><i class="fa-solid fa-map-marker-alt" style="color: var(--danger-color); margin-right: 5px;"></i>${window.UTILS.escapeHtml(s.geotag)}</a>` : '-'}
                                     </td>
                                     <td>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                                         <div style="display: flex; gap: 0.25rem;">
                                             <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editSite" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit">
                                                 <i class="fa-solid fa-pen"></i>
@@ -559,7 +559,7 @@ function getClientSitesHTML(client) {
                 <div style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;">
                     <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">No sites or branch locations added yet.</p>
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                     <button class="btn btn-sm btn-outline-primary" style="margin-top: 1rem;" data-action="addSite" data-id="${client.id}" aria-label="Add">
                         <i class="fa-solid fa-plus"></i> Add First Site
                     </button>
@@ -585,7 +585,7 @@ function getClientProfileHTML(client) {
                 </p>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                         <label class="btn btn-sm btn-outline-primary" style="cursor: pointer; margin: 0;">
                             <i class="fa-solid fa-file-pdf" style="margin-right: 0.25rem;"></i> Upload PDF
                             <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" data-action-change="uploadCompanyProfileDoc" data-id="${client.id}" data-file="true">
@@ -610,7 +610,7 @@ function getClientProfileHTML(client) {
                     <span style="font-size: 0.9rem; color: #166534;"><strong>Source Document:</strong> ${window.UTILS.escapeHtml(client.profileDocument.name)}</span>
                     <span style="font-size: 0.8rem; color: #22c55e; margin-left: 0.5rem;">(Uploaded ${new Date(client.profileDocument.uploadedAt).toLocaleDateString()})</span>
                 </div>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-sm" style="color: #dc2626; background: none; border: none;" data-action="removeProfileDocument" data-id="${client.id}" title="Remove document" aria-label="Close">
                     <i class="fa-solid fa-times"></i>
                 </button>
@@ -631,7 +631,7 @@ function getClientProfileHTML(client) {
                         Upload a company profile PDF/manual, use AI generation from website, or write manually.
                     </p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                        ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                             <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
                                 <i class="fa-solid fa-upload"></i> Upload Document
                                 <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" data-action-change="uploadCompanyProfileDoc" data-id="${client.id}" data-file="true">
@@ -663,7 +663,7 @@ function getClientContactsHTML(client) {
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Contact Persons</h3>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+            ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn btn-sm btn-secondary" data-action="addContactPerson" data-id="${client.id}" aria-label="Add">
                         <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -694,7 +694,7 @@ function getClientContactsHTML(client) {
                                     <td><i class="fa-solid fa-phone" style="color: var(--text-secondary); margin-right: 5px;"></i>${window.UTILS.escapeHtml(c.phone || '-')}</td>
                                     <td><a href="mailto:${window.UTILS.escapeHtml(c.email)}" style="color: var(--primary-color); text-decoration: none;">${window.UTILS.escapeHtml(c.email || '-')}</a></td>
                                     <td>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                                        ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editContact" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
@@ -722,7 +722,7 @@ function getClientDepartmentsHTML(client) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;"><i class="fa-solid fa-sitemap" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Departments</h3>
             <div style="display: flex; gap: 0.5rem;">
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                     <button class="btn btn-sm btn-outline-secondary" data-action="bulkUploadDepartments" data-id="${client.id}" aria-label="Upload">
                         <i class="fa-solid fa-upload" style="margin-right: 0.25rem;"></i> Bulk Upload
                     </button>
@@ -748,7 +748,7 @@ function getClientDepartmentsHTML(client) {
                                     <td style="font-weight: 500;">${window.UTILS.escapeHtml(dept.name)}</td>
                                     <td>${window.UTILS.escapeHtml(dept.head || '-')}</td>
                                     <td>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                                        ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
@@ -767,7 +767,7 @@ function getClientDepartmentsHTML(client) {
                     <i class="fa-solid fa-sitemap" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No departments added yet.</p>
                     <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                        ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                         <button class="btn btn-outline-primary btn-sm" data-action="addDepartment" data-id="${client.id}">Add Manually</button>
                         <button class="btn btn-outline-secondary btn-sm" data-action="bulkUploadDepartments" data-id="${client.id}">Bulk Upload</button>
                         ` : ''}
@@ -790,7 +790,7 @@ function getClientGoodsServicesHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-boxes-stacked" style="margin-right: 0.5rem; color: #f59e0b;"></i>Goods & Services</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Products and services offered by the organization</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+            ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-secondary" data-action="addGoodsService" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -819,7 +819,7 @@ function getClientGoodsServicesHTML(client) {
                                 <td><span class="badge" style="background: #fef3c7; color: #d97706;">${window.UTILS.escapeHtml(item.category || 'General')}</span></td>
                                 <td style="font-size: 0.9rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(item.description || '-')}</td>
                                 <td>
-                                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                                    ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                                     <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
                                     <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
@@ -850,7 +850,7 @@ function getClientKeyProcessesHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-diagram-project" style="margin-right: 0.5rem; color: #06b6d4;"></i>Key Processes</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Core business processes for audit planning</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+            ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-secondary" data-action="addKeyProcess" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -879,7 +879,7 @@ function getClientKeyProcessesHTML(client) {
                                 <td><span class="badge" style="background: ${proc.category === 'Core' ? '#d1fae5' : '#e0f2fe'}; color: ${proc.category === 'Core' ? '#065f46' : '#0369a1'};">${window.UTILS.escapeHtml(proc.category || 'Support')}</span></td>
                                 <td>${window.UTILS.escapeHtml(proc.owner || '-')}</td>
                                 <td>
-                                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                                    ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                                     <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${index}" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>
                                     <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${index}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                     ` : ''}
@@ -910,7 +910,7 @@ function getClientDesignationsHTML(client) {
                 <h3 style="margin: 0;"><i class="fa-solid fa-id-badge" style="margin-right: 0.5rem; color: #84cc16;"></i>Designations</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0 0;">Job titles and roles within the organization</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+            ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-sm btn-secondary" data-action="addClientDesignation" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i> Add
@@ -928,7 +928,7 @@ function getClientDesignationsHTML(client) {
                         <i class="fa-solid fa-user-tie" style="color: #16a34a;"></i>
                         <span style="font-weight: 500;">${window.UTILS.escapeHtml(des.title)}</span>
                         ${des.department ? `<span style="font-size: 0.8rem; color: var(--text-secondary);">(${window.UTILS.escapeHtml(des.department)})</span>` : ''}
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin' || window.state.currentUser.role === 'Lead Auditor') ? `
+                        ${(window.AuthManager && window.AuthManager.canPerform('edit', 'client')) ? `
                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color); padding: 0; margin-left: 0.25rem;" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${index}" aria-label="Close"><i class="fa-solid fa-times"></i></button>
                         ` : ''}
                     </div>
@@ -1180,7 +1180,7 @@ function getClientDocumentsHTML(client) {
                 <h3 style="margin: 0;">Client Documents</h3>
                 <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">System manuals, procedures, and documents provided by the client for audit preparation</p>
             </div>
-            ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+            ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}" aria-label="Upload to cloud">
                     <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 0.5rem;"></i> Add Document
                 </button>
@@ -1213,7 +1213,7 @@ function getClientDocumentsHTML(client) {
                                     <td>${window.UTILS.escapeHtml(doc.date)}</td>
                                     <td>
                                         <button class="btn btn-sm btn-icon" style="color: var(--primary-color);" data-action="viewDocumentNotes" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" title="View Notes" aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                                        ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                                         <button class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="deleteDocument" data-arg1="${client.id}" data-arg2="${window.UTILS.escapeHtml(doc.id)}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
                                         ` : ''}
                                     </td>
@@ -1228,7 +1228,7 @@ function getClientDocumentsHTML(client) {
                     <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
                     <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">No documents uploaded for this client yet.</p>
                     <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 1rem;">Upload system manuals, procedures, org charts and other documents to help prepare custom checklists.</p>
-                    ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                    ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                     <button class="btn btn-outline-primary btn-sm" data-action="openClientDocumentModal" data-id="${client.id}">Add First Document</button>
                     ` : ''}
                 </div>
@@ -1263,10 +1263,10 @@ function getClientComplianceHTML(client) {
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
                 ${['Inquiry', 'Application Received', 'Under Review', 'Contract Sent', 'Contract Signed', 'Active'].map(s => `
                     <span style="padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; 
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? 'cursor: pointer;' : ''}
+                        ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? 'cursor: pointer;' : ''}
                         background: ${appStatus === s ? statusColors[s] : '#f1f5f9'}; 
                         color: ${appStatus === s ? 'white' : '#64748b'};"
-                        ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `data-action="updateClientApplicationStatus" data-arg1="${client.id}" data-arg2="${s}"` : ''}>
+                        ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `data-action="updateClientApplicationStatus" data-arg1="${client.id}" data-arg2="${s}"` : ''}>
                         ${s}
                     </span>
                 `).join('')}
@@ -1294,7 +1294,7 @@ function getClientComplianceHTML(client) {
                         </p>
                     </div>
                 `}
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-sm btn-secondary" data-action="editClientContract" data-id="${client.id}" aria-label="Edit">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${contract.signed ? 'Update Contract' : 'Add Contract Details'}
                 </button>
@@ -1320,7 +1320,7 @@ function getClientComplianceHTML(client) {
                         </p>
                     </div>
                 `}
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-sm btn-secondary" data-action="editClientNDA" data-id="${client.id}" aria-label="Edit">
                     <i class="fa-solid fa-edit" style="margin-right: 0.25rem;"></i>${nda.signed ? 'Update NDA' : 'Record NDA Signature'}
                 </button>
@@ -1335,7 +1335,7 @@ function getClientComplianceHTML(client) {
                     <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
                     Client Changes Log (ISO 9.6)
                 </h4>
-                ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
+                ${(window.AuthManager && window.AuthManager.canPerform('create', 'client')) ? `
                 <button class="btn btn-sm btn-secondary" data-action="addClientChangeLog" data-id="${client.id}" aria-label="Add">
                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>Log Change
                 </button>
@@ -2515,7 +2515,7 @@ window.handleIndustryChange = function (select) {
 
     // Edit Site Modal
     window.editSite = function (clientId, siteIndex) {
-        if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
+        if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) return;
         const client = window.state.clients.find(c => String(c.id) === String(clientId));
         if (!client || !client.sites || !client.sites[siteIndex]) return;
 
@@ -2619,7 +2619,7 @@ window.handleIndustryChange = function (select) {
 
     // Delete Site
     window.deleteSite = function (clientId, siteIndex) {
-        if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
+        if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) return;
         const client = window.state.clients.find(c => String(c.id) === String(clientId));
         if (!client || !client.sites) return;
 
@@ -3738,7 +3738,7 @@ CFO," style="font-family: monospace;"></textarea>
 
     function editCompanyProfile(clientId) {
         // RBAC Check
-        if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+        if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) {
             window.showNotification('Access Denied', 'error');
             return;
         }
@@ -3802,7 +3802,7 @@ CFO," style="font-family: monospace;"></textarea>
     // Upload Company Profile Document
     window.uploadCompanyProfileDoc = async function (clientId, file) {
         // RBAC Check
-        if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+        if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) {
             window.showNotification('Access Denied', 'error');
             return;
         }
@@ -5047,7 +5047,7 @@ CFO," style="font-family: monospace;"></textarea>
 
     window.processAccountSetupImport = function (clientId, input) {
         // RBAC Check
-        if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') {
+        if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) {
             window.showNotification('Access Denied: Only Certification Managers or Admins can perform this action.', 'error');
             return;
         }

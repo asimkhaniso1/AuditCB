@@ -362,7 +362,7 @@ window.getClientProfileHTML = function (client) {
 function _esc(v) { return (v || '-').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
 window.getClientSitesHTML = function (client) {
-    const isAdmin = window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin';
+    const isAdmin = window.AuthManager && window.AuthManager.canPerform('edit', 'client');
     const sites = client.sites || [];
     return `
     <div class="org-table-wrapper" style="margin-top: 1.5rem;">
@@ -1088,7 +1088,7 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
 // 9. EDIT SITE FUNCTION
 // ============================================
 window.editSite = function (clientId, siteIndex) {
-    if (window.state.currentUser.role !== 'Certification Manager' && window.state.currentUser.role !== 'Admin') return;
+    if (!window.AuthManager || !window.AuthManager.canPerform('edit', 'client')) return;
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (!client || !client.sites || !client.sites[siteIndex]) return;
     const site = client.sites[siteIndex];

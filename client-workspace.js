@@ -115,7 +115,7 @@ function populateClientSidebar() {
     // Hide "Add Client" button for Auditors and Lead Auditors
     const addClientBtn = document.querySelector('.client-sidebar-footer button');
     if (addClientBtn && currentUser) {
-        const canAddClients = currentUser.role === 'Admin' || currentUser.role === 'Certification Manager';
+        const canAddClients = window.AuthManager ? window.AuthManager.canPerform('create', 'client') : (currentUser.role === 'Admin' || currentUser.role === 'Certification Manager');
         addClientBtn.style.display = canAddClients ? '' : 'none';
     }
 }

@@ -421,6 +421,26 @@ function handleRouteChange() {
     const hash = window.location.hash.substring(1); // Remove #
     const [baseHash, queryString] = hash.split('?');
 
+    // Permission guard: check module access before rendering
+    const AM = window.AuthManager;
+    if (AM && AM.hasModuleAccess && baseHash && baseHash !== 'dashboard' && !baseHash.startsWith('client/')) {
+        const modulePermMap = {
+            'clients': 'clients', 'auditors': 'auditors',
+            'checklists': 'audits', 'knowledge-base': 'audits',
+            'certificates': 'certs', 'settings': 'settings',
+            'appeals-complaints': 'settings', 'impartiality': 'settings',
+            'management-review': 'settings'
+        };
+        const permKey = modulePermMap[baseHash];
+        if (permKey && AM.hasModuleAccess(permKey) === 'none') {
+            window.showNotification('You do not have permission to access this module', 'error');
+            window.location.hash = '';
+            renderModule('dashboard', false);
+            updateActiveNavItem('dashboard');
+            return;
+        }
+    }
+
     // Check if we are leaving a client workspace
     if (!baseHash.startsWith('client/') && window.state && window.state.activeClientId) {
         if (typeof window.backToDashboard === 'function') {
@@ -1298,23 +1318,45 @@ window.switchUserRole = function (role) {
     handleRouteChange();
 };
 
-// Update navigation items visibility based on user role
+// Update navigation items visibility based on user role using state.rolePermissions
 function updateNavigationForRole(role) {
-    const auditorRoles = ['Auditor', 'Lead Auditor'];
-    const isAuditor = auditorRoles.includes(role);
-
-    // Hide Settings for Auditors
-    const settingsNav = document.querySelector('li[data-module="settings"]');
-    if (settingsNav) {
-        settingsNav.style.display = isAuditor ? 'none' : '';
+    const AM = window.AuthManager;
+    if (!AM || !AM.hasModuleAccess) {
+        // Fallback to basic check if AuthManager not loaded yet
+        const isAuditor = ['Auditor', 'Lead Auditor'].includes(role);
+        const settingsNav = document.querySelector('li[data-module="settings"]');
+        if (settingsNav) settingsNav.style.display = isAuditor ? 'none' : '';
+        return;
     }
 
-    // Hide Governance group for Auditors (optional but good for cleaner UX)
+    // Map sidebar data-module attributes to rolePermissions keys
+    const moduleMap = {
+        'dashboard': 'dashboard',
+        'clients': 'clients',
+        'auditors': 'auditors',
+        'checklists': 'audits',
+        'knowledge-base': 'audits',
+        'certificates': 'certs',
+        'settings': 'settings'
+    };
+
+    // Apply visibility to each nav item
+    Object.entries(moduleMap).forEach(([dataModule, permKey]) => {
+        const navItem = document.querySelector(`li[data-module="${dataModule}"]`);
+        if (navItem) {
+            const level = AM.hasModuleAccess(permKey);
+            navItem.style.display = (level === 'none') ? 'none' : '';
+        }
+    });
+
+    // Governance group: show if settings access is not 'none'
     const governanceHeader = document.querySelector('.nav-group-header');
     const governanceContent = governanceHeader?.nextElementSibling;
     if (governanceHeader && governanceContent) {
-        governanceHeader.style.display = isAuditor ? 'none' : '';
-        governanceContent.style.display = isAuditor ? 'none' : '';
+        const settingsLevel = AM.hasModuleAccess('settings');
+        const hide = settingsLevel === 'none';
+        governanceHeader.style.display = hide ? 'none' : '';
+        governanceContent.style.display = hide ? 'none' : '';
     }
 }
 window.updateNavigationForRole = updateNavigationForRole;
