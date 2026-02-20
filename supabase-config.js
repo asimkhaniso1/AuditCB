@@ -243,7 +243,7 @@ const SupabaseConfig = {
                     <strong>Source:</strong> ${status.source}
                 </div>
 
-                <form id="supabase-config-form" onsubmit="return SupabaseConfig.handleSave(event)">
+                <form id="supabase-config-form">
                     <div class="form-group">
                         <label>Supabase URL</label>
                         <input type="url" id="supabase-url" class="form-control" 
@@ -261,14 +261,14 @@ const SupabaseConfig = {
                     </div>
 
                     <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                        <button type="button" onclick="SupabaseConfig.handleTest()" class="btn btn-secondary">
+                        <button type="button" data-action="SupabaseConfig_handleTest" class="btn btn-secondary">
                             <i class="fa-solid fa-plug"></i> Test Connection
                         </button>
                         <button type="submit" class="btn btn-primary">
                             <i class="fa-solid fa-save"></i> Save Configuration
                         </button>
                         ${status.configured ? `
-                            <button type="button" onclick="SupabaseConfig.handleClear()" class="btn btn-danger">
+                            <button type="button" data-action="SupabaseConfig_handleClear" class="btn btn-danger">
                                 <i class="fa-solid fa-trash"></i> Clear
                             </button>
                         ` : ''}
@@ -294,6 +294,14 @@ const SupabaseConfig = {
             if (contentArea) {
                 SafeDOM.setHTML(contentArea, html);
             }
+        }
+
+        // Attach submit handler (CSP-safe — no inline onsubmit)
+        var configForm = document.getElementById('supabase-config-form');
+        if (configForm) {
+            configForm.addEventListener('submit', function (e) {
+                return SupabaseConfig.handleSave(e);
+            });
         }
     },
 

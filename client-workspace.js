@@ -496,7 +496,7 @@ function renderClientOverview(client) {
                 <button class="btn btn-outline-primary" data-hash="client/${client.id}/plans">
                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>View Audit Plans
                 </button>
-                <button class="btn btn-primary" onclick="window.renderCreateAuditPlanForm('${window.UTILS.escapeHtml(client.name).replace(/'/g, "\\'")}')">
+                <button class="btn btn-primary" data-action="renderCreateAuditPlanForm" data-id="${window.UTILS.escapeHtml(client.name)}">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>New Audit Plan
                 </button>
                 <button class="btn btn-outline-primary" data-hash="client/${client.id}/execution">
@@ -530,7 +530,7 @@ function renderClientOverview(client) {
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${clientPlans.length}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Total Audits</p>
                 </div>
-                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" onclick="window.location.hash = 'client/${client.id}/account-setup'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\'scopes\']')?.click(), 300);">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981; cursor: pointer;" data-action="hashThenClickTab" data-hash="client/${client.id}/account-setup" data-arg1="scopes">
                     <i class="fa-solid fa-certificate" style="font-size: 1.25rem; color: #10b981; margin-bottom: 0.5rem;"></i>
                     <p style="font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0;">${validCerts}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Valid Certs</p>
@@ -833,7 +833,7 @@ function renderCertificationCycleWidget(client) {
                             <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">No certification cycle started yet</p>
                         </div>
                     </div>
-                    <button class="btn btn-primary" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);" style="white-space: nowrap;">
+                    <button class="btn btn-primary" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" style="white-space: nowrap;">
                         <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Set Up Cycle
                     </button>
                 </div>
@@ -963,7 +963,7 @@ function renderAuditCycleTimeline(client) {
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
                     Go to Settings → Certification Scopes & History to set the Initial Date.
                 </p>
-                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);">
+                <button class="btn btn-primary" style="margin-top: 1rem;" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes">
                     <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Go to Settings
                 </button>
             </div>
@@ -1001,7 +1001,7 @@ function renderAuditCycleTimeline(client) {
             <!-- Quick Link to Settings -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0;"><i class="fa-solid fa-timeline" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Certification Cycle</h3>
-                <button class="btn btn-sm btn-outline-primary" onclick="window.location.hash = 'client/${client.id}/settings'; setTimeout(() => document.querySelector('.tab-btn[data-tab=\\'scopes\\']')?.click(), 100);" title="Edit certification dates in Settings">
+                <button class="btn btn-sm btn-outline-primary" data-action="hashThenClickTab" data-hash="client/${client.id}/settings" data-arg1="scopes" title="Edit certification dates in Settings">
                     <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Edit Dates
                 </button>
             </div>
@@ -1292,13 +1292,13 @@ function renderClientExecution(client) {
                                     </td>
                                     <td>${r.recommendation || '-'}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-icon" onclick="window.renderExecutionDetail && window.renderExecutionDetail('${r.id}')" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;">
+                                        <button class="btn btn-sm btn-icon" data-action="renderExecutionDetail" data-id="${r.id}" title="View Report" style="color: var(--primary-color); margin-right: 0.5rem;">
                                             <i class="fa-solid fa-eye"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" onclick="window.openEditReportModal && window.openEditReportModal('${r.id}')" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;">
+                                        <button class="btn btn-sm btn-icon" data-action="openEditReportModal" data-id="${r.id}" title="Edit Report" style="color: #f59e0b; margin-right: 0.5rem;">
                                             <i class="fa-solid fa-edit"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-icon" onclick="window.deleteAuditReport && window.deleteAuditReport('${r.id}')" title="Delete Report" style="color: var(--danger-color);">
+                                        <button class="btn btn-sm btn-icon" data-action="deleteAuditReport" data-id="${r.id}" title="Delete Report" style="color: var(--danger-color);">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>

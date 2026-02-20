@@ -303,12 +303,12 @@ function renderDashboardEnhanced() {
                         <span style="font-size: 0.85rem;">Clients</span>
                     </button>
                     <!-- 2. Plan Audit -->
-                    <button class="btn" onclick="window.renderModule('audit-planning')" style="background: white; color: #667eea; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
+                    <button class="btn" data-action="renderModule" data-id="audit-planning" style="background: white; color: #667eea; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
                         <i class="fa-solid fa-clipboard-list" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                         <span style="font-size: 0.85rem;">Plan Audit</span>
                     </button>
                     <!-- 3. Execute & Report (Unified) -->
-                    <button class="btn" onclick="window.renderModule('audit-execution')" style="background: white; color: #f5576c; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
+                    <button class="btn" data-action="renderModule" data-id="audit-execution" style="background: white; color: #f5576c; border: none; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
                         <i class="fa-solid fa-play-circle" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                         <span style="font-size: 0.85rem;">Execute & Report</span>
                     </button>

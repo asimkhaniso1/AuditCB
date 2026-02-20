@@ -229,7 +229,7 @@
                 <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-keyboard" style="color: var(--primary-color);"></i> Keyboard Shortcuts
                 </h3>
-                <button onclick="this.closest('#shortcut-help-overlay').remove()" style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-secondary);">✕</button>
+                <button data-action="removeElement" data-id="shortcut-help-overlay" style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-secondary);">✕</button>
             </div>
             ${shortcutRows}
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; margin-top: 4px;">

@@ -187,7 +187,7 @@ function renderAuditorForm(auditorId = null) {
                                     <span>${skill}</span>
                                     <span id="skill-val-${skill.toLowerCase()}" style="color: var(--primary-color); font-weight: 600;">${soft(skill.toLowerCase()) === 'excellent' ? '5/5' : soft(skill.toLowerCase()) === 'good' ? '4/5' : '3/5'}</span>
                                 </label>
-                                <select class="form-control" id="skill-${skill.toLowerCase()}" onchange="document.getElementById('skill-val-${skill.toLowerCase()}').textContent = (this.value === 'excellent' ? '5/5' : this.value === 'good' ? '4/5' : '3/5')">
+                                <select class="form-control" id="skill-${skill.toLowerCase()}" data-action-change="updateSkillValue">
                                     <option value="excellent" ${soft(skill.toLowerCase()) === 'excellent' ? 'selected' : ''}>Excellent / Lead Level</option>
                                     <option value="good" ${soft(skill.toLowerCase()) === 'good' ? 'selected' : ''}>Good / Proficient</option>
                                     <option value="fair" ${soft(skill.toLowerCase()) === 'fair' ? 'selected' : ''}>Fair / Developing</option>

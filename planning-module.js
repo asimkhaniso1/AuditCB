@@ -1448,11 +1448,11 @@ window.renderConfigureChecklist = async function (planId) {
                                     <div style="display: flex; align-items: center; gap: 1rem;">
                                         <input type="checkbox" class="checklist-select-cb" data-id="${cl.id}" ${isMainSelected ? 'checked' : ''} style="width: 20px; height: 20px; cursor: pointer;">
                                         <div>
-                                            <h4 style="margin: 0; cursor: pointer;" onclick="this.closest('.card').querySelector('.items-list').classList.toggle('hidden')">${cl.name}</h4>
+                                            <h4 style="margin: 0; cursor: pointer;" data-action="toggleCardItems">${cl.name}</h4>
                                             <small style="color: var(--text-secondary);">${items.length} items • ${cl.standard || 'General'}</small>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="this.closest('.card').querySelector('.items-list').classList.toggle('hidden')">
+                                    <button class="btn btn-sm btn-outline-secondary" data-action="toggleCardItems">
                                         <i class="fa-solid fa-chevron-down"></i> Expand / Edit
                                     </button>
                                 </div>
@@ -1794,7 +1794,7 @@ window.reviewMergedQuestions = function (planId) {
             if (clientDocs.length === 0) return '';
             return `
                 <div class="card" style="margin-bottom: 1.5rem; border: 1px solid #c7d2fe; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="(function(el){ var body = el.closest('.card').querySelector('.client-docs-body'); var arrow = el.querySelector('.doc-arrow'); if(body.style.display === 'none') { body.style.display = 'block'; arrow.style.transform = 'rotate(0)'; } else { body.style.display = 'none'; arrow.style.transform = 'rotate(-90deg)'; } })(this)">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" data-action="toggleClientDocsBody">
                         <div>
                             <h4 style="margin: 0; color: #4338ca;"><i class="fa-solid fa-folder-open" style="margin-right: 0.5rem;"></i>Client Documents (${clientDocs.length})</h4>
                             <p style="margin: 0.25rem 0 0 0; color: #6366f1; font-size: 0.82rem;">Reference materials provided by ${window.UTILS.escapeHtml(clientForPlan.name)}</p>
@@ -1934,7 +1934,7 @@ function addAgendaRow(data = {}) {
             </select>
         </td>
         <td style="text-align: center;">
-            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger-color);" data-action="removeClosestTR"><i class="fa-solid fa-trash"></i></button>
         </td>
     `;
 

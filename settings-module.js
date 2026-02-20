@@ -143,7 +143,7 @@ function renderSettings() {
             <div class="card" style="margin-bottom: 2rem;">
                 <!-- Main Tabs (4 categories) -->
                 <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 0; padding-bottom: 0;">
-                    <button class="tab-btn ${window.state.settingsMainTab === 'cb-profile' ? 'active' : ''}" onclick="switchSettingsMainTab('cb-profile', this)">
+                    <button class="tab-btn ${window.state.settingsMainTab === 'cb-profile' ? 'active' : ''}" data-action="switchSettingsMainTab" data-id="cb-profile">
                         <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>CB Profile
                     </button>
                     <button class="tab-btn ${window.state.settingsMainTab === 'organization' ? 'active' : ''}" data-action="switchSettingsMainTab" data-arg1="organization" data-arg2="this">
@@ -1156,7 +1156,7 @@ window.openAddUserModal = function (userId = null) {
                 <label>Temporary Password <span style="color: var(--danger-color);">*</span></label>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <input type="text" class="form-control" id="user-password" value="${window.PasswordUtils?.generateSecurePassword() || crypto.getRandomValues(new Uint32Array(4)).reduce((s, v) => s + v.toString(36), '').substring(0, 16) + '!A1'}" readonly style="background: #f8fafc; font-family: monospace;">
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('user-password').value = window.PasswordUtils.generateSecurePassword()" title="Generate new password">
+                    <button type="button" class="btn btn-secondary" data-action="generatePassword" data-id="user-password" title="Generate new password">
                         <i class="fa-solid fa-rotate"></i>
                     </button>
                 </div>
@@ -1167,7 +1167,7 @@ window.openAddUserModal = function (userId = null) {
                 <label>Reset Password</label>
                 <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
                     <input type="password" class="form-control" id="user-new-password" placeholder="Leave blank to keep current password">
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('user-new-password').type = document.getElementById('user-new-password').type === 'password' ? 'text' : 'password'">
+                    <button type="button" class="btn btn-secondary" data-action="togglePasswordVisibility" data-id="user-new-password">
                         <i class="fa-solid fa-eye"></i>
                     </button>
                 </div>
@@ -5266,11 +5266,11 @@ function getActivityLogHTML() {
                     Activity Log
                 </h3>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="window.AuditTrail?.exportCSV()">
+                    <button class="btn btn-outline-secondary btn-sm" data-action="AuditTrail_exportCSV">
                         <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Export CSV
                     </button>
                     ${window.state.currentUser?.role === 'Admin' ? `
-                    <button class="btn btn-outline-danger btn-sm" onclick="if(confirm('Clear all activity logs?')) { window.AuditTrail?.clear(); window.switchSettingsSubTab('system', 'activity-log'); }">
+                    <button class="btn btn-outline-danger btn-sm" data-action="clearActivityLogs">
                         <i class="fa-solid fa-trash" style="margin-right: 0.25rem;"></i>Clear Logs
                     </button>
                     ` : ''}
@@ -5383,7 +5383,7 @@ function getUsageAnalyticsHTML() {
                     API Usage Analytics
                 </h3>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="window.APIUsageTracker.exportData()">
+                    <button class="btn btn-outline-secondary btn-sm" data-action="APIUsageTracker_exportData">
                         <i class="fa-solid fa-download" style="margin-right: 0.25rem;"></i>Export
                     </button>
                     <button class="btn btn-outline-danger btn-sm" data-action="resetUsageData">

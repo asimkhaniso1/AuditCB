@@ -969,7 +969,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </div>
                                 ${saved._originalComment ? `
                                 <div style="margin-top: 4px;">
-                                    <button type="button" onclick="var el=document.getElementById('orig-note-${uniqueId}');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('span').textContent=el.style.display==='none'?'View Original Notes':'Hide Original Notes'" style="font-size:0.7rem;color:#8b5cf6;background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">
+                                    <button type="button" data-action="toggleOrigNotes" data-id="${uniqueId}" style="font-size:0.7rem;color:#8b5cf6;background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">
                                         <i class="fa-solid fa-clock-rotate-left" style="font-size:0.65rem;"></i> <span>View Original Notes</span>
                                     </button>
                                     <div id="orig-note-${uniqueId}" style="display:none;margin-top:4px;padding:6px 10px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:0.78rem;color:#92400e;line-height:1.4;">
@@ -1011,7 +1011,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             const safeSrc = displaySrc.replace(/'/g, "\\'");
                             return `
                                          <div class="ev-thumb" data-idx="${imgIdx}" data-save-url="${window.UTILS.escapeHtml(src)}" style="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;">
-                                             <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" onclick="window.viewEvidenceImageByUrl(this.src || '${safeSrc}')"/>
+                                             <img src="${displaySrc}" data-idb-key="${isIdb ? window.UTILS.escapeHtml(src) : ''}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;${isIdb ? ' background: #e2e8f0;' : ''}" data-action="viewEvidenceImageByUrlSelf" data-id="${safeSrc}"/>
                                              <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${imgIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>
                                          </div>
                                      `;
@@ -1040,7 +1040,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                              <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
 
                                          </select>
-                                         <button type="button" class="btn btn-sm btn-info" onclick="const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'" title="View Classification Matrix (ISO 17021-1)">
+                                         <button type="button" class="btn btn-sm btn-info" data-action="toggleDisplay" data-id="criteria-${uniqueId}" title="View Classification Matrix (ISO 17021-1)">
                                             <i class="fa-solid fa-scale-balanced"></i>
                                          </button>
                                      </div>
@@ -1052,7 +1052,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                         <div style="margin-top:5px; border-left: 3px solid var(--warning-color); padding-left: 5px; background: #fffaf0;">
                                             <strong>Minor:</strong> ${window.CONSTANTS.NCR_CRITERIA.MINOR.description}
                                         </div>
-                                        <div style="text-align: right; margin-top: 5px;"><small style="color: blue; cursor: pointer;" onclick="this.parentElement.parentElement.style.display='none'">Close</small></div>
+                                        <div style="text-align: right; margin-top: 5px;"><small style="color: blue; cursor: pointer;" data-action="hideGrandparent">Close</small></div>
                                      </div>
                                  </div>
                                  </div>
@@ -1062,7 +1062,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.5rem;">
                                  <div>
                                      <label style="font-size: 0.8rem;">Personnel Name</label>
-                                     <select id="ncr-personnel-${uniqueId}" class="form-control form-control-sm" onchange="window._autoFillPersonnel && window._autoFillPersonnel('${uniqueId}')">
+                                     <select id="ncr-personnel-${uniqueId}" class="form-control form-control-sm" data-action-change="_autoFillPersonnel" data-id="${uniqueId}">
                                         <option value="">-- Select --</option>
                                         ${clientPersonnel.map(p => `<option value="${window.UTILS.escapeHtml(p.name)}" ${saved.personnel === p.name ? 'selected' : ''}>${window.UTILS.escapeHtml(p.name)}</option>`).join('')}
                                         ${saved.personnel && !clientPersonnel.some(p => p.name === saved.personnel) ? `<option value="${window.UTILS.escapeHtml(saved.personnel)}" selected>${window.UTILS.escapeHtml(saved.personnel)}</option>` : ''}
@@ -1227,7 +1227,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <i class="fa-solid fa-plus-circle" style="margin-right: 0.5rem;"></i> Add Question
                             </button>
                             <div style="position: relative;">
-                                <button class="btn btn-outline-secondary" onclick="document.getElementById('bulk-menu-${report.id}').classList.toggle('hidden')">
+                                <button class="btn btn-outline-secondary" data-action="toggleHidden" data-id="bulk-menu-${report.id}">
                                     <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i> Bulk Actions
                                 </button>
                                 <div id="bulk-menu-${report.id}" class="hidden" style="position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 220px; z-index: 1000;">
@@ -1744,7 +1744,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                                 <h4 style="font-size: 0.95rem; margin: 0; color: var(--text-secondary); text-transform: uppercase;">Meeting Records</h4>
-                                <button class="btn btn-sm btn-outline-primary" onclick="document.querySelector('.tab-btn[data-tab=&quot;meetings&quot;]')?.click()">
+                                <button class="btn btn-sm btn-outline-primary" data-action="clickTab" data-id="meetings">
                                     <i class="fa-solid fa-pen" style="margin-right: 0.25rem;"></i>Edit in Meetings Tab
                                 </button>
                             </div>
@@ -1767,15 +1767,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <label style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Audit Conclusion & Recommendation</label>
                                 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
                                     <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="recommendation-${report.id}" value="Recommended" ${report.recommendation === 'Recommended' ? 'checked' : ''} onchange="window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();">
+                                        <input type="radio" name="recommendation-${report.id}" value="Recommended" ${report.recommendation === 'Recommended' ? 'checked' : ''} data-action-change="setReportRecommendation" data-id="${report.id}">
                                         <span style="margin-left: 0.5rem;">Recommended for Certification</span>
                                     </label>
                                     <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="recommendation-${report.id}" value="Pending" ${report.recommendation === 'Pending' ? 'checked' : ''} onchange="window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();">
+                                        <input type="radio" name="recommendation-${report.id}" value="Pending" ${report.recommendation === 'Pending' ? 'checked' : ''} data-action-change="setReportRecommendation" data-id="${report.id}">
                                         <span style="margin-left: 0.5rem;">Recommended Pending Plan Verification</span>
                                     </label>
                                     <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="recommendation-${report.id}" value="Not Recommended" ${report.recommendation === 'Not Recommended' ? 'checked' : ''} onchange="window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();">
+                                        <input type="radio" name="recommendation-${report.id}" value="Not Recommended" ${report.recommendation === 'Not Recommended' ? 'checked' : ''} data-action-change="setReportRecommendation" data-id="${report.id}">
                                         <span style="margin-left: 0.5rem;">Not Recommended (Major NCs)</span>
                                     </label>
                                 </div>
@@ -1950,7 +1950,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <textarea id="opening-notes" class="form-control" rows="3" placeholder="Key points discussed, scope confirmed, agenda presented...">${openingMeeting.notes || ''}</textarea>
                         </div>
                         <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; overflow: hidden;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" data-action="toggleNextHidden">
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #166534; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Opening Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #166534; font-size: 0.7rem;"></i>
                             </div>
@@ -1998,7 +1998,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <textarea id="closing-response" class="form-control" rows="2" placeholder="Client's response to findings...">${closingMeeting.response || ''}</textarea>
                         </div>
                         <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; overflow: hidden;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.5rem;" data-action="toggleNextHidden">
                                 <label style="font-weight: 600; font-size: 0.85rem; color: #991b1b; margin: 0; cursor: pointer;"><i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i>Closing Meeting Agenda Points</label>
                                 <i class="fa-solid fa-chevron-down" style="color: #991b1b; font-size: 0.7rem;"></i>
                             </div>
@@ -2874,7 +2874,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Personnel Name</label>
-                    <select class="form-control" id="ncr-personnel-modal" onchange="window._autoFillPersonnel && window._autoFillPersonnel('modal')">
+                    <select class="form-control" id="ncr-personnel-modal" data-action-change="_autoFillPersonnel" data-id="modal">
                         <option value="">-- Select --</option>
                         ${((state.clients || []).find(c => c.name === report.client)?.contacts || []).map(c => `<option value="${window.UTILS.escapeHtml(c.name)}">${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                     </select>
@@ -3088,7 +3088,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <div class="form-group" style="margin-bottom: 0;">
                 <label>Personnel Name</label>
-                <select class="form-control" id="ncr-personnel-modal" onchange="window._autoFillPersonnel && window._autoFillPersonnel('modal')">
+                <select class="form-control" id="ncr-personnel-modal" data-action-change="_autoFillPersonnel" data-id="modal">
                     <option value="">-- Select --</option>
                     ${((state.clients || []).find(c => c.name === report.client)?.contacts || []).map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${ncr.personnel === c.name ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
                     ${ncr.personnel && !((state.clients || []).find(c => c.name === report.client)?.contacts || []).some(c => c.name === ncr.personnel) ? `<option value="${window.UTILS.escapeHtml(ncr.personnel)}" selected>${window.UTILS.escapeHtml(ncr.personnel)}</option>` : ''}
@@ -3655,7 +3655,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         overlay.innerHTML = `
         <div style="position: relative; max-width: 90%; max-height: 90%;">
             <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
-            <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
+            <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
@@ -3678,14 +3678,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
         overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
         overlay.innerHTML = `
-            <div style="position: relative; max-width: 90%; max-height: 80vh;" onclick="event.stopPropagation();">
+            <div style="position: relative; max-width: 90%; max-height: 80vh;" data-action="stopProp">
                 <img id="ev-gallery-main" src="${srcs[0]}" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
-                <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
+                <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
-            ${srcs.length > 1 ? `<div style="display: flex; gap: 8px; margin-top: 12px;" onclick="event.stopPropagation();">
-                ${srcs.map((s, i) => `<img src="${s}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid ${i === 0 ? 'white' : 'transparent'}; opacity: ${i === 0 ? '1' : '0.6'};" onclick="document.getElementById('ev-gallery-main').src='${s.replace(/'/g, "\\'")}'; this.parentElement.querySelectorAll('img').forEach(t=>{t.style.border='2px solid transparent';t.style.opacity='0.6';}); this.style.border='2px solid white'; this.style.opacity='1';">`).join('')}
+            ${srcs.length > 1 ? `<div style="display: flex; gap: 8px; margin-top: 12px;" data-action="stopProp">
+                ${srcs.map((s, i) => `<img src="${s}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid ${i === 0 ? 'white' : 'transparent'}; opacity: ${i === 0 ? '1' : '0.6'};" data-action="setGalleryMainSrc"\\'")}'; this.parentElement.querySelectorAll('img').forEach(t=>{t.style.border='2px solid transparent';t.style.opacity='0.6';}); this.style.border='2px solid white'; this.style.opacity='1';">`).join('')}
             </div>` : ''}
             <p style="color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 8px;">${srcs.length} photo${srcs.length > 1 ? 's' : ''} \u2022 Click outside to close</p>
         `;
@@ -3972,8 +3972,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <span style="font-size:0.78rem;color:#64748b;font-weight:600;margin-right:4px;">INCLUDE:</span>
                 ${sections.map(s => pill(s)).join('')}
                 <div style="flex:1;"></div>
-                <button onclick="document.querySelectorAll('.rp-sec-body').forEach(b=>b.classList.remove('collapsed'))" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Expand All</button>
-                <button onclick="document.querySelectorAll('.rp-sec-body').forEach(b=>b.classList.add('collapsed'))" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Collapse All</button>
+                <button data-action="expandAllSections" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Expand All</button>
+                <button data-action="collapseAllSections" style="padding:4px 10px;font-size:0.75rem;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;">Collapse All</button>
             </div>
             <div class="rp-content">
                 <!-- COVER PAGE -->
@@ -4050,7 +4050,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <!-- Report Sections -->
                 <!-- 1: Audit Info -->
                 <div class="rp-sec" id="sec-audit-info">
-                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">1</span>AUDIT INFORMATION<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">1</span>AUDIT INFORMATION<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <table style="width:100%;font-size:0.86rem;border-collapse:collapse;">
                             <tr><td style="padding:7px 12px;width:35%;color:#64748b;font-weight:600;">Client</td><td style="padding:7px 12px;">${d.report.client}</td></tr>
@@ -4077,7 +4077,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
                 <!-- 2: Exec Summary -->
                 <div class="rp-sec" id="sec-summary">
-                    <div class="rp-sec-hdr" style="border-left-color:#059669;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>EXECUTIVE SUMMARY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#059669;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>EXECUTIVE SUMMARY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div id="rp-exec-summary" class="rp-edit" contenteditable="true">${d.report.executiveSummary || '<em style="color:#94a3b8;">Click to add executive summary...</em>'}</div>
                         
@@ -4208,7 +4208,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
                 <!-- 3: Analytics & Insights -->
                 <div class="rp-sec" id="sec-charts">
-                    <div class="rp-sec-hdr" style="border-left-color:#7c3aed;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">3</span>ANALYTICS & INSIGHTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#7c3aed;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">3</span>ANALYTICS & INSIGHTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <!-- KPI Metrics Dashboard -->
                         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:2rem;">
@@ -4629,7 +4629,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
                 <!-- 4: Conformance Verification -->
                 <div class="rp-sec" id="sec-conformance">
-                    <div class="rp-sec-hdr" style="border-left-color:#10b981;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">4</span>CONFORMANCE VERIFICATION (${d.stats.conformCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#10b981;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">4</span>CONFORMANCE VERIFICATION (${d.stats.conformCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f0fdf4;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Status</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
@@ -4640,7 +4640,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <!-- 5: Observations -->
                 ${obsOnlyRows ? `
                 <div class="rp-sec" id="sec-obs">
-                    <div class="rp-sec-hdr" style="border-left-color:#7c3aed;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">5</span>OBSERVATIONS (${d.stats.observationCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#7c3aed;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">5</span>OBSERVATIONS (${d.stats.observationCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f5f3ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:40%;">Details</th></tr></thead>
@@ -4651,7 +4651,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <!-- 6: OFI -->
                 ${ofiOnlyRows ? `
                 <div class="rp-sec" id="sec-ofi">
-                    <div class="rp-sec-hdr" style="border-left-color:#06b6d4;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">6</span>OPPORTUNITIES FOR IMPROVEMENT (${d.stats.ofiCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#06b6d4;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">6</span>OPPORTUNITIES FOR IMPROVEMENT (${d.stats.ofiCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#ecfeff;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:40%;">Recommendation</th></tr></thead>
@@ -4661,7 +4661,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>` : ''}
                 <!-- 7: Findings -->
                 <div class="rp-sec" id="sec-findings">
-                    <div class="rp-sec-hdr" style="border-left-color:#dc2626;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.majorNC + d.stats.minorNC})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#dc2626;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.majorNC + d.stats.minorNC})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
@@ -4672,19 +4672,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 ${(d.report.ncrs || []).length > 0 ? `
                 <!-- 7: NCRs -->
                 <div class="rp-sec" id="sec-ncrs">
-                    <div class="rp-sec-hdr" style="border-left-color:#ea580c;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#ea580c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.85rem;"><strong>' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.8rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
                 </div>` : ''}
                 <!-- 8: Meetings -->
                 <div class="rp-sec" id="sec-meetings">
-                    <div class="rp-sec-hdr" style="border-left-color:#0891b2;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CLOSING MEETING<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#0891b2;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CLOSING MEETING<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
                     </div>
                 </div>
                 <!-- 7: Conclusion -->
                 <div class="rp-sec" id="sec-conclusion">
-                    <div class="rp-sec-hdr" style="border-left-color:#4338ca;" onclick="this.nextElementSibling.classList.toggle('collapsed')"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">10</span>AUDIT CONCLUSION<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#4338ca;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">10</span>AUDIT CONCLUSION<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div style="margin-bottom:10px;"><strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;${d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;'}">${d.report.recommendation || 'Pending'}</span></div>
                         <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || 'Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. Click to edit this conclusion.'}</div>
@@ -5199,7 +5199,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const renderEvThumbs = (item) => {
                     const imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
                     if (!imgs.length) return '';
-                    return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs.map(src => '<img src="' + src + '" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" onclick="window.open(this.src,\'_blank\')">').join('') + '</div>';
+                    return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs.map(src => '<img src="' + src + '" style="width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="openImageInNewTab">').join('') + '</div>';
                 };
                 const conformItems = d.hydratedProgress.filter(i => i.status === 'conform');
                 conformSec.innerHTML = conformItems.map((item, idx) => {

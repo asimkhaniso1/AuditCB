@@ -75,10 +75,10 @@ function renderCertificationModule() {
 
             <!-- Tabs -->
             <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-                <button class="tab-btn active" onclick="switchCertTab(this, 'active-certs')">Active Certificates (${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).length})</button>
-                <button class="tab-btn" onclick="switchCertTab(this, 'pending-certs')">Pending Decisions (${pendingDecisions.length})</button>
-                <button class="tab-btn" onclick="switchCertTab(this, 'suspended-certs')">Suspended/Withdrawn</button>
-                <button class="tab-btn" onclick="switchCertTab(this, 'public-directory')"><i class="fa-solid fa-globe" style="margin-right: 0.5rem;"></i>Public Directory</button>
+                <button class="tab-btn active" data-action="switchCertTab" data-id="active-certs">Active Certificates (${certs.filter(c => c.status === window.CONSTANTS.CERT_STATUS.VALID).length})</button>
+                <button class="tab-btn" data-action="switchCertTab" data-id="pending-certs">Pending Decisions (${pendingDecisions.length})</button>
+                <button class="tab-btn" data-action="switchCertTab" data-id="suspended-certs">Suspended/Withdrawn</button>
+                <button class="tab-btn" data-action="switchCertTab" data-id="public-directory"><i class="fa-solid fa-globe" style="margin-right: 0.5rem;"></i>Public Directory</button>
             </div>
 
             <!-- Tab Content: Active Certificates -->
@@ -1088,7 +1088,7 @@ window.generateEmbedCode = function () {
     document.getElementById('modal-body').innerHTML = `
         <p style="margin-bottom: 1rem; color: var(--text-secondary);">Copy the HTML code below and paste it into your website:</p>
         <textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 0.85rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 4px;">${embedHTML}</textarea>
-        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(\`${embedHTML.replace(/`/g, '\\`')}\`); window.showNotification('Copied to clipboard!', 'success');" style="margin-top: 1rem;">
+        <button class="btn btn-secondary" data-action="copyCertEmbed" style="margin-top: 1rem;">
             <i class="fa-solid fa-copy" style="margin-right: 0.5rem;"></i>Copy to Clipboard
         </button>
     `;

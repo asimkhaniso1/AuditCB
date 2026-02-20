@@ -278,7 +278,7 @@ const DataMigration = {
                             <p style="font-size: 0.85rem; margin-bottom: 1rem; color: #475569;">
                                 Sync your local data to the Supabase cloud database. Use this to back up your data or transition to the cloud version.
                             </p>
-                            <button class="btn btn-primary" onclick="DataMigration.migrateToSupabase()" ${DataMigration.isSyncing ? 'disabled' : ''}>
+                            <button class="btn btn-primary" data-action="DataMigration_migrateToSupabase" ${DataMigration.isSyncing ? 'disabled' : ''}>
                                 <i class="${DataMigration.isSyncing ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-cloud-arrow-up'}" style="margin-right: 0.5rem;"></i>
                                 ${DataMigration.isSyncing ? 'Syncing...' : 'Migrate to Supabase'}
                             </button>
@@ -307,11 +307,11 @@ const DataMigration = {
                                 </label>
                             </div>
 
-                            <button class="btn btn-danger" onclick="window.DataMigration.handleClearData()">
+                            <button class="btn btn-danger" data-action="DataMigration_handleClearData">
                                 <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i> Clear Local Data
                             </button>
                             
-                            <button class="btn btn-secondary" onclick="window.DataMigration.reloadFromCloud()" style="margin-left: 0.5rem;">
+                            <button class="btn btn-secondary" data-action="DataMigration_reloadFromCloud" style="margin-left: 0.5rem;">
                                 <i class="fa-solid fa-cloud-arrow-down" style="margin-right: 0.5rem;"></i> Reload from Cloud
                             </button>
                         </div>

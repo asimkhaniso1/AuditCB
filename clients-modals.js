@@ -16,7 +16,7 @@ const ClientModals = {
             <div class="modal" style="max-width: 600px;">
                 <div class="modal-header">
                     <h3>${title}</h3>
-                    <button class="modal-close" onclick="ClientModals.closeModal()">&times;</button>
+                    <button class="modal-close" data-action="ClientModals_closeModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     ${content}

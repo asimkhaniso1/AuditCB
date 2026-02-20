@@ -205,7 +205,7 @@ const NotificationManager = {
                 <div style="padding: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; display: flex; justify-content: space-between; align-items: center;">
                     <h4 style="margin: 0; font-size: 1rem;"><i class="fa-solid fa-bell" style="margin-right: 0.5rem;"></i>Notifications</h4>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button onclick="NotificationManager.markAllAsRead()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
+                        <button data-action="NotificationManager_markAllAsRead" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
                             Mark all read
                         </button>
                         <button data-action="toggleNotificationPanel" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem;">
@@ -215,7 +215,7 @@ const NotificationManager = {
                 </div>
                 <div style="max-height: 380px; overflow-y: auto;">
                     ${notifs.length > 0 ? notifs.map(n => `
-                        <div onclick="NotificationManager.handleClick(${n.id}, '${n.link || ''}')" 
+                        <div data-action="NotificationManager_handleClick" data-arg1="${n.id}" data-arg2="'${n.link || ''}'" 
                              style="padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; background: ${n.read ? 'white' : '#f0f9ff'}; transition: background 0.2s;">
                             <div style="display: flex; gap: 0.75rem; align-items: start;">
                                 <div style="width: 32px; height: 32px; border-radius: 50%; background: ${this.getTypeColor(n.type)}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">

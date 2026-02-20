@@ -2769,15 +2769,7 @@ window.openAuditorUploadModal = function (auditorId) {
                     <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">Click to browse files</p>
                 </div>
                 <!-- Hidden file input for visual completeness -->
-                <input type="file" id="doc-file" style="display: none;" onchange="if(this.files[0]) { 
-                    if(this.files[0].size > 5242880) { 
-                        alert('File is too large! Max limit is 5MB.'); 
-                        this.value = ''; 
-                        document.getElementById('doc-name').value = '';
-                    } else {
-                        document.getElementById('doc-name').value = this.files[0].name; 
-                    }
-                }">
+                <input type="file" id="doc-file" style="display: none;" data-action-change="handleDocFileChangeAlways">
             </div>
         </form >
         `;

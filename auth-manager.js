@@ -762,7 +762,7 @@ const AuthManager = {
                             <p>Sign in to your account</p>
                         </div>
 
-                        <form id="login-form" onsubmit="return AuthManager.handleLogin(event)">
+                        <form id="login-form">
                             <div class="form-group">
                                 <label><i class="fa-solid fa-envelope" style="margin-right: 0.35rem; color: #64748b;"></i>Email</label>
                                 <input type="text" id="login-username" placeholder="you@company.com" required autofocus>
@@ -793,6 +793,14 @@ const AuthManager = {
                 </div>
             </div>
         `;
+
+        // Attach submit handler (CSP-safe — no inline onsubmit)
+        var loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function (e) {
+                return AuthManager.handleLogin(e);
+            });
+        }
     },
 
     /**

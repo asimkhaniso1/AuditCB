@@ -1,0 +1,53 @@
+﻿advanced-modules.js:2772|onchange|if(this.files[0]) { 
+auditor-form-module.js:190|onchange|document.getElementById('skill-val-${skill.toLowerCase()}').textContent = (this.value === 'excellent' ? '5/5' : this.value === 'good' ? '4/5' : '3/5')
+certifications-module.js:1091|onclick|navigator.clipboard.writeText(\`${embedHTML.replace(/`/g, '\\`')}\`); window.showNotification('Copied to clipboard!', 'success');
+checklist-module.js:786|onchange|document.getElementById('checklist-client-group').style.display = this.value === 'custom' ? 'block' : 'none'
+checklist-module.js:1240|onclick|this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.querySelector('.accordion-icon').style.transform = this.nextElementSibling.style.displ
+checklist-module.js:1257|onclick|const c=this.nextElementSibling; c.style.display=c.style.display==='none'?'block':'none'; this.querySelector('.sub-icon').style.transform=c.style.display==='none'?'rotate(0deg)':'rotate(90deg)';
+client-workspace.js:499|onclick|window.renderCreateAuditPlanForm('${window.UTILS.escapeHtml(client.name).replace(/'/g, 
+clients-module-fix.js:378|oninput|window._orgTableSearch(this, 'sites-table')
+clients-module-fix.js:390|onclick|window._orgViewItem('Site',{Name:'${_esc(s.name)}',Standards:'${_esc(s.standards)}',Address:'${_esc(s.address)}',City:'${_esc(s.city)}',Employees:'${s.employees || '-'}'})
+clients-module-fix.js:392|onclick|window._orgPrintItem('Site',{Name:'${_esc(s.name)}',Address:'${_esc(s.address)}',City:'${_esc(s.city)}'})
+clients-module-fix.js:418|oninput|window._orgTableSearch(this, 'contacts-table')
+clients-module-fix.js:428|onclick|window._orgViewItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}',Phone:'${_esc(c.phone)}'})
+clients-module-fix.js:430|onclick|window._orgPrintItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}'})
+clients-module-fix.js:452|oninput|window._orgTableSearch(this, 'depts-table')
+clients-module-fix.js:462|onclick|window._orgViewItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})
+clients-module-fix.js:464|onclick|window._orgPrintItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})
+clients-module-fix.js:486|oninput|window._orgTableSearch(this, 'goods-table')
+clients-module-fix.js:494|onclick|window._orgViewItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})
+clients-module-fix.js:496|onclick|window._orgPrintItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})
+clients-module-fix.js:517|oninput|window._orgTableSearch(this, 'proc-table')
+clients-module-fix.js:525|onclick|window._orgViewItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})
+clients-module-fix.js:527|onclick|window._orgPrintItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})
+clients-module-fix.js:549|oninput|window._orgTableSearch(this, 'desig-table')
+clients-module-fix.js:560|onclick|window._orgViewItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})
+clients-module-fix.js:562|onclick|window._orgPrintItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})
+clients-module-fix.js:1126|onclick|navigator.geolocation.getCurrentPosition(function(pos){document.getElementById(\'site-geotag\').value=pos.coords.latitude.toFixed(4)+\', \'+pos.coords.longitude.toFixed(4)})
+clients-module.js:1550|onchange|this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#25
+clients-module.js:1954|onchange|this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#25
+clients-module.js:2419|onchange|if(this.files[0]) { 
+clients-module.js:4183|onclick|window.showNotification('Organization setup finalized successfully!', 'success'); window.switchClientDetailTab('${client.id}', 'scopes');
+clients-module.js:4355|onchange|this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));
+clients-module.js:4361|onchange|window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value); window.autoFillExpiry(this)
+clients-module.js:4362|onchange|this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));
+clients-module.js:4369|onchange|this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));
+data-migration.js:310|onclick|window.DataMigration.handleClearData()
+data-migration.js:314|onclick|window.DataMigration.reloadFromCloud()
+execution-module-v2.js:972|onclick|var el=document.getElementById('orig-note-${uniqueId}');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('span').textContent=el.style.display==='none'?'View Original Notes'
+execution-module-v2.js:1014|onclick|window.viewEvidenceImageByUrl(this.src || '${safeSrc}')
+execution-module-v2.js:1043|onclick|const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'
+execution-module-v2.js:1065|onchange|window._autoFillPersonnel && window._autoFillPersonnel('${uniqueId}')
+execution-module-v2.js:1747|onclick|document.querySelector('.tab-btn[data-tab=&quot;meetings&quot;]')?.click()
+execution-module-v2.js:1770|onchange|window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();
+execution-module-v2.js:1774|onchange|window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();
+execution-module-v2.js:1778|onchange|window.state.auditReports.find(r => String(r.id) === String('${report.id}')).recommendation = this.value; window.saveData();
+execution-module-v2.js:2877|onchange|window._autoFillPersonnel && window._autoFillPersonnel('modal')
+execution-module-v2.js:3091|onchange|window._autoFillPersonnel && window._autoFillPersonnel('modal')
+execution-module-v2.js:3688|onclick|document.getElementById('ev-gallery-main').src='${s.replace(/'/g, 
+execution-tab-helpers.js:60|onclick|const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'
+ncr-capa-module.js:460|onchange|window.state.showClosedCAPAs = this.checked; renderNCRCAPAModuleContent(window.state.ncrContextClientId);
+planning-module.js:1797|onclick|(function(el){ var body = el.closest('.card').querySelector('.client-docs-body'); var arrow = el.querySelector('.doc-arrow'); if(body.style.display === 'none') { body.style.display = 'block'; arrow.st
+script.js:904|onclick|state.currentModule = 'auditors'; renderAuditors(); setTimeout(() => renderAuditorDetail(${alert.id}), 100);
+settings-module.js:5273|onclick|if(confirm('Clear all activity logs?')) { window.AuditTrail?.clear(); window.switchSettingsSubTab('system', 'activity-log'); }
+settings-module.js:5386|onclick|window.APIUsageTracker.exportData()

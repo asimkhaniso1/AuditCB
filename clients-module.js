@@ -588,7 +588,7 @@ function getClientProfileHTML(client) {
                 ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                         <label class="btn btn-sm btn-outline-primary" style="cursor: pointer; margin: 0;">
                             <i class="fa-solid fa-file-pdf" style="margin-right: 0.25rem;"></i> Upload PDF
-                            <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc('${client.id}', this.files[0])">
+                            <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" data-action-change="uploadCompanyProfileDoc" data-id="${client.id}" data-file="true">
                         </label>
                         ${client.website ? `
                             <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" data-action="generateCompanyProfile" data-id="${client.id}">
@@ -634,7 +634,7 @@ function getClientProfileHTML(client) {
                         ${(window.state.currentUser.role === 'Certification Manager' || window.state.currentUser.role === 'Admin') ? `
                             <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
                                 <i class="fa-solid fa-upload"></i> Upload Document
-                                <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" onchange="window.uploadCompanyProfileDoc('${client.id}', this.files[0])">
+                                <input type="file" accept=".pdf,.doc,.docx,.txt" style="display: none;" data-action-change="uploadCompanyProfileDoc" data-id="${client.id}" data-file="true">
                             </label>
                             ${client.website ? `
                                 <button class="btn btn-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;" data-action="generateCompanyProfile" data-id="${client.id}">
@@ -1547,7 +1547,7 @@ window.renderAddClient = function () {
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
                                 ${standardsToShow.map((std, i) => `
                                     <label class="standard-checkbox-btn" style="cursor: pointer;">
-                                        <input type="checkbox" name="client_standards" value="${std}" style="display: none;" onchange="this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#2563eb' : '#64748b'; this.nextElementSibling.style.background = this.checked ? '#eff6ff' : '#fff';">
+                                        <input type="checkbox" name="client_standards" value="${std}" style="display: none;" data-action-change="toggleCheckboxStyle">
                                         <span style="display: inline-block; padding: 0.4rem 0.8rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 0.85rem; color: #64748b; transition: all 0.2s;">
                                             ${std}
                                         </span>
@@ -1582,7 +1582,7 @@ window.renderAddClient = function () {
                         <div class="form-group" style="grid-column: 1 / -1;">
                              <label style="display: flex; justify-content: space-between;">
                                 <span>Geotag (Lat, Long)</span>
-                                <a href="#" onclick="event.preventDefault(); navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });" style="font-size: 0.8rem; color: var(--primary-color);">
+                                <a href="#" data-action="getGeolocation" data-id="client-geotag" style="font-size: 0.8rem; color: var(--primary-color);">
                                     <i class="fa-solid fa-location-crosshairs"></i> Detect My Location
                                 </a>
                              </label>
@@ -1951,7 +1951,7 @@ window.renderEditClient = function (clientId) {
         const isChecked = standards.includes(std);
         return `
                                     <label class="standard-checkbox-btn ${isChecked ? 'active' : ''}" style="cursor: pointer;">
-                                        <input type="checkbox" name="client_standards" value="${std}" ${isChecked ? 'checked' : ''} style="display: none;" onchange="this.parentElement.classList.toggle('active', this.checked); this.nextElementSibling.style.borderColor = this.checked ? '#3b82f6' : '#cbd5e1'; this.nextElementSibling.style.color = this.checked ? '#2563eb' : '#64748b'; this.nextElementSibling.style.background = this.checked ? '#eff6ff' : '#fff';">
+                                        <input type="checkbox" name="client_standards" value="${std}" ${isChecked ? 'checked' : ''} style="display: none;" data-action-change="toggleCheckboxStyle">
                                         <span style="display: inline-block; padding: 0.4rem 0.8rem; background: ${isChecked ? '#eff6ff' : '#fff'}; border: 1px solid ${isChecked ? '#3b82f6' : '#cbd5e1'}; color: ${isChecked ? '#2563eb' : '#64748b'}; border-radius: 20px; font-size: 0.85rem; transition: all 0.2s;">
                                             ${std}
                                         </span>
@@ -1986,7 +1986,7 @@ window.renderEditClient = function (clientId) {
                         <div class="form-group" style="grid-column: 1 / -1;">
                              <label style="display: flex; justify-content: space-between;">
                                 <span>Geotag (Lat, Long)</span>
-                                <a href="#" onclick="event.preventDefault(); navigator.geolocation.getCurrentPosition(pos => { document.getElementById('client-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });" style="font-size: 0.8rem; color: var(--primary-color);">
+                                <a href="#" data-action="getGeolocation" data-id="client-geotag" style="font-size: 0.8rem; color: var(--primary-color);">
                                     <i class="fa-solid fa-location-crosshairs"></i> Detect My Location
                                 </a>
                              </label>
@@ -2319,7 +2319,7 @@ window.handleIndustryChange = function (select) {
                 <label>Geotag (Lat, Long)</label>
                 <div style="display: flex; gap: 0.5rem;">
                     <input type="text" class="form-control" id="site-geotag" placeholder="e.g. 37.7749, -122.4194">
-                    <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('site-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
+                    <button type="button" class="btn btn-secondary" data-action="getGeolocation" data-id="site-geotag">
                         <i class="fa-solid fa-location-crosshairs"></i>
                     </button>
                 </div>
@@ -2416,14 +2416,7 @@ window.handleIndustryChange = function (select) {
                     <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.25rem; color: var(--primary-color); margin-bottom: 0.25rem;"></i>
                     <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Click to browse files</p>
                 </div>
-                <input type="file" id="doc-file" style="display: none;" onchange="if(this.files[0]) { 
-                    if(this.files[0].size > 5242880) { 
-                        alert('File is too large! Max limit is 5MB.'); 
-                        this.value = ''; 
-                    } else {
-                        if(!document.getElementById('doc-name').value) document.getElementById('doc-name').value = this.files[0].name; 
-                    }
-                }">
+                <input type="file" id="doc-file" style="display: none;" data-action-change="handleDocFileChange">
             </div>
         </form >
     `;
@@ -2591,7 +2584,7 @@ window.handleIndustryChange = function (select) {
                 <label>Geotag</label>
                 <div style="display: flex; gap: 0.5rem;">
                     <input type="text" class="form-control" id="site-geotag" value="${site.geotag || ''}">
-                    <button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(pos => { document.getElementById('site-geotag').value = pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4); });">
+                    <button type="button" class="btn btn-secondary" data-action="getGeolocation" data-id="site-geotag">
                         <i class="fa-solid fa-location-crosshairs"></i>
                     </button>
                 </div>
@@ -4180,7 +4173,7 @@ CFO," style="font-family: monospace;"></textarea>
                             Next Stage <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
                         </button>
                     ` : `
-                        <button class="btn btn-primary" onclick="window.showNotification('Organization setup finalized successfully!', 'success'); window.switchClientDetailTab('${client.id}', 'scopes');">
+                        <button class="btn btn-primary" data-action="finalizeOrgSetup" data-id="${client.id}">
                             Finalize & View Scopes <i class="fa-solid fa-flag-checkered" style="margin-left: 0.5rem;"></i>
                         </button>
                     `}
@@ -4352,21 +4345,21 @@ CFO," style="font-family: monospace;"></textarea>
                                 <label style="font-size: 0.8rem;">Initial Date</label>
                                 <div style="display: flex; gap: 4px;">
                                     <input type="text" class="form-control" value="${cert.initialDate || ''}" placeholder="e.g. 15-Mar-2024" style="flex: 1;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="initialDate" data-arg4="this.value">
-                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
+                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" data-action-change="formatDatePrev">
                                 </div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Current Issue</label>
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-control cert-current-issue" value="${cert.currentIssue || ''}" placeholder="e.g. 15-Mar-2025" style="flex: 1;" onchange="window.updateCertField('${client.id}', ${index}, 'currentIssue', this.value); window.autoFillExpiry(this)">
-                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
+                                    <input type="text" class="form-control cert-current-issue" value="${cert.currentIssue || ''}" placeholder="e.g. 15-Mar-2025" style="flex: 1;" data-action-change="updateCertFieldAndExpiry" data-arg1="${client.id}" data-arg2="${index}" data-arg3="currentIssue">
+                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" data-action-change="formatDatePrev">
                                 </div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Expiry Date</label>
                                 <div style="display: flex; gap: 4px;">
                                     <input type="text" class="form-control cert-expiry" value="${cert.expiryDate || ''}" placeholder="e.g. 14-Mar-2027" style="flex: 1;" data-action-change="updateCertField" data-arg1="${client.id}" data-arg2="${index}" data-arg3="expiryDate" data-arg4="this.value">
-                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" onchange="this.previousElementSibling.value = new Date(this.value).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}); this.previousElementSibling.dispatchEvent(new Event('change'));">
+                                    <input type="date" style="width: 36px; padding: 0 4px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; opacity: 0.5;" title="Pick date" data-action-change="formatDatePrev">
                                 </div>
                             </div>
                          </div>
@@ -5505,7 +5498,7 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
                  <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
                     <p style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong>Unique Client ID:</strong> <code>${client.id}</code></p>
                     <p style="margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);">This ID is used for linking data in the database.</p>
-                    <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${client.id}').then(() => window.showNotification('ID Copied', 'success'))">
+                    <button class="btn btn-sm btn-secondary" data-action="copyToClipboard" data-id="${client.id}" data-arg1="ID Copied">
                         <i class="fa-solid fa-copy"></i> Copy ID
                     </button>
                 </div>

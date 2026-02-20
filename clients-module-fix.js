@@ -220,7 +220,7 @@ window.getClientSettingsHTML = function (client) {
             <h4>Information</h4>
             <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
                 <p style="margin-bottom: 0.5rem; font-size: 0.9rem;"><strong>Client ID:</strong> <code>${client.id}</code></p>
-                <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${client.id}').then(() => window.showNotification('ID Copied', 'success'))">
+                <button class="btn btn-sm btn-secondary" data-action="copyToClipboard" data-id="${client.id}" data-arg1="ID Copied">
                     <i class="fa-solid fa-copy"></i> Copy ID
                 </button>
             </div>
@@ -375,7 +375,7 @@ window.getClientSitesHTML = function (client) {
         </div>
         ${sites.length > 0 ? `
         <div class="org-table-toolbar">
-            <input class="org-table-search" placeholder="Search sites..." oninput="window._orgTableSearch(this, 'sites-table')">
+            <input class="org-table-search" placeholder="Search sites..." data-action-input="_orgTableSearch" data-id="sites-table">
         </div>
         <div class="org-table">
             <table id="sites-table"><thead><tr>
@@ -387,9 +387,9 @@ window.getClientSitesHTML = function (client) {
                 <td>${window.UTILS.escapeHtml(s.city || '-')}${s.country ? ', ' + window.UTILS.escapeHtml(s.country) : ''}</td>
                 <td>${s.employees ? '<span class="badge-tag badge-green"><i class="fa-solid fa-users" style="margin-right:3px"></i>' + s.employees + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Site',{Name:'${_esc(s.name)}',Standards:'${_esc(s.standards)}',Address:'${_esc(s.address)}',City:'${_esc(s.city)}',Employees:'${s.employees || '-'}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Site" data-json='${JSON.stringify({ Name: s.name || '-', Standards: s.standards || '-', Address: s.address || '-', City: s.city || '-', Employees: s.employees || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-eye"></i></button>
                     ${isAdmin ? `<button class="action-btn edit" title="Edit" data-action="editSite" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>` : ''}
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Site',{Name:'${_esc(s.name)}',Address:'${_esc(s.address)}',City:'${_esc(s.city)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Site" data-json='${JSON.stringify({ Name: s.name || '-', Address: s.address || '-', City: s.city || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-print"></i></button>
                     ${isAdmin ? `<button class="action-btn delete" title="Delete" data-action="deleteSite" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div></td>
             </tr>`).join('')}</tbody></table>
@@ -415,7 +415,7 @@ window.getClientContactsHTML = function (client) {
         </div>
         ${contacts.length > 0 ? `
         <div class="org-table-toolbar">
-            <input class="org-table-search" placeholder="Search contacts..." oninput="window._orgTableSearch(this, 'contacts-table')">
+            <input class="org-table-search" placeholder="Search contacts..." data-action-input="_orgTableSearch" data-id="contacts-table">
         </div>
         <div class="org-table">
             <table id="contacts-table"><thead><tr><th>Name</th><th>Designation</th><th>Department</th><th>Email</th><th style="width:140px">Actions</th></tr></thead>
@@ -425,9 +425,9 @@ window.getClientContactsHTML = function (client) {
                 <td>${c.department ? '<span class="badge-tag badge-primary">' + window.UTILS.escapeHtml(c.department) + '</span>' : '-'}</td>
                 <td>${window.UTILS.escapeHtml(c.email || '-')}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}',Phone:'${_esc(c.phone)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Contact" data-json='${JSON.stringify({ Name: c.name || '-', Designation: c.designation || '-', Department: c.department || '-', Email: c.email || '-', Phone: c.phone || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" data-action="editContact" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Contact',{Name:'${_esc(c.name)}',Designation:'${_esc(c.designation)}',Department:'${_esc(c.department)}',Email:'${_esc(c.email)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Contact" data-json='${JSON.stringify({ Name: c.name || '-', Designation: c.designation || '-', Department: c.department || '-', Email: c.email || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" data-action="deleteContact" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
@@ -449,7 +449,7 @@ window.getClientDepartmentsHTML = function (client) {
         </div>
         ${departments.length > 0 ? `
         <div class="org-table-toolbar">
-            <input class="org-table-search" placeholder="Search departments..." oninput="window._orgTableSearch(this, 'depts-table')">
+            <input class="org-table-search" placeholder="Search departments..." data-action-input="_orgTableSearch" data-id="depts-table">
         </div>
         <div class="org-table">
             <table id="depts-table"><thead><tr><th>Department Name</th><th>Head</th><th style="width:140px">Actions</th></tr></thead>
@@ -459,9 +459,9 @@ window.getClientDepartmentsHTML = function (client) {
                 <td class="name-cell">${window.UTILS.escapeHtml(dept.name)}</td>
                 <td>${deptHead !== '-' ? '<span class="badge-tag badge-blue">' + window.UTILS.escapeHtml(deptHead) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Department" data-json='${JSON.stringify({ Name: dept.name || '-', Head: deptHead || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" data-action="editDepartment" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Department',{Name:'${_esc(dept.name)}',Head:'${_esc(deptHead)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Department" data-json='${JSON.stringify({ Name: dept.name || '-', Head: deptHead || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" data-action="deleteDepartment" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`;
@@ -483,7 +483,7 @@ window.getClientGoodsServicesHTML = function (client) {
         </div>
         ${items.length > 0 ? `
         <div class="org-table-toolbar">
-            <input class="org-table-search" placeholder="Search goods & services..." oninput="window._orgTableSearch(this, 'goods-table')">
+            <input class="org-table-search" placeholder="Search goods & services..." data-action-input="_orgTableSearch" data-id="goods-table">
         </div>
         <div class="org-table">
             <table id="goods-table"><thead><tr><th>Name</th><th>Category</th><th style="width:140px">Actions</th></tr></thead>
@@ -491,9 +491,9 @@ window.getClientGoodsServicesHTML = function (client) {
                 <td class="name-cell">${window.UTILS.escapeHtml(item.name)}</td>
                 <td><span class="badge-tag badge-green">${window.UTILS.escapeHtml(item.category || '-')}</span></td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Item" data-json='${JSON.stringify({ Name: item.name || '-', Category: item.category || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" data-action="editGoodsService" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Item',{Name:'${_esc(item.name)}',Category:'${_esc(item.category)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Item" data-json='${JSON.stringify({ Name: item.name || '-', Category: item.category || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" data-action="deleteGoodsService" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
@@ -514,7 +514,7 @@ window.getClientKeyProcessesHTML = function (client) {
         </div>
         ${processes.length > 0 ? `
         <div class="org-table-toolbar">
-            <input class="org-table-search" placeholder="Search processes..." oninput="window._orgTableSearch(this, 'proc-table')">
+            <input class="org-table-search" placeholder="Search processes..." data-action-input="_orgTableSearch" data-id="proc-table">
         </div>
         <div class="org-table">
             <table id="proc-table"><thead><tr><th>Process Name</th><th>Category</th><th style="width:140px">Actions</th></tr></thead>
@@ -522,9 +522,9 @@ window.getClientKeyProcessesHTML = function (client) {
                 <td class="name-cell">${window.UTILS.escapeHtml(proc.name)}</td>
                 <td><span class="badge-tag badge-amber">${window.UTILS.escapeHtml(proc.category || '-')}</span></td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Process" data-json='${JSON.stringify({ Name: proc.name || '-', Category: proc.category || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" data-action="editKeyProcess" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Process',{Name:'${_esc(proc.name)}',Category:'${_esc(proc.category)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Process" data-json='${JSON.stringify({ Name: proc.name || '-', Category: proc.category || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" data-action="deleteKeyProcess" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`).join('')}</tbody></table>
@@ -546,7 +546,7 @@ window.getClientDesignationsHTML = function (client) {
         </div>
         ${designations.length > 0 ? `
         <div class="org-table-toolbar">
-            <input class="org-table-search" placeholder="Search designations..." oninput="window._orgTableSearch(this, 'desig-table')">
+            <input class="org-table-search" placeholder="Search designations..." data-action-input="_orgTableSearch" data-id="desig-table">
         </div>
         <div class="org-table">
             <table id="desig-table"><thead><tr><th>Title</th><th>Department</th><th style="width:140px">Actions</th></tr></thead>
@@ -557,9 +557,9 @@ window.getClientDesignationsHTML = function (client) {
                 <td class="name-cell">${window.UTILS.escapeHtml(desTitle)}</td>
                 <td>${desDept ? '<span class="badge-tag badge-gray">' + window.UTILS.escapeHtml(desDept) + '</span>' : '-'}</td>
                 <td><div class="actions-cell">
-                    <button class="action-btn view" title="View" onclick="window._orgViewItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})"><i class="fa-solid fa-eye"></i></button>
+                    <button class="action-btn view" title="View" data-action="_orgViewItem" data-arg1="Designation" data-json='${JSON.stringify({ Title: desTitle || '-', Department: desDept || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-eye"></i></button>
                     <button class="action-btn edit" title="Edit" data-action="editClientDesignation" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-pen"></i></button>
-                    <button class="action-btn print" title="Print" onclick="window._orgPrintItem('Designation',{Title:'${_esc(desTitle)}',Department:'${_esc(desDept)}'})"><i class="fa-solid fa-print"></i></button>
+                    <button class="action-btn print" title="Print" data-action="_orgPrintItem" data-arg1="Designation" data-json='${JSON.stringify({ Title: desTitle || '-', Department: desDept || '-' }).replace(/'/g, "&#39;")}'><i class="fa-solid fa-print"></i></button>
                     <button class="action-btn delete" title="Delete" data-action="deleteClientDesignation" data-arg1="${client.id}" data-arg2="${i}"><i class="fa-solid fa-trash"></i></button>
                 </div></td>
             </tr>`;
@@ -1123,7 +1123,7 @@ window.editSite = function (clientId, siteIndex) {
         '</div></div>' +
         '<div class="form-group"><label>Geotag</label><div style="display:flex;gap:0.5rem">' +
         '<input type="text" class="form-control" id="site-geotag" value="' + (site.geotag || '') + '">' +
-        '<button type="button" class="btn btn-secondary" onclick="navigator.geolocation.getCurrentPosition(function(pos){document.getElementById(\'site-geotag\').value=pos.coords.latitude.toFixed(4)+\', \'+pos.coords.longitude.toFixed(4)})">' +
+        '<button type="button" class="btn btn-secondary" data-action="getGeolocation" data-id="site-geotag">' +
         '<i class="fa-solid fa-location-crosshairs"></i></button></div></div></form>';
     window.openModal();
     modalSave.onclick = function () {

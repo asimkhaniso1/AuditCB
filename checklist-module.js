@@ -783,7 +783,7 @@ function renderChecklistEditor(checklistId) {
                         </div>
                         <div class="form-group">
                             <label>Type</label>
-                            <select class="form-control" id="checklist-type" onchange="document.getElementById('checklist-client-group').style.display = this.value === 'custom' ? 'block' : 'none'">
+                            <select class="form-control" id="checklist-type" data-action-change="toggleElementIfValue" data-id="checklist-client-group" data-arg1="custom">
                                 <option value="custom" ${checklist?.type === 'custom' || !checklist ? 'selected' : ''}>Custom (Personal)</option>
                                 ${canEditGlobal ? `<option value="global" ${checklist?.type === 'global' ? 'selected' : ''}>Global (Organization-wide)</option>` : ''}
                             </select>
@@ -1237,7 +1237,7 @@ function viewChecklistDetail(id) {
                 
                 ${checklist.clauses ? checklist.clauses.map((mainClause, idx) => `
                     <div class="accordion-section" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-                        <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); color: #1e293b; cursor: pointer; user-select: none;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.querySelector('.accordion-icon').style.transform = this.nextElementSibling.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';">
+                        <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: linear-gradient(to right, #f8fafc, #f1f5f9); color: #1e293b; cursor: pointer; user-select: none;" data-action="toggleAccordion">
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <span style="background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">Clause ${mainClause.mainClause}</span>
                                 <span style="font-weight: 600; color: #1e293b;">${mainClause.title}</span>
@@ -1254,7 +1254,7 @@ function viewChecklistDetail(id) {
         if (hasItems) {
             return `
                                     <div style="border-bottom: 1px solid #f1f5f9;">
-                                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f0f9ff; color: #1e293b; cursor: pointer; user-select: none;" onclick="const c=this.nextElementSibling; c.style.display=c.style.display==='none'?'block':'none'; this.querySelector('.sub-icon').style.transform=c.style.display==='none'?'rotate(0deg)':'rotate(90deg)';">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #f0f9ff; color: #1e293b; cursor: pointer; user-select: none;" data-action="toggleSubAccordion">
                                             <i class="fa-solid fa-caret-right sub-icon" style="transition: transform 0.2s; transform: rotate(90deg); color: #0369a1; font-size: 0.8rem;"></i>
                                             <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${sub.clause}</span>
                                             <span style="font-weight: 500; color: #334155;">${sub.title || ''}</span>

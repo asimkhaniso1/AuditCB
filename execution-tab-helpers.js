@@ -57,7 +57,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                                  <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor NC</option>
                                  <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
                              </select>
-                             <button type="button" class="btn btn-sm btn-info" onclick="const el = document.getElementById('criteria-${uniqueId}'); el.style.display = el.style.display === 'none' ? 'block' : 'none'" title="View Classification Matrix (ISO 17021-1)">
+                             <button type="button" class="btn btn-sm btn-info" data-action="toggleDisplay" data-id="criteria-${uniqueId}" title="View Classification Matrix (ISO 17021-1)">
                                 <i class="fa-solid fa-scale-balanced"></i>
                              </button>
                          </div>
@@ -69,7 +69,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                             <div style="margin-top:5px; border-left: 3px solid var(--warning-color); padding-left: 5px; background: #fffaf0;">
                                 <strong>Minor:</strong> ${window.CONSTANTS.NCR_CRITERIA.MINOR.description}
                             </div>
-                            <div style="text-align: right; margin-top: 5px;"><small style="color: blue; cursor: pointer;" onclick="this.parentElement.parentElement.style.display='none'">Close</small></div>
+                            <div style="text-align: right; margin-top: 5px;"><small style="color: blue; cursor: pointer;" data-action="hideGrandparent">Close</small></div>
                          </div>
                      </div>
                      <div style="display: flex; flex-direction: column;">

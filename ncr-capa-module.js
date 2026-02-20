@@ -457,7 +457,7 @@ function getCAPATrackerHTML() {
                     CAPA Tracker
                 </h3>
                 <label style="font-size: 0.9rem; user-select: none; cursor: pointer;">
-                    <input type="checkbox" onchange="window.state.showClosedCAPAs = this.checked; renderNCRCAPAModuleContent(window.state.ncrContextClientId);" ${showClosed ? 'checked' : ''}>
+                    <input type="checkbox" data-action-change="toggleClosedCAPAs" ${showClosed ? 'checked' : ''}>
                     Show Closed Items
                 </label>
             </div>

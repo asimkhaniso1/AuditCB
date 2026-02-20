@@ -901,7 +901,7 @@ function renderDashboard() {
                 ${alerts.length > 0 ? `
                     <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
                         ${alerts.map(alert => `
-                            <div style="padding: 0.75rem; border-radius: 6px; background: ${alert.severity === 'critical' ? '#fee2e2' : '#fef3c7'}; border-left: 4px solid ${alert.severity === 'critical' ? '#dc2626' : '#d97706'}; cursor: pointer;" onclick="state.currentModule = 'auditors'; renderAuditors(); setTimeout(() => renderAuditorDetail(${alert.id}), 100);">
+                            <div style="padding: 0.75rem; border-radius: 6px; background: ${alert.severity === 'critical' ? '#fee2e2' : '#fef3c7'}; border-left: 4px solid ${alert.severity === 'critical' ? '#dc2626' : '#d97706'}; cursor: pointer;" data-action="navigateToAuditorDetail" data-id="${alert.id}">
                                 <div style="font-weight: 600; font-size: 0.9rem; color: ${alert.severity === 'critical' ? '#991b1b' : '#92400e'};">${alert.type}</div>
                                 <div style="font-size: 0.85rem; color: ${alert.severity === 'critical' ? '#7f1d1d' : '#78350f'};">${alert.msg}</div>
                             </div>
