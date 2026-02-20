@@ -686,7 +686,7 @@ window.viewAppealDetail = function (id) {
             <button class="btn btn-secondary" onclick="renderAppealsComplaintsModule()"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <div class="card" style="margin-top:1rem;">
                 <h2>APP-${String(appeal.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(appeal.subject)}</h2>
-                <span class="badge" style="background:${getStatusColor(appeal.status)};color:white;">${appeal.status}</span>
+                <span class="badge" style="background:${getStatusColor(appeal.status)};color:white;">${window.UTILS.escapeHtml(appeal.status)}</span>
                 <p><strong>Client:</strong> ${window.UTILS.escapeHtml(appeal.clientName)}</p>
                 <hr>
                 <p>${window.UTILS.escapeHtml(appeal.description)}</p>
@@ -699,7 +699,7 @@ window.viewAppealDetail = function (id) {
             <!-- History section -->
             <div class="card" style="margin-top:1rem;">
                 <h4>History</h4>
-                <ul>${(appeal.history || []).map(h => `<li>${h.date} - ${h.action} - ${h.notes}</li>`).join('')}</ul>
+                <ul>${(appeal.history || []).map(h => `<li>${window.UTILS.escapeHtml(h.date || '')} - ${window.UTILS.escapeHtml(h.action || '')} - ${window.UTILS.escapeHtml(h.notes || '')}</li>`).join('')}</ul>
             </div>
         </div>
     `;
@@ -715,7 +715,7 @@ window.viewComplaintDetail = function (id) {
             <button class="btn btn-secondary" onclick="renderAppealsComplaintsModule()"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <div class="card" style="margin-top:1rem;">
                 <h2>CMP-${String(complaint.id).padStart(3, '0')}: ${window.UTILS.escapeHtml(complaint.subject)}</h2>
-                <span class="badge" style="background:#8b5cf6;color:white;">${complaint.status}</span>
+                <span class="badge" style="background:#8b5cf6;color:white;">${window.UTILS.escapeHtml(complaint.status)}</span>
                 <p><strong>Source:</strong> ${window.UTILS.escapeHtml(complaint.source)}</p>
                 <hr>
                 <p>${window.UTILS.escapeHtml(complaint.description)}</p>
@@ -724,7 +724,7 @@ window.viewComplaintDetail = function (id) {
             </div>
              <div class="card" style="margin-top:1rem;">
                 <h4>History</h4>
-                <ul>${(complaint.history || []).map(h => `<li>${h.date} - ${h.action} - ${h.notes}</li>`).join('')}</ul>
+                <ul>${(complaint.history || []).map(h => `<li>${window.UTILS.escapeHtml(h.date || '')} - ${window.UTILS.escapeHtml(h.action || '')} - ${window.UTILS.escapeHtml(h.notes || '')}</li>`).join('')}</ul>
             </div>
         </div>
     `;
@@ -803,12 +803,12 @@ window.printACRegister = function (type) {
                     ${data.map(a => `
                         <tr>
                             <td>APP-${String(a.id).padStart(3, '0')}</td>
-                            <td>${a.clientName || '-'}</td>
-                            <td>${a.type}</td>
-                            <td>${a.subject}</td>
-                            <td>${a.dateReceived}</td>
-                            <td>${a.dueDate || '-'}</td>
-                            <td>${a.status}</td>
+                            <td>${window.UTILS.escapeHtml(a.clientName || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(a.type)}</td>
+                            <td>${window.UTILS.escapeHtml(a.subject)}</td>
+                            <td>${window.UTILS.escapeHtml(a.dateReceived)}</td>
+                            <td>${window.UTILS.escapeHtml(a.dueDate || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(a.status)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -832,12 +832,12 @@ window.printACRegister = function (type) {
                     ${data.map(c => `
                         <tr>
                             <td>CMP-${String(c.id).padStart(3, '0')}</td>
-                            <td>${c.source}</td>
-                            <td>${c.clientName || '-'}</td>
-                            <td>${c.subject}</td>
-                            <td>${c.dateReceived}</td>
-                            <td>${c.severity}</td>
-                            <td>${c.status}</td>
+                            <td>${window.UTILS.escapeHtml(c.source)}</td>
+                            <td>${window.UTILS.escapeHtml(c.clientName || '-')}</td>
+                            <td>${window.UTILS.escapeHtml(c.subject)}</td>
+                            <td>${window.UTILS.escapeHtml(c.dateReceived)}</td>
+                            <td>${window.UTILS.escapeHtml(c.severity)}</td>
+                            <td>${window.UTILS.escapeHtml(c.status)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -988,7 +988,7 @@ window.managePanelRecords = function (appealId) {
         <label>Decision</label>
         <select id="panel-dec" class="form-control"><option>Upheld</option><option>Rejected</option></select>
         <label>Rationale</label>
-        <textarea id="panel-rat" class="form-control">${appeal.panelRecords.rationale || ''}</textarea>
+        <textarea id="panel-rat" class="form-control">${window.UTILS.escapeHtml(appeal.panelRecords.rationale || '')}</textarea>
     `;
     document.getElementById('modal-save').onclick = async () => {
         appeal.panelRecords.decision = document.getElementById('panel-dec').value;
