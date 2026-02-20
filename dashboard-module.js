@@ -168,7 +168,7 @@ function renderDashboardEnhanced() {
             <div style="margin-bottom: 2rem;">
                 <h2 style="margin: 0; font-size: 1.75rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">AuditCB360 Dashboard</h2>
                 <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">
-                    <i class="fa-solid fa-calendar"></i> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    <i class="fa-solid fa-calendar"></i> ${window.UTILS.formatDate(new Date())}
                     <span style="margin-left: 1rem; padding-left: 1rem; border-left: 1px solid #e2e8f0;">
                         <i class="fa-solid fa-user" style="color: var(--primary-color);"></i> ${window.UTILS.escapeHtml(state.currentUser.name || 'User')} (${window.UTILS.escapeHtml(state.currentUser.role)})
                     </span>
@@ -457,7 +457,7 @@ function renderDashboardEnhanced() {
                                         <div>
                                             <p style="margin: 0; font-weight: 500;">${window.UTILS.escapeHtml(activity.title)}</p>
                                             <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
-                                                <i class="fa-solid fa-calendar"></i> ${window.UTILS.escapeHtml(activity.date)}
+                                                <i class="fa-solid fa-calendar"></i> ${window.UTILS.formatDate(activity.date)}
                                             </p>
                                         </div>
                                         <span class="status-badge status-${activity.status.toLowerCase()}">${activity.status}</span>
