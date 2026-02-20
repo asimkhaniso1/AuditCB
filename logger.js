@@ -8,7 +8,7 @@
  *   Logger.info('module', 'message') - Module-prefixed message
  */
 
-window.DEBUG_MODE = true; // Set to false in production
+window.DEBUG_MODE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 
 window.Logger = {
     /**
@@ -88,4 +88,4 @@ window.Logger = {
 };
 
 // Ensure Logger is available immediately
-console.log('[Logger] AuditCB360 Logger initialized');
+if (window.DEBUG_MODE) console.log('[Logger] AuditCB360 Logger initialized (debug mode)');
