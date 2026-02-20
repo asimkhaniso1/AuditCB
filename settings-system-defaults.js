@@ -102,11 +102,11 @@ async function saveDefaultSettings() {
         window.state.cbSettings.dateFormat = document.getElementById('cb-date-format').value;
         window.state.cbSettings.currency = document.getElementById('cb-currency').value;
         window.state.cbSettings.certificateNumberFormat = document.getElementById('cb-cert-format').value;
-        window.state.cbSettings.defaultStage1Duration = parseInt(document.getElementById('cb-stage1-duration').value);
-        window.state.cbSettings.defaultStage2Duration = parseInt(document.getElementById('cb-stage2-duration').value);
+        window.state.cbSettings.defaultStage1Duration = parseInt(document.getElementById('cb-stage1-duration').value, 10);
+        window.state.cbSettings.defaultStage2Duration = parseInt(document.getElementById('cb-stage2-duration').value, 10);
         window.state.cbSettings.manDayCalculationMode = document.getElementById('cb-manday-mode').value;
-        window.state.cbSettings.notificationLeadTime = parseInt(document.getElementById('cb-notification-leadtime').value);
-        window.state.cbSettings.sessionTimeout = parseInt(document.getElementById('cb-session-timeout').value);
+        window.state.cbSettings.notificationLeadTime = parseInt(document.getElementById('cb-notification-leadtime').value, 10);
+        window.state.cbSettings.sessionTimeout = parseInt(document.getElementById('cb-session-timeout').value, 10);
 
         // Save to localStorage
         window.saveData();

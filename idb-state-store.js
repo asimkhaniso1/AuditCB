@@ -198,9 +198,9 @@ const StateStore = {
                                 const parsed = JSON.parse(lsSaved);
                                 if (window.Logger) Logger.info('StateStore', 'Migrated data from localStorage to IndexedDB');
                                 // Save to IndexedDB for next time
-                                this.save(parsed).catch(() => { });
+                                this.save(parsed).catch((e) => { (window.Logger || console).debug('[StateStore] IDB migration-save failed:', e); });
                                 // Clean up localStorage to free space
-                                try { localStorage.removeItem(this.LS_KEY); } catch (e) { }
+                                try { localStorage.removeItem(this.LS_KEY); } catch (e) { (window.Logger || console).debug('[StateStore] LS cleanup failed:', e); }
                                 resolve(parsed);
                             } else {
                                 resolve(null);
@@ -235,7 +235,7 @@ const StateStore = {
      */
     clear: function () {
         // Always clear localStorage too (migration cleanup)
-        try { localStorage.removeItem(this.LS_KEY); } catch (e) { }
+        try { localStorage.removeItem(this.LS_KEY); } catch (e) { (window.Logger || console).debug('[StateStore] LS clear failed:', e); }
 
         if (this._useLocalStorage || !this._db) {
             return Promise.resolve();

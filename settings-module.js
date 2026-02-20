@@ -2600,10 +2600,10 @@ window.saveDefaults = function () {
     const settings = window.state.cbSettings;
     settings.certificateNumberFormat = window.Sanitizer.sanitizeText(document.getElementById('cert-format').value);
     settings.dateFormat = document.getElementById('date-format').value;
-    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration').value);
-    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration').value);
-    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead').value);
-    settings.sessionTimeout = parseInt(document.getElementById('session-timeout').value);
+    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration').value, 10);
+    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration').value, 10);
+    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead').value, 10);
+    settings.sessionTimeout = parseInt(document.getElementById('session-timeout').value, 10);
     settings.currency = document.getElementById('currency').value;
     settings.manDayCalculationMode = document.getElementById('manday-mode').value;
 
@@ -2782,8 +2782,8 @@ window.editCertDecision = function (decision) {
 };
 
 window.saveCAPATimelines = function () {
-    window.state.cbPolicies.capaTimelines.majorCorrection = parseInt(document.getElementById('capa-major').value) || 90;
-    window.state.cbPolicies.capaTimelines.minorCorrection = parseInt(document.getElementById('capa-minor').value) || 30;
+    window.state.cbPolicies.capaTimelines.majorCorrection = parseInt(document.getElementById('capa-major').value, 10) || 90;
+    window.state.cbPolicies.capaTimelines.minorCorrection = parseInt(document.getElementById('capa-minor').value, 10) || 30;
     window.state.cbPolicies.capaTimelines.capaVerification = window.Sanitizer.sanitizeText(document.getElementById('capa-verify').value);
     window.saveData();
     window.showNotification('CAPA timelines saved', 'success');

@@ -40,7 +40,7 @@ function parseCSV(filePath) {
             if (val.startsWith('[') || val.startsWith('{')) {
                 try {
                     val = JSON.parse(val);
-                } catch (e) { }
+                } catch (e) { /* intentional: keep as string if not valid JSON */ }
             }
             obj[h] = val;
         });

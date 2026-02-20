@@ -69,7 +69,7 @@
             try {
                 const val = JSON.parse(localStorage.getItem(key));
                 if (val.clients) console.log(`   -> contains ${val.clients.length} clients.`);
-            } catch (e) { }
+            } catch (e) { /* best-effort parse for diagnostic display */ }
         }
     });
 
