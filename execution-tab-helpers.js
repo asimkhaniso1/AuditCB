@@ -75,7 +75,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
                      <div style="display: flex; flex-direction: column;">
                          <label style="font-size: 0.8rem;">Evidence Image <span style="font-weight: normal; color: var(--text-secondary);">(max 5MB)</span></label>
                         <div style="display: flex; gap: 5px;">
-                             <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" onclick="document.getElementById('img-${uniqueId}').click()">
+                             <button type="button" class="btn btn-sm btn-outline-secondary" style="border-style: dashed; flex: 1;" data-action="clickElement" data-id="img-${uniqueId}">
                                  <i class="fa-solid fa-file-image"></i> Upload
                              </button>
                              <button type="button" class="btn btn-sm btn-outline-secondary" style="flex: 1;" data-action="handleCameraButton" data-id="${uniqueId}" title="Capture photo from mobile camera or webcam">

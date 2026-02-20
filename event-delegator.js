@@ -36,26 +36,47 @@
         return [];
     }
 
+    // ─── Built-in helper actions ───────────────────────────────────────
+    var builtins = {
+        clickElement: function (id) { var el = document.getElementById(id); if (el) el.click(); },
+        removeElement: function (id) { var el = document.getElementById(id); if (el) el.remove(); },
+        removeSelf: function (target) { if (target) target.remove(); }
+    };
+
     // ─── Click Delegation ────────────────────────────────────────────
     document.addEventListener('click', function (e) {
         // 1. data-hash: simple hash navigation
         var hashTarget = e.target.closest('[data-hash]');
         if (hashTarget) {
+            if (hashTarget.dataset.stopProp === 'true') e.stopPropagation();
             e.preventDefault();
             window.location.hash = hashTarget.dataset.hash;
             return;
         }
 
-        // 2. data-action: call a window function
+        // 2. data-action: call a window function or built-in
         var actionTarget = e.target.closest('[data-action]');
         if (actionTarget) {
             var action = actionTarget.dataset.action;
+            if (actionTarget.dataset.stopProp === 'true') e.stopPropagation();
+
+            // Check built-in actions first
+            if (builtins[action]) {
+                var args = extractArgs(actionTarget);
+                if (action === 'removeSelf') {
+                    builtins.removeSelf(actionTarget);
+                } else if (args.length > 0) {
+                    builtins[action].apply(null, args);
+                }
+                return;
+            }
+
             var fn = window[action];
             if (typeof fn === 'function') {
                 // Build argument list from data-* attributes
-                var args = extractArgs(actionTarget);
-                if (args.length > 0) {
-                    fn.apply(null, args);
+                var args2 = extractArgs(actionTarget);
+                if (args2.length > 0) {
+                    fn.apply(null, args2);
                 } else {
                     // No args — pass element context (for toggleNavGroup-like handlers)
                     fn.call(actionTarget, actionTarget, actionTarget.dataset, e);

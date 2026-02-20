@@ -64,7 +64,7 @@ function renderAuditExecutionEnhanced() {
             <td>
                 ${report.planId ?
                     `<span class="badge" style="background: #3b82f6; color: white; cursor: pointer; font-weight: 600;" 
-                           onclick="event.stopPropagation(); window.location.hash = 'client/${clientId}/plans';" 
+                           data-hash="client/${clientId}/plans" data-stop-prop="true" 
                            title="View linked audit plan">
                         <i class="fa-solid fa-link" style="margin-right: 0.25rem;"></i>${planRef}
                     </span>` :
@@ -990,7 +990,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
                                  <label style="font-size: 0.78rem; font-weight: 600; color: #475569; margin: 0;"><i class="fa-solid fa-images" style="margin-right: 0.25rem; color: #6366f1;"></i>Evidence Photos</label>
                                  <div style="display: flex; gap: 4px;">
-                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #6366f1; color: white; border: none; border-radius: 4px;" onclick="document.getElementById('img-${uniqueId}').click()" title="Upload image">
+                                     <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #6366f1; color: white; border: none; border-radius: 4px;" data-action="clickElement" data-id="img-${uniqueId}" title="Upload image">
                                          <i class="fa-solid fa-file-image"></i> Upload
                                      </button>
                                      <button type="button" class="btn btn-sm" style="padding: 2px 8px; font-size: 0.72rem; background: #0ea5e9; color: white; border: none; border-radius: 4px;" data-action="handleCameraButton" data-id="${uniqueId}" title="Camera">
@@ -3267,7 +3267,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             div.dataset.role = role;
             div.dataset.org = org;
             div.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; background: #eff6ff; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.25rem;';
-            div.innerHTML = `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${name}</strong>${role ? ' – ' + role : ''}${org ? ' (' + org + ')' : ''}<button class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" onclick="this.parentElement.remove()"><i class="fa-solid fa-times"></i></button>`;
+            div.innerHTML = `<i class="fa-solid fa-user-plus" style="color: #3b82f6;"></i><strong>${name}</strong>${role ? ' – ' + role : ''}${org ? ' (' + org + ')' : ''}<button class="btn btn-sm" style="margin-left: auto; padding: 0 0.25rem; color: #dc2626;" data-action="removeSelf"><i class="fa-solid fa-times"></i></button>`;
             list.appendChild(div);
         }
         nameEl.value = ''; if (roleEl) roleEl.value = ''; if (orgEl) orgEl.value = '';
@@ -3965,7 +3965,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         <h2 style="margin:0 0 4px;font-size:1.25rem;"><i class="fa-solid fa-file-pdf" style="margin-right:8px;"></i>Report Preview & Edit</h2>
                         <div style="opacity:0.8;font-size:0.88rem;">${d.report.client} — ${d.report.standard || 'ISO Standard'}</div>
                     </div>
-                    <button onclick="document.getElementById('report-preview-overlay').remove()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;"><i class="fa-solid fa-times"></i></button>
+                    <button data-action="removeElement" data-id="report-preview-overlay" style="background:rgba(255,255,255,0.15);border:none;color:white;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;"><i class="fa-solid fa-times"></i></button>
                 </div>
             </div>
             <div class="rp-pills">
@@ -4694,7 +4694,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             <div class="rp-footer">
                 <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
                 <div style="display:flex;gap:10px;">
-                    <button onclick="document.getElementById('report-preview-overlay').remove()" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
+                    <button data-action="removeElement" data-id="report-preview-overlay" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
                     <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
                     <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>

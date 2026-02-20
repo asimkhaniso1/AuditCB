@@ -2132,7 +2132,7 @@ function getDataManagementHTML() {
                         <strong style="color: var(--danger-color);">Warning: Replaces all current data.</strong>
                     </p>
                     <input type="file" id="restore-file" accept=".json" style="display: none;" data-action-change="restoreData" data-id="this">
-                    <button class="btn btn-secondary" onclick="document.getElementById('restore-file').click()">
+                    <button class="btn btn-secondary" data-action="clickElement" data-id="restore-file">
                         <i class="fa-solid fa-upload" style="margin-right: 0.5rem;"></i>
                         Select Backup File
                     </button>

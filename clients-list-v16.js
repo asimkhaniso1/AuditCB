@@ -61,8 +61,8 @@ function renderClientsEnhanced() {
                 <button class="btn btn-sm edit-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="Edit"><i class="fa-solid fa-edit"></i></button>
                 ` : ''}
                 ${(window.state.currentUser?.role === 'Admin') ? `
-                <button class="btn btn-sm" onclick="event.stopPropagation(); window.archiveClient('${client.id}')" style="color: #f59e0b;" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
-                <button class="btn btn-sm" onclick="event.stopPropagation(); window.deleteClient('${client.id}')" style="color: #ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn btn-sm" data-action="archiveClient" data-id="${client.id}" data-stop-prop="true" style="color: #f59e0b;" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
+                <button class="btn btn-sm" data-action="deleteClient" data-id="${client.id}" data-stop-prop="true" style="color: #ef4444;" title="Delete"><i class="fa-solid fa-trash"></i></button>
                 ` : ''}
                 <button class="btn btn-sm view-client" data-client-id="${client.id}" style="color: var(--primary-color);" title="View"><i class="fa-solid fa-eye"></i></button>
                 </div>
@@ -80,7 +80,7 @@ function renderClientsEnhanced() {
                         <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('client-import-file').click()" style="white-space: nowrap;">
+                        <button class="btn btn-sm btn-outline-secondary" data-action="clickElement" data-id="client-import-file" style="white-space: nowrap;">
                             <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
                         </button>
                     ` : ''}

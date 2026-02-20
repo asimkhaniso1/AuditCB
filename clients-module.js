@@ -72,7 +72,7 @@ function renderClientsEnhanced() {
                         <button class="btn btn-sm btn-outline-secondary" data-action="downloadImportTemplate" style="white-space: nowrap;" title="Restricted to Cert Managers">
                             <i class="fa-solid fa-file-export" style="margin-right: 0.5rem;"></i>Template
                         </button>
-                         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('client-import-file').click()" style="white-space: nowrap;" title="Restricted to Cert Managers">
+                         <button class="btn btn-sm btn-outline-secondary" data-action="clickElement" data-id="client-import-file" style="white-space: nowrap;" title="Restricted to Cert Managers">
                             <i class="fa-solid fa-file-import" style="margin-right: 0.5rem;"></i>Import
                         </button>
                     ` : ''}
@@ -482,7 +482,7 @@ function getClientInfoHTML(client) {
                     <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
                         <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
                         No auditors found with ${client.industry || 'this'} industry experience. 
-                        <a href="#" onclick="window.renderModule('auditors'); return false;" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
+                        <a href="#" data-action="renderModule" data-id="auditors" style="color: var(--primary-color);">Add auditors</a> with relevant industry expertise.
                     </p>
                 `}
     </div>
@@ -2412,7 +2412,7 @@ window.handleIndustryChange = function (select) {
             </div>
             <div class="form-group">
                 <label>File Attachment <span style="font-size: 0.8rem; color: #94a3b8;">(optional)</span></label>
-                <div style="border: 2px dashed var(--border-color); padding: 1rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
+                <div style="border: 2px dashed var(--border-color); padding: 1rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" data-action="clickElement" data-id="doc-file">
                     <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.25rem; color: var(--primary-color); margin-bottom: 0.25rem;"></i>
                     <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Click to browse files</p>
                 </div>

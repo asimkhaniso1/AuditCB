@@ -2764,7 +2764,7 @@ window.openAuditorUploadModal = function (auditorId) {
             </div>
             <div class="form-group">
                 <label>File Select</label>
-                <div style="border: 2px dashed var(--border-color); padding: 1.5rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" onclick="document.getElementById('doc-file').click()">
+                <div style="border: 2px dashed var(--border-color); padding: 1.5rem; text-align: center; border-radius: var(--radius-sm); cursor: pointer; background: #f8fafc;" data-action="clickElement" data-id="doc-file">
                     <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 0.5rem;"></i>
                     <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">Click to browse files</p>
                 </div>

@@ -65,10 +65,29 @@ function transformHandler(fullMatch, eventType, handlerBody) {
         return `data-hash="${hashMatch2[1]}"`;
     }
 
+    // ─── Pattern 1c: event.stopPropagation(); window.location.hash = '...' ───
+    const stopPropHashMatch = body.match(/^event\.stopPropagation\(\);\s*(?:window\.)?location\.hash\s*=\s*['"]([^'"]+)['"];?$/);
+    if (stopPropHashMatch) {
+        return `data-hash="${stopPropHashMatch[1]}" data-stop-prop="true"`;
+    }
+
     // ─── Pattern 2: event.preventDefault(); functionName() ───
     const preventMatch = body.match(/^event\.preventDefault\(\);\s*(?:window\.)?(\w+)\((.*)\);?$/);
     if (preventMatch) {
         return buildDataAction(preventMatch[1], preventMatch[2], eventType);
+    }
+
+    // ─── Pattern 2b: event.stopPropagation(); functionName() ───
+    const stopPropFuncMatch = body.match(/^event\.stopPropagation\(\);\s*(?:window\.)?(\w+)\((.*)\);?$/);
+    if (stopPropFuncMatch) {
+        const result = buildDataAction(stopPropFuncMatch[1], stopPropFuncMatch[2], eventType);
+        if (result) return result + ' data-stop-prop="true"';
+    }
+
+    // ─── Pattern 2c: functionName(); return false; ───
+    const returnFalseMatch = body.match(/^(?:window\.)?(\w+)\((.*)\);\s*return\s+false;?$/);
+    if (returnFalseMatch) {
+        return buildDataAction(returnFalseMatch[1], returnFalseMatch[2], eventType);
     }
 
     // ─── Pattern 3: Simple function call — functionName() or window.functionName() ───
@@ -77,8 +96,25 @@ function transformHandler(fullMatch, eventType, handlerBody) {
         return buildDataAction(funcMatch[1], funcMatch[2], eventType);
     }
 
-    // ─── Pattern 4: this.style or other JS expression (complex) ───
-    // These can't be auto-migrated — skip
+    // ─── Pattern 4: document.getElementById('x').click() ───
+    const clickElMatch = body.match(/^document\.getElementById\(['"]([^'"]+)['"]\)\.click\(\);?$/);
+    if (clickElMatch) {
+        return `data-action="clickElement" data-id="${clickElMatch[1]}"`;
+    }
+
+    // ─── Pattern 5: document.getElementById('x').remove() ───
+    const removeElMatch = body.match(/^document\.getElementById\(['"]([^'"]+)['"]\)\.remove\(\);?$/);
+    if (removeElMatch) {
+        return `data-action="removeElement" data-id="${removeElMatch[1]}"`;
+    }
+
+    // ─── Pattern 6: this.closest('.x').remove() or this.parentElement.remove() ───
+    const closestRemoveMatch = body.match(/^this\.(?:closest\(['"]\.[^'"]+['"]\)|parentElement(?:\.parentElement)*)\.remove\(\);?$/);
+    if (closestRemoveMatch) {
+        return `data-action="removeSelf"`;
+    }
+
+    // ─── Pattern 7: Complex — can't auto-migrate ───
     return null;
 }
 
