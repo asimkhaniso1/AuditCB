@@ -10,7 +10,6 @@ if (window.Logger) Logger.debug('Modules', 'clients-module-fix.js loading...');
 // ============================================
 
 window.getClientOrgSetupHTML = function (client) {
-    console.log('[WIZARD-FIX] getClientOrgSetupHTML called, client:', client?.name, 'id:', client?.id, 'departments:', client?.departments?.length, 'sites:', client?.sites?.length);
     if (!client._wizardStep) client._wizardStep = 1;
     const currentStep = client._wizardStep;
 
@@ -63,29 +62,22 @@ window.getClientOrgSetupHTML = function (client) {
 };
 
 window.getClientOrgSetupHTML.renderWizardStep = function (client, step) {
-    console.log('[WIZARD-FIX] renderWizardStep called, step:', step, 'client:', client?.name);
-    try {
-        var result;
-        switch (step) {
-            case 1: result = window.getClientProfileHTML(client); break;
-            case 2: result = window.getClientSitesHTML(client); break;
-            case 3: result = window.getClientDepartmentsHTML(client); break;
-            case 4: result = window.getClientDesignationsHTML(client); break;
-            case 5: result = window.getClientContactsHTML(client); break;
-            case 6: result = window.getClientGoodsServicesHTML(client); break;
-            case 7: result = window.getClientKeyProcessesHTML(client); break;
-            default: result = ''; break;
-        }
-        console.log('[WIZARD-FIX] renderWizardStep result length:', result ? result.length : 'NULL/UNDEFINED', 'type:', typeof result);
-        return '<div style="background:#fef2f2;padding:4px 8px;font-size:11px;color:#ef4444;border:1px solid #fca5a5;border-radius:4px;margin-bottom:8px;">[DEBUG] Step ' + step + ' HTML length: ' + (result ? result.length : 0) + '</div>' + (result || '');
-    } catch (e) {
-        console.error('[WIZARD-FIX] renderWizardStep ERROR:', e);
-        return '<div style="color:red;padding:2rem;">Error rendering step ' + step + ': ' + e.message + '</div>';
+    step = parseInt(step, 10) || 1; // DOM data-arg2 returns strings; switch needs numbers
+    switch (step) {
+        case 1: return window.getClientProfileHTML(client);
+        case 2: return window.getClientSitesHTML(client);
+        case 3: return window.getClientDepartmentsHTML(client);
+        case 4: return window.getClientDesignationsHTML(client);
+        case 5: return window.getClientContactsHTML(client);
+        case 6: return window.getClientGoodsServicesHTML(client);
+        case 7: return window.getClientKeyProcessesHTML(client);
+        default: return '';
     }
 };
 
 window.setSetupWizardStep = function (clientId, step) {
-    if (step < 1 || step > 7) return;
+    step = parseInt(step, 10); // DOM data-arg2 returns strings
+    if (step < 1 || step > 7 || isNaN(step)) return;
     const client = window.state.clients.find(c => String(c.id) === String(clientId));
     if (client) {
         client._wizardStep = step;

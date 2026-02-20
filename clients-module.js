@@ -4186,8 +4186,8 @@ CFO," style="font-family: monospace;"></textarea>
     `;
     }
 
-    // Helper to render the specific step content
     getClientOrgSetupHTML.renderWizardStep = function (client, step) {
+        step = parseInt(step, 10) || 1; // DOM data-arg2 returns strings; switch needs numbers
         switch (step) {
             case 1: return getClientProfileHTML(client);
             case 2: return getClientSitesHTML(client);
@@ -4201,7 +4201,8 @@ CFO," style="font-family: monospace;"></textarea>
     };
 
     window.setSetupWizardStep = function (clientId, step) {
-        if (step < 1 || step > 7) return;
+        step = parseInt(step, 10); // DOM data-arg2 returns strings
+        if (step < 1 || step > 7 || isNaN(step)) return;
         const client = window.state.clients.find(c => String(c.id) === String(clientId));
         if (client) {
             client._wizardStep = step;
