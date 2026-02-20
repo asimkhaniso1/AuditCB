@@ -356,8 +356,49 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
 
                     <!-- Sidebar Column -->
                     <div style="display: grid; gap: 1.5rem; align-self: start;">
-                        
-                        <!-- Card: Duration Calculation -->
+
+                        <!-- Card: Compliance & Method (FIRST) -->
+                        <div class="card" style="margin: 0; padding: 1.5rem;">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #1d4ed8;">
+                                <i class="fa-solid fa-shield-halved"></i> Governance
+                            </h3>
+                            
+                            <div style="display: grid; gap: 1rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Type</label>
+                                    <select class="form-control" id="plan-audit-type">
+                                        <option value="Stage 1">Stage 1 Audit</option>
+                                        <option value="Stage 2" selected>Stage 2 Audit</option>
+                                        <option value="Surveillance">Surveillance</option>
+                                        <option value="Recertification">Recertification</option>
+                                        <option value="Special">Special Audit</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Method</label>
+                                    <select class="form-control" id="plan-audit-method">
+                                        <option value="On-site" selected>On-site</option>
+                                        <option value="Remote">Remote</option>
+                                        <option value="Hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Impartiality Risk</label>
+                                    <select class="form-control" id="plan-impartiality-risk">
+                                        <option value="None" selected>None Identified</option>
+                                        <option value="Low">Low - Mitigated</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High Risk</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Impartiality Notes</label>
+                                    <textarea class="form-control" id="plan-impartiality-notes" rows="2" style="font-size: 0.8rem;" placeholder="Mitigation actions..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: Duration Calculation (SECOND) -->
                         <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid var(--primary-color);">
                             <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
                                 <i class="fa-solid fa-calculator"></i> Audit Duration
@@ -399,47 +440,6 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                                 </div>
                             </div>
                             <small id="manday-hint" style="color: #6b7280; display: block; margin-top: 8px; font-size: 0.75rem; text-align: center;">Based on ISO 17021-1 Annex Tables</small>
-                        </div>
-
-                        <!-- Card: Compliance & Method -->
-                        <div class="card" style="margin: 0; padding: 1.5rem;">
-                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #1d4ed8;">
-                                <i class="fa-solid fa-shield-halved"></i> Governance
-                            </h3>
-                            
-                            <div style="display: grid; gap: 1rem;">
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Audit Type</label>
-                                    <select class="form-control" id="plan-audit-type">
-                                        <option value="Stage 1">Stage 1 Audit</option>
-                                        <option value="Stage 2" selected>Stage 2 Audit</option>
-                                        <option value="Surveillance">Surveillance</option>
-                                        <option value="Recertification">Recertification</option>
-                                        <option value="Special">Special Audit</option>
-                                    </select>
-                                </div>
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Method</label>
-                                    <select class="form-control" id="plan-audit-method">
-                                        <option value="On-site" selected>On-site</option>
-                                        <option value="Remote">Remote</option>
-                                        <option value="Hybrid">Hybrid</option>
-                                    </select>
-                                </div>
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Impartiality Risk</label>
-                                    <select class="form-control" id="plan-impartiality-risk">
-                                        <option value="None" selected>None Identified</option>
-                                        <option value="Low">Low - Mitigated</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="High">High Risk</option>
-                                    </select>
-                                </div>
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Impartiality Notes</label>
-                                    <textarea class="form-control" id="plan-impartiality-notes" rows="2" style="font-size: 0.8rem;" placeholder="Mitigation actions..."></textarea>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Main Actions -->
@@ -2009,7 +2009,6 @@ window.printAuditPlanDetails = function (planId) {
                 <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
             </div>
 
-            <table class="meta-table">
                 <tr>
                     <td><span class="meta-label">Client</span>${window.UTILS.escapeHtml(plan.client)}</td>
                     <td><span class="meta-label">Audit Standard</span>${window.UTILS.escapeHtml(plan.standard)}</td>
@@ -2018,13 +2017,17 @@ window.printAuditPlanDetails = function (planId) {
                     <td><span class="meta-label">Planned Date</span>${window.UTILS.escapeHtml(plan.date)}</td>
                     <td><span class="meta-label">Audit Type</span>${window.UTILS.escapeHtml(plan.type)}</td>
                 </tr>
+                <tr>
+                    <td><span class="meta-label">Audit Method</span>${window.UTILS.escapeHtml(plan.auditMethod || 'On-site')}</td>
+                    <td><span class="meta-label">Impartiality Risk</span>${window.UTILS.escapeHtml(plan.impartialityAssessment?.risk || 'None Identified')}${plan.impartialityAssessment?.notes ? ' — ' + window.UTILS.escapeHtml(plan.impartialityAssessment.notes) : ''}</td>
+                </tr>
                  <tr>
                     <td><span class="meta-label">Lead Auditor</span>${window.UTILS.escapeHtml(leadAuditor)}</td>
                     <td><span class="meta-label">Audit Team</span>${window.UTILS.escapeHtml(otherMembers.join(', ') || 'None')}</td>
                 </tr>
                  <tr>
                     <td><span class="meta-label">Total Man-Days</span>${window.UTILS.escapeHtml(plan.manDays)} days (${window.UTILS.escapeHtml(plan.onsiteDays)} onsite)</td>
-                    <td><span class="meta-label">Risk Level</span>Medium (Standard)</td>
+                    <td><span class="meta-label">Operational Risk</span>${window.UTILS.escapeHtml(plan.riskLevel || 'Medium')}</td>
                 </tr>
             </table>
 
