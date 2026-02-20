@@ -23,11 +23,6 @@ function initClientSidebarWithRetry(retryCount = 0, maxRetries = 100) {
 
     // If we have user and clients, OR if data is fully loaded (even with no clients), proceed
     if ((hasUser && hasClients) || (hasUser && isDataLoaded)) {
-        console.log('[CLIENT SIDEBAR] Data ready, initializing sidebar', {
-            user: hasUser?.email,
-            clientsCount: window.state?.clients?.length,
-            dataLoaded: isDataLoaded
-        });
         populateClientSidebar();
         setupClientSearch();
         return;
@@ -65,19 +60,12 @@ function populateClientSidebar() {
     const currentUser = window.state?.currentUser;
 
     // DEBUG: Log current state
-    console.log('[CLIENT SIDEBAR DEBUG]', {
-        allClientsCount: allClients.length,
-        currentUser: currentUser,
-        hasGetVisibleClients: typeof window.getVisibleClients === 'function'
-    });
-
     // Use RLS-aware client filtering (respects database permissions)
     // This ensures Admins see all clients and Auditors see only assigned ones
     // Fallback to allClients if getVisibleClients is not yet loaded
     let clients = (typeof window.getVisibleClients === 'function') ? window.getVisibleClients() : allClients;
 
     // DEBUG: Log filtered results
-    console.log('[CLIENT SIDEBAR DEBUG] Filtered clients:', clients.length);
 
 
     if (clients.length === 0) {
@@ -376,16 +364,13 @@ window.renderClientModule = function (clientId, moduleName) {
             }
             break;
         case 'settings':
-            console.log('[DEBUG-WORKSPACE] Settings case triggered for client:', client.id);
             if (typeof renderClientDetail === 'function') {
                 renderClientDetail(client.id, { showAccountSetup: true, showAnalytics: false });
                 setTimeout(() => {
                     const settingsTab = document.querySelector('.tab-btn[data-tab="settings"]');
-                    console.log('[DEBUG-WORKSPACE] Settings tab found:', !!settingsTab);
                     if (settingsTab) {
                         settingsTab.click();
                     } else if (typeof renderClientTab === 'function') {
-                        console.log('[DEBUG-WORKSPACE] Using renderClientTab fallback for settings');
                         renderClientTab(client, 'settings');
                     }
                 }, 200);
@@ -1320,7 +1305,6 @@ window.refreshClientSidebar = populateClientSidebar;
 // Export
 window.populateClientSidebar = populateClientSidebar;
 window.downloadReport = function (reportId) {
-    console.log('Downloading report:', reportId);
     window.showNotification('Preparing report download...', 'info');
     setTimeout(() => {
         window.showNotification('Report downloaded successfully (Simulated)', 'success');

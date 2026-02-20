@@ -216,7 +216,6 @@ const DataMigration = {
                 if (window.StateStore) {
                     window.StateStore.save(window.state);
                 }
-                console.log('Data saved to IndexedDB successfully');
             } catch (e) {
                 console.error('Failed to save state:', e);
             }
@@ -374,7 +373,6 @@ const DataMigration = {
             const keepChecklists = keepChecklistsEl ? keepChecklistsEl.checked : true;
             const keepAdmin = keepAdminEl ? keepAdminEl.checked : true;
 
-            console.log('Handling Clear Data:', { keepChecklists, keepAdmin });
             this.clearAllData({ keepChecklists, keepAdmin });
         } catch (error) {
             console.error('Handle clear data error:', error);

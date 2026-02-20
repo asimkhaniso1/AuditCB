@@ -208,7 +208,6 @@ function deletePlan(planId) {
         if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
             window.SupabaseClient.db.delete('audit_plans', String(planId))
                 .then(() => {
-                    console.log(`Plan ${planId} deleted from cloud.`);
                 })
                 .catch(err => {
                     console.error('Cloud deletion failed:', err);
@@ -631,7 +630,6 @@ function updateClientDetails(clientName) {
             siteGroup.style.display = 'block';
             if (noSitesMessage) noSitesMessage.style.display = 'none';
             // Debugging
-            console.log('Rendering sites:', client.sites);
 
             siteCheckboxes.innerHTML = client.sites.map((s, i) => `
                 <div style="padding: 10px; background: #fff; border-radius: 6px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; width: 100%; box-sizing: border-box;">

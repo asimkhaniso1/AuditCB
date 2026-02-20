@@ -123,4 +123,3 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
     `;
 };
 
-console.log('✅ Checklist item renderer loaded');

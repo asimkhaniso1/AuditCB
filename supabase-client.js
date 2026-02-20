@@ -1187,7 +1187,6 @@ const SupabaseClient = {
                 }
             };
 
-            console.log('[upsertClient] Sending payload:', JSON.stringify(clientData, null, 2));
 
             const { data, error } = await this.client
                 .from('clients')
@@ -1442,7 +1441,6 @@ const SupabaseClient = {
                     const user = users.find(u => u.email?.toLowerCase() === auditor.email.toLowerCase());
                     if (user) {
                         auditor.userId = user.id || user.supabaseId;
-                        // console.log(`Linked auditor ${auditor.name} to user ${auditor.userId}`);
                     }
                 }
             });

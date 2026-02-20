@@ -538,7 +538,6 @@ function openImportChecklistModal() {
                 // Get public URL
                 cloudUrl = window.SupabaseClient.storage.getPublicUrl('checklists', path);
                 cloudPath = path;
-                console.log('Checklist uploaded to cloud:', path);
             } catch (uploadErr) {
                 console.error('Failed to upload checklist to cloud:', uploadErr);
                 window.showNotification('File uploaded locally (cloud upload failed)', 'warning');
@@ -613,7 +612,6 @@ function openImportChecklistModal() {
             if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
                 try {
                     await window.SupabaseClient.syncChecklistsToSupabase([newChecklist]);
-                    console.log('✅ Checklist saved to Supabase DB');
                 } catch (dbErr) {
                     console.error('Checklist DB save failed:', dbErr);
                     window.showNotification('Imported locally, but DB sync failed: ' + dbErr.message, 'warning');

@@ -48,6 +48,5 @@
         };
     };
 
-    console.log('✅ Debounce/Throttle utilities loaded');
 
 })();

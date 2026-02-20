@@ -1,4 +1,0 @@
--- ==========================================
--- 73. ADD MISSING CERTIFICATE COLUMNS - REVERTED / SKIPPED
--- User requested to use existing columns (JSONB)
--- ==========================================

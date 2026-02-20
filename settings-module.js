@@ -131,7 +131,6 @@ function renderSettings() {
     if (window.SupabaseClient?.isInitialized && window.SupabaseClient.syncSettingsFromSupabase) {
         window.SupabaseClient.syncSettingsFromSupabase().then(result => {
             if (result.updated) {
-                console.log('[Settings] Supabase data loaded, refreshing form...');
                 // Update form fields with loaded data without full re-render (avoid loop)
                 updateSettingsFormFields();
             }
@@ -564,7 +563,6 @@ window.saveCBProfile = function () {
         // Explicitly sync settings to Supabase when user saves
         if (window.SupabaseClient?.isInitialized) {
             window.SupabaseClient.syncSettingsToSupabase(window.state.settings)
-                .then(() => console.log('[Settings] Synced to Supabase'))
                 .catch(e => console.warn('Settings Supabase sync failed:', e));
         }
 
@@ -640,7 +638,6 @@ function updateSettingsFormFields() {
         `).join('');
     }
 
-    console.log('[Settings] Form fields and tables updated with Supabase data');
 }
 
 window.handleLogoUpload = function (input) {
@@ -1211,7 +1208,6 @@ async function ensureAuditorProfile(userId, userName) {
         if (error) {
             console.warn('Auto-creating auditor profile failed (might already exist):', error.message);
         } else {
-            console.log('Ensured auditor profile for user:', userId);
         }
     } catch (e) {
         console.warn('Error in ensureAuditorProfile:', e);
@@ -3638,14 +3634,12 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
         abbr = 'MS';
     }
 
-    console.log(`[KB Analysis] Starting ${mode.toUpperCase()} ${auditType.toUpperCase()} AI extraction for: ${standardName} (${abbr})${clientId ? ' with client context' : ''}`);
 
     // Fix: Define docContent from the document object
     let docContent = doc.extractedText || '';
 
     // If no extracted text, try to re-extract from cloud URL
     if ((!docContent || docContent.length < 100) && doc.cloudUrl) {
-        console.log('[KB Analysis] No extracted text found. Attempting to re-extract from cloud URL:', doc.cloudUrl);
         try {
             const response = await fetch(doc.cloudUrl);
             if (response.ok) {
@@ -3656,7 +3650,6 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
                     docContent = reExtracted;
                     doc.extractedText = reExtracted; // Cache it for next time
                     window.saveData();
-                    console.log(`[KB Analysis] Re-extracted ${reExtracted.length} chars from cloud PDF`);
                 }
             }
         } catch (reExtractErr) {
@@ -3668,7 +3661,6 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
         console.warn(`[KB Analysis] Document text is empty or too short (${docContent.length} chars). Will proceed with AI general knowledge.`);
         window._kbProgress?.show('No PDF text found — using AI knowledge...', 15);
     } else {
-        console.log(`[KB Analysis] Source text available: ${docContent.length} chars`);
         window._kbProgress?.show(`Text extracted: ${Math.round(docContent.length / 1000)}K chars`, 15);
     }
 
@@ -3712,7 +3704,6 @@ async function extractStandardClauses(doc, standardName, mode = 'standard', audi
             if (client.profile) parts.push(`Profile: ${client.profile.substring(0, 500)}`);
             parts.push(`\nIMPORTANT: Make checklist questions SPECIFIC to this organization's industry, processes, products, and scope. Reference their actual processes/products where relevant.`);
             clientContext = parts.join('\n');
-            console.log(`[KB Analysis] Client context added: ${client.name} (${client.industry || 'no industry'})`);
         }
     }
 
@@ -3805,7 +3796,6 @@ SURVEILLANCE-SPECIFIC REQUIREMENTS:
             );
         }
 
-        console.log(`[KB Analysis] Mode: ${mode} | AuditType: ${auditType} | Batches: ${batches.length} | maxTokens: ${config.maxTokens} | Source: ${config.sourceLimit} chars`);
 
         let allClauses = [];
         let allChecklist = [];
@@ -3821,7 +3811,6 @@ SURVEILLANCE-SPECIFIC REQUIREMENTS:
                 await new Promise(resolve => setTimeout(resolve, config.batchDelay));
             }
 
-            console.log(`[KB Analysis] Extracting ${batch.label} (batch ${bi + 1}/${batches.length})...`);
             window._kbProgress?.show(`AI extracting ${batch.label}... (${bi + 1}/${batches.length})`, batchStartPct);
 
             const batchSource = batch.useSource ? sourceSection : `\nUse your expert knowledge of ${standardName}. Be comprehensive — list EVERY control.\n`;
@@ -3844,7 +3833,6 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
 [{"clause":"X.Y","title":"...","requirement":"${auditType === 'surveillance' ? 'Key requirement for surveillance...' : 'Full text...'}","subRequirements":["a) ..."],"checklistQuestions":["${auditType === 'surveillance' ? 'What evidence shows continued...?' : 'Q1?'}"]}]`;
 
             const text = await window.AI_SERVICE.callProxyAPI(prompt, { maxTokens: config.maxTokens });
-            console.log(`[KB Analysis] ${batch.label} response: ${text.length} chars (first 200: ${text.substring(0, 200)}...)`);
             window._kbProgress?.show(`Parsing ${batch.label} response...`, batchEndPct - 5);
 
             let jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -3878,7 +3866,6 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
                 });
                 window._kbProgress?.show(`${batch.label}: ${batchClauses.length} clauses extracted ✓`, batchEndPct);
                 const batchQs = batchClauses.reduce((sum, c) => sum + (c.checklistQuestions?.length || 0), 0);
-                console.log(`[KB Analysis] ${batch.label}: ${batchClauses.length} clauses, ${batchQs} questions (running total: ${allChecklist.length} Qs)`);
             } else {
                 window._kbProgress?.show(`${batch.label}: extraction failed ✗`, batchEndPct);
                 console.warn(`[KB Analysis] ${batch.label}: extraction failed`);
@@ -3915,7 +3902,6 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
                         }
                     });
                     if (gapCount > 0) {
-                        console.log(`[KB Analysis] Gap-fill: injected ${gapCount} missing clause(s) from built-in database`);
                         // Re-sort by clause number
                         allClauses.sort((a, b) => {
                             const na = String(a.clause).split('.').map(Number);
@@ -3954,7 +3940,6 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
                 doc.lastClientId = '';
             }
             window.saveData();
-            console.log(`✅ [KB Analysis] SUCCESS! ${allClauses.length} clauses + ${allChecklist.length} checklist Qs from ${standardName}`);
             return;
         } else {
             console.warn(`[KB Analysis] Both batches failed`);
@@ -3971,7 +3956,6 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
     doc.status = 'ready';
     doc.lastAnalyzed = new Date().toISOString().split('T')[0];
     window.saveData();
-    console.log(`[KB Analysis] Fallback complete: ${doc.clauses.length} clauses loaded`);
 }
 
 // Built-in clause database for common standards (fallback) - COMPREHENSIVE with sub-clauses and bullet points
@@ -4295,7 +4279,6 @@ window.updateKBSection = function (docId, clauseId, newContent) {
             window.saveData();
             // Optional: Notification? unique notification might be annoying on every blur.
             // Maybe show a small toast or just save silently.
-            console.log('Section updated:', clauseId);
         }
     }
 };
@@ -4419,7 +4402,6 @@ window.extractTextFromFile = async function (file) {
                 const pdf = await loadingTask.promise;
                 let fullText = '';
                 const maxPages = pdf.numPages; // Extract ALL pages for complete analysis
-                console.log(`[PDF Extraction] Extracting ${maxPages} pages from ${file.name}`);
                 for (let i = 1; i <= maxPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
@@ -4429,13 +4411,11 @@ window.extractTextFromFile = async function (file) {
                 return fullText;
             } else if (file.name.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 // DOCX extraction: DOCX is a ZIP containing word/document.xml
-                console.log(`[DOCX Extraction] Extracting text from ${file.name}`);
 
                 // Use mammoth.js if available (better formatting)
                 if (typeof mammoth !== 'undefined') {
                     const arrayBuffer = await file.arrayBuffer();
                     const result = await mammoth.extractRawText({ arrayBuffer });
-                    console.log(`[DOCX Extraction] mammoth.js extracted ${result.value.length} chars`);
                     return result.value;
                 }
 
@@ -4446,7 +4426,6 @@ window.extractTextFromFile = async function (file) {
                 // Find word/document.xml in the ZIP
                 const docXml = await extractDocxText(uint8);
                 if (docXml) {
-                    console.log(`[DOCX Extraction] Extracted ${docXml.length} chars from ${file.name}`);
                     return docXml;
                 }
 
@@ -4655,7 +4634,6 @@ window.createChecklistFromKB = async function (docId) {
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'id' });
-            console.log('[KB] Checklist synced to Supabase:', newChecklist.name);
         } catch (dbErr) {
             console.error('[KB] Failed to sync checklist to Supabase:', dbErr);
         }
@@ -4700,14 +4678,12 @@ window.deleteKnowledgeDoc = async function (type, id) {
         try {
             // Delete from storage if cloudPath exists
             if (doc.cloudPath) {
-                console.log('[Delete] Attempting to delete from storage:', doc.cloudPath);
                 const { data, error } = await window.SupabaseClient.client.storage
                     .from('documents')
                     .remove([doc.cloudPath]);
                 if (error) {
                     console.error('[Delete] Storage deletion error:', error);
                 } else {
-                    console.log('[Delete] Successfully deleted file from storage:', doc.cloudPath, data);
                 }
             } else {
                 console.warn('[Delete] No cloudPath found for document:', doc);
@@ -4718,7 +4694,6 @@ window.deleteKnowledgeDoc = async function (type, id) {
                 .from('documents')
                 .delete()
                 .eq('id', id);
-            console.log('Deleted document metadata from database:', id);
 
             // Sync settings (KB metadata)
             await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);

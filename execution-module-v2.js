@@ -797,7 +797,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         contacts = allContacts;
                     } else {
                         window.showNotification(`Using ${contacts.length} personnel from Opening Meeting attendees.`, 'info');
-                        console.log(`[AI AutoMap] Filtered to ${contacts.length} opening meeting attendees out of ${allContacts.length} total contacts`);
                     }
                 } else {
                     window.showNotification('No opening meeting attendees recorded. Using full client roster.', 'warning');
@@ -1527,7 +1526,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (item.status !== 'nc') return;
                 // Use shared helper for clause/requirement resolution
                 let { clauseText, reqText } = window.KB_HELPERS.resolveChecklistClause(item, assignedChecklists);
-                console.log(`[Review Findings] Item ${originalIdx}: checklistId=${item.checklistId}, itemIdx=${item.itemIdx}, clause=${clauseText}, req=${reqText?.substring(0, 60)}`);
 
                 // Fallback: use clause/requirement saved directly on the progress item
                 // BUT only if the saved values are not corrupted (from old DOM scraping)
@@ -2161,7 +2159,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     if (report) {
                         report.clauseOrder = newOrder;
                         window.saveData();
-                        console.log('[Reorder] Saved clause order:', newOrder);
                     }
                 }
             });
@@ -3303,7 +3300,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 openingMeeting: report.openingMeeting,
                 closingMeeting: report.closingMeeting
             }).then(() => {
-                console.log('[Meetings] Synced to Supabase');
             }).catch(err => {
                 console.warn('[Meetings] Supabase sync failed, queuing for offline:', err);
                 // Fallback to offline queue
@@ -3473,7 +3469,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     let displayUrl = compressedDataUrl; // always use this for thumbnail display
 
                     // 2. Upload to Supabase (if online)
-                    console.log('[Evidence Upload] Online:', window.navigator.onLine, 'SupabaseClient:', !!window.SupabaseClient, 'Initialized:', window.SupabaseClient?.isInitialized);
                     if (window.navigator.onLine && window.SupabaseClient) {
                         try {
                             if (!window.SupabaseClient.isInitialized) {
@@ -3492,14 +3487,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 const blob = new Blob([ab], { type: mime });
                                 const uploadFile = new File([blob], file.name, { type: mime });
 
-                                console.log('[Evidence Upload] Uploading file:', file.name, 'Size:', blob.size, 'bytes');
                                 const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-' + Date.now());
-                                console.log('[Evidence Upload] Result:', result);
                                 if (result && result.url) {
                                     finalUrl = result.url;
                                     displayUrl = result.url;
                                     isCloud = true;
-                                    console.log('[Evidence Upload] Success! Cloud URL:', result.url.substring(0, 80));
                                 } else {
                                     console.warn('[Evidence Upload] No URL returned - result was:', JSON.stringify(result));
                                 }
@@ -3518,7 +3510,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             const idbKey = 'idb://evidence-' + uniqueId + '-' + Date.now();
                             await EvidenceDB.put(idbKey, compressedDataUrl);
                             finalUrl = idbKey; // small string for state/localStorage
-                            console.log('[Evidence Upload] Stored in IndexedDB:', idbKey);
                         } catch (idbErr) {
                             console.error('[Evidence Upload] IndexedDB store failed:', idbErr);
                             // Last resort: keep base64 in state (may hit quota)
@@ -3596,7 +3587,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
     // View evidence image in full size (modal/popup)
     // View evidence image in full size (modal/popup)
     window.viewEvidenceImage = function (uniqueId) {
-        console.log('[viewEvidenceImage] Attempting to view image for:', uniqueId);
 
         // Strategy 1: Standard ID
         let imgEl = document.getElementById('evidence-img-' + uniqueId);
@@ -3613,7 +3603,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (container) {
                     const nearbyImg = container.querySelector('img[id^="evidence-img-"]');
                     if (nearbyImg) {
-                        console.log('[viewEvidenceImage] Found image via context:', nearbyImg.id);
                         imgEl = nearbyImg;
                     }
                 }
@@ -3625,7 +3614,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             if (uniqueId === 0 || uniqueId === '0') {
                 const firstImg = document.querySelector('img[id^="evidence-img-"]');
                 if (firstImg) {
-                    console.log('[viewEvidenceImage] Fallback: Using first found evidence image:', firstImg.id);
                     imgEl = firstImg;
                 }
             }
@@ -3643,7 +3631,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             return;
         }
 
-        console.log('[viewEvidenceImage] Opening modal for src:', imgEl.src.substring(0, 50) + '...');
 
         // Create modal overlay
         const overlay = document.createElement('div');
@@ -3785,7 +3772,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 if (ncr.evidenceImage) ncr.evidenceImage = await resolveUrl(ncr.evidenceImage);
             }
         }
-        console.log('[Report] Resolved idb:// evidence URLs');
 
         // Attempt to get client details for address/logo if available
         const client = window.state.clients.find(c => c.name === report.client) || {};
@@ -4969,7 +4955,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             // STEP 2: Severity classification is PRESERVED as-is (set by auditor/senior reviewer)
             // AI does NOT change severity — it only polishes text below
-            console.log('[AI] Respecting auditor severity classifications — skipping auto-classify');
 
             // STEP 2.5: AI Generate Conformance Text (for findings with empty remarks)
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating conformance text...';
@@ -5149,7 +5134,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     d.hydratedProgress[hpIdx]._aiGenerated = true;
                                 }
                             });
-                            console.log(`[AI] Generated conformance text for ${generated.filter(g => g._aiGenerated).length} items`);
                         }
                     }
                 } catch (conformErr) {
@@ -5840,7 +5824,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     const idbKey = 'idb://evidence-' + uniqueId + '-sc-' + Date.now();
                     await EvidenceDB.put(idbKey, dataUrl);
                     finalUrl = idbKey;
-                    console.log('[Screen Capture] Stored in IndexedDB:', idbKey);
                 } catch (idbErr) {
                     console.error('[Screen Capture] IndexedDB store failed:', idbErr);
                     finalUrl = dataUrl;
@@ -6010,7 +5993,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             e.stopPropagation();
             const sectionId = e.target.getAttribute('data-section-id');
             const isChecked = e.target.checked;
-            console.log('Global handler: Section checkbox clicked:', sectionId, 'checked:', isChecked);
 
             // Find all items in this section and toggle selection
             const section = document.getElementById(sectionId);
@@ -6020,7 +6002,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }
 
             const items = section.querySelectorAll('.checklist-item');
-            console.log('Found', items.length, 'items in section');
 
             items.forEach((item, idx) => {
                 // Toggle the individual checkbox too
@@ -6040,7 +6021,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }
             });
 
-            console.log('Selection complete for', items.length, 'items');
         }
     });
 
@@ -6071,7 +6051,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         if (btn) {
             const action = btn.getAttribute('data-action');
             const reportId = btn.getAttribute('data-report-id');
-            console.log('Bulk action button clicked:', action, 'for report:', reportId);
 
             if (action && reportId) {
                 window.bulkUpdateStatus(parseInt(reportId), action);
@@ -6090,7 +6069,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         // Log all clicks for debugging
         if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
-            console.log('Button class detected:', btn.className, 'Has status-btn?', btn.classList.contains('status-btn'));
         }
 
         while (btn && btn.classList && !btn.classList.contains('status-btn')) {
@@ -6107,7 +6085,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             const uniqueId = btn.getAttribute('data-unique-id');
             const status = btn.getAttribute('data-status');
-            console.log('Status button clicked:', status, 'for item:', uniqueId);
 
             if (uniqueId && status) {
                 window.setChecklistStatus(uniqueId, status);

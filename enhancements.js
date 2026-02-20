@@ -762,7 +762,6 @@
             nativeInputValueSetter.call(input, isoDate);
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log(`[Date Paste] "${dateText}" → ${isoDate}`);
             return true;
         }
         return false;
@@ -794,10 +793,8 @@
                     applyDateToInput(input, clipText);
                 }
             }).catch(function (err) {
-                console.log('[Date Paste] Clipboard read failed:', err.message);
             });
         }
     }, true);
 
-    console.log('✅ Enhancements module loaded: Lazy Load | Shortcuts | Analytics | PDF Export | Responsive | Date Paste');
 })();

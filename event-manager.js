@@ -58,7 +58,6 @@
             this.listeners.forEach((listener, key) => {
                 this.remove(key);
             });
-            console.log('[EventManager] Cleaned up', this.listeners.size, 'listeners');
         },
 
         /**
@@ -72,9 +71,7 @@
          * List all active listener keys (for debugging)
          */
         debug() {
-            console.log('[EventManager] Active listeners:');
             this.listeners.forEach((listener, key) => {
-                console.log(`  - ${key}: ${listener.event} on`, listener.element);
             });
             return Array.from(this.listeners.keys());
         }
@@ -85,6 +82,5 @@
         window.EventManager.cleanup();
     });
 
-    console.log('✅ EventManager initialized');
 
 })();

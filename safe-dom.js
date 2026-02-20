@@ -22,16 +22,22 @@ const SafeDOM = {
             return;
         }
 
-        // Use Sanitizer if available
+        // Use Sanitizer API if available (future Chrome)
         if (window.Sanitizer && typeof window.Sanitizer.sanitizeHTML === 'function') {
             element.innerHTML = window.Sanitizer.sanitizeHTML(html, config);
         } else if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
-            // Fallback to DOMPurify directly
-            element.innerHTML = window.DOMPurify.sanitize(html, config);
+            // DOMPurify — primary sanitizer
+            element.innerHTML = window.DOMPurify.sanitize(html, Object.assign({
+                USE_PROFILES: { html: true },
+                ADD_ATTR: ['data-action', 'data-action-change', 'data-id', 'data-json', 'data-arg1', 'data-arg2', 'data-hash', 'data-module', 'data-subtab', 'tabindex', 'role', 'aria-label', 'aria-hidden', 'aria-expanded']
+            }, config));
         } else {
-            // Last resort - log warning and use textContent
-            Logger.error('SafeDOM: No sanitizer available! Using textContent instead.');
-            element.textContent = html;
+            // Fallback — sanitizer not loaded, use innerHTML directly but log warning
+            if (!SafeDOM._warnedNoSanitizer) {
+                Logger.warn('SafeDOM: No sanitizer available (DOMPurify not loaded). Using innerHTML directly.');
+                SafeDOM._warnedNoSanitizer = true;
+            }
+            element.innerHTML = html;
         }
     },
 

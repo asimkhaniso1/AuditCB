@@ -1419,10 +1419,8 @@ function renderClientTab(client, tabName) {
 }
 
 window.handleLogoUpload = function (input) {
-    console.log('[handleLogoUpload] Triggered', input);
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        console.log('[handleLogoUpload] File selected:', file.name, file.size, file.type);
 
         // IMMEDIATE FEEDBACK: Show notification that file was accepted
         if (window.showNotification) {
@@ -1433,7 +1431,6 @@ window.handleLogoUpload = function (input) {
 
         const reader = new FileReader();
         reader.onload = function (e) {
-            console.log('[handleLogoUpload] File read successfully');
             window._tempClientLogo = e.target.result;
 
             // Robust element finding: Try ID first, then relative search if ID fails or finds wrong element
@@ -1447,13 +1444,11 @@ window.handleLogoUpload = function (input) {
                 placeholder = parentCard.querySelector('#client-logo-placeholder') || placeholder;
             }
 
-            console.log('[handleLogoUpload] UI Elements:', { previewImg, placeholder });
 
             if (previewImg && placeholder) {
                 previewImg.style.backgroundImage = `url(${e.target.result})`;
                 previewImg.style.display = 'block';
                 placeholder.style.display = 'none';
-                console.log('[handleLogoUpload] Thumbnail preview updated');
             } else {
                 console.error('[handleLogoUpload] UI Elements missing from DOM. Check your template.');
                 alert('Thumbnail preview failed: UI elements not found.');
@@ -2189,7 +2184,6 @@ window.saveAuditClient = async function (clientId) {
             window.showNotification('Logo upload failed, but client data saved.', 'warning');
         }
     } else if (window._tempClientLogo) {
-        console.log('Saving new logo (Base64 or existing)...');
         client.logoUrl = window._tempClientLogo;
     }
 
@@ -2221,7 +2215,6 @@ window.saveAuditClient = async function (clientId) {
     if (window.SupabaseClient?.isInitialized) {
         window.SupabaseClient.upsertClient(client)
             .then(() => {
-                console.log('Sync successful');
             })
             .catch(err => {
                 console.error('Supabase sync failed:', err);
@@ -4470,7 +4463,6 @@ CFO," style="font-family: monospace;"></textarea>
             // 1. Sync the CLIENT object (so data.certificates JSONB persists dates)
             syncPromises.push(
                 window.SupabaseClient.upsertClient(client)
-                    .then(() => console.log('[saveCertificateDetails] Client synced to Supabase'))
                     .catch(err => console.error('[saveCertificateDetails] Client sync failed:', err))
             );
 
@@ -4483,7 +4475,6 @@ CFO," style="font-family: monospace;"></textarea>
                     // SELF-HEAL: If cert has no ID (legacy bug), generate one now
                     if (!cert.id) {
                         cert.id = 'CERT-' + Date.now() + '-' + Math.floor(Math.random() * 100000) + '-' + i;
-                        console.log('Generated missing ID for cert:', cert.id);
                     }
 
                     return window.SupabaseClient.upsertCertificate(cert)
@@ -5277,15 +5268,6 @@ CFO," style="font-family: monospace;"></textarea>
         const client = window.state.clients.find(c => String(c.id) === String(clientId));
         const auditors = window.state.auditors || [];
         const assignments = window.state.auditorAssignments || [];
-
-        console.log('[openClientAuditorAssignmentModal] Debug Info:', {
-            clientId,
-            clientName,
-            totalAuditors: auditors.length,
-            totalAssignments: assignments.length,
-            auditorsList: auditors.map(a => ({ id: a.id, name: a.name }))
-        });
-
         // Check if there are any auditors in the system
         if (auditors.length === 0) {
             window.showNotification('No auditors found in the system. Please add auditors first from the Auditors module.', 'warning');
@@ -5297,12 +5279,6 @@ CFO," style="font-family: monospace;"></textarea>
             .filter(a => String(a.clientId) === String(clientId))
             .map(a => String(a.auditorId));
         const availableAuditors = auditors.filter(a => !assignedAuditorIds.includes(String(a.id)));
-
-        console.log('[openClientAuditorAssignmentModal] Assignment Info:', {
-            assignedAuditorIds,
-            availableAuditors: availableAuditors.length
-        });
-
         if (availableAuditors.length === 0) {
             window.showNotification('All auditors are already assigned to this client.', 'info');
             return;
@@ -5357,7 +5333,6 @@ CFO," style="font-family: monospace;"></textarea>
             // Sync to Supabase
             if (window.SupabaseClient?.isInitialized) {
                 window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
-                    .then(() => console.log('Auditor assignment synced to Supabase'))
                     .catch(e => console.error('Auditor assignment sync failed:', e));
             }
 
@@ -5387,13 +5362,6 @@ CFO," style="font-family: monospace;"></textarea>
 
     // Remove auditor assignment from a client
     window.removeClientAuditorAssignment = function (clientId, auditorId) {
-        console.log('[removeClientAuditorAssignment] Called with:', {
-            clientId,
-            auditorId,
-            typeC: typeof clientId,
-            typeA: typeof auditorId
-        });
-
         const client = window.state.clients.find(c => String(c.id) === String(clientId));
         const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
 
@@ -5430,7 +5398,6 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
             // Sync to Supabase
             if (window.SupabaseClient?.isInitialized) {
                 window.SupabaseClient.deleteAuditorAssignment(aid, cid)
-                    .then(() => console.log('Auditor assignment removed from Supabase'))
                     .catch(e => console.error('Auditor assignment removal failed:', e));
             }
 
