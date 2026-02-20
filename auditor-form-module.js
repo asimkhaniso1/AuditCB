@@ -287,15 +287,15 @@ window.saveAuditorForm = function (auditorId) {
     auditor.role = document.getElementById('auditor-role').value;
     auditor.pictureUrl = document.getElementById('auditor-picture').value;
     auditor.dateJoined = document.getElementById('auditor-joined').value;
-    auditor.age = parseInt(document.getElementById('auditor-age').value) || null;
-    auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
+    auditor.age = parseInt(document.getElementById('auditor-age', 10).value) || null;
+    auditor.experience = parseInt(document.getElementById('auditor-experience', 10).value) || 0;
     auditor.email = email;
     auditor.phone = document.getElementById('auditor-phone').value;
     auditor.location = document.getElementById('auditor-location').value;
 
     // Update Expertise & Education
     auditor.standards = standards;
-    auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
+    auditor.manDayRate = parseInt(document.getElementById('auditor-rate', 10).value) || 0;
 
     auditor.education = {
         degree: document.getElementById('auditor-degree').value,

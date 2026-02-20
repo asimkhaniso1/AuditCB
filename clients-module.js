@@ -1780,7 +1780,7 @@ window.saveNewClient = async function () {
         website: Sanitizer.sanitizeURL(cleanData.website),
         contacts: contacts,
         sites: sites,
-        employees: parseInt(cleanData.employees) || 0,
+        employees: parseInt(cleanData.employees, 10) || 0,
         shifts: document.getElementById('client-shifts') ? document.getElementById('client-shifts').value : 'No',
         logoUrl: window._tempClientLogo || ''
     };
@@ -2161,7 +2161,7 @@ window.saveAuditClient = async function (clientId) {
     client.status = document.getElementById('client-status').value;
     // Direct read to avoid sanitizer issues for now
     client.website = document.getElementById('client-website').value.trim();
-    client.employees = parseInt(cleanData.employees) || 0;
+    client.employees = parseInt(cleanData.employees, 10) || 0;
     client.shifts = document.getElementById('client-shifts').value;
     client.nextAudit = cleanData.nextAudit;
 
@@ -2328,7 +2328,7 @@ window.handleIndustryChange = function (select) {
             const city = document.getElementById('site-city').value;
             const country = document.getElementById('site-country').value;
             const geotag = document.getElementById('site-geotag').value;
-            const employees = parseInt(document.getElementById('site-employees').value) || null;
+            const employees = parseInt(document.getElementById('site-employees', 10).value) || null;
             const shift = document.getElementById('site-shift').value || null;
 
             if (name) {
@@ -2336,7 +2336,7 @@ window.handleIndustryChange = function (select) {
                 const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
                 client.sites.push({ name, address, city, country, geotag, employees, shift, standards });
                 // Auto-sync: update company-level employees from sum of site employees
-                const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees) || 0), 0);
+                const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees, 10) || 0), 0);
                 if (siteTotal > 0) client.employees = siteTotal;
                 window.saveData();
 
@@ -2593,14 +2593,14 @@ window.handleIndustryChange = function (select) {
             const city = document.getElementById('site-city').value;
             const country = document.getElementById('site-country').value;
             const geotag = document.getElementById('site-geotag').value;
-            const employees = parseInt(document.getElementById('site-employees').value) || null;
+            const employees = parseInt(document.getElementById('site-employees', 10).value) || null;
             const shift = document.getElementById('site-shift').value || null;
 
             if (name) {
                 const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
                 client.sites[siteIndex] = { ...site, name, address, city, country, geotag, employees, shift, standards };
                 // Auto-sync: update company-level employees from sum of site employees
-                const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees) || 0), 0);
+                const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees, 10) || 0), 0);
                 if (siteTotal > 0) client.employees = siteTotal;
                 window.saveData();
 
@@ -2688,7 +2688,7 @@ window.handleIndustryChange = function (select) {
                             address: parts[1] || '',
                             city: parts[2] || '',
                             country: parts[3] || '',
-                            employees: parseInt(parts[4]) || 0,
+                            employees: parseInt(parts[4], 10) || 0,
                             shift: parts[5]?.toLowerCase() === 'yes' ? 'Yes' : 'No',
                             standards: client.standard || ''
                         });
@@ -3089,7 +3089,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
                         newDepartments.push({
                             name: parts[0],
                             head: parts[1] || '',
-                            employeeCount: parseInt(parts[2]) || 0
+                            employeeCount: parseInt(parts[2], 10) || 0
                         });
                     } else {
                         errors++;
@@ -4552,7 +4552,7 @@ CFO," style="font-family: monospace;"></textarea>
             \u003ch4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #1d4ed8;"\u003eAdd New Revision\u003c/h4\u003e
             \u003cdiv class="form-group"\u003e
                 \u003clabel\u003eRevision Number\u003c/label\u003e
-                \u003cinput type="text" id="new-revision-number" class="form-control" placeholder="e.g., 01, 02" value="${String(parseInt(cert.revision || '00') + 1).padStart(2, '0')}"\u003e
+                \u003cinput type="text" id="new-revision-number" class="form-control" placeholder="e.g., 01, 02" value="${String(parseInt(cert.revision || '00', 10) + 1).padStart(2, '0')}"\u003e
             \u003c/div\u003e
             \u003cdiv class="form-group"\u003e
                 \u003clabel\u003eChange Description\u003c/label\u003e
@@ -4881,7 +4881,7 @@ CFO," style="font-family: monospace;"></textarea>
 
                     // Backward compatibility with old template fields
                     if (row['Status']) client.status = window.Sanitizer.sanitizeText(row['Status']);
-                    if (row['Employee Count']) client.employees = parseInt(row['Employee Count']) || 0;
+                    if (row['Employee Count']) client.employees = parseInt(row['Employee Count'], 10) || 0;
                     if (row['Website']) client.website = window.Sanitizer.sanitizeURL(row['Website']);
                     if (row['Next Audit Date']) client.nextAudit = row['Next Audit Date'];
 
@@ -5082,7 +5082,7 @@ CFO," style="font-family: monospace;"></textarea>
                             address: clean(r['Address']),
                             city: clean(r['City']),
                             country: clean(r['Country']),
-                            employees: parseInt(r['Employees']) || 0,
+                            employees: parseInt(r['Employees'], 10) || 0,
                             shift: clean(r['Shift (Yes/No)']),
                             standards: clean(r['Standards'])
                         });

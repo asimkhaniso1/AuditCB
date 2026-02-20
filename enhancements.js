@@ -729,9 +729,9 @@
             const day = m[1].padStart(2, '0');
             const month = m[2].padStart(2, '0');
             const year = m[3];
-            if (parseInt(m[1]) > 12) {
+            if (parseInt(m[1], 10) > 12) {
                 return `${year}-${month}-${day}`;
-            } else if (parseInt(m[2]) > 12) {
+            } else if (parseInt(m[2], 10) > 12) {
                 return `${year}-${day}-${month}`;
             }
             return `${year}-${month}-${day}`;

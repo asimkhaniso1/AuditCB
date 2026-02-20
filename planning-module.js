@@ -616,7 +616,7 @@ function updateClientDetails(clientName) {
         }
 
         // Auto-fill calculation params — use sum of site employees if available
-        const siteEmpSum = (client.sites || []).reduce((s, site) => s + (parseInt(site.employees) || 0), 0);
+        const siteEmpSum = (client.sites || []).reduce((s, site) => s + (parseInt(site.employees, 10) || 0), 0);
         if (document.getElementById('plan-employees')) {
             document.getElementById('plan-employees').value = siteEmpSum > 0 ? siteEmpSum : (client.employees || 0);
         }
@@ -649,7 +649,7 @@ function updateClientDetails(clientName) {
                     const count = checked.length;
                     // Recalculate employees from selected sites
                     let empSum = 0;
-                    checked.forEach(c => { empSum += parseInt(c.dataset.employees) || 0; });
+                    checked.forEach(c => { empSum += parseInt(c.dataset.employees, 10) || 0; });
                     if (document.getElementById('plan-sites')) {
                         document.getElementById('plan-sites').value = count;
                     }
@@ -721,7 +721,7 @@ function autoCalculateDays() {
     let hasShiftWork = false;
 
     selectedCheckboxes.forEach(checkbox => {
-        const empCount = parseInt(checkbox.dataset.employees) || 0;
+        const empCount = parseInt(checkbox.dataset.employees, 10) || 0;
         totalEmployees += empCount;
         // Check for shift work - if any site has shift, consider it
         const shift = checkbox.dataset.shift;
@@ -2660,7 +2660,7 @@ function renderMultiSiteSamplingCalculator() {
 }
 
 window.calculateSampling = function () {
-    const n = parseInt(document.getElementById('ms-total-sites').value) || 0;
+    const n = parseInt(document.getElementById('ms-total-sites', 10).value) || 0;
     const stage = document.getElementById('ms-stage').value;
     const risk = document.getElementById('ms-risk').value;
 

@@ -636,7 +636,7 @@ window.addSite = function (clientId) {
         if (name) {
             if (!client.sites) client.sites = [];
             const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
-            const employees = parseInt(document.getElementById('site-employees').value) || null;
+            const employees = parseInt(document.getElementById('site-employees', 10).value) || null;
             const shift = document.getElementById('site-shift').value || null;
             client.sites.push({
                 name,
@@ -648,7 +648,7 @@ window.addSite = function (clientId) {
                 standards
             });
             // Auto-sync: update company-level employees from sum of site employees
-            const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees) || 0), 0);
+            const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees, 10) || 0), 0);
             if (siteTotal > 0) client.employees = siteTotal;
             window.saveData();
             if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
@@ -1132,7 +1132,7 @@ window.editSite = function (clientId, siteIndex) {
         var city = document.getElementById('site-city').value;
         var country = document.getElementById('site-country').value;
         var geotag = document.getElementById('site-geotag').value;
-        var employees = parseInt(document.getElementById('site-employees').value) || null;
+        var employees = parseInt(document.getElementById('site-employees', 10).value) || null;
         var shift = document.getElementById('site-shift').value || null;
         if (name) {
             var standards = Array.from(document.getElementById('site-standards').selectedOptions).map(function (o) { return o.value }).join(', ');

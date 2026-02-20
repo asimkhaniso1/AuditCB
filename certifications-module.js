@@ -422,7 +422,7 @@ window.openIssueCertificateModal = function (reportId) {
         const client = state.clients.find(c => c.name === clientSelect.value);
         if (!client || !client.sites) return;
 
-        const selectedIndices = Array.from(sitesList.querySelectorAll('input:checked')).map(input => parseInt(input.value));
+        const selectedIndices = Array.from(sitesList.querySelectorAll('input:checked')).map(input => parseInt(input.value, 10));
         const selectedSites = client.sites.filter((_, i) => selectedIndices.includes(i));
 
         if (selectedSites.length > 0) {
@@ -526,7 +526,7 @@ window.openIssueCertificateModal = function (reportId) {
         const independent = document.getElementById('cert-independent').value;
 
         // Capture Selected Sites
-        const selectedSiteIndices = Array.from(document.querySelectorAll('#cert-sites-list input:checked')).map(input => parseInt(input.value));
+        const selectedSiteIndices = Array.from(document.querySelectorAll('#cert-sites-list input:checked')).map(input => parseInt(input.value, 10));
         const activeClient = state.clients.find(c => c.name === document.getElementById('cert-client').value) || {};
         const sitesCovered = (activeClient.sites || []).filter((_, i) => selectedSiteIndices.includes(i));
 

@@ -1324,7 +1324,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 document.querySelectorAll('.bulk-action-btn').forEach(btn => {
                     btn.addEventListener('click', function () {
                         const action = this.getAttribute('data-action');
-                        const reportId = parseInt(this.getAttribute('data-report-id'));
+                        const reportId = parseInt(this.getAttribute('data-report-id', 10));
                         window.Logger.debug('Execution', 'Bulk action clicked:', { action, reportId });
                         window.bulkUpdateStatus(reportId, action);
                     });
@@ -4391,8 +4391,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                     
                                     // Sort clauses numerically
                                     const sortedClauses = Object.keys(clauseData).sort((a, b) => {
-                                        const numA = parseInt(a) || 999;
-                                        const numB = parseInt(b) || 999;
+                                        const numA = parseInt(a, 10) || 999;
+                                        const numB = parseInt(b, 10) || 999;
                                         return numA - numB;
                                     });
                                     
@@ -4735,7 +4735,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             clauseData[mainClause].ok++;
                         }
                     });
-                    const sorted = Object.keys(clauseData).sort((a, b) => parseInt(a) - parseInt(b));
+                    const sorted = Object.keys(clauseData).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
                     if (sorted.length) {
                         new Chart(clauseCtx.getContext('2d'), {
                             type: 'bar',
@@ -5418,7 +5418,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         };
         const printWindow = window.open('', '_blank');
         if (!printWindow) { window.showNotification('Pop-up blocked. Please allow pop-ups.', 'warning'); return; }
-        const clauseLabels = Object.keys(d.stats.ncByClause).sort((a, b) => parseInt(a) - parseInt(b));
+        const clauseLabels = Object.keys(d.stats.ncByClause).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
         const clauseValues = clauseLabels.map(k => d.stats.ncByClause[k]);
         const standard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
         const cbName = d.cbSettings.cbName || '';
@@ -5484,7 +5484,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 else areaStats[mainC].minor++;
             }
         });
-        var areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a) - parseInt(b); });
+        var areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
         var areaTableRows = areaSortedKeys.map(function (k) {
             var s = areaStats[k]; var total = s.conform + s.minor + s.major + s.obs + s.ofi;
             var hasIssue = s.major > 0 || s.minor > 0;
@@ -6053,7 +6053,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const reportId = btn.getAttribute('data-report-id');
 
             if (action && reportId) {
-                window.bulkUpdateStatus(parseInt(reportId), action);
+                window.bulkUpdateStatus(parseInt(reportId, 10), action);
 
                 // Close menu
                 const menu = document.getElementById('bulk-menu-' + reportId);

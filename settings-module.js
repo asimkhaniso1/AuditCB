@@ -2596,10 +2596,10 @@ window.saveDefaults = function () {
     const settings = window.state.cbSettings;
     settings.certificateNumberFormat = window.Sanitizer.sanitizeText(document.getElementById('cert-format').value);
     settings.dateFormat = document.getElementById('date-format').value;
-    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration').value, 10);
-    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration').value, 10);
-    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead').value, 10);
-    settings.sessionTimeout = parseInt(document.getElementById('session-timeout').value, 10);
+    settings.defaultStage1Duration = parseInt(document.getElementById('stage1-duration', 10).value, 10);
+    settings.defaultStage2Duration = parseInt(document.getElementById('stage2-duration', 10).value, 10);
+    settings.notificationLeadTime = parseInt(document.getElementById('notification-lead', 10).value, 10);
+    settings.sessionTimeout = parseInt(document.getElementById('session-timeout', 10).value, 10);
     settings.currency = document.getElementById('currency').value;
     settings.manDayCalculationMode = document.getElementById('manday-mode').value;
 
@@ -2778,8 +2778,8 @@ window.editCertDecision = function (decision) {
 };
 
 window.saveCAPATimelines = function () {
-    window.state.cbPolicies.capaTimelines.majorCorrection = parseInt(document.getElementById('capa-major').value, 10) || 90;
-    window.state.cbPolicies.capaTimelines.minorCorrection = parseInt(document.getElementById('capa-minor').value, 10) || 30;
+    window.state.cbPolicies.capaTimelines.majorCorrection = parseInt(document.getElementById('capa-major', 10).value, 10) || 90;
+    window.state.cbPolicies.capaTimelines.minorCorrection = parseInt(document.getElementById('capa-minor', 10).value, 10) || 30;
     window.state.cbPolicies.capaTimelines.capaVerification = window.Sanitizer.sanitizeText(document.getElementById('capa-verify').value);
     window.saveData();
     window.showNotification('CAPA timelines saved', 'success');
@@ -4596,8 +4596,8 @@ window.createChecklistFromKB = async function (docId) {
             requirement: sub.items.length === 1 && sub.items[0].clause === sub.clause ? sub.items[0].requirement : undefined
         }))
     })).sort((a, b) => {
-        const aNum = parseInt(a.mainClause) || 999;
-        const bNum = parseInt(b.mainClause) || 999;
+        const aNum = parseInt(a.mainClause, 10) || 999;
+        const bNum = parseInt(b.mainClause, 10) || 999;
         return aNum - bNum;
     });
 
@@ -4848,7 +4848,7 @@ window.viewKBAnalysis = function (docId) {
                 groups[main].push(c);
             });
 
-            return Object.keys(groups).sort((a, b) => parseInt(a) - parseInt(b)).map(mainNum => {
+            return Object.keys(groups).sort((a, b) => parseInt(a, 10) - parseInt(b, 10)).map(mainNum => {
                 const items = groups[mainNum];
                 const sTitle = sectionTitles[mainNum] || 'Other';
                 return `
@@ -5177,8 +5177,8 @@ window.openQuickAssignModal = function (auditorId, auditorName) {
 
 // Save assignment
 async function saveAssignment() {
-    const auditorId = parseInt(document.getElementById('assign-auditor').value);
-    const clientId = parseInt(document.getElementById('assign-client').value);
+    const auditorId = parseInt(document.getElementById('assign-auditor', 10).value);
+    const clientId = parseInt(document.getElementById('assign-client', 10).value);
     const notes = document.getElementById('assign-notes')?.value || '';
 
     if (!auditorId || !clientId) {

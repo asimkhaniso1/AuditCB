@@ -154,7 +154,7 @@ window.selectClient = function (clientId) {
 
     // Update right sidebar visual state
     document.querySelectorAll('.client-list-item').forEach(item => {
-        item.classList.toggle('active', parseInt(item.dataset.clientId) === clientId);
+        item.classList.toggle('active', parseInt(item.dataset.clientId, 10) === clientId);
     });
 
     // Show client settings icon in header
@@ -437,7 +437,7 @@ function renderClientOverview(client) {
     const upcomingAudits = clientPlans.filter(p => p.status === 'Planned' || p.status === 'Approved').length;
     const validCerts = clientCerts.filter(c => c.status === 'Valid').length;
     const totalSites = (client.sites || []).length;
-    const totalEmployees = (client.sites || []).reduce((acc, site) => acc + (parseInt(site.employees) || 0), 0) || client.employees || 0;
+    const totalEmployees = (client.sites || []).reduce((acc, site) => acc + (parseInt(site.employees, 10) || 0), 0) || client.employees || 0;
 
     // Organization Data (use client's actual data, no hardcoded defaults)
     const departments = client.departments || [];

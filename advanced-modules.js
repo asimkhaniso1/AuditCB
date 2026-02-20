@@ -1810,9 +1810,9 @@ function renderManDayCalculator() {
     document.getElementById('manday-form').addEventListener('submit', (e) => {
         e.preventDefault();
 
-        const employees = parseInt(document.getElementById('employees').value);
-        const sites = parseInt(document.getElementById('sites').value);
-        const effectiveness = parseInt(document.getElementById('effectiveness').value);
+        const employees = parseInt(document.getElementById('employees', 10).value);
+        const sites = parseInt(document.getElementById('sites', 10).value);
+        const effectiveness = parseInt(document.getElementById('effectiveness', 10).value);
         const shiftWork = document.getElementById('shiftwork').value === 'true';
         const risk = document.getElementById('risk').value;
 
@@ -1970,7 +1970,7 @@ window.openMultiSiteSamplingCalculatorModal = function () {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
 
-                const totalSites = parseInt(document.getElementById('modal-total-sites').value);
+                const totalSites = parseInt(document.getElementById('modal-total-sites', 10).value);
                 const riskLevel = document.getElementById('modal-site-risk').value;
                 const hasNCRs = document.getElementById('modal-sites-with-ncrs').value === 'true';
                 const hasComplex = document.getElementById('modal-complex-processes').value === 'true';
@@ -2245,9 +2245,9 @@ function openEditAuditorModal(auditorId) {
         auditor.location = cleanData.location;
         auditor.pictureUrl = Sanitizer.sanitizeURL(result.formData.pictureUrl); // Use sanitized URL
 
-        auditor.experience = parseInt(document.getElementById('auditor-experience').value) || 0;
-        auditor.manDayRate = parseInt(document.getElementById('auditor-rate').value) || 0;
-        auditor.customerRating = parseInt(document.getElementById('auditor-rating').value) || 0;
+        auditor.experience = parseInt(document.getElementById('auditor-experience', 10).value) || 0;
+        auditor.manDayRate = parseInt(document.getElementById('auditor-rate', 10).value) || 0;
+        auditor.customerRating = parseInt(document.getElementById('auditor-rating', 10).value) || 0;
         auditor.dateJoined = document.getElementById('auditor-date-joined').value;
 
         auditor.hasPassport = document.getElementById('auditor-passport').value === 'true';
@@ -2306,7 +2306,7 @@ function openAddTrainingModal(auditorId) {
         const course = document.getElementById('training-course').value;
         const provider = document.getElementById('training-provider').value;
         const date = document.getElementById('training-date').value;
-        const cpdHours = parseInt(document.getElementById('training-cpd').value) || 0;
+        const cpdHours = parseInt(document.getElementById('training-cpd', 10).value) || 0;
         const certificate = document.getElementById('training-certificate').value;
         const fileInput = document.getElementById('training-file');
         const file = fileInput.files[0];
@@ -2649,7 +2649,7 @@ window.openAddTrainingModal = function (auditorId) {
             provider: document.getElementById('training-provider').value || 'Unknown',
             date: document.getElementById('training-date').value,
             duration: document.getElementById('training-duration').value + ' hours',
-            cpdHours: parseInt(document.getElementById('training-cpd').value) || 0,
+            cpdHours: parseInt(document.getElementById('training-cpd', 10).value) || 0,
             type: document.getElementById('training-type').value,
             certificate: document.getElementById('training-certificate').checked,
             notes: document.getElementById('training-notes').value
@@ -2914,7 +2914,7 @@ window.addWitnessAudit = function (auditorId) {
             client: client,
             standard: document.getElementById('witness-standard').value,
             witnessedBy: document.getElementById('witness-by').value,
-            rating: parseInt(document.getElementById('witness-rating').value),
+            rating: parseInt(document.getElementById('witness-rating', 10).value),
             notes: document.getElementById('witness-notes').value
         });
 
@@ -3002,7 +3002,7 @@ window.addPerformanceReview = function (auditorId) {
         auditor.evaluations.performanceReviews.unshift({
             date: document.getElementById('review-date').value,
             type: document.getElementById('review-type').value,
-            rating: parseInt(document.getElementById('review-rating').value),
+            rating: parseInt(document.getElementById('review-rating', 10).value),
             reviewedBy: document.getElementById('review-by').value,
             outcome: document.getElementById('review-outcome').value,
             notes: document.getElementById('review-notes').value
@@ -3080,9 +3080,9 @@ window.addReportReview = function (auditorId) {
             reportType: document.getElementById('report-type').value,
             client: document.getElementById('audit-client').value,
             reviewer: document.getElementById('reviewer-name').value,
-            qualityRating: parseInt(document.getElementById('quality-rating').value),
-            completenessRating: parseInt(document.getElementById('completeness-rating').value),
-            technicalRating: parseInt(document.getElementById('technical-rating').value),
+            qualityRating: parseInt(document.getElementById('quality-rating', 10).value),
+            completenessRating: parseInt(document.getElementById('completeness-rating', 10).value),
+            technicalRating: parseInt(document.getElementById('technical-rating', 10).value),
             notes: document.getElementById('review-notes').value
         });
 
@@ -3253,10 +3253,10 @@ function renderMultiSiteSamplingCalculator() {
     document.getElementById('sampling-form').addEventListener('submit', (e) => {
         e.preventDefault();
 
-        const totalSites = parseInt(document.getElementById('total-sites').value);
+        const totalSites = parseInt(document.getElementById('total-sites', 10).value);
         const riskLevel = document.getElementById('risk-level').value;
         const maturityLevel = document.getElementById('maturity-level').value;
-        const mandatoryCount = parseInt(document.getElementById('mandatory-sites').value) || 0;
+        const mandatoryCount = parseInt(document.getElementById('mandatory-sites', 10).value) || 0;
 
         // Create array of mandatory sites (just count for now)
         const mandatorySites = Array(mandatoryCount).fill('Mandatory');
