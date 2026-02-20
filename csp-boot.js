@@ -72,10 +72,25 @@
     }
 })();
 
-// ─── 3. PDF.js Worker Configuration ───────────────────────────────
-// PDF.js CDN is deferred, so configure worker after all scripts load
+// ─── 3. PDF.js Worker Configuration + CDN Fallbacks ──────────────
+// Check after DOM loads whether CDN scripts loaded; inject fallbacks if not
 document.addEventListener('DOMContentLoaded', function () {
+    // PDF.js worker config
     if (typeof pdfjsLib !== 'undefined') {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // DOMPurify CDN fallback: if cdnjs failed, try unpkg
+    if (typeof DOMPurify === 'undefined' || window.DOMPurify.isEmergency) {
+        var dpScript = document.createElement('script');
+        dpScript.src = 'https://unpkg.com/dompurify@3.0.6/dist/purify.min.js';
+        document.head.appendChild(dpScript);
+    }
+
+    // Chart.js CDN fallback: if jsdelivr failed, try cdnjs
+    if (typeof Chart === 'undefined') {
+        var cjScript = document.createElement('script');
+        cjScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+        document.head.appendChild(cjScript);
     }
 });
