@@ -35,7 +35,7 @@ const StateStore = {
         return new Promise((resolve, reject) => {
             // Feature detection
             if (!window.indexedDB) {
-                console.warn('[StateStore] IndexedDB not available, falling back to localStorage');
+                (window.Logger || console).warn('[StateStore] IndexedDB not available, falling back to localStorage');
                 this._useLocalStorage = true;
                 this.isReady = true;
                 resolve();
@@ -50,18 +50,18 @@ const StateStore = {
                     // Create the object store if it doesn't exist
                     if (!db.objectStoreNames.contains(this.STORE_NAME)) {
                         db.createObjectStore(this.STORE_NAME);
-                        console.log('[StateStore] Created object store:', this.STORE_NAME);
+                        if (window.Logger) Logger.info('StateStore', 'Created object store:', this.STORE_NAME);
                     }
                 };
 
                 req.onsuccess = (event) => {
                     this._db = event.target.result;
                     this.isReady = true;
-                    console.log('[StateStore] IndexedDB ready');
+                    if (window.Logger) Logger.info('StateStore', 'IndexedDB ready');
 
                     // Handle unexpected close (e.g., browser clearing storage)
                     this._db.onclose = () => {
-                        console.warn('[StateStore] Database closed unexpectedly');
+                        (window.Logger || console).warn('[StateStore] Database closed unexpectedly');
                         this._db = null;
                         this.isReady = false;
                     };
@@ -70,20 +70,20 @@ const StateStore = {
                 };
 
                 req.onerror = (event) => {
-                    console.warn('[StateStore] IndexedDB open failed, falling back to localStorage:', event.target.error);
+                    (window.Logger || console).warn('[StateStore] IndexedDB open failed, falling back to localStorage:', event.target.error);
                     this._useLocalStorage = true;
                     this.isReady = true;
                     resolve(); // Don't reject — graceful fallback
                 };
 
                 req.onblocked = () => {
-                    console.warn('[StateStore] IndexedDB blocked (another tab may have an older version open)');
+                    (window.Logger || console).warn('[StateStore] IndexedDB blocked (another tab may have an older version open)');
                     this._useLocalStorage = true;
                     this.isReady = true;
                     resolve();
                 };
             } catch (err) {
-                console.warn('[StateStore] IndexedDB init error, falling back to localStorage:', err);
+                (window.Logger || console).warn('[StateStore] IndexedDB init error, falling back to localStorage:', err);
                 this._useLocalStorage = true;
                 this.isReady = true;
                 resolve();
@@ -117,7 +117,7 @@ const StateStore = {
                 try {
                     localStorage.setItem(this.LS_KEY, stateJSON);
                 } catch (quotaErr) {
-                    console.warn('[StateStore] localStorage quota exceeded. State kept in memory only.');
+                    (window.Logger || console).warn('[StateStore] localStorage quota exceeded. State kept in memory only.');
                 }
                 resolve();
             });
@@ -132,22 +132,22 @@ const StateStore = {
 
                 tx.oncomplete = () => {
                     const sizeKB = Math.round(stateJSON.length / 1024);
-                    console.log(`[StateStore] Saved ${sizeKB}KB to IndexedDB`);
+                    if (window.Logger) Logger.debug('StateStore', `Saved ${sizeKB}KB to IndexedDB`);
                     resolve();
                 };
 
                 tx.onerror = (event) => {
-                    console.warn('[StateStore] IndexedDB write failed, trying localStorage:', event.target.error);
+                    (window.Logger || console).warn('[StateStore] IndexedDB write failed, trying localStorage:', event.target.error);
                     // Fallback to localStorage on write failure
                     try {
                         localStorage.setItem(this.LS_KEY, stateJSON);
                     } catch (quotaErr) {
-                        console.warn('[StateStore] localStorage fallback also failed. State in memory only.');
+                        (window.Logger || console).warn('[StateStore] localStorage fallback also failed. State in memory only.');
                     }
                     resolve(); // Don't reject — best effort
                 };
             } catch (err) {
-                console.warn('[StateStore] Transaction error:', err);
+                (window.Logger || console).warn('[StateStore] Transaction error:', err);
                 resolve();
             }
         });
@@ -165,7 +165,7 @@ const StateStore = {
                     const saved = localStorage.getItem(this.LS_KEY);
                     resolve(saved ? JSON.parse(saved) : null);
                 } catch (err) {
-                    console.warn('[StateStore] localStorage load failed:', err);
+                    (window.Logger || console).warn('[StateStore] localStorage load failed:', err);
                     resolve(null);
                 }
             });
@@ -183,20 +183,20 @@ const StateStore = {
                         try {
                             const parsed = JSON.parse(req.result);
                             const sizeKB = Math.round(req.result.length / 1024);
-                            console.log(`[StateStore] Loaded ${sizeKB}KB from IndexedDB`);
+                            if (window.Logger) Logger.debug('StateStore', `Loaded ${sizeKB}KB from IndexedDB`);
                             resolve(parsed);
                         } catch (parseErr) {
-                            console.warn('[StateStore] Corrupt data in IndexedDB:', parseErr);
+                            (window.Logger || console).warn('[StateStore] Corrupt data in IndexedDB:', parseErr);
                             resolve(null);
                         }
                     } else {
                         // Nothing in IndexedDB — try localStorage (migration path)
-                        console.log('[StateStore] No data in IndexedDB, checking localStorage for migration...');
+                        if (window.Logger) Logger.info('StateStore', 'No data in IndexedDB, checking localStorage for migration...');
                         try {
                             const lsSaved = localStorage.getItem(this.LS_KEY);
                             if (lsSaved) {
                                 const parsed = JSON.parse(lsSaved);
-                                console.log('[StateStore] Migrated data from localStorage to IndexedDB');
+                                if (window.Logger) Logger.info('StateStore', 'Migrated data from localStorage to IndexedDB');
                                 // Save to IndexedDB for next time
                                 this.save(parsed).catch(() => { });
                                 // Clean up localStorage to free space
@@ -206,14 +206,14 @@ const StateStore = {
                                 resolve(null);
                             }
                         } catch (lsErr) {
-                            console.warn('[StateStore] localStorage migration failed:', lsErr);
+                            (window.Logger || console).warn('[StateStore] localStorage migration failed:', lsErr);
                             resolve(null);
                         }
                     }
                 };
 
                 req.onerror = (event) => {
-                    console.warn('[StateStore] IndexedDB read failed:', event.target.error);
+                    (window.Logger || console).warn('[StateStore] IndexedDB read failed:', event.target.error);
                     // Fallback to localStorage
                     try {
                         const saved = localStorage.getItem(this.LS_KEY);
@@ -223,7 +223,7 @@ const StateStore = {
                     }
                 };
             } catch (err) {
-                console.warn('[StateStore] Transaction error on load:', err);
+                (window.Logger || console).warn('[StateStore] Transaction error on load:', err);
                 resolve(null);
             }
         });
@@ -247,12 +247,12 @@ const StateStore = {
                 const store = tx.objectStore(this.STORE_NAME);
                 store.delete(this.STATE_KEY);
                 tx.oncomplete = () => {
-                    console.log('[StateStore] Cleared IndexedDB state');
+                    if (window.Logger) Logger.info('StateStore', 'Cleared IndexedDB state');
                     resolve();
                 };
                 tx.onerror = () => resolve();
             } catch (err) {
-                console.warn('[StateStore] Clear error:', err);
+                (window.Logger || console).warn('[StateStore] Clear error:', err);
                 resolve();
             }
         });
@@ -262,4 +262,4 @@ const StateStore = {
 // Export globally
 window.StateStore = StateStore;
 
-console.log('[StateStore] Module loaded');
+// Module loaded silently

@@ -490,7 +490,7 @@ function renderDashboardEnhanced() {
     if (window.dashboardCharts) {
         Object.values(window.dashboardCharts).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') {
-                try { chart.destroy(); } catch (e) { }
+                try { chart.destroy(); } catch (e) { if (window.Logger) Logger.debug('Dashboard', 'Chart cleanup warning:', e.message); }
             }
         });
     }
