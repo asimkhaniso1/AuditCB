@@ -98,4 +98,30 @@ console.log(`   Original: ${Math.round(totalOriginal / 1024)}KB`);
 console.log(`   Minified: ${Math.round(totalMinified / 1024)}KB`);
 console.log(`   Savings:  ${Math.round((1 - totalMinified / totalOriginal) * 100)}%`);
 if (errors) console.log(`   Errors:   ${errors}`);
-console.log('✅ Build complete! Output in dist/');
+
+// 4. Add content-hash cache busting to index.html
+const crypto = require('crypto');
+const indexPath = path.join(DIST, 'index.html');
+if (fs.existsSync(indexPath)) {
+    console.log('\n🔗 Adding content-hash cache busting...');
+    let html = fs.readFileSync(indexPath, 'utf8');
+    let replacements = 0;
+
+    // Replace ?v=ANYTHING with ?h=CONTENT_HASH for local JS and CSS files
+    html = html.replace(/(?:src|href)="\.\/([^"]+?)(?:\?v=[^"]*)?"/g, (match, filePath) => {
+        const fullPath = path.join(DIST, filePath);
+        if (fs.existsSync(fullPath)) {
+            const content = fs.readFileSync(fullPath);
+            const hash = crypto.createHash('md5').update(content).digest('hex').substring(0, 8);
+            const attr = match.startsWith('src') ? 'src' : 'href';
+            replacements++;
+            return `${attr}="./${filePath}?h=${hash}"`;
+        }
+        return match;
+    });
+
+    fs.writeFileSync(indexPath, html, 'utf8');
+    console.log(`   ✅ Updated ${replacements} file references with content hashes`);
+}
+
+console.log('\n✅ Build complete! Output in dist/');
