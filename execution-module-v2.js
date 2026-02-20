@@ -573,18 +573,27 @@ function renderExecutionDetail(reportId) {
     const checklists = state.checklists || [];
     const assignedChecklists = planChecklists.map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
 
-    // Diagnostic: help debug missing checklists
-    if (assignedChecklists.length === 0) {
-        console.warn('[Execution] No assigned checklists.', {
-            planFound: !!plan,
-            planId: plan?.id,
-            reportPlanId: report.planId,
-            reportClient: report.client,
-            planClient: plan?.client,
-            selectedChecklistIds: planChecklists,
-            globalChecklistCount: checklists.length,
-            globalChecklistIds: checklists.map(c => c.id)
-        });
+    // Recovery: if plan has checklists but local state is missing them, try fetching from Supabase
+    if (assignedChecklists.length === 0 && planChecklists.length > 0) {
+        console.warn('[Execution] No assigned checklists — plan references IDs:', planChecklists, 'but state has', checklists.length, 'checklists');
+        // Attempt on-demand recovery from Supabase
+        if (window.SupabaseClient?.isInitialized && !window._checklistRecoveryAttempted) {
+            window._checklistRecoveryAttempted = true;
+            console.info('[Execution] Attempting checklist recovery from Supabase...');
+            window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
+                window._checklistRecoveryAttempted = false;
+                const recovered = (state.checklists || []).filter(c => planChecklists.includes(String(c.id)));
+                if (recovered.length > 0) {
+                    console.info('[Execution] Recovered', recovered.length, 'checklist(s) from Supabase. Re-rendering...');
+                    renderExecutionDetail(reportId);
+                } else {
+                    console.warn('[Execution] Supabase returned', (state.checklists || []).length, 'checklists but none match plan IDs:', planChecklists);
+                }
+            }).catch(err => {
+                window._checklistRecoveryAttempted = false;
+                console.warn('[Execution] Checklist recovery failed:', err);
+            });
+        }
     }
     const customItems = report.customItems || [];
 
