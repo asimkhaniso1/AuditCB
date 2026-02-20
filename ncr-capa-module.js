@@ -207,6 +207,7 @@ function renderNCRCAPAModuleContent(clientId) {
                 <!-- Internal Navigation Tabs -->
                 <div class="tab-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                     <button class="tab-btn active" data-action="switchNCRTab" data-arg1="register" data-arg2="this">NCR Register</button>
+                    <button class="tab-btn" data-action="switchNCRTab" data-arg1="ofi-obs" data-arg2="this">OFI / OBS</button>
                     <button class="tab-btn" data-action="switchNCRTab" data-arg1="capa" data-arg2="this">CAPA Tracker</button>
                     <button class="tab-btn" data-action="switchNCRTab" data-arg1="verification" data-arg2="this">Verification</button>
                     <button class="tab-btn" data-action="switchNCRTab" data-arg1="analytics" data-arg2="this">Analytics</button>
@@ -231,6 +232,7 @@ function switchNCRTab(tabName, btnElement) {
 
     switch (tabName) {
         case 'register': container.innerHTML = getNCRRegisterHTML(); break;
+        case 'ofi-obs': container.innerHTML = getOFIOBSHTML(); break;
         case 'capa': container.innerHTML = getCAPATrackerHTML(); break;
         case 'verification': container.innerHTML = getVerificationHTML(); break;
         case 'analytics':
@@ -364,7 +366,7 @@ function renderNCRTable(ncrs) {
                                 ${window.UTILS.escapeHtml(ncr.description || '')}
                             </td>
                             <td>
-                                ${ncr.dueDate || '-'}
+                                ${ncr.dueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}
                                 ${isOverdue ? '<br><span style="color: #dc2626; font-size: 0.75rem; font-weight: bold;">⚠️ OVERDUE</span>' :
                 daysDiff <= 7 && ncr.status !== 'Closed' ? '<br><span style="color: #f59e0b; font-size: 0.75rem;">⏰ Due Soon</span>' : ''}
                             </td>
@@ -433,8 +435,149 @@ function filterNCRs() {
 }
 
 // --------------------------------------------
-// TAB 2: CAPA TRACKER
+// TAB 2: OFI / OBS (Read-Only Tracking)
+// Surfaces Observations & Opportunities for
+// Improvement from audit execution checklists.
+// These are NOT NCRs — no CAPA required.
 // --------------------------------------------
+
+function getOFIOBSHTML() {
+    const reports = window.state.auditReports || [];
+    const clientId = window.state.ncrContextClientId;
+
+    // Collect all OFI/OBS from checklist progress across reports
+    const findings = [];
+
+    reports.forEach(report => {
+        // Context filter: only show findings for the active client
+        if (clientId) {
+            const reportClientId = report.clientId || report.client_id;
+            const client = (window.state.clients || []).find(c => c.name === report.client);
+            const matchesId = String(reportClientId) === String(clientId);
+            const matchesName = client && String(client.id) === String(clientId);
+            if (!matchesId && !matchesName) return;
+        }
+
+        const progress = report.checklistProgress || [];
+        progress.forEach(item => {
+            if (item.status !== 'nc') return;
+            const t = (item.ncrType || '').toLowerCase();
+            if (t !== 'observation' && t !== 'ofi') return;
+
+            // Resolve clause text from checklist
+            let clauseText = item.clause || '';
+            let reqText = item.requirement || '';
+            if (!clauseText && item.checklistId) {
+                const checklists = window.state.checklists || [];
+                const cl = checklists.find(c => String(c.id) === String(item.checklistId));
+                if (cl && cl.items && cl.items[item.itemIdx]) {
+                    clauseText = cl.items[item.itemIdx].clause || '';
+                    reqText = reqText || cl.items[item.itemIdx].requirement || '';
+                }
+            }
+
+            findings.push({
+                type: t === 'ofi' ? 'OFI' : 'OBS',
+                clause: clauseText,
+                description: item.ncrDescription || item.comment || reqText || '',
+                client: report.client || '',
+                auditDate: report.date || '',
+                standard: report.standard || '',
+                reportId: report.id
+            });
+        });
+
+        // Also collect from report.findings[] (manually added findings)
+        const manualFindings = report.findings || [];
+        manualFindings.forEach(f => {
+            const t = (f.type || '').toLowerCase();
+            if (t !== 'observation' && t !== 'ofi') return;
+
+            findings.push({
+                type: t === 'ofi' ? 'OFI' : 'OBS',
+                clause: f.clause || '',
+                description: f.description || '',
+                client: report.client || '',
+                auditDate: report.date || '',
+                standard: report.standard || '',
+                reportId: report.id
+            });
+        });
+    });
+
+    const obsCount = findings.filter(f => f.type === 'OBS').length;
+    const ofiCount = findings.filter(f => f.type === 'OFI').length;
+
+    return `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">
+                    <i class="fa-solid fa-lightbulb" style="margin-right: 0.5rem;"></i>
+                    Observations & Opportunities for Improvement
+                </h3>
+            </div>
+
+            <!-- KPI Cards -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${findings.length}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Total Findings</div>
+                </div>
+                <div class="card" style="background: linear-gradient(135deg, #8b5cf6 0%, #c4b5fd 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${obsCount}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Observations (OBS)</div>
+                </div>
+                <div class="card" style="background: linear-gradient(135deg, #0891b2 0%, #67e8f9 100%); color: white; padding: 1.25rem; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold;">${ofiCount}</div>
+                    <div style="opacity: 0.9; font-size: 0.85rem;">Opportunities (OFI)</div>
+                </div>
+            </div>
+
+            <div style="background: #f0fdf4; border-left: 3px solid #22c55e; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.85rem; color: #166534;">
+                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                OFI/OBS findings are informational — they highlight good practices or areas for improvement but do not require corrective action.
+            </div>
+
+            ${findings.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No OFI/OBS findings recorded across audits.</p>' : `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Clause</th>
+                            <th>Description</th>
+                            <th>Client</th>
+                            <th>Audit Date</th>
+                            <th>Standard</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${findings.map(f => `
+                            <tr>
+                                <td>
+                                    <span class="badge" style="background: ${f.type === 'OFI' ? '#0891b2' : '#7c3aed'}; color: white; font-size: 0.75rem;">
+                                        ${f.type}
+                                    </span>
+                                </td>
+                                <td><span class="badge bg-gray">${window.UTILS.escapeHtml(f.clause || '-')}</span></td>
+                                <td style="max-width: 350px;">${window.UTILS.escapeHtml(f.description || '-')}</td>
+                                <td>${window.UTILS.escapeHtml(f.client)}</td>
+                                <td>${window.UTILS.formatDate(f.auditDate)}</td>
+                                <td>${window.UTILS.escapeHtml(f.standard || '-')}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            `}
+        </div>
+    `;
+}
+
+// --------------------------------------------
+// TAB 3: CAPA TRACKER
+// --------------------------------------------
+
 
 function getCAPATrackerHTML() {
     let ncrs = window.state.ncrs || [];
@@ -489,7 +632,7 @@ function getCAPATrackerHTML() {
                                 <td style="max-width: 200px;">${window.UTILS.escapeHtml(ncr.rootCause || 'Pending analysis')}</td>
                                 <td style="max-width: 250px;">${window.UTILS.escapeHtml(ncr.correctiveAction || 'Not yet defined')}</td>
                                 <td>${window.UTILS.escapeHtml(ncr.capaResponsible || 'Not assigned')}</td>
-                                <td>${ncr.dueDate || '-'}</td>
+                                <td>${ncr.dueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}</td>
                                 <td>
                                     <button class="btn btn-sm" data-action="updateCAPAProgress" data-id="${ncr.id}" aria-label="Edit">
                                         <i class="fa-solid fa-edit"></i> Update
@@ -543,7 +686,7 @@ function getVerificationHTML() {
                                 <td><strong>NCR-${String(ncr.id).padStart(3, '0')}</strong></td>
                                 <td>${window.UTILS.escapeHtml(ncr.clientName || '')}</td>
                                 <td style="max-width: 300px;">${window.UTILS.escapeHtml(ncr.correctiveAction || '')}</td>
-                                <td>${ncr.capaImplementedDate || 'Not yet implemented'}</td>
+                                <td>${ncr.capaImplementedDate ? window.UTILS.formatDate(ncr.capaImplementedDate) : 'Not yet implemented'}</td>
                                 <td>${window.UTILS.escapeHtml(ncr.verificationMethod || '')}</td>
                                 <td>
                                     <button class="btn btn-sm btn-primary" data-action="verifyCAPA" data-id="${ncr.id}" aria-label="Confirm">
