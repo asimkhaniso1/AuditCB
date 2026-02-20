@@ -234,93 +234,14 @@ let saveTimeout;
 let lastSaveSize = 0;
 
 function saveState() {
-    // Debounce saves to prevent excessive localStorage writes
+    // Debounce saves to prevent excessive writes
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
         try {
-            // Use a JSON replacer to strip base64 evidence images DURING serialization only
-            // This avoids mutating the live state object (which would erase images from display)
-            const stateJSON = JSON.stringify(state, (key, value) => {
-                // Strip base64 from evidenceImage (single string)
-                if (key === 'evidenceImage' && typeof value === 'string' && value.startsWith('data:')) {
-                    return '';
-                }
-                // Strip base64 entries from evidenceImages array
-                if (key === 'evidenceImages' && Array.isArray(value)) {
-                    return value.filter(u => u && !u.startsWith('data:'));
-                }
-                return value;
-            });
-            const sizeInMB = new Blob([stateJSON]).size / 1024 / 1024;
-            lastSaveSize = sizeInMB;
-
-            // Check storage quota (warn at 4.5MB, 90% of typical 5MB limit)
-            if (sizeInMB > 4.5) {
-                console.warn(`Storage usage high: ${sizeInMB.toFixed(2)}MB / 5MB`);
-                window.showNotification(
-                    `Storage usage: ${sizeInMB.toFixed(2)}MB. Consider exporting old data.`,
-                    'warning'
-                );
-            }
-
-            try {
-                localStorage.setItem('auditCB360State', stateJSON);
-            } catch (quotaErr) {
-                console.warn(`[saveState] localStorage quota exceeded (${sizeInMB.toFixed(2)}MB). State kept in memory only.`);
-                // Don't crash — state is still in memory and the app works fine
-            }
-
-            // DISABLED 2026-01-12: Auto-sync causes DELETE ALL + INSERT ALL on every save
-            // This was the root cause of "deleted data reappearing" bug
-            // Direct database operations (per-record insert/update/delete) are used instead
-            /*
-            if (window.SupabaseClient?.isInitialized && state.currentUser) {
-                try {
-                    // Sync all data types to Supabase (non-blocking)
-                    window.SupabaseClient.syncUsersToSupabase(state.users || [])
-                        .catch(e => console.warn('User sync failed:', e));
-
-                    window.SupabaseClient.syncClientsToSupabase(state.clients || [])
-                        .catch(e => console.warn('Client sync failed:', e));
-
-                    window.SupabaseClient.syncAuditorsToSupabase(state.auditors || [])
-                        .catch(e => console.warn('Auditor sync failed:', e));
-
-                    window.SupabaseClient.syncAuditPlansToSupabase(state.auditPlans || [])
-                        .catch(e => console.warn('Audit plan sync failed:', e));
-
-                    window.SupabaseClient.syncAuditReportsToSupabase(state.auditReports || [])
-                        .catch(e => console.warn('Audit report sync failed:', e));
-
-                    window.SupabaseClient.syncChecklistsToSupabase(state.checklists || [])
-                        .catch(e => console.warn('Checklist sync failed:', e));
-
-                    // NOTE: Settings sync is intentionally NOT automatic
-                    // Settings should only sync when user explicitly clicks Save in Settings UI
-                    // This prevents default values from overwriting user's saved data
-                    // window.SupabaseClient.syncSettingsToSupabase(state.settings)
-                    //     .catch(e => console.warn('Settings sync failed:', e));
-
-                    window.SupabaseClient.syncDocumentsToSupabase(state.documents || [])
-                        .catch(e => console.warn('Document sync failed:', e));
-
-                    window.SupabaseClient.syncCertificationDecisionsToSupabase(state.certificationDecisions || [])
-                        .catch(e => console.warn('Certification decision sync failed:', e));
-                } catch (syncError) {
-                    console.warn('Supabase sync error:', syncError);
-                }
-            }
-            */
+            // Use StateStore (IndexedDB) — no 5MB limit
+            await window.StateStore.save(state);
         } catch (e) {
             console.error('Save failed:', e);
-            if (e.name === 'QuotaExceededError') {
-                window.showNotification(
-                    'Storage limit exceeded! Please export and clear old data.',
-                    'error'
-                );
-            } else {
-                console.warn('LocalStorage not available:', e);
-            }
         }
     }, 500); // Wait 500ms before saving
 }
@@ -342,32 +263,32 @@ function getStorageStats() {
 
 window.getStorageStats = getStorageStats;
 
-function loadState() {
+async function loadState() {
     try {
-        const saved = localStorage.getItem('auditCB360State');
-        if (saved) {
-            const data = JSON.parse(saved);
+        // Initialize IndexedDB state store
+        await window.StateStore.init();
+
+        // Load from IndexedDB (auto-migrates from localStorage on first run)
+        const data = await window.StateStore.load();
+        if (data) {
             // Check version compatibility
             if (data.version === DATA_VERSION) {
                 Object.assign(state, data);
 
                 // SAFETY: Ensure currentUser is initialized from authentication
                 if (!state.currentUser) {
-                    // No saved user - require authentication
                     window.Logger.warn('Core', 'No authenticated user found. Login required.');
                     state.currentUser = null;
                 }
             } else {
                 window.Logger.warn('Core', `Version mismatch (Store: ${data.version}, App: ${DATA_VERSION}). Resetting to defaults.`);
-                // Do not load saved data, keep strictly default mock data
-                // We'll save the new default state naturally on next edit
             }
         }
 
         // Migrate checklists to hierarchical format if needed
         migrateChecklistsToHierarchy();
     } catch (e) {
-        console.warn('LocalStorage not available:', e);
+        console.warn('State load failed:', e);
     }
 }
 
@@ -422,7 +343,9 @@ function migrateChecklistsToHierarchy() {
 
 
 
-loadState();
+// Load state asynchronously from IndexedDB (migrates from localStorage on first run)
+// Resolves before rendering starts since DOMContentLoaded fires after microtasks
+window._stateReady = loadState();
 
 // Helper functions (Safe ID Generation)
 function getNextId(collection) {
@@ -1401,7 +1324,10 @@ function updateNavigationForRole(role) {
 window.updateNavigationForRole = updateNavigationForRole;
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Wait for IndexedDB state to be loaded before checking auth
+    if (window._stateReady) await window._stateReady;
+
     // Check if user is logged in (not demo mode)
     const isLoggedIn = state.currentUser && !state.currentUser.isDemo && state.currentUser.email;
 

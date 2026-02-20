@@ -417,11 +417,11 @@ const SupabaseClient = {
                 Logger.info(`Hydrated certificates for ${hydrationCount} clients`);
             }
 
-            // CRITICAL: Save to localStorage directly (don't call saveData - it triggers upload!)
+            // CRITICAL: Save to IndexedDB (don't call saveData - it triggers upload!)
             try {
-                localStorage.setItem('auditCB360State', JSON.stringify(window.state));
-            } catch (quotaErr) {
-                Logger.warn('localStorage quota exceeded during cloud sync save. State kept in memory only.');
+                await window.StateStore.save(window.state);
+            } catch (saveErr) {
+                Logger.warn('IndexedDB save failed during cloud sync. State kept in memory only.');
             }
 
             const elapsed = ((performance.now() - syncStart) / 1000).toFixed(1);

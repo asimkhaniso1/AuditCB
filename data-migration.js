@@ -211,12 +211,14 @@ const DataMigration = {
                 auditPlans: window.state.auditPlans.length
             });
 
-            // Directly write to localStorage to ensure immediate persistence
+            // Directly write to IndexedDB to ensure immediate persistence
             try {
-                localStorage.setItem('auditCB360State', JSON.stringify(window.state));
-                console.log('Data saved to localStorage successfully');
+                if (window.StateStore) {
+                    window.StateStore.save(window.state);
+                }
+                console.log('Data saved to IndexedDB successfully');
             } catch (e) {
-                console.error('Failed to save to localStorage:', e);
+                console.error('Failed to save state:', e);
             }
 
             // 4. Force specific reloads
@@ -340,8 +342,12 @@ const DataMigration = {
         try {
             window.showNotification('Clearing local cache and reloading from cloud...', 'info');
 
-            // Clear localStorage to force fresh load from Supabase
-            localStorage.removeItem('auditCB360State');
+            // Clear IndexedDB + localStorage to force fresh load from Supabase
+            if (window.StateStore) {
+                window.StateStore.clear();
+            } else {
+                localStorage.removeItem('auditCB360State');
+            }
 
             // Force reload
             setTimeout(() => {

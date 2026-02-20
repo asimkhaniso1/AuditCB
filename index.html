@@ -333,8 +333,11 @@
     <script src="./constants.js?v=16.3_FINAL"></script>
     <script src="./debounce.js?v=16.3_FINAL"></script>
 
+    <!-- IndexedDB state store (must load before script.js) -->
+    <script src="./idb-state-store.js?v=21.0_IDB"></script>
+
     <!-- Load core script to initialize window.state -->
-    <script src="./script.js?v=20.3_QUOTA_SAFE"></script>
+    <script src="./script.js?v=21.0_IDB"></script>
 
     <!-- Core Modules load after state is initialized -->
     <script src="./event-manager.js?v=16.3_FINAL"></script>
