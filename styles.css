@@ -1872,3 +1872,29 @@ textarea:focus:invalid {
 .sidebar {
     will-change: transform;
 }
+
+/* ============================================
+   CSP FIX: Moved from inline <style> in index.html
+   Modal Z-Index Fix to prevent sidebar overlap
+   ============================================ */
+
+.modal-overlay {
+    z-index: 9999 !important;
+}
+
+.modal-content {
+    z-index: 10000 !important;
+    position: relative !important;
+}
+
+/* Hide app until login check completes */
+.auth-pending {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.auth-ready {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.3s ease;
+}

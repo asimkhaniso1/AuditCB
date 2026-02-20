@@ -12,7 +12,7 @@
     <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com;
+        script-src 'self' 'unsafe-inline' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com;
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
         img-src 'self' data: https: blob:;
@@ -43,99 +43,11 @@
         onerror="this.onerror=null;this.src='https://unpkg.com/dompurify@3.0.6/dist/purify.min.js';"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script>
-        // 🛡️ EMERGENCY RECOVERY: Ensure critical security objects exist even if CDNs fail
-        (function () {
-            if (typeof window.DOMPurify === 'undefined') {
-                console.warn('⚠️ DOMPurify missing - Initializing EMERGENCY fallbacks');
-                window.DOMPurify = {
-                    sanitize: function (dirty) { return dirty; },
-                    isEmergency: true
-                };
-            }
-
-            // 🧪 Initialize Sanitizer shell immediately to prevent ReferenceErrors during early boot
-            window.Sanitizer = window.Sanitizer || {
-                sanitizeHTML: function (d) { return window.DOMPurify ? window.DOMPurify.sanitize(d) : d; },
-                sanitizeText: function (d) { return d; },
-                sanitizeURL: function (d) { return d; },
-                escapeHTML: function (d) { return d; },
-                _placeholder: true
-            };
-
-            // 🛠️ UTILS Fallback: Ensure basic escaping exists if utils.js fails
-            window.UTILS = window.UTILS || {
-                escapeHtml: function (s) {
-                    if (!s) return '';
-                    return String(s).replace(/[&<>"']/g, function (m) {
-                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
-                    });
-                }
-            };
-
-            // ☢️ v19.0 ULTRA PURGE - Breaking Persistent Cache
-            const APP_VERSION = '19.0';
-
-            // 1. Purge Cache API (Breaking the most stubborn level of caching)
-            if ('caches' in window) {
-                caches.keys().then(names => {
-                    for (let name of names) {
-                        caches.delete(name);
-                        console.log('☢️ CACHE PURGED:', name);
-                    }
-                });
-            }
-
-            // 2. Unregister all Service Workers
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                    for (let registration of registrations) {
-                        registration.unregister();
-                        console.log('☢️ Service Worker Unregistered');
-                    }
-                });
-            }
-
-            // 3. Force Reload logic
-            if (window.location.search.indexOf('v=' + APP_VERSION) === -1 && !localStorage.getItem('v' + APP_VERSION + '_reloaded')) {
-                console.log('🔄 First visit to v' + APP_VERSION + ' - Forcing full purge reload');
-                localStorage.setItem('v' + APP_VERSION + '_reloaded', 'true');
-                // Clear state to force fresh fetch
-                window.location.href = window.location.pathname + '?v=' + APP_VERSION + '&purge=' + Date.now() + window.location.hash;
-            } else if (window.location.search) {
-                // Clean up URL after purge - remove query params
-                window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-            }
-        })();
-    </script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
+    <!-- CSP-compliant boot: fallbacks + cache purge + PDF.js config -->
+    <script src="./csp-boot.js?v=21.1_CSP"></script>
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Modal Z-Index Fix to prevent sidebar overlap -->
-    <style>
-        .modal-overlay {
-            z-index: 9999 !important;
-        }
-
-        .modal-content {
-            z-index: 10000 !important;
-            position: relative !important;
-        }
-
-        /* Hide app until login check completes */
-        .auth-pending {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .auth-ready {
-            opacity: 1;
-            pointer-events: auto;
-            transition: opacity 0.3s ease;
-        }
-    </style>
+    <!-- Modal z-index + auth-pending styles now in styles.css (CSP compliance) -->
 </head>
 
 <body>
@@ -263,17 +175,7 @@
                 </div>
             </div>
 
-            <style>
-                @keyframes spin {
-                    0% {
-                        transform: rotate(0deg);
-                    }
-
-                    100% {
-                        transform: rotate(360deg);
-                    }
-                }
-            </style>
+            <!-- @keyframes spin now in styles.css -->
         </main>
 
         <aside class="client-sidebar" id="client-sidebar">
