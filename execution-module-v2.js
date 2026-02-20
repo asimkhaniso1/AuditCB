@@ -72,7 +72,7 @@ function renderAuditExecutionEnhanced() {
                 }
             </td>
             <td>${report.client}</td>
-            <td>${report.date}</td>
+            <td>${window.UTILS.formatDate(report.date)}</td>
             <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.findings}</span></td>
             <td><span style="background: ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'var(--success-color)' :
                     report.status === 'Approved' ? '#7c3aed' :
@@ -786,7 +786,7 @@ function renderExecutionDetail(reportId) {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
                         <h2 style="margin-bottom: 0.5rem;">Audit Execution: ${report.client}</h2>
-                        <p style="color: var(--text-secondary);">Audit Date: ${report.date} | Status: ${report.status}</p>
+                        <p style="color: var(--text-secondary);">Audit Date: ${window.UTILS.formatDate(report.date)} | Status: ${report.status}</p>
                     </div>
                     <button class="btn btn-primary" data-action="generateAuditReport" data-id="${report.id}" aria-label="Export PDF">
                         <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report

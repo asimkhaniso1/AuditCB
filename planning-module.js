@@ -26,7 +26,7 @@ function renderAuditPlanningEnhanced() {
                 <div style="font-size: 0.75rem; color: var(--text-secondary);">${window.UTILS.escapeHtml(plan.standard) || 'ISO 9001:2015'}</div>
             </td>
             <td>${window.UTILS.escapeHtml(plan.type) || 'Surveillance'}</td>
-            <td>${window.UTILS.escapeHtml(plan.date)}</td>
+            <td>${window.UTILS.formatDate(plan.date)}</td>
             <td>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     ${((plan.team && Array.isArray(plan.team)) ? plan.team : (plan.auditors || []).map(id => (state.auditors.find(a => a.id === id) || {}).name || 'Unknown')).map(auditor => `
@@ -1192,7 +1192,7 @@ window.printAuditChecklist = function (planId) {
                         <img src="${qrUrl}" alt="QR" style="width: 80px; height: 80px;">
                     </div>
                     <h1>Audit Checklist Execution Report</h1>
-                    <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${plan.date}</p>
+                    <p><strong>Client:</strong> ${plan.client} | <strong>Standard:</strong> ${plan.standard} | <strong>Date:</strong> ${window.UTILS.formatDate(plan.date)}</p>
                     <p><strong>Auditor(s):</strong> ${auditorNames} | <strong>Status:</strong> ${report ? 'Finalized' : 'In Progress'}</p>
                 </div>
         `;
@@ -2014,7 +2014,7 @@ window.printAuditPlanDetails = function (planId) {
                     <td><span class="meta-label">Audit Standard</span>${window.UTILS.escapeHtml(plan.standard)}</td>
                 </tr>
                 <tr>
-                    <td><span class="meta-label">Planned Date</span>${window.UTILS.escapeHtml(plan.date)}</td>
+                    <td><span class="meta-label">Planned Date</span>${window.UTILS.formatDate(plan.date)}</td>
                     <td><span class="meta-label">Audit Type</span>${window.UTILS.escapeHtml(plan.type)}</td>
                 </tr>
                 <tr>
@@ -2834,7 +2834,7 @@ window.renderPreAuditReview = function (planId) {
                     <p style="color: var(--text-secondary); margin: 0;">
                         <i class="fa-solid fa-building" style="margin-right: 0.5rem;"></i>${client?.name || plan.client}
                         <span style="margin: 0 0.75rem;">•</span>
-                        <i class="fa-solid fa-calendar" style="margin-right: 0.5rem;"></i>${plan.date}
+                        <i class="fa-solid fa-calendar" style="margin-right: 0.5rem;"></i>${window.UTILS.formatDate(plan.date)}
                         <span style="margin: 0 0.75rem;">•</span>
                         ${plan.standard}
                     </p>
@@ -3166,7 +3166,7 @@ window.exportPreAuditPDF = function (planId) {
                 <div class="meta">
                     <div><strong>Client:</strong> ${client?.name || plan.client}</div>
                     <div><strong>Standard:</strong> ${plan.standard}</div>
-                    <div><strong>Audit Date:</strong> ${plan.date}</div>
+                    <div><strong>Audit Date:</strong> ${window.UTILS.formatDate(plan.date)}</div>
                     <div><strong>Review Completed:</strong> ${plan.preAudit.completedDate || 'In Progress'}</div>
                     <div><strong>Reviewed By:</strong> ${plan.preAudit.completedBy || 'Auditor'}</div>
                 </div>
