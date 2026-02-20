@@ -162,6 +162,20 @@ if (fs.existsSync(indexPath)) {
 
     fs.writeFileSync(indexPath, html, 'utf8');
     console.log(`   ✅ Updated ${replacements} file references with content hashes`);
+
+    // 5. Minify HTML
+    const htmlBefore = html.length;
+    // Remove HTML comments (but keep conditional comments)
+    html = html.replace(/<!--(?!\[)[\s\S]*?-->/g, '');
+    // Collapse whitespace between tags
+    html = html.replace(/>\s+</g, '><');
+    // Remove leading whitespace on lines
+    html = html.replace(/^\s+/gm, '');
+    // Collapse blank lines
+    html = html.replace(/\n{2,}/g, '\n');
+    fs.writeFileSync(indexPath, html, 'utf8');
+    const htmlAfter = html.length;
+    console.log(`   ✅ HTML minified: ${Math.round(htmlBefore / 1024)}KB → ${Math.round(htmlAfter / 1024)}KB (${Math.round((1 - htmlAfter / htmlBefore) * 100)}% smaller)`);
 }
 
 console.log('\n✅ Build complete! Output in dist/');
