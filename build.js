@@ -93,11 +93,51 @@ for (const file of jsFiles) {
     }
 }
 
+// 3b. Minify all CSS files in dist (no extra dependency needed)
+const cssFiles = [];
+function findCSS(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) findCSS(fullPath);
+        else if (entry.name.endsWith('.css')) cssFiles.push(fullPath);
+    }
+}
+findCSS(DIST);
+
+let cssOriginal = 0, cssMinified = 0;
+console.log(`\n🎨 Minifying ${cssFiles.length} CSS files...`);
+for (const file of cssFiles) {
+    const original = fs.statSync(file).size;
+    cssOriginal += original;
+    try {
+        let css = fs.readFileSync(file, 'utf8');
+        // Remove comments
+        css = css.replace(/\/\*[\s\S]*?\*\//g, '');
+        // Remove leading/trailing whitespace per line
+        css = css.replace(/^\s+/gm, '').replace(/\s+$/gm, '');
+        // Collapse multiple whitespace/newlines
+        css = css.replace(/\s*\n\s*/g, '').replace(/\s{2,}/g, ' ');
+        // Remove spaces around selectors/braces
+        css = css.replace(/\s*([{}:;,>~+])\s*/g, '$1');
+        // Remove trailing semicolons before }
+        css = css.replace(/;}/g, '}');
+        fs.writeFileSync(file, css, 'utf8');
+        const minified = fs.statSync(file).size;
+        cssMinified += minified;
+        const savings = Math.round((1 - minified / original) * 100);
+        console.log(`  ✅ ${path.basename(file)}: ${Math.round(original / 1024)}KB → ${Math.round(minified / 1024)}KB (${savings}% smaller)`);
+    } catch (e) {
+        cssMinified += original;
+        console.warn(`  ⚠️ ${path.basename(file)}: minification failed`);
+    }
+}
+
 console.log(`\n📊 Results:`);
-console.log(`   Original: ${Math.round(totalOriginal / 1024)}KB`);
-console.log(`   Minified: ${Math.round(totalMinified / 1024)}KB`);
-console.log(`   Savings:  ${Math.round((1 - totalMinified / totalOriginal) * 100)}%`);
-if (errors) console.log(`   Errors:   ${errors}`);
+console.log(`   JS  — Original: ${Math.round(totalOriginal / 1024)}KB, Minified: ${Math.round(totalMinified / 1024)}KB, Savings: ${Math.round((1 - totalMinified / totalOriginal) * 100)}%`);
+console.log(`   CSS — Original: ${Math.round(cssOriginal / 1024)}KB, Minified: ${Math.round(cssMinified / 1024)}KB, Savings: ${cssOriginal ? Math.round((1 - cssMinified / cssOriginal) * 100) : 0}%`);
+console.log(`   Total Bundle: ${Math.round((totalMinified + cssMinified) / 1024)}KB`);
+if (errors) console.log(`   JS Errors: ${errors}`);
 
 // 4. Add content-hash cache busting to index.html
 const crypto = require('crypto');
