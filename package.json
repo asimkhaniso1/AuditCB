@@ -3,13 +3,15 @@
     "version": "1.0.0",
     "description": "AuditCB360 Certification System",
     "scripts": {
-        "start": "http-server -p 8080"
+        "start": "http-server -p 8080",
+        "build": "node build.js"
     },
     "engines": {
         "node": "20.x"
     },
     "devDependencies": {
-        "supabase": "^2.72.2"
+        "supabase": "^2.72.2",
+        "terser": "^5.46.0"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.93.2",
