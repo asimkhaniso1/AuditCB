@@ -530,6 +530,105 @@ function deleteAuditReport(reportId) {
 window.deleteAuditReport = deleteAuditReport;
 window.openEditReportModal = openEditReportModal;
 
+/**
+ * Reconstruct a checklist template from saved checklistProgress data.
+ * Used when the original checklist template is lost from both local and cloud storage.
+ */
+function _reconstructChecklistFromProgress(report, planChecklistIds, plan) {
+    const progress = report.checklistProgress || [];
+    if (progress.length === 0) {
+        console.warn('[Execution] No checklistProgress data to reconstruct from.');
+        return;
+    }
+
+    // Group progress items by checklistId
+    const groupedById = {};
+    progress.forEach(item => {
+        if (item.isCustom) return; // Skip custom items
+        const clId = String(item.checklistId);
+        if (!groupedById[clId]) groupedById[clId] = [];
+        groupedById[clId].push(item);
+    });
+
+    const reconstructed = [];
+    Object.entries(groupedById).forEach(([clId, items]) => {
+        // Build hierarchical clause structure from progress items
+        const clauseGroups = {};
+        items.forEach(item => {
+            const clauseText = item.clause || '';
+            const mainClauseNum = clauseText.split('.')[0] || 'General';
+
+            if (!clauseGroups[mainClauseNum]) {
+                clauseGroups[mainClauseNum] = {
+                    mainClause: mainClauseNum,
+                    title: _getClauseTitle(mainClauseNum),
+                    subClauses: []
+                };
+            }
+            clauseGroups[mainClauseNum].subClauses.push({
+                clause: clauseText,
+                requirement: item.requirement || ''
+            });
+        });
+
+        const clauses = Object.values(clauseGroups).sort((a, b) => {
+            const na = parseFloat(a.mainClause) || 0;
+            const nb = parseFloat(b.mainClause) || 0;
+            return na - nb;
+        });
+
+        const checklist = {
+            id: clId,
+            name: `${plan?.standard || 'Audit'} Checklist (Recovered)`,
+            standard: plan?.standard || 'Unknown',
+            type: 'global',
+            clauses: clauses,
+            createdBy: 'System Recovery',
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString().split('T')[0],
+            _recovered: true
+        };
+
+        reconstructed.push(checklist);
+    });
+
+    if (reconstructed.length > 0) {
+        if (!state.checklists) state.checklists = [];
+        reconstructed.forEach(cl => {
+            // Don't duplicate if somehow already there
+            if (!state.checklists.some(c => String(c.id) === String(cl.id))) {
+                state.checklists.push(cl);
+            }
+        });
+        window.saveData();
+
+        // Also push recovered checklists to Supabase for persistence
+        if (window.SupabaseClient?.isInitialized) {
+            window.SupabaseClient.syncChecklistsToSupabase(reconstructed)
+                .then(() => console.info('[Execution] Recovered checklists synced to Supabase.'))
+                .catch(err => console.warn('[Execution] Failed to sync recovered checklists:', err));
+        }
+
+        const totalItems = reconstructed.reduce((sum, cl) =>
+            sum + cl.clauses.reduce((s, c) => s + c.subClauses.length, 0), 0);
+        console.info(`[Execution] Reconstructed ${reconstructed.length} checklist(s) with ${totalItems} items from progress data.`);
+        window.showNotification?.(`Recovered ${reconstructed.length} checklist(s) from audit data`, 'success');
+
+        // Re-render with recovered checklists
+        const reportId = report.id;
+        setTimeout(() => renderExecutionDetail(reportId), 100);
+    }
+}
+
+function _getClauseTitle(clauseNum) {
+    const titles = {
+        '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning',
+        '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation',
+        '10': 'Improvement', 'A': 'Annex A Controls', 'General': 'General Requirements'
+    };
+    return titles[clauseNum] || `Clause ${clauseNum}`;
+}
+
 function renderExecutionDetail(reportId) {
     const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
@@ -573,10 +672,11 @@ function renderExecutionDetail(reportId) {
     const checklists = state.checklists || [];
     const assignedChecklists = planChecklists.map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
 
-    // Recovery: if plan has checklists but local state is missing them, try fetching from Supabase
+    // Recovery: if plan has checklists but local state is missing them
     if (assignedChecklists.length === 0 && planChecklists.length > 0) {
-        console.warn('[Execution] No assigned checklists — plan references IDs:', planChecklists, 'but state has', checklists.length, 'checklists');
-        // Attempt on-demand recovery from Supabase
+        console.warn('[Execution] Missing checklists — plan IDs:', planChecklists, '| state has:', checklists.length);
+
+        // STRATEGY 1: Try Supabase recovery
         if (window.SupabaseClient?.isInitialized && !window._checklistRecoveryAttempted) {
             window._checklistRecoveryAttempted = true;
             console.info('[Execution] Attempting checklist recovery from Supabase...');
@@ -584,15 +684,19 @@ function renderExecutionDetail(reportId) {
                 window._checklistRecoveryAttempted = false;
                 const recovered = (state.checklists || []).filter(c => planChecklists.includes(String(c.id)));
                 if (recovered.length > 0) {
-                    console.info('[Execution] Recovered', recovered.length, 'checklist(s) from Supabase. Re-rendering...');
+                    console.info('[Execution] Recovered', recovered.length, 'checklist(s) from Supabase.');
                     renderExecutionDetail(reportId);
                 } else {
-                    console.warn('[Execution] Supabase returned', (state.checklists || []).length, 'checklists but none match plan IDs:', planChecklists);
+                    // STRATEGY 2: Reconstruct from checklistProgress
+                    _reconstructChecklistFromProgress(report, planChecklists, plan);
                 }
-            }).catch(err => {
+            }).catch(() => {
                 window._checklistRecoveryAttempted = false;
-                console.warn('[Execution] Checklist recovery failed:', err);
+                _reconstructChecklistFromProgress(report, planChecklists, plan);
             });
+        } else if (!window._checklistRecoveryAttempted) {
+            // No Supabase — try direct reconstruction
+            _reconstructChecklistFromProgress(report, planChecklists, plan);
         }
     }
     const customItems = report.customItems || [];
