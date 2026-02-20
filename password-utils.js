@@ -95,6 +95,46 @@ const PasswordUtils = {
     },
 
     /**
+     * Generate a cryptographically secure random password
+     * @param {number} length - Password length (default 16)
+     * @returns {string} - Random password meeting all strength requirements
+     */
+    generateSecurePassword(length = 16) {
+        const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const lower = 'abcdefghijklmnopqrstuvwxyz';
+        const digits = '0123456789';
+        const special = '!@#$%&*_+-=?';
+        const all = upper + lower + digits + special;
+
+        // Use crypto API for secure randomness
+        const randomValues = new Uint32Array(length);
+        crypto.getRandomValues(randomValues);
+
+        // Guarantee at least one of each category
+        const password = [
+            upper[randomValues[0] % upper.length],
+            lower[randomValues[1] % lower.length],
+            digits[randomValues[2] % digits.length],
+            special[randomValues[3] % special.length]
+        ];
+
+        // Fill remaining with random chars from full set
+        for (let i = 4; i < length; i++) {
+            password.push(all[randomValues[i] % all.length]);
+        }
+
+        // Shuffle using Fisher-Yates with secure random
+        const shuffleValues = new Uint32Array(password.length);
+        crypto.getRandomValues(shuffleValues);
+        for (let i = password.length - 1; i > 0; i--) {
+            const j = shuffleValues[i] % (i + 1);
+            [password[i], password[j]] = [password[j], password[i]];
+        }
+
+        return password.join('');
+    },
+
+    /**
      * Show password strength indicator
      * @param {string} password - Password to check
      * @param {string} containerId - ID of container to show indicator
@@ -132,5 +172,3 @@ const PasswordUtils = {
 
 // Export to window
 window.PasswordUtils = PasswordUtils;
-
-console.log('PasswordUtils module loaded');

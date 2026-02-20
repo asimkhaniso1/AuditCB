@@ -58,7 +58,7 @@ window.inviteUser = async function () {
             Logger.warn('Edge Function not available, using direct signup:', edgeFunctionError);
 
             // Method 2: Fallback to direct signup with temporary password
-            const tempPassword = 'Welcome123!' + Math.random().toString(36).substring(7);
+            const tempPassword = window.PasswordUtils?.generateSecurePassword() || ('Temp' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36) + '!Aa1');
 
             const { data: authData, error: signUpError } = await window.SupabaseClient.client.auth.signUp({
                 email: email,

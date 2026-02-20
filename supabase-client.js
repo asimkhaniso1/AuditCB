@@ -1992,7 +1992,7 @@ const SupabaseClient = {
                 updated_at: new Date().toISOString()
             };
 
-            console.log('[DEBUG] Syncing Settings to Supabase:', settingsData);
+            Logger.debug('Sync', 'Syncing Settings to Supabase:', settingsData);
 
             // Use UPSERT with ID if available, otherwise INSERT
             const { data, error } = await this.client
@@ -2002,7 +2002,7 @@ const SupabaseClient = {
                 .single();
 
             if (error) {
-                console.error('[DEBUG] Supabase Settings Sync Error:', error.message);
+                Logger.error('Sync', 'Supabase Settings Sync Error:', error.message);
                 throw error;
             }
 

@@ -1154,8 +1154,13 @@ window.openAddUserModal = function (userId = null) {
             ${!isEdit ? `
             <div class="form-group">
                 <label>Temporary Password <span style="color: var(--danger-color);">*</span></label>
-                <input type="text" class="form-control" id="user-password" value="Welcome123!" readonly style="background: #f8fafc;">
-                <small style="color: var(--text-secondary);">Default password for new users.</small>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="text" class="form-control" id="user-password" value="${window.PasswordUtils?.generateSecurePassword() || crypto.getRandomValues(new Uint32Array(4)).reduce((s, v) => s + v.toString(36), '').substring(0, 16) + '!A1'}" readonly style="background: #f8fafc; font-family: monospace;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('user-password').value = window.PasswordUtils.generateSecurePassword()" title="Generate new password">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+                <small style="color: var(--text-secondary);">Auto-generated secure password. Share this with the user.</small>
             </div>
             ` : `
             <div class="form-group">
@@ -1308,7 +1313,7 @@ window.saveUser = async function (userId) {
         }
     } else {
         // Create new user
-        const defaultPassword = document.getElementById('user-password')?.value || 'Welcome123!';
+        const defaultPassword = document.getElementById('user-password')?.value || (window.PasswordUtils?.generateSecurePassword() || 'Temp' + Date.now() + '!Aa1');
 
         const newUser = {
             id: `usr_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,

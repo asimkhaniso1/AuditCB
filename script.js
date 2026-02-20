@@ -1924,17 +1924,17 @@ window.toggleNavGroup = function (header) {
 
 // Toggle User Dropdown Menu in Header
 window.toggleUserMenu = function () {
-    console.log('[DEBUG] toggleUserMenu called');
+    Logger.debug('UI', 'toggleUserMenu called');
     const dropdown = document.getElementById('user-dropdown-menu');
-    console.log('[DEBUG] dropdown element:', dropdown);
+    Logger.debug('UI', 'dropdown element:', dropdown);
     if (!dropdown) {
-        console.error('[DEBUG] Dropdown element not found!');
+        Logger.error('UI', 'Dropdown element not found');
         return;
     }
 
     const isVisible = dropdown.style.display !== 'none';
     dropdown.style.display = isVisible ? 'none' : 'block';
-    console.log('[DEBUG] Dropdown toggled to:', dropdown.style.display);
+    Logger.debug('UI', 'Dropdown toggled to:', dropdown.style.display);
 
     // Update user info in dropdown
     if (!isVisible && window.state?.currentUser) {
@@ -1961,9 +1961,9 @@ document.addEventListener('click', function (e) {
 
 // Logout User
 window.logoutUser = function () {
-    console.log('[DEBUG] logoutUser called');
+    Logger.debug('Auth', 'logoutUser called');
     if (confirm('Are you sure you want to logout?')) {
-        console.log('[DEBUG] User confirmed logout');
+        Logger.debug('Auth', 'User confirmed logout');
 
         // Clear current user completely
         window.state.currentUser = null;
@@ -1977,9 +1977,9 @@ window.logoutUser = function () {
         showLoginOverlay();
 
         window.showNotification('Logged out successfully', 'info');
-        console.log('[DEBUG] Login overlay shown');
+        Logger.debug('Auth', 'Login overlay shown');
     } else {
-        console.log('[DEBUG] User cancelled logout');
+        Logger.debug('Auth', 'User cancelled logout');
     }
 };
 

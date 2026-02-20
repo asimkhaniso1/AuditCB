@@ -1470,7 +1470,7 @@ window.handleLogoUpload = function (input) {
 };
 
 window.renderAddClient = function () {
-    console.log('[DEBUG] renderAddClient called');
+    if (window.Logger) Logger.debug('Clients', 'renderAddClient called');
 
     const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
         ? window.state.cbSettings.standardsOffered

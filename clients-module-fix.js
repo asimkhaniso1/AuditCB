@@ -3,7 +3,7 @@
  * Exposes ALL functions to global scope that were accidentally privately scoped in clients-module.js
  * INCLUDES HTML Generators to ensure they bind to the global functions.
  */
-console.log('[DEBUG] clients-module-fix.js loading...');
+if (window.Logger) Logger.debug('Modules', 'clients-module-fix.js loading...');
 
 // ============================================
 // 1. ORIGINAL FIXES (HTML GENERATORS - ORG SETUP)
@@ -1372,4 +1372,4 @@ window.aiGenerateScope = async function (clientId, certIndex) {
     }
 };
 
-console.log('[DEBUG] clients-module-fix.js loaded successfully with HTML generators.');
+if (window.Logger) Logger.debug('Modules', 'clients-module-fix.js loaded successfully with HTML generators.');
