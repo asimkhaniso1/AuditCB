@@ -1799,6 +1799,7 @@ textarea:focus:invalid {
 
 /* Tablet Landscape (769px-1024px) - Improve two-column layouts */
 @media (max-width: 1024px) {
+
     /* Audit Plan form: 2fr 1fr grid compresses well, but charts need help */
     [style*="grid-template-columns: 2fr 1fr"] {
         grid-template-columns: 1.5fr 1fr !important;
@@ -1809,7 +1810,7 @@ textarea:focus:invalid {
     [style*="grid-template-columns: 1fr 1fr"] {
         grid-template-columns: 1fr !important;
     }
-    
+
     /* Keep 2fr 1fr chart layout */
     [style*="grid-template-columns: 2fr 1fr"]:not(form *) {
         grid-template-columns: 1fr !important;
@@ -1818,6 +1819,7 @@ textarea:focus:invalid {
 
 /* Tablet Portrait (481px-768px) */
 @media (max-width: 768px) {
+
     /* Audit Plan form: fully single column */
     [style*="grid-template-columns: 2fr 1fr"] {
         grid-template-columns: 1fr !important;
@@ -1853,8 +1855,11 @@ textarea:focus:invalid {
         margin-bottom: 0.75rem;
     }
 
-    input, select, textarea {
-        font-size: 16px; /* Prevent zoom on iOS */
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+        /* Prevent zoom on iOS */
     }
 }
 
@@ -1897,4 +1902,9 @@ textarea:focus:invalid {
     opacity: 1;
     pointer-events: auto;
     transition: opacity 0.3s ease;
+}
+
+/* Logout button hover - CSP Phase 2 (replaced inline onmouseover/onmouseout) */
+.logout-btn:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
 }

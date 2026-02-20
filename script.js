@@ -1922,6 +1922,13 @@ window.toggleNavGroup = function (header) {
     }
 };
 
+// Navigate to client settings (adapter for event delegator)
+window.navigateClientSettings = function () {
+    if (window.state.activeClientId) {
+        window.location.hash = 'client/' + window.state.activeClientId + '/settings';
+    }
+};
+
 // Toggle User Dropdown Menu in Header
 window.toggleUserMenu = function () {
     Logger.debug('UI', 'toggleUserMenu called');

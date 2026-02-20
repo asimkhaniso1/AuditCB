@@ -65,8 +65,7 @@
     <div class="app-container auth-pending" id="app-container">
         <!-- LEFT SIDEBAR: CB-Level Functions -->
         <aside class="sidebar" id="sidebar">
-            <div class="logo-container" id="cb-logo-display" onclick="window.location.hash = 'dashboard'"
-                style="cursor: pointer;">
+            <div class="logo-container" id="cb-logo-display" data-hash="dashboard" style="cursor: pointer;">
                 <i class="fa-solid fa-certificate"></i>
                 <h1>AuditCB360</h1>
             </div>
@@ -88,7 +87,7 @@
                             class="fa-solid fa-certificate"></i> Certificates</li>
 
                     <!-- Governance Group -->
-                    <li class="nav-group-header" onclick="toggleNavGroup(this)" role="button" tabindex="0"
+                    <li class="nav-group-header" data-action="toggleNavGroup" role="button" tabindex="0"
                         aria-label="Toggle Governance Menu" style="justify-content: space-between;">
                         <span><i class="fa-solid fa-scale-balanced"></i> Governance</span>
                         <i class="fa-solid fa-chevron-down group-arrow" style="font-size: 0.8rem; margin-right: 0;"></i>
@@ -116,31 +115,30 @@
                 <h2 id="page-title">Dashboard</h2>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <!-- Client Settings Icon (visible only in Client Workspace) -->
-                    <button id="client-settings-btn" class="btn btn-icon"
-                        onclick="if(window.state.activeClientId) window.location.hash = 'client/' + window.state.activeClientId + '/settings'"
+                    <button id="client-settings-btn" class="btn btn-icon" data-action="navigateClientSettings"
                         style="display: none; border: none; background: transparent; color: var(--text-secondary); font-size: 1.1rem; padding: 0.5rem; cursor: pointer;"
                         title="Client Settings">
                         <i class="fa-solid fa-cog"></i>
                     </button>
-                    <button class="btn btn-outline-primary" onclick="window.location.hash = 'manday-calculator'"
+                    <button class="btn btn-outline-primary" data-hash="manday-calculator"
                         style="border: none; background: transparent; color: var(--primary-color);"
                         title="Man-Day Calculator">
                         <i class="fa-solid fa-calculator"></i>
                     </button>
-                    <button class="btn btn-outline-primary" onclick="window.location.hash = 'multisite-sampling'"
+                    <button class="btn btn-outline-primary" data-hash="multisite-sampling"
                         style="border: none; background: transparent; color: var(--primary-color);"
                         title="Multi-Site Sampling Calculator (IAF MD 1)">
                         <i class="fa-solid fa-sitemap"></i>
                     </button>
                     <!-- Notification Bell -->
-                    <button id="notification-bell" class="btn btn-icon" onclick="toggleNotificationPanel()"
+                    <button id="notification-bell" class="btn btn-icon" data-action="toggleNotificationPanel"
                         style="border: none; background: transparent; color: var(--text-secondary); font-size: 1.1rem; padding: 0.5rem; cursor: pointer; position: relative;"
                         title="Notifications">
                         <i class="fa-solid fa-bell"></i>
                         <span id="notification-badge"
                             style="display: none; position: absolute; top: 2px; right: 2px; background: #ef4444; color: white; font-size: 0.65rem; font-weight: bold; padding: 2px 5px; border-radius: 10px; min-width: 16px; text-align: center;">0</span>
                     </button>
-                    <div class="user-profile" id="header-user-profile" onclick="window.toggleUserMenu()"
+                    <div class="user-profile" id="header-user-profile" data-action="toggleUserMenu"
                         style="cursor: pointer; position: relative;">
                         <span id="header-user-name">Admin User</span>
                         <div class="avatar"><i class="fa-solid fa-user"></i></div>
@@ -152,10 +150,9 @@
                                 <div style="font-weight: 600; color: var(--text-color);">System Admin</div>
                                 <div style="font-size: 0.8rem; color: var(--text-secondary);">Admin</div>
                             </div>
-                            <button onclick="window.logoutUser()"
+                            <button data-action="logoutUser"
                                 style="width: 100%; padding: 0.875rem 1rem; background: transparent; border: none; text-align: left; cursor: pointer; color: #ef4444; font-size: 0.9rem; display: flex; align-items: center; gap: 0.75rem; transition: background 0.2s;"
-                                onmouseover="this.style.background='rgba(239,68,68,0.1)';"
-                                onmouseout="this.style.background='transparent';">
+                                class="logout-btn">
                                 <i class="fa-solid fa-sign-out-alt"></i>
                                 Logout
                             </button>
@@ -193,7 +190,7 @@
                 <!-- Populated by JS -->
             </div>
             <div class="client-sidebar-footer">
-                <button class="btn btn-sm btn-primary" onclick="window.renderAddClient()" style="width: 100%;">
+                <button class="btn btn-sm btn-primary" data-action="renderAddClient" style="width: 100%;">
                     <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>Add Client
                 </button>
             </div>
@@ -242,7 +239,8 @@
     <script src="./script.js?v=21.0_IDB"></script>
 
     <!-- Core Modules load after state is initialized -->
-    <script src="./event-manager.js?v=16.3_FINAL"></script>
+    <script src="./event-delegator.js?v=21.0_CSP2" defer></script>
+    <script src="./event-manager.js?v=16.3_FINAL" defer></script>
     <script src="./validation.js?v=16.3_FINAL"></script>
     <script src="./auth-manager.js?v=19.0_HERO_LOGIN"></script>
     <script src="./email-service.js?v=16.3_FINAL"></script>
