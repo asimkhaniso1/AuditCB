@@ -379,7 +379,7 @@ window.getClientSitesHTML = function (client) {
         </div>
         <div class="org-table">
             <table id="sites-table"><thead><tr>
-                <th>Site Name</th><th>Standards</th><th>Address</th><th>City</th><th>Employees</th><th style="width:140px">Actions</th>
+                <th>Site Name</th><th>Standards</th><th>Address</th><th>City</th><th>Employees at Site</th><th style="width:140px">Actions</th>
             </tr></thead><tbody>${sites.map((s, i) => `<tr>
                 <td class="name-cell">${window.UTILS.escapeHtml(s.name)}</td>
                 <td>${(s.standards || 'Inherited').split(',').map(st => '<span class="badge-tag badge-primary">' + st.trim() + '</span>').join('')}</td>
@@ -625,7 +625,7 @@ window.addSite = function (clientId) {
                     <small style="color:var(--text-secondary)">Hold Ctrl/Cmd to select multiple</small>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-                    <div class="form-group"><label>Employees</label><input type="number" id="site-employees" class="form-control" min="0"></div>
+                    <div class="form-group"><label>Employees at Site</label><input type="number" id="site-employees" class="form-control" min="0" placeholder="Headcount at this location"></div>
                     <div class="form-group"><label>Shift Work?</label><select class="form-control" id="site-shift">
                         <option value="">-- Not specified --</option><option value="No">No</option><option value="Yes">Yes</option>
                     </select></div>
@@ -1115,7 +1115,7 @@ window.editSite = function (clientId, siteIndex) {
         '<select class="form-control" id="site-standards" multiple style="height:100px">' + stdHtml + '</select>' +
         '<small style="color:var(--text-secondary)">Hold Ctrl/Cmd to select multiple</small></div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">' +
-        '<div class="form-group"><label>Employees</label><input type="number" class="form-control" id="site-employees" min="0" value="' + (site.employees || '') + '"></div>' +
+        '<div class="form-group"><label>Employees at Site</label><input type="number" class="form-control" id="site-employees" min="0" placeholder="Headcount at this location" value="' + (site.employees || '') + '"></div>' +
         '<div class="form-group"><label>Shift Work?</label><select class="form-control" id="site-shift">' +
         '<option value=""' + (!site.shift ? ' selected' : '') + '>-- Not specified --</option>' +
         '<option value="No"' + (site.shift === 'No' ? ' selected' : '') + '>No</option>' +
