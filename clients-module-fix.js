@@ -10,6 +10,7 @@ if (window.Logger) Logger.debug('Modules', 'clients-module-fix.js loading...');
 // ============================================
 
 window.getClientOrgSetupHTML = function (client) {
+    console.log('[WIZARD-FIX] getClientOrgSetupHTML called, client:', client?.name, 'id:', client?.id, 'departments:', client?.departments?.length, 'sites:', client?.sites?.length);
     if (!client._wizardStep) client._wizardStep = 1;
     const currentStep = client._wizardStep;
 
@@ -62,15 +63,21 @@ window.getClientOrgSetupHTML = function (client) {
 };
 
 window.getClientOrgSetupHTML.renderWizardStep = function (client, step) {
-    switch (step) {
-        case 1: return window.getClientProfileHTML(client);
-        case 2: return window.getClientSitesHTML(client);
-        case 3: return window.getClientDepartmentsHTML(client);
-        case 4: return window.getClientDesignationsHTML(client);
-        case 5: return window.getClientContactsHTML(client);
-        case 6: return window.getClientGoodsServicesHTML(client);
-        case 7: return window.getClientKeyProcessesHTML(client);
-        default: return '';
+    console.log('[WIZARD-FIX] renderWizardStep called, step:', step, 'client:', client?.name);
+    try {
+        switch (step) {
+            case 1: return window.getClientProfileHTML(client);
+            case 2: return window.getClientSitesHTML(client);
+            case 3: return window.getClientDepartmentsHTML(client);
+            case 4: return window.getClientDesignationsHTML(client);
+            case 5: return window.getClientContactsHTML(client);
+            case 6: return window.getClientGoodsServicesHTML(client);
+            case 7: return window.getClientKeyProcessesHTML(client);
+            default: return '';
+        }
+    } catch (e) {
+        console.error('[WIZARD-FIX] renderWizardStep ERROR:', e);
+        return '<div style="color:red;padding:2rem;">Error rendering step ' + step + ': ' + e.message + '</div>';
     }
 };
 
