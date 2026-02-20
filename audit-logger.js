@@ -294,10 +294,23 @@ const AuditLogger = {
      * Setup automatic cleanup
      */
     setupAutoCleanup: function () {
-        // PERF: Store interval ID so it can be cleared on logout
+        // Guard against stacking: clear any previous interval
+        if (this._cleanupIntervalId) {
+            clearInterval(this._cleanupIntervalId);
+        }
         this._cleanupIntervalId = setInterval(() => {
             this.cleanup();
         }, 60 * 60 * 1000); // 1 hour
+    },
+
+    /**
+     * Destroy / teardown (call on logout to prevent memory leaks)
+     */
+    destroy: function () {
+        if (this._cleanupIntervalId) {
+            clearInterval(this._cleanupIntervalId);
+            this._cleanupIntervalId = null;
+        }
     },
 
     /**
