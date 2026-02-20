@@ -1764,8 +1764,7 @@ window.handleLoginSubmit = async function (form) {
                     }
                 }).catch(err => console.warn('Supabase audit report sync failed:', err));
 
-                // Sync checklists from Supabase — clear local stale data first
-                window.state.checklists = [];
+                // Sync checklists from Supabase (sync function handles full replacement)
                 window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
                     // Always re-render after sync since cloud replaces local data
                     if (window.renderChecklistLibrary) window.renderChecklistLibrary();
