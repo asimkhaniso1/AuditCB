@@ -55,13 +55,13 @@ window.UTILS = {
         }
         if (!plan) {
             // Fallback: show short id
-            var rawId = typeof planOrId === 'string' ? planOrId : (planOrId && planOrId.id ? planOrId.id : '');
+            let rawId = typeof planOrId === 'string' ? planOrId : (planOrId && planOrId.id ? planOrId.id : '');
             return 'PLN-' + (rawId ? rawId.substring(0, 8) : '???');
         }
 
         // Client initials: take first letter of each word, max 3 chars
-        var clientName = plan.client || '';
-        var initials = clientName
+        let clientName = plan.client || '';
+        let initials = clientName
             .replace(/[^a-zA-Z0-9\s]/g, '')
             .split(/\s+/)
             .filter(Boolean)
@@ -71,24 +71,24 @@ window.UTILS = {
         if (!initials) initials = 'XX';
 
         // Year from plan date
-        var year = '';
+        let year = '';
         if (plan.date) {
-            var d = new Date(plan.date);
+            let d = new Date(plan.date);
             year = !isNaN(d.getTime()) ? String(d.getFullYear()) : plan.date.substring(0, 4);
         } else {
             year = String(new Date().getFullYear());
         }
 
         // Sequence: count plans for same client in same year, order by date
-        var samePlans = plans
+        let samePlans = plans
             .filter(function (p) {
                 return p.client === plan.client &&
                     p.date && p.date.substring(0, 4) === year;
             })
             .sort(function (a, b) { return (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)); });
-        var idx = samePlans.findIndex(function (p) { return String(p.id) === String(plan.id); });
-        var seq = (idx >= 0 ? idx + 1 : samePlans.length + 1);
-        var seqStr = seq < 10 ? '0' + seq : String(seq);
+        let idx = samePlans.findIndex(function (p) { return String(p.id) === String(plan.id); });
+        let seq = (idx >= 0 ? idx + 1 : samePlans.length + 1);
+        let seqStr = seq < 10 ? '0' + seq : String(seq);
 
         return 'PLN-' + initials + '-' + year + '-' + seqStr;
     }

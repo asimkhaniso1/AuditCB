@@ -297,7 +297,7 @@ const SupabaseConfig = {
         }
 
         // Attach submit handler (CSP-safe — no inline onsubmit)
-        var configForm = document.getElementById('supabase-config-form');
+        let configForm = document.getElementById('supabase-config-form');
         if (configForm) {
             configForm.addEventListener('submit', function (e) {
                 return SupabaseConfig.handleSave(e);

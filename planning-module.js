@@ -3243,7 +3243,7 @@ window.exportPreAuditPDF = function (planId) {
 window._goToKB = function () {
     window.location.hash = '#settings';
     setTimeout(function () {
-        var kbTab = document.querySelector('[data-tab="knowledge-base"]');
+        let kbTab = document.querySelector('[data-tab="knowledge-base"]');
         if (kbTab) kbTab.click();
     }, 400);
 };

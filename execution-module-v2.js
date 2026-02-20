@@ -4121,13 +4121,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </div>
                                 <div id="rp-positive-obs" class="rp-edit" contenteditable="true" style="color:#15803d;font-size:0.9rem;line-height:1.7;">
                                     ${(function () {
-                        var t = d.report.positiveObservations;
-                        var items = [];
+                        let t = d.report.positiveObservations;
+                        let items = [];
                         if (t.includes('\n')) {
                             items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[\.)\-]\s*/, '').trim()).filter(Boolean);
                         } else {
                             // Flat text: split on sequential "N. " at sentence boundaries
-                            var parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
+                            let parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
                             if (parts && parts.length > 1) {
                                 items = parts.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
                             } else {
@@ -4154,14 +4154,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 </div>
                                 <div id="rp-ofi" class="rp-edit" contenteditable="true" style="color:#92400e;font-size:0.9rem;line-height:1.7;">
                                     ${(function () {
-                        var t = d.report.ofi;
-                        var items = [];
+                        let t = d.report.ofi;
+                        let items = [];
                         if (Array.isArray(t)) {
                             items = t;
                         } else if (t.includes('\n')) {
                             items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[\.)\-]\s*/, '').trim()).filter(Boolean);
                         } else {
-                            var parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
+                            let parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
                             if (parts && parts.length > 1) {
                                 items = parts.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
                             } else {
@@ -5425,11 +5425,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const cbEmail = d.cbSettings.cbEmail || '';
         const cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
         // Helper: render all evidence images for PDF (string concat)
-        var renderEvThumbsPdf = function (item) {
-            var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+        let renderEvThumbsPdf = function (item) {
+            let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
             if (!imgs.length) return '';
-            var limited = imgs.slice(0, 2);
-            var extra = imgs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (imgs.length - 2) + ' more)</span>' : '';
+            let limited = imgs.slice(0, 2);
+            let extra = imgs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (imgs.length - 2) + ' more)</span>' : '';
             return '<div class="ev-inline">' + limited.map(function (url) { return '<a href="' + url + '" target="_blank"><img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;"></a>'; }).join('') + extra + '</div>';
         };
         const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').map((item, idx) => {
@@ -5470,13 +5470,13 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const clauseAreaNames = { '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning', '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation', '10': 'Improvement' };
         const areaStats = {};
         (d.hydratedProgress || []).forEach(function (item) {
-            var clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
-            var mainC = clause.split('.')[0];
+            let clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || '';
+            let mainC = clause.split('.')[0];
             if (!mainC || !clauseAreaNames[mainC]) return;
             if (!areaStats[mainC]) areaStats[mainC] = { conform: 0, minor: 0, major: 0, obs: 0, ofi: 0 };
             if (item.status === 'conform') areaStats[mainC].conform++;
             else if (item.status === 'nc') {
-                var t = (item.ncrType || '').toLowerCase();
+                let t = (item.ncrType || '').toLowerCase();
                 if (t === 'major') areaStats[mainC].major++;
                 else if (t === 'minor') areaStats[mainC].minor++;
                 else if (t === 'observation') areaStats[mainC].obs++;
@@ -5484,18 +5484,18 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 else areaStats[mainC].minor++;
             }
         });
-        var areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
-        var areaTableRows = areaSortedKeys.map(function (k) {
-            var s = areaStats[k]; var total = s.conform + s.minor + s.major + s.obs + s.ofi;
-            var hasIssue = s.major > 0 || s.minor > 0;
-            var statusBg = hasIssue ? (s.major > 0 ? '#fee2e2' : '#fef3c7') : '#dcfce7';
-            var statusFg = hasIssue ? (s.major > 0 ? '#991b1b' : '#92400e') : '#166534';
-            var statusTxt = hasIssue ? (s.major > 0 ? 'Needs Action' : 'Minor Issues') : 'Satisfactory';
+        let areaSortedKeys = Object.keys(areaStats).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
+        let areaTableRows = areaSortedKeys.map(function (k) {
+            let s = areaStats[k]; var total = s.conform + s.minor + s.major + s.obs + s.ofi;
+            let hasIssue = s.major > 0 || s.minor > 0;
+            let statusBg = hasIssue ? (s.major > 0 ? '#fee2e2' : '#fef3c7') : '#dcfce7';
+            let statusFg = hasIssue ? (s.major > 0 ? '#991b1b' : '#92400e') : '#166534';
+            let statusTxt = hasIssue ? (s.major > 0 ? 'Needs Action' : 'Minor Issues') : 'Satisfactory';
             return '<tr><td style="padding:8px 12px;font-weight:600;">Clause ' + k + '</td><td style="padding:8px 12px;">' + clauseAreaNames[k] + '</td><td style="padding:8px 12px;text-align:center;">' + total + '</td><td style="padding:8px 12px;text-align:center;color:#166534;">' + s.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;">' + (s.major + s.minor) + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + statusTxt + '</span></td></tr>';
         }).join('');
-        var areaTableHtml = areaSortedKeys.length > 0 ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Area</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">NC</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table></div>' : '';
+        let areaTableHtml = areaSortedKeys.length > 0 ? '<div style="margin-top:16px;page-break-before:always;"><div style="font-size:0.88rem;font-weight:700;color:#1e293b;margin-bottom:8px;">Clause Area Performance Overview</div><table class="info-tbl" style="width:100%;font-size:0.82rem;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Area</th><th style="padding:8px 12px;text-align:center;">Checked</th><th style="padding:8px 12px;text-align:center;">Conform</th><th style="padding:8px 12px;text-align:center;">NC</th><th style="padding:8px 12px;text-align:center;">Status</th></tr></thead><tbody>' + areaTableRows + '</tbody></table></div>' : '';
         // Serialize area stats for chart script
-        var areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
+        let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
 
         const reportHtml = '<!DOCTYPE html><html><head>'
             + '<title>Audit Report — ' + d.report.client + '</title>'
@@ -5571,19 +5571,19 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '</div>'
             // TABLE OF CONTENTS
             + (function () {
-                var tocSections = [];
-                var colors = ['#2563eb', '#059669', '#7c3aed', '#059669', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#4338ca', '#c2410c'];
-                var descs = ['Organization details, scope, audit team and dates', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Closing meeting, certification recommendation and signatures', 'Photographic evidence from the audit'];
-                var names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
-                var keys = ['audit-info', 'summary', 'charts', 'conformance', 'obs', 'ofi', 'findings', 'ncrs', 'conclusion', 'evidence'];
-                var num = 1;
+                let tocSections = [];
+                let colors = ['#2563eb', '#059669', '#7c3aed', '#059669', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#4338ca', '#c2410c'];
+                let descs = ['Organization details, scope, audit team and dates', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Closing meeting, certification recommendation and signatures', 'Photographic evidence from the audit'];
+                let names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
+                let keys = ['audit-info', 'summary', 'charts', 'conformance', 'obs', 'ofi', 'findings', 'ncrs', 'conclusion', 'evidence'];
+                let num = 1;
                 for (var i = 0; i < keys.length; i++) {
-                    var k = keys[i];
+                    let k = keys[i];
                     if (k === 'ncrs' && (!(d.report.ncrs || []).length)) continue;
                     if (k === 'obs' && !obsOnlyRowsHtml) continue;
                     if (k === 'ofi' && !ofiOnlyRowsHtml) continue;
                     if (k === 'evidence') {
-                        var hasEvidence = (d.hydratedProgress || []).some(function (it) { return it.evidenceImage; }) || (d.report.ncrs || []).some(function (n) { return n.evidenceImage; });
+                        let hasEvidence = (d.hydratedProgress || []).some(function (it) { return it.evidenceImage; }) || (d.report.ncrs || []).some(function (n) { return n.evidenceImage; });
                         if (!hasEvidence) continue;
                     }
                     if (en[k] !== false) {
@@ -5654,9 +5654,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             // EVIDENCE GALLERY
             + (function () {
-                var evidenceItems = [];
+                let evidenceItems = [];
                 (d.hydratedProgress || []).forEach(function (item) {
-                    var imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
+                    let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
                     imgs.forEach(function (img) {
                         evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: img, status: item.status });
                     });
@@ -5667,8 +5667,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 });
                 if (evidenceItems.length === 0) return '';
-                var cards = evidenceItems.map(function (ev) {
-                    var borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
+                let cards = evidenceItems.map(function (ev) {
+                    let borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
                     return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
                 }).join('');
                 return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;"><span class="sn" style="background:#c2410c;"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
@@ -5730,7 +5730,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         printWindow.document.write(reportHtml);
         printWindow.document.close();
         setTimeout(function () { printWindow.print(); }, 1800);
-        var overlay = document.getElementById('report-preview-overlay');
+        let overlay = document.getElementById('report-preview-overlay');
         if (overlay) overlay.remove();
     };
 

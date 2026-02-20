@@ -1460,17 +1460,17 @@ window.initClientDashboardCharts = function (clientId) {
             plugins: [{
                 id: 'textCenter',
                 beforeDraw: function (chart) {
-                    var width = chart.width,
+                    let width = chart.width,
                         height = chart.height,
                         ctx = chart.ctx;
 
                     ctx.restore();
-                    var fontSize = (height / 114).toFixed(2);
+                    let fontSize = (height / 114).toFixed(2);
                     ctx.font = "bold " + fontSize + "em sans-serif";
                     ctx.textBaseline = "middle";
                     ctx.fillStyle = "#1e293b";
 
-                    var text = score + "%",
+                    let text = score + "%",
                         textX = Math.round((width - ctx.measureText(text).width) / 2),
                         textY = height / 2; // Center
 
@@ -1478,7 +1478,7 @@ window.initClientDashboardCharts = function (clientId) {
 
                     ctx.font = "normal " + (fontSize * 0.3).toFixed(2) + "em sans-serif";
                     ctx.fillStyle = "#64748b";
-                    var text2 = "Conformity",
+                    let text2 = "Conformity",
                         text2X = Math.round((width - ctx.measureText(text2).width) / 2),
                         text2Y = height / 2 + 20;
 

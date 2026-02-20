@@ -313,26 +313,26 @@ window.getClientProfileHTML = function (client) {
     const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
     function formatProfileText(text) {
         if (!text) return '';
-        var esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml(text) : text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        var lines = esc.split('\n');
-        var html = '';
+        let esc = (window.UTILS && window.UTILS.escapeHtml) ? window.UTILS.escapeHtml(text) : text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let lines = esc.split('\n');
+        let html = '';
         for (var i = 0; i < lines.length; i++) {
-            var line = lines[i].trim();
+            let line = lines[i].trim();
             if (!line) { html += '<div style="height:0.5rem"></div>'; continue; }
-            var processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            let processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
             if (line.match(/^\*\*[^*]+\*\*:?$/)) {
-                var title = line.replace(/\*\*/g, '').replace(/:$/, '');
+                let title = line.replace(/\*\*/g, '').replace(/:$/, '');
                 html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem">' + title + '</strong></div>';
             } else if (line.match(/^---\s*.+\s*---$/)) {
                 html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem;text-transform:uppercase;letter-spacing:0.5px">' + line.replace(/---/g, '').trim() + '</strong></div>';
             } else if (line.match(/^(Company Overview|Industry and Market|Products\/Services|Products\/Services Offered|Organizational Structure|Operational Locations|Management System|Key Processes|Context for Audit)/i)) {
                 html += '<div style="margin-top:1rem;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid #e2e8f0"><strong style="color:#1e40af;font-size:0.95rem">' + processedLine + '</strong></div>';
             } else if (line.match(/^[-*] /)) {
-                var bulletText = line.replace(/^[-*]\s+/, '');
+                let bulletText = line.replace(/^[-*]\s+/, '');
                 bulletText = bulletText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
                 html += '<div style="padding:0.2rem 0 0.2rem 1.2rem;position:relative"><span style="position:absolute;left:0.4rem;color:#3b82f6">&#8226;</span>' + bulletText + '</div>';
             } else if (line.match(/^(Industry|Website|Standards|Total Employees):/)) {
-                var p = line.split(':'); var lbl = p[0]; var v = p.slice(1).join(':').trim();
+                let p = line.split(':'); var lbl = p[0]; var v = p.slice(1).join(':').trim();
                 html += '<div style="padding:0.3rem 0"><span style="font-weight:600;color:#475569">' + lbl + ':</span> ' + v + '</div>';
             } else {
                 html += '<p style="margin:0.3rem 0;line-height:1.6;color:#334155">' + processedLine + '</p>';
@@ -608,7 +608,7 @@ window.addSite = function (clientId) {
     if (!client) return;
     const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
     const stdHtml = stdOptions.map(function (std) {
-        var sel = (client.standard || '').includes(std) ? 'selected' : '';
+        let sel = (client.standard || '').includes(std) ? 'selected' : '';
         return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
     }).join('');
     window.openModal('Add Site', `
@@ -1098,7 +1098,7 @@ window.editSite = function (clientId, siteIndex) {
     modalTitle.textContent = 'Edit Site Location';
     const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
     const stdHtml = stdOptions.map(function (std) {
-        var sel = (site.standards || client.standard || '').includes(std) ? 'selected' : '';
+        let sel = (site.standards || client.standard || '').includes(std) ? 'selected' : '';
         return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
     }).join('');
     modalBody.innerHTML = '<form id="site-form">' +
@@ -1127,15 +1127,15 @@ window.editSite = function (clientId, siteIndex) {
         '<i class="fa-solid fa-location-crosshairs"></i></button></div></div></form>';
     window.openModal();
     modalSave.onclick = function () {
-        var name = document.getElementById('site-name').value;
-        var address = document.getElementById('site-address').value;
-        var city = document.getElementById('site-city').value;
-        var country = document.getElementById('site-country').value;
-        var geotag = document.getElementById('site-geotag').value;
-        var employees = parseInt(document.getElementById('site-employees', 10).value) || null;
-        var shift = document.getElementById('site-shift').value || null;
+        let name = document.getElementById('site-name').value;
+        let address = document.getElementById('site-address').value;
+        let city = document.getElementById('site-city').value;
+        let country = document.getElementById('site-country').value;
+        let geotag = document.getElementById('site-geotag').value;
+        let employees = parseInt(document.getElementById('site-employees', 10).value) || null;
+        let shift = document.getElementById('site-shift').value || null;
         if (name) {
-            var standards = Array.from(document.getElementById('site-standards').selectedOptions).map(function (o) { return o.value }).join(', ');
+            let standards = Array.from(document.getElementById('site-standards').selectedOptions).map(function (o) { return o.value }).join(', ');
             client.sites[siteIndex] = Object.assign({}, site, { name: name, address: address, city: city, country: country, geotag: geotag, employees: employees, shift: shift, standards: standards });
             window.saveData();
             if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
@@ -1155,23 +1155,23 @@ window.editSite = function (clientId, siteIndex) {
 // ============================================
 window.handleClientLogoUpload = function (input, clientId) {
     if (!clientId) clientId = window.state.activeClientId;
-    var file = input.files[0];
+    let file = input.files[0];
     if (!file) return;
     if (file.size > 1024 * 1024) {
         window.showNotification('Logo too large. Max 1MB', 'error');
         input.value = '';
         return;
     }
-    var reader = new FileReader();
+    let reader = new FileReader();
     reader.onload = function (e) {
-        var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+        let client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
         if (client) {
             client.logoUrl = e.target.result;
             window.saveData();
             if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
                 window.SupabaseClient.upsertClient(client).catch(function (err) { console.error('Supabase sync failed:', err); });
             }
-            var preview = document.getElementById('edit-client-logo-preview') || document.getElementById('client-logo-preview-img');
+            let preview = document.getElementById('edit-client-logo-preview') || document.getElementById('client-logo-preview-img');
             if (preview) {
                 if (preview.tagName === 'DIV') {
                     preview.style.display = 'block';
@@ -1182,7 +1182,7 @@ window.handleClientLogoUpload = function (input, clientId) {
                     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">';
                 }
             }
-            var placeholder = document.getElementById('client-logo-placeholder');
+            let placeholder = document.getElementById('client-logo-placeholder');
             if (placeholder) placeholder.style.display = 'none';
             window.showNotification('Logo uploaded', 'success');
         }
@@ -1193,7 +1193,7 @@ window.handleClientLogoUpload = function (input, clientId) {
 // 10. GENERATE COMPANY PROFILE (AI-Enhanced)
 // ============================================
 window.generateCompanyProfile = async function (clientId) {
-    var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+    let client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
     if (!client) return;
 
     // Save previous version to history
@@ -1203,16 +1203,16 @@ window.generateCompanyProfile = async function (clientId) {
     }
 
     // Build context data
-    var sitesInfo = (client.sites || []).map(function (s) {
+    let sitesInfo = (client.sites || []).map(function (s) {
         return s.name + (s.city ? ', ' + s.city : '') + (s.country ? ', ' + s.country : '') + (s.employees ? ' (' + s.employees + ' employees)' : '') + (s.standards ? ' [' + s.standards + ']' : '');
     }).join('; ');
-    var goodsInfo = (client.goodsServices || []).map(function (g) {
+    let goodsInfo = (client.goodsServices || []).map(function (g) {
         return (g.name || g) + (g.category ? ' (' + g.category + ')' : '') + (g.description ? ': ' + g.description : '');
     }).join('; ');
-    var processInfo = (client.keyProcesses || []).map(function (p) {
+    let processInfo = (client.keyProcesses || []).map(function (p) {
         return (p.name || p) + (p.category ? ' [' + p.category + ']' : '') + (p.owner ? ' - ' + p.owner : '');
     }).join('; ');
-    var deptInfo = (client.departments || []).map(function (d) {
+    let deptInfo = (client.departments || []).map(function (d) {
         return d.name + (d.head ? ' (Head: ' + d.head + ')' : '') + (d.employeeCount ? ' [' + d.employeeCount + ' staff]' : '');
     }).join('; ');
 
@@ -1220,7 +1220,7 @@ window.generateCompanyProfile = async function (clientId) {
     if (window.AI_SERVICE && window.AI_SERVICE.callProxyAPI) {
         window.showNotification('AI is generating comprehensive company profile...', 'info');
         try {
-            var prompt = 'You are an ISO Certification Body auditor preparing an Organization Context profile for an audit. Write a comprehensive, professional Organization Context / Company Profile based on the following data.' +
+            let prompt = 'You are an ISO Certification Body auditor preparing an Organization Context profile for an audit. Write a comprehensive, professional Organization Context / Company Profile based on the following data.' +
                 '\n\nCompany: ' + client.name +
                 '\nIndustry: ' + (client.industry || 'Not specified') +
                 '\nWebsite: ' + (client.website || 'Not provided') +
@@ -1238,8 +1238,8 @@ window.generateCompanyProfile = async function (clientId) {
                 '\n4. Keep it between 300-500 words.' +
                 '\n5. Return ONLY the profile text, no JSON wrapping or markdown formatting.';
 
-            var aiResult = await window.AI_SERVICE.callProxyAPI(prompt);
-            var cleanResult = aiResult.replace(/```/g, '').trim();
+            let aiResult = await window.AI_SERVICE.callProxyAPI(prompt);
+            let cleanResult = aiResult.replace(/```/g, '').trim();
             client.profile = cleanResult;
             client.profileUpdated = new Date().toISOString();
             window.saveData();
@@ -1256,13 +1256,13 @@ window.generateCompanyProfile = async function (clientId) {
 
     // Fallback: Template-based generation
     window.showNotification('Generating company profile from template...', 'info');
-    var parts = [];
+    let parts = [];
     parts.push(client.name + ' - Organization Context');
     parts.push('\nIndustry: ' + (client.industry || 'Not specified'));
     if (client.website) parts.push('Website: ' + client.website);
     parts.push('\n--- Company Overview ---');
-    var empText = client.employees ? ' with approximately ' + client.employees + ' employees' : '';
-    var siteText = (client.sites && client.sites.length > 1) ? ' operating across ' + client.sites.length + ' locations' : ' operating from a single location';
+    let empText = client.employees ? ' with approximately ' + client.employees + ' employees' : '';
+    let siteText = (client.sites && client.sites.length > 1) ? ' operating across ' + client.sites.length + ' locations' : ' operating from a single location';
     parts.push(client.name + ' is a ' + (client.industry || 'professional') + ' organization' + empText + siteText + '.');
     if (client.standard) parts.push('\nThe organization maintains certification to ' + client.standard + ' standards, demonstrating its commitment to quality, safety and continuous improvement.');
     if (client.sites && client.sites.length > 0) {
@@ -1296,12 +1296,12 @@ window.generateCompanyProfile = async function (clientId) {
 // 11. AI GENERATE SCOPE
 // ============================================
 window.aiGenerateScope = async function (clientId, certIndex) {
-    var client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
+    let client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
     if (!client) return;
-    var cert = (client.certificates || [])[certIndex];
+    let cert = (client.certificates || [])[certIndex];
     if (!cert) { window.showNotification('Certificate not found', 'error'); return; }
 
-    var relevantSites = (client.sites || []).filter(function (s) {
+    let relevantSites = (client.sites || []).filter(function (s) {
         return (s.standards && s.standards.includes(cert.standard)) || (!s.standards && client.standard && client.standard.includes(cert.standard));
     });
     if (relevantSites.length === 0) { window.showNotification('No sites found for this standard', 'warning'); return; }
@@ -1310,8 +1310,8 @@ window.aiGenerateScope = async function (clientId, certIndex) {
         // Fallback: template-based scope
         relevantSites.forEach(function (site) {
             if (!cert.siteScopes) cert.siteScopes = {};
-            var goods = (client.goodsServices || []).map(function (g) { return g.name || g; }).join(', ');
-            var processes = (client.keyProcesses || []).map(function (p) { return p.name || p; }).join(', ');
+            let goods = (client.goodsServices || []).map(function (g) { return g.name || g; }).join(', ');
+            let processes = (client.keyProcesses || []).map(function (p) { return p.name || p; }).join(', ');
             cert.siteScopes[site.name] = 'The ' + cert.standard + ' management system covering ' + (goods || 'all products and services') + ' through ' + (processes || 'key operational processes') + ' at ' + site.name + (site.city ? ', ' + site.city : '') + '.';
         });
         window.saveData();
@@ -1322,11 +1322,11 @@ window.aiGenerateScope = async function (clientId, certIndex) {
 
     window.showNotification('AI is generating certification scope...', 'info');
     try {
-        var siteNames = relevantSites.map(function (s) { return s.name + (s.city ? ', ' + s.city : ''); }).join('; ');
-        var goods = (client.goodsServices || []).map(function (g) { return (g.name || g) + (g.description ? ': ' + g.description : ''); }).join('; ');
-        var processes = (client.keyProcesses || []).map(function (p) { return p.name || p; }).join('; ');
+        let siteNames = relevantSites.map(function (s) { return s.name + (s.city ? ', ' + s.city : ''); }).join('; ');
+        let goods = (client.goodsServices || []).map(function (g) { return (g.name || g) + (g.description ? ': ' + g.description : ''); }).join('; ');
+        let processes = (client.keyProcesses || []).map(function (p) { return p.name || p; }).join('; ');
 
-        var prompt = 'You are an ISO Certification Body auditor. Generate certification scope statements for each site listed below.' +
+        let prompt = 'You are an ISO Certification Body auditor. Generate certification scope statements for each site listed below.' +
             '\n\nCompany: ' + client.name +
             '\nStandard: ' + cert.standard +
             '\nIndustry: ' + (client.industry || 'General') +
@@ -1343,15 +1343,15 @@ window.aiGenerateScope = async function (clientId, certIndex) {
             '\nExample: {"Head Office": "Design, development and...", "Factory": "Manufacturing of..."}' +
             '\nReturn ONLY the JSON, no markdown formatting.';
 
-        var aiResult = await window.AI_SERVICE.callProxyAPI(prompt);
-        var cleanResult = aiResult.replace(/```json/g, '').replace(/```/g, '').trim();
-        var scopes = JSON.parse(cleanResult);
+        let aiResult = await window.AI_SERVICE.callProxyAPI(prompt);
+        let cleanResult = aiResult.replace(/```json/g, '').replace(/```/g, '').trim();
+        let scopes = JSON.parse(cleanResult);
 
         if (!cert.siteScopes) cert.siteScopes = {};
         relevantSites.forEach(function (site) {
-            var scopeText = scopes[site.name];
+            let scopeText = scopes[site.name];
             if (!scopeText) {
-                var keys = Object.keys(scopes);
+                let keys = Object.keys(scopes);
                 for (var i = 0; i < keys.length; i++) {
                     if (keys[i].toLowerCase().indexOf(site.name.toLowerCase()) >= 0 || site.name.toLowerCase().indexOf(keys[i].toLowerCase()) >= 0) {
                         scopeText = scopes[keys[i]];

@@ -795,7 +795,7 @@ const AuthManager = {
         `;
 
         // Attach submit handler (CSP-safe — no inline onsubmit)
-        var loginForm = document.getElementById('login-form');
+        let loginForm = document.getElementById('login-form');
         if (loginForm) {
             loginForm.addEventListener('submit', function (e) {
                 return AuthManager.handleLogin(e);
