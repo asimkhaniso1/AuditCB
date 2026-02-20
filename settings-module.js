@@ -5324,38 +5324,114 @@ This only removes future access to new client data.`;
 };
 
 // ============================================
-// USAGE ANALYTICS TAB - API COST MONITORING
+// USAGE ANALYTICS TAB - COMPREHENSIVE COST MONITORING
 // ============================================
 
+function _computePlatformMetrics() {
+    const clients = window.state.clients || [];
+    const reports = window.state.auditReports || [];
+    const plans = window.state.auditPlans || [];
+    const checklists = window.state.checklists || [];
+    const ncrs = window.state.ncrs || [];
+    const auditors = window.state.auditors || [];
+    const tracker = window.APIUsageTracker;
+    const aiCost = tracker ? tracker.getSummary().totalEstimatedCost : 0;
+
+    // Estimate DB size: ~each JSON record averages these sizes
+    const dbSizeKB = (clients.length * 5) + (plans.length * 10) + (reports.length * 50) + (checklists.length * 30) + (ncrs.length * 5) + (auditors.length * 3);
+    const dbSizeMB = (dbSizeKB / 1024).toFixed(2);
+
+    // Determine current tier
+    let currentTier = 'Free';
+    let tierCostMonth = 0;
+    if (dbSizeKB > 512000 || clients.length > 500) { currentTier = 'Team'; tierCostMonth = 599; }
+    else if (dbSizeKB > 51200 || clients.length > 50) { currentTier = 'Pro'; tierCostMonth = 25; }
+
+    const totalMonthly = tierCostMonth + (aiCost / Math.max(1, Math.ceil((new Date() - new Date(2026, 0, 1)) / (1000 * 60 * 60 * 24 * 30))));
+    const totalAnnual = tierCostMonth * 12 + aiCost;
+    const costPerClient = clients.length > 0 ? (totalAnnual / clients.length).toFixed(2) : '0.00';
+
+    // Per-client metrics
+    const perClient = clients.map(c => {
+        const cId = String(c.id);
+        const cReports = reports.filter(r => String(r.client) === cId || String(r.clientId) === cId);
+        const cPlans = plans.filter(p => String(p.client) === cId || String(p.clientId) === cId);
+        const cNcrs = ncrs.filter(n => String(n.clientId) === cId);
+        const progressItems = cReports.reduce((sum, r) => sum + (r.checklistProgress?.length || 0), 0);
+        const evidenceCount = cReports.reduce((sum, r) => {
+            return sum + (r.checklistProgress || []).reduce((s, p) => s + (p.evidenceImages?.length || (p.evidenceImage ? 1 : 0)), 0);
+        }, 0);
+        const estStorageKB = (cReports.length * 50) + (cPlans.length * 10) + (cNcrs.length * 5) + (evidenceCount * 500);
+        return {
+            name: c.name, id: c.id, industry: c.industry || '-',
+            audits: cReports.length, plans: cPlans.length, ncrs: cNcrs.length,
+            progressItems, evidenceCount,
+            storageMB: (estStorageKB / 1024).toFixed(2),
+            estCost: clients.length > 0 ? (totalAnnual / clients.length).toFixed(2) : '0.00'
+        };
+    }).sort((a, b) => b.audits - a.audits);
+
+    // Per-standard metrics
+    const byStandard = {};
+    plans.forEach(p => {
+        const std = p.standard || p.certificationStandard || 'Unknown';
+        if (!byStandard[std]) byStandard[std] = { audits: 0, clients: new Set(), checklists: 0, ncrs: 0, avgItems: [] };
+        byStandard[std].audits++;
+        if (p.client || p.clientId) byStandard[std].clients.add(String(p.client || p.clientId));
+    });
+    reports.forEach(r => {
+        const plan = plans.find(p => String(p.id) === String(r.planId));
+        if (plan) {
+            const std = plan.standard || plan.certificationStandard || 'Unknown';
+            if (byStandard[std]) {
+                byStandard[std].ncrs += (r.checklistProgress || []).filter(p => p.status === 'nc').length;
+                byStandard[std].avgItems.push(r.checklistProgress?.length || 0);
+            }
+        }
+    });
+    const standards = Object.entries(byStandard).map(([name, d]) => ({
+        name, audits: d.audits, clients: d.clients.size, ncrs: d.ncrs,
+        avgItems: d.avgItems.length > 0 ? Math.round(d.avgItems.reduce((a, b) => a + b, 0) / d.avgItems.length) : 0,
+        estCostPerAudit: d.avgItems.length > 0 ? ((d.avgItems.reduce((a, b) => a + b, 0) / d.avgItems.length) * 0.0001).toFixed(4) : '0.05'
+    })).sort((a, b) => b.audits - a.audits);
+
+    return { clients, reports, plans, checklists, ncrs, auditors, aiCost, dbSizeMB, dbSizeKB, currentTier, tierCostMonth, totalMonthly, totalAnnual, costPerClient, perClient, standards };
+}
+
+function _tierBar(used, limit, label, unit = 'MB') {
+    const pct = Math.min(100, (used / limit * 100)).toFixed(1);
+    const color = pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#10b981';
+    return `
+        <div style="margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                <span style="color: #475569;">${label}</span>
+                <span style="font-weight: 600; color: ${color};">${typeof used === 'number' ? used.toFixed(1) : used} / ${limit} ${unit} (${pct}%)</span>
+            </div>
+            <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: ${pct}%; background: ${color}; border-radius: 4px; transition: width 0.5s;"></div>
+            </div>
+        </div>`;
+}
+
 function getUsageAnalyticsHTML() {
-    // Get usage data from tracker
     const tracker = window.APIUsageTracker;
     if (!tracker) {
-        return `
-            <div class="fade-in">
-                <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">
-                    <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
-                    Usage Analytics
-                </h3>
-                <div class="alert alert-warning">
-                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
-                    API Usage Tracker module not loaded. Please refresh the page.
-                </div>
-            </div>
-            `;
+        return `<div class="fade-in"><div class="alert alert-warning"><i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>API Usage Tracker module not loaded. Please refresh.</div></div>`;
     }
 
+    const m = _computePlatformMetrics();
     const summary = tracker.getSummary();
     const todayUsage = tracker.getUsageByPeriod('today');
     const monthUsage = tracker.getUsageByPeriod('month');
     const features = Object.entries(summary.byFeature || {});
 
     return `
-            <div class="fade-in">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <div class="fade-in">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
                 <h3 style="color: var(--primary-color); margin: 0;">
                     <i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i>
-                    API Usage Analytics
+                    Platform Cost & Usage Analytics
                 </h3>
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn btn-outline-secondary btn-sm" data-action="APIUsageTracker_exportData" aria-label="Download">
@@ -5367,164 +5443,245 @@ function getUsageAnalyticsHTML() {
                 </div>
             </div>
 
-            <!--Pricing Info Banner-- >
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <i class="fa-solid fa-circle-info" style="font-size: 1.5rem;"></i>
-                    <div>
-                        <strong>Gemini 2.0 Flash Pricing</strong>
-                        <div style="font-size: 0.85rem; opacity: 0.9;">
-                            Input: $0.10/1M tokens • Output: $0.40/1M tokens
-                        </div>
+            <!-- ===================== SECTION 1: PLATFORM COST OVERVIEW ===================== -->
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f766e 100%); color: white; padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fa-solid fa-coins" style="font-size: 1.25rem;"></i>
+                    <strong style="font-size: 1.1rem;">Total Platform Cost Overview</strong>
+                    <span style="background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; margin-left: 0.5rem;">
+                        ${m.currentTier} Tier
+                    </span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+                    <div style="background: rgba(255,255,255,0.08); padding: 1rem; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.75rem; opacity: 0.7;">Supabase</div>
+                        <div style="font-size: 1.5rem; font-weight: 700;">$${m.tierCostMonth}</div>
+                        <div style="font-size: 0.7rem; opacity: 0.6;">/month</div>
                     </div>
+                    <div style="background: rgba(255,255,255,0.08); padding: 1rem; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.75rem; opacity: 0.7;">AI (Gemini)</div>
+                        <div style="font-size: 1.5rem; font-weight: 700;">${tracker.formatCost(m.aiCost)}</div>
+                        <div style="font-size: 0.7rem; opacity: 0.6;">all-time</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.08); padding: 1rem; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.75rem; opacity: 0.7;">Hosting (Vercel)</div>
+                        <div style="font-size: 1.5rem; font-weight: 700;">$0</div>
+                        <div style="font-size: 0.7rem; opacity: 0.6;">Free tier</div>
+                    </div>
+                    <div style="background: rgba(16,185,129,0.2); padding: 1rem; border-radius: 12px; text-align: center; border: 1px solid rgba(16,185,129,0.4);">
+                        <div style="font-size: 0.75rem; opacity: 0.7;">Annual Total</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #6ee7b7;">$${m.totalAnnual.toFixed(0)}</div>
+                        <div style="font-size: 0.7rem; opacity: 0.6;">$${m.costPerClient}/client</div>
+                    </div>
+                </div>
+
+                <!-- Tier Usage Bars -->
+                <div style="margin-top: 1.25rem; background: rgba(255,255,255,0.06); padding: 1rem; border-radius: 10px;">
+                    ${_tierBar(parseFloat(m.dbSizeMB), m.currentTier === 'Free' ? 500 : (m.currentTier === 'Pro' ? 8192 : 65536), 'Database', 'MB')}
+                    ${_tierBar(m.clients.length, m.currentTier === 'Free' ? 50 : (m.currentTier === 'Pro' ? 2000 : 10000), 'Clients', '')}
+                    ${_tierBar(m.reports.length, m.currentTier === 'Free' ? 100 : (m.currentTier === 'Pro' ? 5000 : 50000), 'Audit Reports', '')}
                 </div>
             </div>
 
-            <!--Summary Cards-- >
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                <!-- Total Calls -->
-                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">
-                        ${summary.totalCalls}
-                    </div>
-                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Total API Calls</div>
-                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                        Today: ${todayUsage.calls}
-                    </div>
-                </div>
-
-                <!-- Total Tokens -->
-                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #7c3aed;">
-                        ${tracker.formatTokens(summary.totalTokens)}
-                    </div>
-                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Total Tokens</div>
-                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                        In: ${tracker.formatTokens(summary.totalInputTokens)} / Out: ${tracker.formatTokens(summary.totalOutputTokens)}
-                    </div>
-                </div>
-
-                <!-- Estimated Cost -->
-                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #059669;">
-                        ${tracker.formatCost(summary.totalEstimatedCost)}
-                    </div>
-                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Total Est. Cost</div>
-                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                        This Month: ${tracker.formatCost(monthUsage.cost)}
-                    </div>
-                </div>
-
-                <!-- Tracking Since -->
-                <div class="card" style="padding: 1.25rem; border: 1px solid var(--border-color); text-align: center;">
-                    <div style="font-size: 1.25rem; font-weight: bold; color: #374151;">
-                        ${summary.createdAt ? new Date(summary.createdAt).toLocaleDateString() : 'N/A'}
-                    </div>
-                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Tracking Since</div>
-                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                        ${summary.createdAt ? Math.ceil((new Date() - new Date(summary.createdAt)) / (1000 * 60 * 60 * 24)) : 0} days
-                    </div>
-                </div>
-            </div>
-
-            <!--Usage by Feature-- >
+            <!-- ===================== SECTION 2: AI API USAGE ===================== -->
             <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                 <h4 style="margin: 0 0 1rem 0; color: #374151;">
-                    <i class="fa-solid fa-layer-group" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                    Usage by Feature
+                    <i class="fa-solid fa-robot" style="margin-right: 0.5rem; color: #7c3aed;"></i>
+                    AI API Usage
+                    <span style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; margin-left: 0.5rem;">Gemini 2.0 Flash</span>
                 </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div style="background: #f0f9ff; padding: 1rem; border-radius: 10px; text-align: center;">
+                        <div style="font-size: 1.75rem; font-weight: bold; color: var(--primary-color);">${summary.totalCalls}</div>
+                        <div style="font-size: 0.8rem; color: #64748b;">API Calls</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">Today: ${todayUsage.calls}</div>
+                    </div>
+                    <div style="background: #faf5ff; padding: 1rem; border-radius: 10px; text-align: center;">
+                        <div style="font-size: 1.75rem; font-weight: bold; color: #7c3aed;">${tracker.formatTokens(summary.totalTokens)}</div>
+                        <div style="font-size: 0.8rem; color: #64748b;">Tokens</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">In: ${tracker.formatTokens(summary.totalInputTokens)} / Out: ${tracker.formatTokens(summary.totalOutputTokens)}</div>
+                    </div>
+                    <div style="background: #f0fdf4; padding: 1rem; border-radius: 10px; text-align: center;">
+                        <div style="font-size: 1.75rem; font-weight: bold; color: #059669;">${tracker.formatCost(summary.totalEstimatedCost)}</div>
+                        <div style="font-size: 0.8rem; color: #64748b;">Est. Cost</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">This Month: ${tracker.formatCost(monthUsage.cost)}</div>
+                    </div>
+                </div>
                 ${features.length > 0 ? `
                     <div class="table-container">
                         <table>
-                            <thead>
+                            <thead><tr><th>Feature</th><th style="text-align:center;">Calls</th><th style="text-align:center;">Input</th><th style="text-align:center;">Output</th><th style="text-align:right;">Cost</th></tr></thead>
+                            <tbody>${features.map(([f, d]) => `
                                 <tr>
-                                    <th>Feature</th>
-                                    <th style="text-align: center;">Calls</th>
-                                    <th style="text-align: center;">Input Tokens</th>
-                                    <th style="text-align: center;">Output Tokens</th>
-                                    <th style="text-align: right;">Est. Cost</th>
+                                    <td><span class="badge" style="background:#e0f2fe;color:#0284c7;">${tracker.getFeatureDisplayName(f)}</span></td>
+                                    <td style="text-align:center;font-weight:600;">${d.calls}</td>
+                                    <td style="text-align:center;">${tracker.formatTokens(d.inputTokens)}</td>
+                                    <td style="text-align:center;">${tracker.formatTokens(d.outputTokens)}</td>
+                                    <td style="text-align:right;color:#059669;font-weight:600;">${tracker.formatCost(d.cost)}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                            <tfoot><tr style="background:#f8fafc;font-weight:bold;">
+                                <td>Total</td><td style="text-align:center;">${summary.totalCalls}</td>
+                                <td style="text-align:center;">${tracker.formatTokens(summary.totalInputTokens)}</td>
+                                <td style="text-align:center;">${tracker.formatTokens(summary.totalOutputTokens)}</td>
+                                <td style="text-align:right;color:#059669;">${tracker.formatCost(summary.totalEstimatedCost)}</td>
+                            </tr></tfoot>
+                        </table>
+                    </div>
+                ` : `<div style="text-align:center;padding:1.5rem;color:var(--text-secondary);"><i class="fa-solid fa-chart-pie" style="font-size:1.5rem;margin-bottom:0.5rem;color:#cbd5e1;"></i><p style="margin:0;">No AI usage yet. Use features like KB Analysis or NCR Auto-Map to start tracking.</p></div>`}
+            </div>
+
+            <!-- ===================== SECTION 3: PER-CLIENT COST BREAKDOWN ===================== -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                <h4 style="margin: 0 0 1rem 0; color: #374151;">
+                    <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #0ea5e9;"></i>
+                    Cost Per Client
+                    <span style="background: #e0f2fe; color: #0284c7; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; margin-left: 0.5rem;">${m.perClient.length} clients</span>
+                </h4>
+                ${m.perClient.length > 0 ? `
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table>
+                            <thead style="position: sticky; top: 0; background: #f8fafc;">
+                                <tr>
+                                    <th>Client</th>
+                                    <th style="text-align:center;">Audits</th>
+                                    <th style="text-align:center;">NCRs</th>
+                                    <th style="text-align:center;">Checklist Items</th>
+                                    <th style="text-align:center;">Evidence</th>
+                                    <th style="text-align:right;">Est. Storage</th>
+                                    <th style="text-align:right;">Est. Cost/yr</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${features.map(([feature, data]) => `
+                                ${m.perClient.map(c => `
                                     <tr>
                                         <td>
-                                            <span class="badge" style="background: #e0f2fe; color: #0284c7;">
-                                                ${tracker.getFeatureDisplayName(feature)}
-                                            </span>
+                                            <div style="font-weight: 500;">${window.UTILS.escapeHtml(c.name)}</div>
+                                            <div style="font-size: 0.75rem; color: #94a3b8;">${window.UTILS.escapeHtml(c.industry)}</div>
                                         </td>
-                                        <td style="text-align: center; font-weight: bold;">${data.calls}</td>
-                                        <td style="text-align: center;">${tracker.formatTokens(data.inputTokens)}</td>
-                                        <td style="text-align: center;">${tracker.formatTokens(data.outputTokens)}</td>
-                                        <td style="text-align: right; color: #059669; font-weight: bold;">${tracker.formatCost(data.cost)}</td>
+                                        <td style="text-align:center;"><span class="badge" style="background:${c.audits > 0 ? '#dcfce7' : '#f1f5f9'};color:${c.audits > 0 ? '#166534' : '#94a3b8'};">${c.audits}</span></td>
+                                        <td style="text-align:center;"><span class="badge" style="background:${c.ncrs > 0 ? '#fef2f2' : '#f1f5f9'};color:${c.ncrs > 0 ? '#991b1b' : '#94a3b8'};">${c.ncrs}</span></td>
+                                        <td style="text-align:center;">${c.progressItems}</td>
+                                        <td style="text-align:center;">${c.evidenceCount} <span style="color:#94a3b8;font-size:0.75rem;">files</span></td>
+                                        <td style="text-align:right;font-weight:500;">${c.storageMB} MB</td>
+                                        <td style="text-align:right;font-weight:600;color:#059669;">$${c.estCost}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                             <tfoot>
-                                <tr style="background: #f8fafc; font-weight: bold;">
-                                    <td>Total</td>
-                                    <td style="text-align: center;">${summary.totalCalls}</td>
-                                    <td style="text-align: center;">${tracker.formatTokens(summary.totalInputTokens)}</td>
-                                    <td style="text-align: center;">${tracker.formatTokens(summary.totalOutputTokens)}</td>
-                                    <td style="text-align: right; color: #059669;">${tracker.formatCost(summary.totalEstimatedCost)}</td>
+                                <tr style="background: #f0fdf4; font-weight: bold;">
+                                    <td>Total (${m.perClient.length} clients)</td>
+                                    <td style="text-align:center;">${m.reports.length}</td>
+                                    <td style="text-align:center;">${m.perClient.reduce((s, c) => s + c.ncrs, 0)}</td>
+                                    <td style="text-align:center;">${m.perClient.reduce((s, c) => s + c.progressItems, 0)}</td>
+                                    <td style="text-align:center;">${m.perClient.reduce((s, c) => s + c.evidenceCount, 0)}</td>
+                                    <td style="text-align:right;">${m.perClient.reduce((s, c) => s + parseFloat(c.storageMB), 0).toFixed(2)} MB</td>
+                                    <td style="text-align:right;color:#059669;">$${m.totalAnnual.toFixed(0)}</td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
-                ` : `
-                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                        <i class="fa-solid fa-chart-pie" style="font-size: 2rem; margin-bottom: 1rem; color: #cbd5e1;"></i>
-                        <p style="margin: 0;">No API usage recorded yet.</p>
-                        <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem;">Use AI features like Agenda Generation or NCR Analysis to start tracking.</p>
-                    </div>
-                `}
+                ` : `<p style="text-align:center;color:var(--text-secondary);padding:1rem;">No clients yet.</p>`}
             </div>
 
-            <!--Cost Projection-- >
-            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color);">
+            <!-- ===================== SECTION 4: PER-STANDARD COST ANALYSIS ===================== -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
                 <h4 style="margin: 0 0 1rem 0; color: #374151;">
-                    <i class="fa-solid fa-calculator" style="margin-right: 0.5rem; color: #7c3aed;"></i>
-                    Monthly Cost Projection
+                    <i class="fa-solid fa-certificate" style="margin-right: 0.5rem; color: #d97706;"></i>
+                    Cost Per Standard
                 </h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
-                    ${[50, 100, 200, 500].map(audits => {
-        // Estimate ~3.5 API calls per audit, ~3000 tokens per call
-        const estimatedCalls = audits * 3.5;
-        const estimatedTokens = estimatedCalls * 3000;
-        const inputCost = (estimatedTokens * 0.6 / 1000000) * 0.10;
-        const outputCost = (estimatedTokens * 0.4 / 1000000) * 0.40;
-        const totalCost = inputCost + outputCost;
-        return `
-                            <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #374151;">${audits}</div>
-                                <div style="font-size: 0.8rem; color: #6b7280;">audits/month</div>
-                                <div style="font-size: 1.1rem; font-weight: bold; color: #059669; margin-top: 0.5rem;">
-                                    ~${tracker.formatCost(totalCost)}
-                                </div>
-                            </div>
-                        `;
-    }).join('')}
-                </div>
-                <p style="margin: 1rem 0 0 0; font-size: 0.8rem; color: #6b7280; text-align: center;">
-                    * Projections based on Gemini 2.0 Flash pricing, avg 3.5 AI calls per audit with ~3,000 tokens each
-                </p>
+                ${m.standards.length > 0 ? `
+                    <div class="table-container">
+                        <table>
+                            <thead><tr>
+                                <th>Standard</th>
+                                <th style="text-align:center;">Audits</th>
+                                <th style="text-align:center;">Clients</th>
+                                <th style="text-align:center;">Avg Items</th>
+                                <th style="text-align:center;">NCRs Found</th>
+                                <th style="text-align:right;">Est. AI Cost/Audit</th>
+                            </tr></thead>
+                            <tbody>
+                                ${m.standards.map(s => `
+                                    <tr>
+                                        <td><span class="badge" style="background:#fef3c7;color:#92400e;">${window.UTILS.escapeHtml(s.name)}</span></td>
+                                        <td style="text-align:center;font-weight:600;">${s.audits}</td>
+                                        <td style="text-align:center;">${s.clients}</td>
+                                        <td style="text-align:center;">${s.avgItems}</td>
+                                        <td style="text-align:center;"><span style="color:${s.ncrs > 0 ? '#dc2626' : '#94a3b8'};font-weight:${s.ncrs > 0 ? '600' : '400'};">${s.ncrs}</span></td>
+                                        <td style="text-align:right;color:#059669;font-weight:600;">~$${s.estCostPerAudit}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : `<p style="text-align:center;color:var(--text-secondary);padding:1rem;">No audit plans with standards found.</p>`}
             </div>
 
-            <!-- Supabase Database & Storage -->
-            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-top: 1.5rem;">
+            <!-- ===================== SECTION 5: SCALABILITY PROJECTIONS ===================== -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                <h4 style="margin: 0 0 1rem 0; color: #374151;">
+                    <i class="fa-solid fa-rocket" style="margin-right: 0.5rem; color: #7c3aed;"></i>
+                    Scalability & Cost Projections
+                </h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            <th>Scale</th><th style="text-align:center;">Supabase Tier</th>
+                            <th style="text-align:right;">Platform/mo</th><th style="text-align:right;">AI/mo</th>
+                            <th style="text-align:right;">Annual Total</th><th style="text-align:right;">Per Client/yr</th>
+                        </tr></thead>
+                        <tbody>
+                            ${[
+            { clients: 10, tier: 'Free', cost: 0 },
+            { clients: 50, tier: 'Free', cost: 0 },
+            { clients: 100, tier: 'Pro', cost: 25 },
+            { clients: 250, tier: 'Pro', cost: 25 },
+            { clients: 500, tier: 'Pro', cost: 25 },
+            { clients: 1000, tier: 'Pro+', cost: 50 },
+            { clients: 2000, tier: 'Team', cost: 599 }
+        ].map(s => {
+            const aiMo = s.clients * 3 * 3.5 * 3000 / 1000000 * 0.18 / 12;
+            const annual = (s.cost * 12) + (aiMo * 12);
+            const perClient = (annual / s.clients).toFixed(2);
+            const isCurrent = s.clients <= m.clients.length * 2 && s.clients >= m.clients.length;
+            return `
+                                    <tr style="${isCurrent ? 'background: #f0fdf4; font-weight: 500;' : ''}">
+                                        <td style="font-weight: 600;">${s.clients} clients
+                                            ${isCurrent ? '<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:8px;font-size:0.65rem;margin-left:4px;">YOU</span>' : ''}
+                                        </td>
+                                        <td style="text-align:center;">
+                                            <span class="badge" style="background:${s.tier === 'Free' ? '#dcfce7' : s.tier === 'Team' ? '#fef2f2' : '#e0f2fe'};color:${s.tier === 'Free' ? '#166534' : s.tier === 'Team' ? '#991b1b' : '#0369a1'};">${s.tier}</span>
+                                        </td>
+                                        <td style="text-align:right;">$${s.cost}</td>
+                                        <td style="text-align:right;color:#7c3aed;">$${aiMo.toFixed(2)}</td>
+                                        <td style="text-align:right;font-weight: 600;color:#059669;">$${annual.toFixed(0)}</td>
+                                        <td style="text-align:right;font-weight: 600;">$${perClient}</td>
+                                    </tr>`;
+        }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 0.75rem; padding: 0.5rem; background: #eff6ff; border-radius: 6px; font-size: 0.75rem; color: #1e40af;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 4px;"></i>
+                    Projections assume ~3 audits/client/year, 3.5 AI calls/audit, 3K tokens/call. Actual costs may vary.
+                </div>
+            </div>
+
+            <!-- ===================== SECTION 6: SUPABASE DB & STORAGE ===================== -->
+            <div class="card" style="padding: 1.5rem; border: 1px solid var(--border-color);">
                 <h4 style="margin: 0 0 1rem 0; color: #374151;">
                     <i class="fa-solid fa-database" style="margin-right: 0.5rem; color: #10b981;"></i>
                     Supabase Database & Storage
                 </h4>
                 <div id="supabase-stats-container">
-                    <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
-                        <i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i>
-                        Loading Supabase statistics...
+                    <div style="text-align:center;padding:1.5rem;color:var(--text-secondary);">
+                        <i class="fa-solid fa-spinner fa-spin" style="margin-right:0.5rem;"></i>Loading Supabase statistics...
                     </div>
                 </div>
             </div>
         </div>
-            `;
+    `;
 }
 
 // Load Supabase stats asynchronously after render
