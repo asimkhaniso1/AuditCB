@@ -572,6 +572,20 @@ function renderExecutionDetail(reportId) {
     const planChecklists = plan?.selectedChecklists || [];
     const checklists = state.checklists || [];
     const assignedChecklists = planChecklists.map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
+
+    // Diagnostic: help debug missing checklists
+    if (assignedChecklists.length === 0) {
+        console.warn('[Execution] No assigned checklists.', {
+            planFound: !!plan,
+            planId: plan?.id,
+            reportPlanId: report.planId,
+            reportClient: report.client,
+            planClient: plan?.client,
+            selectedChecklistIds: planChecklists,
+            globalChecklistCount: checklists.length,
+            globalChecklistIds: checklists.map(c => c.id)
+        });
+    }
     const customItems = report.customItems || [];
 
     // Create lookup
@@ -1176,7 +1190,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 }).join('');
             } else {
-                checklistHTML = `<div class="alert alert-warning">No configured checklists found.</div>`;
+                checklistHTML = `<div class="alert alert-warning" style="display:flex;align-items:flex-start;gap:1rem;">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size:1.5rem;color:#d97706;margin-top:2px;"></i>
+                    <div>
+                        <strong>No configured checklists found.</strong>
+                        <p style="margin:0.5rem 0 0;color:#6b7280;font-size:0.9rem;">To add checklists:<br>
+                        1. Go to <strong>Plans & Audits</strong> → select this audit plan<br>
+                        2. Under <strong>Checklist Selection</strong>, choose the applicable standard checklist(s)<br>
+                        3. Return here and refresh the page</p>
+                    </div>
+                </div>`;
             }
 
             // Custom Items Section
