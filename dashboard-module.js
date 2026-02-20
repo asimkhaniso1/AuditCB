@@ -27,80 +27,97 @@ function renderDashboardEnhanced() {
     // Calculate Real Stats from Actual Data (Filtered by User Role)
     // Use optional chaining or fallbacks for global helper functions
     const visibleClients = (typeof window.getVisibleClients === 'function') ? window.getVisibleClients() : [];
-    const totalClients = visibleClients.length;
-    const activeClients = visibleClients.filter(c => c.status === 'Active').length;
-    const inactiveClients = visibleClients.filter(c => c.status === 'Inactive').length;
-
-    // Safety check for auditors array
     const auditors = window.state.auditors || [];
-    const totalAuditors = auditors.length;
-    const leadAuditors = auditors.filter(a => a.role === 'Lead Auditor').length;
-
     const auditPlans = (typeof window.getVisiblePlans === 'function') ? window.getVisiblePlans() : [];
     const auditReports = (typeof window.getVisibleReports === 'function') ? window.getVisibleReports() : [];
 
-    // Advanced Calculations
-    const upcomingAudits = auditPlans.filter(p => p.status !== 'Completed').length;
-    const completedAudits = auditPlans.filter(p => p.status === 'Completed').length;
-    const draftPlans = auditPlans.filter(p => p.status === 'Draft').length;
-    const completionRate = auditPlans.length > 0 ? Math.round((completedAudits / auditPlans.length) * 100) : 0;
+    // PERF: Fingerprint-based cache — skip expensive stats computation if data hasn't changed
+    const cacheKey = `${visibleClients.length}|${auditors.length}|${auditPlans.length}|${auditReports.length}|${(window.state.certificates || []).length}`;
+    let stats;
 
-    // Auditor stats
-    const leadAuditorCount = auditors.filter(a => a.role === 'Lead Auditor').length;
-    const supportAuditorCount = totalAuditors - leadAuditorCount;
+    if (window._dashboardStatsCache && window._dashboardStatsCache._key === cacheKey) {
+        stats = window._dashboardStatsCache;
+        Logger.info('Dashboard stats served from cache');
+    } else {
+        const now = new Date();
+        const totalClients = visibleClients.length;
+        const activeClients = visibleClients.filter(c => c.status === 'Active').length;
+        const inactiveClients = visibleClients.filter(c => c.status === 'Inactive').length;
 
-    // NCR Analysis from actual reports (includes checklist NCs via getAllDashboardFindings)
-    let totalNCRs = 0;
-    let majorNCRs = 0;
-    let minorNCRs = 0;
-    let openNCRs = 0;
-    let closedNCRs = 0;
-    let overdueNCRs = 0;
-    let complianceScoreSum = 0;
-    let complianceCount = 0;
-    const now30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const totalAuditors = auditors.length;
+        const leadAuditors = auditors.filter(a => a.role === 'Lead Auditor').length;
 
-    auditReports.forEach(report => {
-        const ncrs = getAllDashboardFindings(report);
-        // NCR Stats
-        totalNCRs += ncrs.length;
-        const major = ncrs.filter(n => (n.type || '').toLowerCase() === 'major').length;
-        const minor = ncrs.filter(n => (n.type || '').toLowerCase() === 'minor').length;
+        const upcomingAudits = auditPlans.filter(p => p.status !== 'Completed').length;
+        const completedAudits = auditPlans.filter(p => p.status === 'Completed').length;
+        const draftPlans = auditPlans.filter(p => p.status === 'Draft').length;
+        const completionRate = auditPlans.length > 0 ? Math.round((completedAudits / auditPlans.length) * 100) : 0;
 
-        majorNCRs += major;
-        minorNCRs += minor;
-        openNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
-        closedNCRs += ncrs.filter(n => n.status === 'Closed').length;
+        const leadAuditorCount = leadAuditors;
+        const supportAuditorCount = totalAuditors - leadAuditorCount;
 
-        // Overdue NCRs: open NCRs from reports older than 30 days
-        const reportDate = report.date ? new Date(report.date) : null;
-        if (reportDate && reportDate < now30DaysAgo) {
-            overdueNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
-        }
+        // NCR Analysis from actual reports (includes checklist NCs via getAllDashboardFindings)
+        let totalNCRs = 0;
+        let majorNCRs = 0;
+        let minorNCRs = 0;
+        let openNCRs = 0;
+        let closedNCRs = 0;
+        let overdueNCRs = 0;
+        let complianceScoreSum = 0;
+        let complianceCount = 0;
+        const now30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-        // Compliance Score: use real checklist data when available
-        const progress = report.checklistProgress || [];
-        if (progress.length > 0) {
-            const assessed = progress.filter(p => p.status && p.status !== '');
-            if (assessed.length > 0) {
-                const conformCount = assessed.filter(p => p.status === 'conform').length;
-                complianceScoreSum += Math.round((conformCount / assessed.length) * 100);
+        auditReports.forEach(report => {
+            const ncrs = getAllDashboardFindings(report);
+            totalNCRs += ncrs.length;
+            const major = ncrs.filter(n => (n.type || '').toLowerCase() === 'major').length;
+            const minor = ncrs.filter(n => (n.type || '').toLowerCase() === 'minor').length;
+
+            majorNCRs += major;
+            minorNCRs += minor;
+            openNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
+            closedNCRs += ncrs.filter(n => n.status === 'Closed').length;
+
+            const reportDate = report.date ? new Date(report.date) : null;
+            if (reportDate && reportDate < now30DaysAgo) {
+                overdueNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
+            }
+
+            const progress = report.checklistProgress || [];
+            if (progress.length > 0) {
+                const assessed = progress.filter(p => p.status && p.status !== '');
+                if (assessed.length > 0) {
+                    const conformCount = assessed.filter(p => p.status === 'conform').length;
+                    complianceScoreSum += Math.round((conformCount / assessed.length) * 100);
+                    complianceCount++;
+                }
+            } else if (report.status === 'Completed' || report.status === 'Review' || ncrs.length > 0) {
+                const reportScore = Math.max(0, 100 - (major * 15) - (minor * 5));
+                complianceScoreSum += reportScore;
                 complianceCount++;
             }
-        } else if (report.status === 'Completed' || report.status === 'Review' || ncrs.length > 0) {
-            const reportScore = Math.max(0, 100 - (major * 15) - (minor * 5));
-            complianceScoreSum += reportScore;
-            complianceCount++;
-        }
-    });
+        });
 
-    // Certificates issued (count completed audit plans as proxy)
-    const certificatesIssued = (window.state.certificates || []).length || completedAudits;
+        const certificatesIssued = (window.state.certificates || []).length || completedAudits;
+        const avgComplianceScore = complianceCount > 0 ? Math.round(complianceScoreSum / complianceCount) : 0;
 
-    // Compliance Score Analysis
-    const avgComplianceScore = complianceCount > 0
-        ? Math.round(complianceScoreSum / complianceCount)
-        : 0;
+        stats = {
+            _key: cacheKey,
+            totalClients, activeClients, inactiveClients,
+            totalAuditors, leadAuditors, leadAuditorCount, supportAuditorCount,
+            upcomingAudits, completedAudits, draftPlans, completionRate,
+            totalNCRs, majorNCRs, minorNCRs, openNCRs, closedNCRs, overdueNCRs,
+            complianceScoreSum, complianceCount, avgComplianceScore, certificatesIssued
+        };
+        window._dashboardStatsCache = stats;
+        Logger.info('Dashboard stats computed and cached');
+    }
+
+    // Destructure for use in the template below
+    const { totalClients, activeClients, inactiveClients, totalAuditors, leadAuditors,
+        leadAuditorCount, supportAuditorCount, upcomingAudits, completedAudits,
+        draftPlans, completionRate, totalNCRs, majorNCRs, minorNCRs, openNCRs,
+        closedNCRs, overdueNCRs, complianceScoreSum, complianceCount,
+        avgComplianceScore, certificatesIssued } = stats;
 
     // Industry Distribution
     const industryStats = {};

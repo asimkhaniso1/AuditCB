@@ -294,8 +294,8 @@ const AuditLogger = {
      * Setup automatic cleanup
      */
     setupAutoCleanup: function () {
-        // Clean up old entries every hour
-        setInterval(() => {
+        // PERF: Store interval ID so it can be cleared on logout
+        this._cleanupIntervalId = setInterval(() => {
             this.cleanup();
         }, 60 * 60 * 1000); // 1 hour
     },

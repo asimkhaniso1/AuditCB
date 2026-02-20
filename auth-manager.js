@@ -83,6 +83,21 @@ const AuthManager = {
 
             this.clearSession();
 
+            // PERF: Clear session monitor interval to prevent memory leaks
+            if (this._sessionMonitorId) {
+                clearInterval(this._sessionMonitorId);
+                this._sessionMonitorId = null;
+            }
+
+            // Also clear audit logger interval if it exists
+            if (window.AuditLogger?._cleanupIntervalId) {
+                clearInterval(window.AuditLogger._cleanupIntervalId);
+                window.AuditLogger._cleanupIntervalId = null;
+            }
+
+            // Clear dashboard stats cache
+            window._dashboardStatsCache = null;
+
             // Clear app state
             window.state.currentUser = null;
 
@@ -288,7 +303,8 @@ const AuthManager = {
      */
     setupSessionMonitor: function () {
         // Check session every minute
-        setInterval(() => {
+        // PERF: Store interval ID so it can be cleared on logout
+        this._sessionMonitorId = setInterval(() => {
             const session = this.getSession();
             if (!session) return;
 
