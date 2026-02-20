@@ -207,7 +207,7 @@ function renderAuditorForm(auditorId = null) {
                      <button type="button" class="btn btn-secondary btn-lg" data-hash="#auditors-list" style="min-width: 150px;">
                         Cancel
                     </button>
-                    <button type="button" class="btn btn-primary btn-lg" data-action="saveAuditorForm" data-id="${auditorId || }" style="min-width: 200px;">
+                    <button type="button" class="btn btn-primary btn-lg" data-action="saveAuditorForm" data-id="${auditorId || ''}" style="min-width: 200px;">
                         <i class="fa-solid fa-save" style="margin-right: 0.5rem;"></i> ${btnText}
                     </button>
                 </div>
