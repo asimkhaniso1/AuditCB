@@ -317,6 +317,51 @@ const SupabaseClient = {
     },
 
     /**
+     * INCREMENTAL SYNC HELPERS
+     * Track last sync timestamp per table to only fetch changed rows.
+     * Uses sessionStorage so each tab/session starts fresh but benefits
+     * from delta sync on subsequent navigations within the same session.
+     */
+    _getSyncTimestamp(table) {
+        try {
+            return sessionStorage.getItem(`sync_ts_${table}`) || null;
+        } catch (e) { return null; }
+    },
+
+    _setSyncTimestamp(table) {
+        try {
+            sessionStorage.setItem(`sync_ts_${table}`, new Date().toISOString());
+        } catch (e) { /* ignore */ }
+    },
+
+    _clearSyncTimestamps() {
+        try {
+            const keys = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const k = sessionStorage.key(i);
+                if (k.startsWith('sync_ts_')) keys.push(k);
+            }
+            keys.forEach(k => sessionStorage.removeItem(k));
+            Logger.info('Sync timestamps cleared — next sync will be full');
+        } catch (e) { /* ignore */ }
+    },
+
+    /**
+     * Build a Supabase query with optional incremental filter.
+     * If a previous sync timestamp exists for this table, adds .gte('updated_at', ts).
+     * @param {string} table - Table name
+     * @returns {{ query: object, isIncremental: boolean, lastSync: string|null }}
+     */
+    _buildSyncQuery(table) {
+        const lastSync = this._getSyncTimestamp(table);
+        let query = this.client.from(table).select('*');
+        if (lastSync) {
+            query = query.gte('updated_at', lastSync);
+        }
+        return { query, isIncremental: !!lastSync, lastSync };
+    },
+
+    /**
      * Load all user data from Supabase cloud
      * Called automatically on sign-in to sync data across devices
      */
@@ -958,14 +1003,13 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('profiles')
-                .select('*')
-                .order('full_name', { ascending: true });
+            const { query, isIncremental } = this._buildSyncQuery('profiles');
+            const { data, error } = await query.order('full_name', { ascending: true });
 
             if (error) throw error;
 
-            Logger.info('Fetched user profiles:', data?.length || 0);
+            this._setSyncTimestamp('profiles');
+            Logger.info(`Fetched user profiles (${isIncremental ? 'incremental' : 'full'}): ${data?.length || 0}`);
             return data || [];
         } catch (error) {
             Logger.error('Failed to fetch user profiles:', error);
@@ -1271,10 +1315,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('clients')
-                .select('*')
-                .order('name', { ascending: true });
+            const { query, isIncremental } = this._buildSyncQuery('clients');
+            const { data, error } = await query.order('name', { ascending: true });
 
             if (error) throw error;
 
@@ -1326,8 +1368,8 @@ const SupabaseClient = {
             });
 
             window.state.clients = localClients;
-            // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
-            Logger.info(`Synced clients from Supabase: ${added} added, ${updated} updated`);
+            this._setSyncTimestamp('clients');
+            Logger.info(`Synced clients (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
 
             // CRITICAL: Refresh the client sidebar after syncing
             if (typeof window.populateClientSidebar === 'function') {
@@ -1352,10 +1394,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('auditors')
-                .select('*')
-                .order('name', { ascending: true });
+            const { query, isIncremental } = this._buildSyncQuery('auditors');
+            const { data, error } = await query.order('name', { ascending: true });
 
             if (error) throw error;
 
@@ -1409,7 +1449,8 @@ const SupabaseClient = {
 
             window.state.auditors = localAuditors;
             // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
-            Logger.info(`Synced auditors from Supabase: ${added} added, ${updated} updated`);
+            this._setSyncTimestamp('auditors');
+            Logger.info(`Synced auditors (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch auditors from Supabase:', error);
@@ -1472,9 +1513,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('auditor_assignments')
-                .select('*');
+            const { query, isIncremental } = this._buildSyncQuery('auditor_assignments');
+            const { data, error } = await query;
 
             if (error) throw error;
 
@@ -1511,7 +1551,8 @@ const SupabaseClient = {
 
             window.state.auditorAssignments = localAssignments;
             window.saveData();
-            Logger.info(`Synced assignments from Supabase: ${added} added, ${updated} updated`);
+            this._setSyncTimestamp('auditor_assignments');
+            Logger.info(`Synced assignments (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch assignments from Supabase:', error);
@@ -1677,10 +1718,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('audit_plans')
-                .select('*')
-                .order('date', { ascending: false });
+            const { query, isIncremental } = this._buildSyncQuery('audit_plans');
+            const { data, error } = await query.order('date', { ascending: false });
 
             if (error) throw error;
 
@@ -1736,7 +1775,8 @@ const SupabaseClient = {
 
             window.state.auditPlans = localPlans;
             // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
-            Logger.info(`Synced audit plans from Supabase: ${added} added, ${updated} updated`);
+            this._setSyncTimestamp('audit_plans');
+            Logger.info(`Synced audit plans (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch audit plans from Supabase:', error);
@@ -1754,10 +1794,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('audit_reports')
-                .select('*')
-                .order('date', { ascending: false });
+            const { query, isIncremental } = this._buildSyncQuery('audit_reports');
+            const { data, error } = await query.order('date', { ascending: false });
 
             if (error) throw error;
 
@@ -1809,7 +1847,8 @@ const SupabaseClient = {
             });
 
             window.state.auditReports = localReports;
-            Logger.info(`Synced audit reports from Supabase: ${added} added, ${updated} updated`);
+            this._setSyncTimestamp('audit_reports');
+            Logger.info(`Synced audit reports (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch audit reports from Supabase:', error);
@@ -1858,14 +1897,11 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('checklists')
-                .select('*')
-                .order('name', { ascending: true });
+            const { query, isIncremental } = this._buildSyncQuery('checklists');
+            const { data, error } = await query.order('name', { ascending: true });
 
             if (error) throw error;
 
-            // Supabase is the source of truth — replace local checklists entirely
             const cloudChecklists = (data || []).map(checklist => ({
                 id: checklist.id,
                 name: checklist.name,
@@ -1883,13 +1919,26 @@ const SupabaseClient = {
 
             const localCount = (window.state.checklists || []).length;
             const cloudCount = cloudChecklists.length;
+            let added = 0, updated = 0;
 
-            window.state.checklists = cloudChecklists;
-            // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
+            if (isIncremental && cloudCount > 0) {
+                // INCREMENTAL: merge changed checklists into existing array
+                const local = window.state.checklists || [];
+                cloudChecklists.forEach(cc => {
+                    const idx = local.findIndex(l => String(l.id) === String(cc.id));
+                    if (idx !== -1) { local[idx] = cc; updated++; }
+                    else { local.push(cc); added++; }
+                });
+                window.state.checklists = local;
+            } else {
+                // FULL: Supabase is source of truth — replace entirely
+                window.state.checklists = cloudChecklists;
+                added = Math.max(0, cloudCount - localCount);
+                updated = Math.min(localCount, cloudCount);
+            }
 
-            const added = Math.max(0, cloudCount - localCount);
-            const updated = Math.min(localCount, cloudCount);
-            Logger.info(`Synced checklists from Supabase: ${cloudCount} cloud, replaced ${localCount} local`);
+            this._setSyncTimestamp('checklists');
+            Logger.info(`Synced checklists (${isIncremental ? 'delta' : 'full'}): ${cloudCount} fetched, ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch checklists from Supabase:', error);
@@ -2062,10 +2111,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('documents')
-                .select('*')
-                .order('uploaded_at', { ascending: false });
+            const { query, isIncremental } = this._buildSyncQuery('documents');
+            const { data, error } = await query.order('uploaded_at', { ascending: false });
 
             if (error) throw error;
 
@@ -2138,7 +2185,8 @@ const SupabaseClient = {
 
             window.state.documents = localDocs;
             // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
-            Logger.info(`Synced documents from Supabase: ${added} added, ${updated} updated`);
+            this._setSyncTimestamp('documents');
+            Logger.info(`Synced documents (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
             return { added, updated };
         } catch (error) {
             Logger.error('Failed to fetch documents from Supabase:', error);
@@ -2183,10 +2231,8 @@ const SupabaseClient = {
         }
 
         try {
-            const { data, error } = await this.client
-                .from('certification_decisions')
-                .select('*')
-                .order('date', { ascending: false });
+            const { query, isIncremental } = this._buildSyncQuery('certification_decisions');
+            const { data, error } = await query.order('date', { ascending: false });
 
             if (error) throw error;
 
@@ -2223,7 +2269,8 @@ const SupabaseClient = {
             }
 
             // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
-            Logger.info(`Synced ${data.length} certification decisions (Mapped ${localCerts.length} active certs)`);
+            this._setSyncTimestamp('certification_decisions');
+            Logger.info(`Synced cert decisions (${isIncremental ? 'delta' : 'full'}): ${data.length} rows (${localCerts.length} active certs)`);
             return { added: 0, updated: data.length };
         } catch (error) {
             Logger.error('Failed to fetch certification decisions:', error);

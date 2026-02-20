@@ -342,6 +342,11 @@ const DataMigration = {
         try {
             window.showNotification('Clearing local cache and reloading from cloud...', 'info');
 
+            // Clear sync timestamps so next login does a FULL sync
+            if (window.SupabaseClient && window.SupabaseClient._clearSyncTimestamps) {
+                window.SupabaseClient._clearSyncTimestamps();
+            }
+
             // Clear IndexedDB + localStorage to force fresh load from Supabase
             if (window.StateStore) {
                 window.StateStore.clear();
