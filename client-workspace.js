@@ -380,14 +380,10 @@ window.renderClientModule = function (clientId, moduleName) {
             }
             break;
         case 'account-setup':
-            if (typeof renderClientDetail === 'function') {
-                renderClientDetail(client.id, { showAccountSetup: true, showAnalytics: false });
-                setTimeout(() => {
-                    // Render Account Setup directly (tab button removed from tab bar)
-                    if (typeof renderClientTab === 'function') {
-                        renderClientTab(client, 'client_org');
-                    }
-                }, 200);
+            if (typeof renderClientTab === 'function') {
+                // Render directly — avoid race condition with renderClientDetail + setTimeout
+                contentArea.innerHTML = '<div id="tab-content"></div>';
+                renderClientTab(client, 'client_org');
             } else {
                 contentArea.innerHTML = 'Module not loaded';
             }
