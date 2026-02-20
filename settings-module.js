@@ -966,7 +966,10 @@ function getUsersHTML() {
                     User Management
                 </h3>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    ${(window.state.currentUser?.role === 'Admin' || window.state.currentUser?.role === 'Certification Manager') ? `
+                    ${(window.AuthManager && window.AuthManager.canPerform('create', 'user')) ? `
+                    <button class="btn btn-outline-primary" data-action="openInviteUserModal" aria-label="Invite user">
+                        <i class="fa-solid fa-envelope"></i> Invite
+                    </button>
                     <button class="btn btn-primary" data-action="openAddUserModal" aria-label="Add user">
                         <i class="fa-solid fa-user-plus"></i> Add User
                     </button>
