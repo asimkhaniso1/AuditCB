@@ -73,6 +73,9 @@
 })();
 
 // ─── 3. PDF.js Worker Configuration ───────────────────────────────
-if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
+// PDF.js CDN is deferred, so configure worker after all scripts load
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+});
