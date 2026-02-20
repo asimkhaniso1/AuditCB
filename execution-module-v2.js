@@ -246,7 +246,7 @@ function openCreateReportModal() {
 
     // Helpers exposed for HTML interaction
     window.selectAuditPlan = (id) => {
-        const plan = state.auditPlans.find(p => p.id == id);
+        const plan = state.auditPlans.find(p => p.id === id);
         if (!plan) return;
 
         document.getElementById('report-plan').value = id;
@@ -556,7 +556,7 @@ function renderExecutionDetail(reportId) {
             plan.team.forEach((name, i) => auditTeam.push({ name, role: i === 0 ? 'Lead Auditor' : 'Team Auditor' }));
         } else if (plan.auditors && Array.isArray(plan.auditors)) {
             plan.auditors.forEach((id, i) => {
-                const a = (state.auditors || []).find(x => x.id == id);
+                const a = (state.auditors || []).find(x => x.id === id);
                 if (a) auditTeam.push({ name: a.name, role: i === 0 ? 'Lead Auditor' : (a.role || 'Team Auditor') });
             });
         }
@@ -1362,7 +1362,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         if (cl) {
                             if (cl.clauses && (String(item.itemIdx).includes('-'))) {
                                 const [mainClauseVal, subIdxVal] = String(item.itemIdx).split('-');
-                                const mainObj = cl.clauses.find(m => m.mainClause == mainClauseVal);
+                                const mainObj = cl.clauses.find(m => m.mainClause === mainClauseVal);
                                 if (mainObj && mainObj.subClauses && mainObj.subClauses[subIdxVal]) {
                                     clauseText = mainObj.subClauses[subIdxVal].clause || `Clause ${mainClauseVal}`;
                                     reqText = mainObj.subClauses[subIdxVal].requirement || '';
@@ -2570,7 +2570,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     const cl = assignedChecklists.find(c => String(c.id) === String(item.checklistId));
                     if (cl && cl.clauses && String(item.itemIdx).includes('-')) {
                         const [mc, si] = String(item.itemIdx).split('-');
-                        const mainObj = cl.clauses.find(m => m.mainClause == mc);
+                        const mainObj = cl.clauses.find(m => m.mainClause === mc);
                         if (mainObj && mainObj.subClauses && mainObj.subClauses[si]) {
                             clauseText = mainObj.subClauses[si].clause || clauseText;
                         }

@@ -1055,7 +1055,7 @@ window.runAutoSummary = async function (reportId) {
     try {
         // Gather compliant items for Positive Observations using shared helper
         const compliantItems = [];
-        const plan = window.state.auditPlans.find(p => p.id == report.planId) || {};
+        const plan = window.state.auditPlans.find(p => p.id === report.planId) || {};
         const assignedChecklists = (window.state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
 
         if (report.checklistProgress) {

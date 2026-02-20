@@ -1151,7 +1151,7 @@ window.printAuditChecklist = function (planId) {
             auditorNames = plan.team.join(', ');
         } else if (plan.auditors && Array.isArray(plan.auditors)) {
             auditorNames = plan.auditors.map(id => {
-                const auditor = (state.auditors || []).find(a => a.id == id);
+                const auditor = (state.auditors || []).find(a => a.id === id);
                 return auditor ? auditor.name : 'Unknown';
             }).join(', ');
         }
@@ -1198,7 +1198,7 @@ window.printAuditChecklist = function (planId) {
         `;
 
         planChecklists.forEach(clId => {
-            const cl = checklists.find(c => c.id == clId);
+            const cl = checklists.find(c => c.id === clId);
             if (!cl) return; // Skip if checklist not found
 
             content += `
@@ -1958,7 +1958,7 @@ window.viewAuditPlan = viewAuditPlan;
 window.openChecklistSelectionModal = window.renderConfigureChecklist; // Legacy alias
 
 window.printAuditPlanDetails = function (planId) {
-    const plan = state.auditPlans.find(p => p.id == planId);
+    const plan = state.auditPlans.find(p => p.id === planId);
     if (!plan) return;
 
     const client = state.clients.find(c => c.name === plan.client);
@@ -2506,8 +2506,8 @@ window.viewAuditPlan = viewAuditPlan;
 
 // Navigation Helpers (Integrated Lifecycle)
 window.navigateToAuditExecution = function (planId) {
-    let report = window.state.auditReports.find(r => r.planId == planId);
-    const plan = window.state.auditPlans.find(p => p.id == planId);
+    let report = window.state.auditReports.find(r => r.planId === planId);
+    const plan = window.state.auditPlans.find(p => p.id === planId);
 
     if (!plan) {
         window.showNotification('Plan not found', 'error');
@@ -2551,7 +2551,7 @@ window.navigateToAuditExecution = function (planId) {
 };
 
 window.navigateToReporting = function (planId) {
-    const report = window.state.auditReports.find(r => r.planId == planId);
+    const report = window.state.auditReports.find(r => r.planId === planId);
     if (!report) {
         window.showNotification('No report data found. Please complete execution first.', 'warning');
         return;

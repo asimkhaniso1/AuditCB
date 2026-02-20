@@ -200,7 +200,7 @@ const DataMigration = {
                     name: 'System Admin',
                     email: 'admin@auditcb.com',
                     role: 'Admin',
-                    password: 'admin'
+                    password: 'admin' // SECURITY: bootstrap-only; auto-migrated to SHA-256 hash on first login
                 }];
             }
 

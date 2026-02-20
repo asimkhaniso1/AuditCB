@@ -3283,7 +3283,7 @@ window.showAnalysisModeModal = function (docId, isReanalyze = false) {
     // Build client options for context selector — only clients with matching standards
     const clients = window.state.clients || [];
     const kb = window.state.knowledgeBase;
-    const kbDoc = kb?.standards?.find(d => d.id == docId);
+    const kbDoc = kb?.standards?.find(d => d.id === docId);
     const docISONumbers = (kbDoc?.name || '').match(/\d{4,5}/g) || [];
     const matchingClients = clients.filter(c => {
         if (!c.standard || docISONumbers.length === 0) return true;
@@ -3463,7 +3463,7 @@ window._kbProgress = {
 
 window.analyzeStandard = async function (docId, mode, auditType, clientId) {
     const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id == docId);
+    const doc = kb.standards.find(d => d.id === docId);
     if (!doc) {
         window.showNotification('Standard not found', 'error');
         return;
@@ -3524,7 +3524,7 @@ window.analyzeStandard = async function (docId, mode, auditType, clientId) {
 window.analyzeDocument = async function (type, docId) {
     const kb = window.state.knowledgeBase;
     const collection = type === 'sop' ? kb.sops : type === 'policy' ? kb.policies : kb.marketing;
-    const doc = collection.find(d => d.id == docId);
+    const doc = collection.find(d => d.id === docId);
     if (!doc) {
         window.showNotification('Document not found', 'error');
         return;
@@ -4267,10 +4267,10 @@ window.lookupClauseText = function (standardName, clauseNumber) {
 // Update Knowledge Base Section Content (Manual Edit)
 window.updateKBSection = function (docId, clauseId, newContent) {
     const kb = window.state.knowledgeBase;
-    let doc = kb.standards.find(d => d.id == docId) ||
-        kb.sops.find(d => d.id == docId) ||
-        kb.policies.find(d => d.id == docId) ||
-        kb.marketing.find(d => d.id == docId);
+    let doc = kb.standards.find(d => d.id === docId) ||
+        kb.sops.find(d => d.id === docId) ||
+        kb.policies.find(d => d.id === docId) ||
+        kb.marketing.find(d => d.id === docId);
 
     if (doc && doc.clauses) {
         const clause = doc.clauses.find(c => c.clause === clauseId);
@@ -4520,7 +4520,7 @@ function _buildChecklistTitle(doc) {
 // Create a checklist from KB extracted questions
 window.createChecklistFromKB = async function (docId) {
     const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id == docId);
+    const doc = kb.standards.find(d => d.id === docId);
     if (!doc || !doc.generatedChecklist || doc.generatedChecklist.length === 0) {
         window.showNotification('No checklist questions found. Re-analyze the standard first.', 'error');
         return;
@@ -4652,16 +4652,16 @@ window.deleteKnowledgeDoc = async function (type, id) {
 
     // Find the document
     if (type === 'standard') {
-        doc = kb.standards.find(d => d.id == id);
+        doc = kb.standards.find(d => d.id === id);
         kb.standards = kb.standards.filter(d => d.id != id);
     } else if (type === 'sop') {
-        doc = kb.sops.find(d => d.id == id);
+        doc = kb.sops.find(d => d.id === id);
         kb.sops = kb.sops.filter(d => d.id != id);
     } else if (type === 'policy') {
-        doc = kb.policies.find(d => d.id == id);
+        doc = kb.policies.find(d => d.id === id);
         kb.policies = kb.policies.filter(d => d.id != id);
     } else {
-        doc = kb.marketing.find(d => d.id == id);
+        doc = kb.marketing.find(d => d.id === id);
         kb.marketing = kb.marketing.filter(d => d.id != id);
     }
 
@@ -4712,18 +4712,18 @@ window.viewKBAnalysis = function (docId) {
     const kb = window.state.knowledgeBase;
 
     // Search across all collections
-    let doc = kb.standards.find(d => d.id == docId);
+    let doc = kb.standards.find(d => d.id === docId);
     let docType = 'standard';
     if (!doc) {
-        doc = kb.sops.find(d => d.id == docId);
+        doc = kb.sops.find(d => d.id === docId);
         docType = 'sop';
     }
     if (!doc) {
-        doc = kb.policies.find(d => d.id == docId);
+        doc = kb.policies.find(d => d.id === docId);
         docType = 'policy';
     }
     if (!doc) {
-        doc = kb.marketing.find(d => d.id == docId);
+        doc = kb.marketing.find(d => d.id === docId);
         docType = 'marketing';
     }
     if (!doc) {
@@ -4927,7 +4927,7 @@ window.viewKBAnalysis = function (docId) {
 // Re-analyze standard with AI for more detailed extraction
 window.reanalyzeStandard = async function (docId, mode = 'standard', auditType = 'initial', clientId = '') {
     const kb = window.state.knowledgeBase;
-    const doc = kb.standards.find(d => d.id == docId);
+    const doc = kb.standards.find(d => d.id === docId);
     if (!doc) {
         console.warn('Document not found for re-analysis:', docId);
         return;
@@ -5292,8 +5292,8 @@ function getActivityLogHTML() {
 
 // Remove assignment
 window.removeAssignment = async function (auditorId, clientId) {
-    const auditor = window.state.auditors.find(a => a.id == auditorId);
-    const client = window.state.clients.find(c => c.id == clientId);
+    const auditor = window.state.auditors.find(a => a.id === auditorId);
+    const client = window.state.clients.find(c => c.id === clientId);
 
     const confirmMsg = `Remove "${client?.name || 'client'}" from ${auditor?.name || 'auditor'} 's assignments?
 
@@ -5302,9 +5302,9 @@ window.removeAssignment = async function (auditorId, clientId) {
 This only removes future access to new client data.`;
 
     if (confirm(confirmMsg)) {
-        // Use loose equality (==) to handle type mismatches (string vs number)
+        // Use loose equality (===) to handle type mismatches (string vs number)
         window.state.auditorAssignments = window.state.auditorAssignments.filter(
-            a => !(a.auditorId == auditorId && a.clientId == clientId)
+            a => !(a.auditorId === auditorId && a.clientId === clientId)
         );
         window.saveData();
 

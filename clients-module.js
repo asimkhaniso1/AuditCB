@@ -1091,7 +1091,7 @@ function getClientAuditsHTML(client) {
             ${clientPlans.length > 0 ? `
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     ${clientPlans.map(plan => {
-        const report = clientReports.find(r => r.planId == plan.id || r.date === plan.date);
+        const report = clientReports.find(r => r.planId === plan.id || r.date === plan.date);
         const ncrCount = report ? (report.ncrs || []).length : 0;
         return `
                             <div style="display: flex; align-items: center; padding: 1rem; background: #f8fafc; border-radius: 8px; border-left: 4px solid ${plan.status === 'Completed' ? '#10b981' : '#3b82f6'};">
@@ -1841,7 +1841,7 @@ window.saveNewClient = async function () {
 
 window.renderEditClient = function (clientId) {
     // Use loose equality to handle string/number ID mismatch
-    const client = window.state.clients.find(c => c.id == clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) {
         window.showNotification('Client not found', 'error');
         renderClientsEnhanced();
@@ -2078,7 +2078,7 @@ window.renderEditClient = function (clientId) {
 };
 
 window.saveAuditClient = async function (clientId) {
-    const client = window.state.clients.find(c => c.id == clientId);
+    const client = window.state.clients.find(c => c.id === clientId);
     if (!client) return;
 
     // 1. Define Fields

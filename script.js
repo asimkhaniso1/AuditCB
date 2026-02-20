@@ -1243,7 +1243,7 @@ window.loginUser = function (form) {
             name: 'System Admin',
             email: 'info@companycertification.com',
             role: 'Admin',
-            password: 'admin' // Simple plain text for prototype
+            password: 'admin' // SECURITY: bootstrap-only; auto-migrated to SHA-256 hash on first login (see handleLoginSubmit)
         });
         window.state.users = users;
     }
@@ -1670,7 +1670,7 @@ window.handleLoginSubmit = async function (form) {
                 name: 'System Admin',
                 email: 'info@companycertification.com',
                 role: 'Admin',
-                password: 'admin'
+                password: 'admin' // SECURITY: bootstrap-only; auto-migrated to SHA-256 hash on first login
             }];
         }
 

@@ -1201,7 +1201,7 @@ function renderAuditorTab(auditor, tabName) {
 function getAuditorClientsTabHTML(auditor) {
     const assignments = window.state.auditorAssignments || [];
     // Filter assignments for this auditor
-    const assignedIds = assignments.filter(a => a.auditorId == auditor.id).map(a => a.clientId);
+    const assignedIds = assignments.filter(a => a.auditorId === auditor.id).map(a => a.clientId);
     const assignedClients = window.state.clients.filter(c => assignedIds.includes(c.id));
 
     return `
