@@ -408,7 +408,7 @@ const AuthManager = {
         if (!contentArea) return;
 
         // Get CB settings for branding
-        const cbName = window.state?.cbSettings?.cbName || 'AuditCB360';
+        const cbName = window.state?.cbSettings?.cbName || 'Audit360 Suite';
         const cbLogo = window.state?.cbSettings?.cbLogo || '';
 
         contentArea.style.padding = '0';
@@ -797,7 +797,7 @@ const AuthManager = {
                     </div>
 
                     <div class="hero-footer">
-                        &copy; ${new Date().getFullYear()} ${window.UTILS?.escapeHtml?.(cbName) || cbName} &bull; Powered by AuditCB360
+                        &copy; ${new Date().getFullYear()} ${window.UTILS?.escapeHtml?.(cbName) || cbName} &bull; Powered by Audit360
                     </div>
                 </div>
             </div>
