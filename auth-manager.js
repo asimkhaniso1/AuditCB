@@ -768,7 +768,7 @@ const AuthManager = {
                         <div class="logo-area">
                             ${cbLogo
                 ? '<img src="' + cbLogo + '" alt="Logo">'
-                : '<div class="fallback-icon"><i class="fa-solid fa-certificate"></i></div>'
+                : '<img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 56px; object-fit: contain;">'
             }
                             <h2>${window.UTILS?.escapeHtml?.(cbName) || cbName}</h2>
                             <p>Sign in to your account</p>
