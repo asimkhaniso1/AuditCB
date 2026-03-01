@@ -1,5 +1,5 @@
 // ============================================
-// AUDITCB360 - MAIN APPLICATION SCRIPT (ESM-ready)
+// AUDITCB360 - MAIN APPLICATION SCRIPT
 // ============================================
 
 const DATA_VERSION = '1.4'; // Increment to force state reset
@@ -1070,7 +1070,7 @@ function closeModal() {
     document.getElementById('modal-save').style.display = ''; // Reset visibility for next modal
 }
 
-// Window export (used by all existing code) for global access
+// Export to window for global access
 window.openModal = openModal;
 window.closeModal = closeModal;
 
@@ -1409,7 +1409,7 @@ function showLoginOverlay() {
     `;
 
     // Get CB settings for branding
-    const cbName = window.state?.cbSettings?.cbName || 'Audit360';
+    const cbName = window.state?.cbSettings?.cbName || 'AuditCB360';
     const cbLogo = window.state?.cbSettings?.cbLogo || '';
 
     overlay.innerHTML = `
@@ -1630,7 +1630,7 @@ function showLoginOverlay() {
                     <div class="logo-area">
                         ${cbLogo
             ? '<img src="' + cbLogo + '" alt="Logo">'
-            : '<img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 56px; object-fit: contain;">'
+            : '<div class="fallback-icon"><i class="fa-solid fa-certificate"></i></div>'
         }
                         <h2>${cbName}</h2>
                         <p>Sign in to your account</p>
@@ -1903,14 +1903,14 @@ function updateCBLogoDisplay() {
         // Use maximum defensiveness
         const settings = (window.state && window.state.cbSettings) ? window.state.cbSettings : {};
         const logoUrl = settings.logoUrl || '';
-        const cbName = settings.cbName || 'Audit360';
+        const cbName = settings.cbName || 'AuditCB360';
 
         if (logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'))) {
-            // Replace entire header with the custom CB logo
+            // Replace entire header with just the logo
             logoContainer.innerHTML = `<img src="${logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS?.escapeHtml(cbName) || 'Logo'}">`;
         } else {
-            // Default: Audit360 logo
-            logoContainer.innerHTML = `<img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 40px; max-width: 180px; object-fit: contain;">`;
+            // Default: icon + text
+            logoContainer.innerHTML = `<i class="fa-solid fa-certificate"></i><h1>${window.UTILS?.escapeHtml(cbName) || 'AuditCB360'}</h1>`;
         }
     } catch (e) {
         console.warn('[SILENT ERROR] updateCBLogoDisplay failed:', e.message);
@@ -2019,8 +2019,3 @@ window.logoutUser = function () {
 // GLOBAL EXPORTS
 window.saveState = saveState;
 window.saveData = saveState;
-
-// Support CommonJS/test environments
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = state;
-}
