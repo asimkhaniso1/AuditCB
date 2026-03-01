@@ -1,5 +1,5 @@
 // ============================================
-// AUTHENTICATION MODULE
+// AUTHENTICATION MODULE (ESM-ready)
 // ============================================
 // Basic authentication system with role-based access control
 // TODO: Replace with proper backend authentication (Firebase Auth, Auth0, etc.)
@@ -250,10 +250,12 @@ const AuthManager = {
     },
 
     /**
-     * Generate simple token (for demo - use JWT in production)
+     * Generate cryptographically secure token
      */
     generateToken: function () {
-        return 'demo_' + Math.random().toString(36).substr(2) + Date.now().toString(36);
+        const bytes = new Uint8Array(32);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
     },
 
     /**
@@ -768,7 +770,7 @@ const AuthManager = {
                         <div class="logo-area">
                             ${cbLogo
                 ? '<img src="' + cbLogo + '" alt="Logo">'
-                : '<div class="fallback-icon"><i class="fa-solid fa-certificate"></i></div>'
+                : '<img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 56px; object-fit: contain;">'
             }
                             <h2>${window.UTILS?.escapeHtml?.(cbName) || cbName}</h2>
                             <p>Sign in to your account</p>
@@ -855,7 +857,7 @@ const AuthManager = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.AuthManager = AuthManager;
 
 // Auto-initialize on load
@@ -866,3 +868,8 @@ if (document.readyState === 'loading') {
 }
 
 Logger.info('AuthManager module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AuthManager;
+}
