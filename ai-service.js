@@ -1,5 +1,5 @@
 // ============================================
-// AI SERVICE MODULE (GEMINI INTEGRATION)
+// AI SERVICE MODULE (GEMINI INTEGRATION) (ESM-ready)
 // ============================================
 
 // ============================================
@@ -553,6 +553,19 @@ Return a raw JSON array with 'id' and 'text' fields only:
             if (parts.length > 0) openingMeetingContext = `\nOpening Meeting:\n${parts.join('\n')}\n`;
         }
 
+        // Get Audit Plan Objectives, Criteria, Methodology context
+        let planScopeContext = '';
+        if (reportData.planId && window.state?.auditPlans) {
+            const plan = window.state.auditPlans.find(p => String(p.id) === String(reportData.planId));
+            if (plan) {
+                const parts = [];
+                if (plan.auditObjectives) parts.push(`Audit Objectives:\n${plan.auditObjectives}`);
+                if (plan.auditCriteria) parts.push(`Audit Criteria:\n${plan.auditCriteria}`);
+                if (plan.auditMethodology) parts.push(`Audit Methodology:\n${plan.auditMethodology}`);
+                if (parts.length > 0) planScopeContext = `\n${parts.join('\n\n')}\n`;
+            }
+        }
+
         const prompt = `
 You are a Senior Lead Auditor with over 30 years of experience at a top-tier international Certification Body (e.g., BSI, Bureau Veritas, DNV, TÜV, SGS). Write an Executive Summary, Positive Observations, and Opportunities for Improvement for a formal Audit Report that will be submitted to the client. Your writing must reflect the authority, precision, and measured judgment of a seasoned CB professional. The report will be reviewed and attested by a Qualified Registrar before client submission.
 
@@ -565,6 +578,7 @@ Context:
 - Compliant Clauses/Areas: ${areaText}
 ${orgPlanContext}
 ${openingMeetingContext}
+${planScopeContext}
 ${kbContext ? `
 Standard Requirements (from Knowledge Base):
 ${kbContext}
@@ -573,8 +587,14 @@ ${obsText ? `
 Audit Observations & OFI Findings (from checklist):
 ${obsText}
 ` : ''}
+CRITICAL RULES — CCI Gold Standard:
+- Do NOT use percentage scoring or compliance percentages anywhere in the report
+- Do NOT mix clauses across different standards — if multiple standards are audited, keep them clearly separated
+- Use legally defensible, accreditation-ready language suitable for external review by an accreditation body
+- The report must follow ISO 17021 certification body reporting requirements
+
 Instructions:
-1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}) and observations/OFIs (${obsCount}) raised. Conclude with the audit team's overall impression of the management system's maturity and effectiveness. Use language that reflects 30+ years of assessment experience — measured, precise, and professional.
+1. Executive Summary: Write a comprehensive, authoritative paragraph (150-250 words) summarizing the audit scope, methodology, and overall conclusion. Open with the audit context (type, standard, dates). ${planScopeContext ? 'Reference the stated audit objectives and methodology from the audit plan.' : ''} Briefly reference the opening meeting (attendees, date). State the overall assessment outcome, mentioning the number of non-conformities (${ncCount}) and observations/OFIs (${obsCount}) raised. Conclude with the audit team's overall impression of the management system's maturity and effectiveness. Use language that reflects 30+ years of assessment experience — measured, precise, and professional.
 2. Positive Observations: Based on the "Compliant Clauses/Areas" listed above${kbContext ? ' and the standard requirements from the Knowledge Base,' : ','} generate 4-6 specific positive observations. Each must reference the specific clause number and title (e.g. "Clause 5.1 Leadership and commitment"). Describe the specific objective evidence of effective implementation observed. Use authoritative language (e.g., "The audit team confirmed that the organization has established a well-embedded approach to...", "Through examination of records and interviews, the assessment confirmed mature implementation of..."). Do NOT use markdown formatting. Each observation MUST be on its own numbered line (1. 2. 3. etc).
 3. OFI: ${obsText ? 'Based on the "Audit Observations & OFI Findings" listed above, write specific, actionable opportunities for improvement that reference the actual observations raised during the audit. Include the relevant clause numbers and reference specific documents, procedures, or records where improvement is recommended.' : 'Write a list of specific, actionable opportunities for improvement referencing relevant clause requirements.'} Use measured, constructive improvement language befitting a senior auditor (e.g., "The organization would benefit from further developing...", "The audit team recommends consideration of...", "To further enhance the maturity of the management system, the organization may consider..."). These are NOT non-conformities.
 
@@ -753,11 +773,14 @@ Example:
             // Try direct API call
             for (const model of models) {
                 try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
                     const response = await fetch(url, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-goog-api-key': apiKey
+                        },
                         body: JSON.stringify({
                             contents: [{ parts: [{ text: prompt }] }]
                         })
@@ -912,7 +935,7 @@ Example:
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.AI_SERVICE = AI_SERVICE;
 
 // ============================================
@@ -1117,3 +1140,8 @@ window.runAutoSummary = async function (reportId) {
         btn.disabled = false;
     }
 };
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AI_SERVICE;
+}
