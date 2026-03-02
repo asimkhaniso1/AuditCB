@@ -2647,22 +2647,26 @@ window.navigateToAuditExecution = function (planId) {
         window.showNotification('Audit started! Loading checklist...', 'success');
     }
 
+    // Helper: wait for renderExecutionDetail to be available then call it
+    const reportIdStr = String(report.id);
+    const callWhenReady = (attempt) => {
+        if (typeof window.renderExecutionDetail === 'function') {
+            window.renderExecutionDetail(reportIdStr);
+        } else if (attempt < 10) {
+            setTimeout(() => callWhenReady(attempt + 1), 300);
+        } else {
+            window.showNotification('Execution module not loaded after retries. Please refresh the page.', 'error');
+        }
+    };
+
     // Switch to execution tab if available (global view)
     const tab = document.querySelector('[data-module="audit-execution"]');
     if (tab) {
         tab.click();
-        setTimeout(() => {
-            if (window.renderExecutionDetail) {
-                window.renderExecutionDetail(String(report.id));
-            }
-        }, 200);
+        setTimeout(() => callWhenReady(0), 200);
     } else {
-        // Client workspace context — render directly
-        if (window.renderExecutionDetail) {
-            window.renderExecutionDetail(String(report.id));
-        } else {
-            window.showNotification('Execution module not loaded. Please refresh the page.', 'error');
-        }
+        // Client workspace context — render directly (with retry)
+        callWhenReady(0);
     }
 };
 

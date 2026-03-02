@@ -175,8 +175,24 @@
             if (tryObjectMethod(action, actionTarget, args3)) return;
 
             if (window.Logger) {
-                window.Logger.warn('EventDelegator', 'Unknown action: ' + action);
+                window.Logger.warn('EventDelegator', 'Unknown action: ' + action + ' — will retry in 500ms (deferred script may still be loading)');
             }
+            // Retry once after delay — deferred scripts may not have loaded yet
+            setTimeout(function() {
+                let retryFn = window[action];
+                if (typeof retryFn === 'function') {
+                    let retryArgs = extractArgs(actionTarget);
+                    if (retryArgs.length > 0) {
+                        retryFn.apply(null, retryArgs);
+                    } else {
+                        retryFn.call(actionTarget, actionTarget, actionTarget.dataset, e);
+                    }
+                } else if (tryObjectMethod(action, actionTarget, extractArgs(actionTarget))) {
+                    // resolved via object.method pattern
+                } else {
+                    if (window.Logger) window.Logger.error('EventDelegator', 'Action still not found after retry: ' + action);
+                }
+            }, 500);
             return;
         }
     });
