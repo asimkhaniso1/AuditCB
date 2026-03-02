@@ -10,7 +10,7 @@
     <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com;
+        script-src 'self' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://browser.sentry-cdn.com;
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
         img-src 'self' data: https: blob:;
@@ -22,7 +22,8 @@
         form-action 'self';
     ">
 
-    <title>AuditCB360 – ISO CB Auditor & Audit Management</title>
+    <title>Audit360 – ISO CB Auditor & Audit Management</title>
+    <link rel="icon" type="image/jpeg" href="./Audit360-logo.jpeg">
     <meta name="description"
         content="Manage ISO Certification Body operations including clients, auditors, audits, and certification decisions.">
     <meta name="theme-color" content="#0f172a">
@@ -73,8 +74,7 @@
         <!-- LEFT SIDEBAR: CB-Level Functions -->
         <aside class="sidebar" id="sidebar">
             <div class="logo-container" id="cb-logo-display" data-hash="dashboard" style="cursor: pointer;">
-                <i class="fa-solid fa-certificate"></i>
-                <h1>AuditCB360</h1>
+                <img src="./Audit360-logo.jpeg" alt="Audit360" style="max-height: 40px; max-width: 180px; object-fit: contain;">
             </div>
             <nav class="main-nav" role="navigation" aria-label="Main navigation">
                 <ul>
@@ -237,6 +237,10 @@
     <script src="./safe-dom.js?v=16.3_FINAL"></script>
     <script src="./utils.js?v=16.3_FINAL"></script>
     <script src="./sanitization.js?v=16.3_FINAL"></script>
+    <!-- Sentry Error Monitoring (loads early to capture init errors) -->
+    <script src="https://browser.sentry-cdn.com/8.34.0/bundle.min.js" crossorigin="anonymous" defer></script>
+    <script src="./sentry-init.js?v=21.0_MONITORING" defer></script>
+
     <script src="./constants.js?v=16.3_FINAL"></script>
     <script src="./debounce.js?v=16.3_FINAL"></script>
 
@@ -266,12 +270,15 @@
     <script src="./api-usage-tracker.js?v=17.2_PRICING" defer></script>
     <script src="./ai-service.js?v=17.7_SENIOR_TONE" defer></script>
     <script src="./execution-tab-helpers.js?v=17.0_CLAUSE_DATA" defer></script>
+    <script src="./execution-list.js?v=21.0_SPLIT" defer></script>
     <script src="./execution-module-v2.js?v=20.9_COLLAPSE_FIX" defer></script>
     <!-- REMOVED: reporting-module.js - merged into execution-module.js -->
     <script src="./enhancements.js?v=18.0_DATE_PASTE" defer></script>
     <script src="./dashboard-module.js?v=17.2_ENHANCED_KPI" defer></script>
+    <script src="./clients-crud.js?v=21.0_SPLIT" defer></script>
+    <script src="./clients-import.js?v=21.0_SPLIT" defer></script>
     <script src="./clients-module.js?v=19.0_DATE_TEXT" defer></script>
-    <script src="./clients-module-fix.js?v=18.0_TABLE_STYLE" defer></script>
+    <script src="./clients-org-setup.js?v=21.0_RENAME" defer></script>
     <script src="./clients-list-v16.js?v=16.3_FINAL" defer></script>
     <script src="./clients-detail.js?v=16.3_FINAL" defer></script>
     <script src="./clients-modals.js?v=16.3_FINAL" defer></script>
@@ -285,6 +292,8 @@
     <script src="./management-review-module.js?v=16.3_FINAL" defer></script>
     <script src="./record-retention-module.js?v=16.3_FINAL" defer></script>
     <script src="./ncr-capa-module.js?v=16.4_FK_FIX" defer></script>
+    <script src="./settings-users.js?v=21.0_SPLIT" defer></script>
+    <script src="./settings-kb.js?v=21.0_SPLIT" defer></script>
     <script src="./settings-module.js?v=19.0_GAPFILL" defer></script>
     <script src="./settings-system-defaults.js?v=16.3_FINAL" defer></script>
     <script src="./audit-trail-module.js?v=16.3_FINAL" defer></script>

@@ -14,6 +14,13 @@
 // normalizeStdName, extractClauseNum, lookupKBRequirement, resolveChecklistClause,
 // resolveStandardName are all available via window.KB_HELPERS.*
 
+// EARLY EXPORTS: Set immediately using function hoisting (functions defined below are hoisted)
+try {
+    window.renderExecutionDetail = renderExecutionDetail;
+    window.deleteAuditReport = deleteAuditReport;
+    window.openEditReportModal = openEditReportModal;
+} catch(e) { console.warn('[execution-list] Early export failed:', e.message); }
+
 
 // Navigation Helper: Back to Execution List
 window.handleBackToExecutionList = function () {
@@ -534,7 +541,7 @@ function deleteAuditReport(reportId) {
     renderAuditExecutionEnhanced();
 }
 
-// Export functions for use in other modules (e.g., client-workspace.js)
+// Export functions — also set at top of file via hoisting for resilience
 window.renderExecutionDetail = renderExecutionDetail;
 window.deleteAuditReport = deleteAuditReport;
 window.openEditReportModal = openEditReportModal;
