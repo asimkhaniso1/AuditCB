@@ -1,5 +1,5 @@
 // ============================================
-// AUDIT PLANNING MODULE
+// AUDIT PLANNING MODULE (ESM-ready)
 // ============================================
 
 function renderAuditPlanningEnhanced() {
@@ -398,6 +398,38 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             </div>
                         </div>
 
+                        <!-- Card: Audit Scope & Methodology -->
+                        <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid #0891b2;">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #0891b2;">
+                                <i class="fa-solid fa-bullseye"></i> Audit Objectives, Criteria & Methodology
+                            </h3>
+                            
+                            <div style="display: grid; gap: 1rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Objectives</label>
+                                    <textarea class="form-control" id="plan-objectives" rows="4" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Define audit objectives...">• Determine conformity of the management system with audit criteria
+• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements
+• Evaluate the effectiveness of the management system in meeting its specified objectives
+• Identify areas for potential improvement of the management system</textarea>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Criteria</label>
+                                    <textarea class="form-control" id="plan-criteria" rows="3" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Define audit criteria...">• Applicable ISO management system standard(s) as stated above
+• Organization's management system documentation (manuals, procedures, work instructions)
+• Applicable legal, statutory and regulatory requirements
+• Previous audit findings and corrective action records</textarea>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Methodology</label>
+                                    <textarea class="form-control" id="plan-methodology" rows="4" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Describe audit methodology...">• Risk-based sampling of processes, records, and documentation
+• Interviews with management and operational personnel at all levels
+• Observation of activities and work environment on-site
+• Review of documented information and objective evidence
+• Verification of corrective actions from previous audits</textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Card: Duration Calculation (SECOND) -->
                         <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid var(--primary-color);">
                             <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
@@ -570,6 +602,17 @@ function editAuditPlan(id) {
             plan.agenda.forEach(item => addAgendaRow(item));
         } else {
             addAgendaRow({ day: 'Day 1', time: '09:00 - 09:30', item: 'Opening Meeting', dept: 'Top Management', auditor: 'All' });
+        }
+
+        // Fill Audit Objectives, Criteria & Methodology
+        if (plan.auditObjectives && document.getElementById('plan-objectives')) {
+            document.getElementById('plan-objectives').value = plan.auditObjectives;
+        }
+        if (plan.auditCriteria && document.getElementById('plan-criteria')) {
+            document.getElementById('plan-criteria').value = plan.auditCriteria;
+        }
+        if (plan.auditMethodology && document.getElementById('plan-methodology')) {
+            document.getElementById('plan-methodology').value = plan.auditMethodology;
         }
 
     }, 100);
@@ -1020,6 +1063,27 @@ function viewAuditPlan(id) {
                                     </div>
                             `).join('')}
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Objectives, Criteria & Methodology -->
+            <div class="card" style="margin: 0 0 1.5rem 0; border-top: 4px solid #0891b2;">
+                <h4 style="margin-top: 0; margin-bottom: 1rem; color: #0891b2; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">
+                    <i class="fa-solid fa-bullseye" style="margin-right: 0.5rem;"></i> Audit Objectives, Criteria & Methodology
+                </h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Objectives</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Criteria</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.auditCriteria || '• ' + (plan.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Methodology</div>
+                        <div style="font-size: 0.85rem; color: #334155; white-space: pre-line; line-height: 1.7; background: #f8fafc; padding: 0.75rem; border-radius: 6px; border: 1px solid #e2e8f0;">${plan.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment\n• Review of documented information and objective evidence'}</div>
                     </div>
                 </div>
             </div>
@@ -2100,15 +2164,22 @@ window.printAuditPlanDetails = function (planId) {
             ` : ''}
 
             <div class="section-title">AUDIT OBJECTIVES</div>
-            <ul style="margin-top: 0; padding-left: 20px; color: #333;">
-                <li>Determine conformity of the management system with audit criteria.</li>
-                <li>Evaluate the ability of the management system to ensure likely compliance with statutory, regulatory and contractual requirements.</li>
-                <li>Evaluate the effectiveness of the management system in meeting its specified objectives.</li>
-                <li>Identify areas for potential improvement.</li>
-            </ul>
+            <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
+${plan.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement'}
+            </div>
+
+            <div class="section-title">AUDIT CRITERIA</div>
+            <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
+${plan.auditCriteria || '• ' + (plan.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation (manuals, procedures, work instructions)\n• Applicable legal, statutory and regulatory requirements\n• Previous audit findings and corrective action records'}
+            </div>
+
+            <div class="section-title">AUDIT METHODOLOGY</div>
+            <div style="white-space: pre-line; color: #333; line-height: 1.8; padding-left: 10px;">
+${plan.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits'}
+            </div>
 
             <div class="footer">
-                Generated by AuditCB • ${new Date().toLocaleString()} • Page 1 of 1
+                Generated by Audit360 • ${new Date().toLocaleString()} • Page 1 of 1
             </div>
 
             <script>
@@ -2244,7 +2315,11 @@ function saveAuditPlan(shouldPrint = false) {
             notes: impartialityNotes,
             assessedBy: window.state.currentUser?.name || 'System',
             assessedDate: new Date().toISOString().split('T')[0]
-        }
+        },
+        // Audit Objectives, Criteria & Methodology (ISO 17021-1)
+        auditObjectives: document.getElementById('plan-objectives')?.value || '',
+        auditCriteria: document.getElementById('plan-criteria')?.value || '',
+        auditMethodology: document.getElementById('plan-methodology')?.value || ''
     };
 
     // 7. Save to Supabase (CRITICAL FIX: Database Persistence)
@@ -3250,3 +3325,8 @@ window._goToKB = function () {
         if (kbTab) kbTab.click();
     }, 400);
 };
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { printAuditChecklist, closeAuditPlan, bulkSelectConfigItems, editConfigItemRequirement, reviewMergedQuestions, renderAuditPlanningEnhanced, autoCalculateDays, updateClientDetails, addAgendaRow, saveAuditPlan, editAuditPlan, viewAuditPlan, printAuditPlanDetails, onload, generateAIAgenda, deleteAgendaRow, togglePlanningAnalytics, renderCreateAuditPlanForm, navigateToAuditExecution, navigateToReporting, calculateSampling, renderMultiSiteSamplingCalculator, renderPreAuditReview, updatePreAuditItem, updatePreAuditNotes, updateReadinessDecision, updateReadinessNotes, savePreAuditReview, completePreAuditReview, exportPreAuditPDF, _goToKB };
+}

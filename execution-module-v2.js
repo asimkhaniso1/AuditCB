@@ -1,871 +1,12 @@
 // ============================================
-// AUDIT EXECUTION MODULE - Enhanced with Tabs
+// AUDIT EXECUTION MODULE - Enhanced with Tabs (ESM-ready)
 // ============================================
+// List view, report CRUD, and detail view => Extracted to execution-list.js
 
 // ---------- KB Helpers loaded from ai-service.js (window.KB_HELPERS) ----------
 // normalizeStdName, extractClauseNum, lookupKBRequirement, resolveChecklistClause,
 // resolveStandardName are all available via window.KB_HELPERS.*
 
-
-// Navigation Helper: Back to Execution List
-window.handleBackToExecutionList = function () {
-    if (window.state.activeClientId) {
-        // Force navigation to client execution view
-        const currentHash = window.location.hash;
-        const targetHash = '#client/' + window.state.activeClientId + '/execution';
-
-        // If already on the target hash, force a reload by going through temp hash
-        if (currentHash === targetHash || currentHash.startsWith(targetHash)) {
-            window.location.hash = '#temp-redirect';
-            setTimeout(() => {
-                window.location.hash = targetHash.substring(1); // Remove leading #
-            }, 10);
-        } else {
-            window.location.hash = targetHash.substring(1);
-        }
-    } else {
-        // Global context - just render the list
-        renderAuditExecutionEnhanced();
-    }
-};
-
-function renderAuditExecutionEnhanced() {
-    const state = window.state;
-    // Safety Check: Ensure state exists
-    if (!state) {
-        console.error('Critical Error: window.state is undefined in execution module');
-        return;
-    }
-
-    // Initialize auditReports if missing
-    if (!state.auditReports) {
-        state.auditReports = [];
-    }
-
-    // Initialize clients if missing (prevent crash in map)
-    if (!state.clients) {
-        state.clients = [];
-    }
-
-    const searchTerm = state.executionSearchTerm || '';
-
-    try {
-
-        let filteredReports = state.auditReports.filter(report => {
-            return (report.client || '').toLowerCase().includes(searchTerm.toLowerCase());
-        });
-
-        const rows = filteredReports.map(report => {
-            const planRef = report.planId ? window.UTILS.getPlanRef(report.planId) : '-';
-            const clientId = state.clients.find(c => c.name === report.client)?.id;
-
-            return `
-        <tr class="execution-row" data-report-id="${report.id}" style="cursor: pointer;">
-            <td>
-                ${report.planId ?
-                    `<span class="badge" style="background: #3b82f6; color: white; cursor: pointer; font-weight: 600;" 
-                           data-hash="client/${clientId}/plans" data-stop-prop="true" 
-                           title="View linked audit plan">
-                        <i class="fa-solid fa-link" style="margin-right: 0.25rem;"></i>${planRef}
-                    </span>` :
-                    `<span style="color: var(--text-secondary); font-size: 0.85rem;">No Plan</span>`
-                }
-            </td>
-            <td>${report.client}</td>
-            <td>${window.UTILS.formatDate(report.date)}</td>
-            <td><span style="background: ${report.findings > 0 ? 'var(--danger-color)' : 'var(--success-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.findings}</span></td>
-            <td><span style="background: ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'var(--success-color)' :
-                    report.status === 'Approved' ? '#7c3aed' :
-                        report.status === 'In Review' ? 'var(--warning-color)' :
-                            '#64748b'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${report.status}</span></td>
-            <td>
-                <button class="btn btn-sm view-execution" data-report-id="${report.id}" style="color: var(--primary-color); margin-right: 0.5rem;" title="View Report" aria-label="View"><i class="fa-solid fa-eye"></i></button>
-                <button class="btn btn-sm edit-execution" data-report-id="${report.id}" style="color: #f59e0b; margin-right: 0.5rem;" title="Edit Report" aria-label="Edit"><i class="fa-solid fa-edit"></i></button>
-                <button class="btn btn-sm delete-execution" data-report-id="${report.id}" style="color: var(--danger-color);" title="Delete Report" aria-label="Delete"><i class="fa-solid fa-trash"></i></button>
-            </td>
-        </tr>
-    `;
-        }).join('');
-
-        const html = `
-        <div class="fade-in">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2 style="margin: 0;">Audit Execution & Reports</h2>
-                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="btn btn-sm btn-outline-secondary" data-action="toggleExecutionAnalytics" style="white-space: nowrap;">
-                        <i class="fa-solid ${state.showExecutionAnalytics !== false ? 'fa-chart-simple' : 'fa-chart-line'}" style="margin-right: 0.5rem;"></i>${state.showExecutionAnalytics !== false ? 'Hide Analytics' : 'Show Analytics'}
-                    </button>
-                    <button class="btn btn-primary" data-action="openCreateReportModal">
-                        <i class="fa-solid fa-play" style="margin-right: 0.5rem;"></i> Start Audit Execution
-                    </button>
-                </div>
-            </div>
-
-            ${state.showExecutionAnalytics !== false ? `
-             <div class="fade-in" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                <!-- Total Reports -->
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-file-contract"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Reports</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditReports.length}</div>
-                    </div>
-                </div>
-
-                <!-- Pending Closure -->
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">In Progress</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditReports.filter(r => r.status !== window.CONSTANTS.STATUS.FINALIZED).length}</div>
-                    </div>
-                </div>
-
-                 <!-- Total Findings -->
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Findings</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${state.auditReports.reduce((acc, r) => acc + (r.findings || 0), 0)}</div>
-                    </div>
-                </div>
-                
-                 <!-- Avg Findings -->
-                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fefce8; color: #ca8a04; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        <i class="fa-solid fa-chart-pie"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Avg per Audit</div>
-                        <div style="font-size: 1.5rem; font-weight: bold;">${(state.auditReports.reduce((acc, r) => acc + (r.findings || 0), 0) / (state.auditReports.length || 1)).toFixed(1)}</div>
-                    </div>
-                </div>
-            </div>
-            ` : ''}
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
-                <div style="display: flex; gap: 1rem; flex: 1;">
-                    <input type="text" id="execution-search" placeholder="Search by client..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
-                </div>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Plan Ref</th>
-                            <th>Client</th>
-                            <th>Audit Date</th>
-                            <th>Findings (NCs)</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows || '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No reports found</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
-        window.contentArea.innerHTML = html;
-
-        // Event listeners with EventManager (prevents memory leaks)
-        const searchInput = document.getElementById('execution-search');
-        if (searchInput) {
-            // Debounced search handler (300ms delay)
-            const debouncedSearch = debounce((value) => {
-                state.executionSearchTerm = value;
-                renderAuditExecutionEnhanced();
-            }, 300);
-
-            EventManager.add(searchInput, 'input', (e) => {
-                debouncedSearch(e.target.value);
-            }, 'execution-search-input');
-        }
-
-        document.querySelectorAll('.view-execution, .execution-row').forEach(el => {
-            el.addEventListener('click', (e) => {
-                if (!e.target.closest('.edit-execution')) {
-                    const reportId = el.getAttribute('data-report-id');
-                    renderExecutionDetail(reportId);
-                }
-            });
-        });
-
-        document.querySelectorAll('.edit-execution').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const reportId = btn.getAttribute('data-report-id');
-                openEditReportModal(reportId);
-            });
-        });
-
-        document.querySelectorAll('.delete-execution').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const reportId = btn.getAttribute('data-report-id');
-                deleteAuditReport(reportId);
-            });
-        });
-
-
-
-        // Helper for toggle
-        window.toggleExecutionAnalytics = function () {
-            if (state.showExecutionAnalytics === undefined) state.showExecutionAnalytics = true;
-            state.showExecutionAnalytics = !state.showExecutionAnalytics;
-            renderAuditExecutionEnhanced();
-        };
-    } catch (error) {
-        console.error('Error rendering execution module:', error);
-        if (window.ErrorHandler) {
-            window.ErrorHandler.handle(error, 'Render Execution Module', true);
-        }
-        if (window.contentArea) {
-            window.contentArea.innerHTML = '<div class="alert alert-danger" style="padding: 2rem; text-align: center; color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 1rem;"></i><br>Failed to load execution module. Please refresh the page.</div>';
-        }
-    }
-}
-
-function openCreateReportModal() {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-    // Filter out plans that already have a report OR are marked Completed
-    const allOpenPlans = state.auditPlans.filter(p => !p.reportId && p.status !== 'Completed');
-    allOpenPlans.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
-
-    // Helpers exposed for HTML interaction
-    window.selectAuditPlan = (id) => {
-        const plan = state.auditPlans.find(p => p.id === id);
-        if (!plan) return;
-
-        document.getElementById('report-plan').value = id;
-        document.getElementById('report-date').value = plan.date;
-        document.getElementById('plan-display').textContent = `${window.UTILS.getPlanRef(plan)}: ${plan.client}`;
-        document.querySelectorAll('.select-plan-btn').forEach(b => {
-            b.className = 'btn btn-sm btn-outline-primary select-plan-btn';
-            b.textContent = 'Select';
-        });
-        const btn = event.target; // Captured from onclick
-        if (btn) {
-            btn.className = 'btn btn-sm btn-success select-plan-btn';
-            btn.textContent = 'Selected';
-        }
-        document.getElementById('confirm-section').style.display = 'block';
-    };
-
-    window.filterAuditPlansStart = (clientName) => {
-        const filtered = clientName ? allOpenPlans.filter(p => p.client === clientName) : allOpenPlans;
-        document.getElementById('plan-list-tbody').innerHTML = renderTableLines(filtered);
-    };
-
-    const renderTableLines = (plans) => {
-        if (plans.length === 0) return '<tr><td colspan="5" style="padding:1rem; text-align:center; color:#999;">No open plans found for selected criteria.</td></tr>';
-        return plans.map(p => `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 8px; font-weight: 600;">${window.UTILS.getPlanRef(p)}</td>
-                <td style="padding: 8px;">${window.UTILS.escapeHtml(p.client)}</td>
-                <td style="padding: 8px;">${window.UTILS.escapeHtml(p.standard)}</td>
-                <td style="padding: 8px;">${window.UTILS.escapeHtml(p.date)}</td>
-                <td style="padding: 8px; text-align: center;">
-                    <button class="btn btn-sm btn-outline-primary select-plan-btn" 
-                        data-action="selectAuditPlan" data-id="${p.id}">
-                        Select
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    };
-
-    const activeClient = window.state.activeClientId ? state.clients.find(c => c.id === window.state.activeClientId) : null;
-    const initialClientName = activeClient ? activeClient.name : '';
-
-    modalBody.innerHTML = `
-        <div style="margin-bottom: 1rem;">
-            <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filter by Company:</label>
-            <select class="form-control" id="start-audit-client-filter" data-action-change="filterAuditPlansStart" data-id="this.value" style="margin-bottom: 1rem; border-color: var(--primary-color);" ${activeClient ? 'disabled' : ''}>
-                <option value="">-- All Companies with Open Plans --</option>
-                ${uniqueClients.map(c => `<option value="${c}" ${c === initialClientName ? 'selected' : ''}>${c}</option>`).join('')}
-            </select>
-
-            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                    <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 1;">
-                        <tr>
-                            <th style="padding: 8px; text-align: left;">Ref</th>
-                            <th style="padding: 8px; text-align: left;">Client</th>
-                            <th style="padding: 8px; text-align: left;">Standard</th>
-                            <th style="padding: 8px; text-align: left;">Date</th>
-                            <th style="padding: 8px;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="plan-list-tbody">
-                        ${renderTableLines(allOpenPlans)}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <div id="confirm-section" style="display: none; border-top: 1px solid #e2e8f0; padding-top: 1rem; animation: fadeIn 0.3s;">
-            <div style="background: #f0fdf4; padding: 0.75rem; border-radius: 6px; border: 1px solid #bbf7d0; margin-bottom: 1rem;">
-                <i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i> Ready to start audit for <strong id="plan-display"></strong>
-            </div>
-            
-            <input type="hidden" id="report-plan">
-            
-            <div class="form-group">
-                <label>Confirm Execution Date</label>
-                <input type="date" class="form-control" id="report-date" required>
-            </div>
-            
-            <div class="form-group">
-                 <label>Initial Status</label>
-                 <select class="form-control" id="report-status">
-                    <option>${window.CONSTANTS.STATUS.IN_PROGRESS}</option>
-                    <option>${window.CONSTANTS.STATUS.DRAFT}</option>
-                </select>
-            </div>
-        </div>
-    `;
-    window.openModal();
-
-    // Auto-filter if in client context
-    if (initialClientName) {
-        window.filterAuditPlansStart(initialClientName);
-    }
-
-    // Update button text to 'Start Audit'
-    document.getElementById('modal-save').textContent = 'Start Audit';
-
-    modalSave.onclick = () => {
-        const planId = document.getElementById('report-plan').value;
-        const date = document.getElementById('report-date').value;
-        const status = document.getElementById('report-status')?.value || window.CONSTANTS.STATUS.IN_PROGRESS;
-
-        if (planId && date) {
-            const plan = state.auditPlans.find(p => String(p.id) === String(planId));
-            const newReport = {
-                id: String(Date.now()),
-                planId: String(plan.id), // Link to plan
-                client: plan.client,
-                date: date,
-                findings: 0,
-                status: status
-            };
-
-            if (!state.auditReports) state.auditReports = [];
-
-            // Check if report already exists for this plan
-            const existingReport = state.auditReports.find(r => String(r.planId) === String(planId));
-            if (existingReport) {
-                window.showNotification('Report already exists for this plan. Opening existing report.', 'info');
-                // Ensure plan is linked
-                if (!plan.reportId) {
-                    plan.reportId = existingReport.id;
-                    plan.status = 'Completed';
-                    window.saveData();
-                }
-                window.closeModal();
-                renderAuditExecutionEnhanced();
-                return;
-            }
-
-            state.auditReports.push(newReport);
-
-            // Mark plan as executed
-            plan.reportId = String(newReport.id);
-            plan.status = 'Completed'; // Optional: Mark plan as completed/executed
-
-            window.saveData();
-            window.closeModal();
-            renderAuditExecutionEnhanced();
-            window.showNotification('Audit Initiated! Checklist loaded from Plan.', 'success');
-
-            // Persist to Cloud
-            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-                // 1. Insert Report
-                window.SupabaseClient.db.insert('audit_reports', {
-                    id: String(newReport.id),  // DB uses TEXT for id
-                    plan_id: String(plan.id),
-                    client_name: newReport.client,  // DB column is client_name
-                    client_id: plan.clientId || null,
-                    date: newReport.date,
-                    status: newReport.status,
-                    findings: 0,
-                    data: newReport
-                }).catch(err => console.error('Failed to insert report to cloud:', err));
-
-                // 2. Update Plan
-                window.SupabaseClient.db.update('audit_plans', String(plan.id), {
-                    report_id: String(newReport.id),
-                    status: 'Completed'
-                }).catch(err => console.error('Failed to update plan in cloud:', err));
-            }
-        } else {
-            window.showNotification('Please select an Audit Plan from the list', 'error');
-        }
-    };
-}
-
-
-function openEditReportModal(reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
-
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Edit Report Basic Info';
-    modalBody.innerHTML = `
-        <form id="report-form">
-            <div class="form-group">
-                <label>Client</label>
-                <input type="text" class="form-control" value="${window.UTILS.escapeHtml(report.client)}" disabled>
-            </div>
-            <div class="form-group">
-                <label>Audit Date</label>
-                <input type="date" class="form-control" id="report-date" value="${report.date}" required>
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <select class="form-control" id="report-status">
-                    <option ${report.status === window.CONSTANTS.STATUS.IN_PROGRESS ? 'selected' : ''}>${window.CONSTANTS.STATUS.IN_PROGRESS}</option>
-                    <option ${report.status === window.CONSTANTS.STATUS.DRAFT ? 'selected' : ''}>${window.CONSTANTS.STATUS.DRAFT}</option>
-                    <option ${report.status === window.CONSTANTS.STATUS.FINALIZED ? 'selected' : ''}>${window.CONSTANTS.STATUS.FINALIZED}</option>
-                </select>
-            </div>
-        </form>
-    `;
-
-    window.openModal();
-
-    modalSave.onclick = () => {
-        const date = document.getElementById('report-date').value;
-        const status = document.getElementById('report-status').value;
-
-        if (date) {
-            report.date = date;
-            report.status = status;
-
-            window.saveData();
-            window.closeModal();
-            renderAuditExecutionEnhanced();
-            window.showNotification('Report info updated successfully');
-        }
-    };
-}
-
-function deleteAuditReport(reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) {
-        window.showNotification('Report not found', 'error');
-        return;
-    }
-
-    // Confirm deletion
-    const clientName = report.client || 'Unknown Client';
-    const reportDate = report.date || 'N/A';
-
-    if (!confirm(`Are you sure you want to delete this audit report?\n\nClient: ${clientName}\nDate: ${reportDate}\n\nThis action cannot be undone.`)) {
-        return;
-    }
-
-    // Find and update the related audit plan
-    const relatedPlan = state.auditPlans.find(p => String(p.reportId) === String(reportId));
-    if (relatedPlan) {
-        relatedPlan.reportId = null;
-        relatedPlan.status = 'Scheduled'; // Reset to scheduled
-    }
-
-    // Remove from state
-    const index = state.auditReports.findIndex(r => String(r.id) === String(reportId));
-    if (index > -1) {
-        state.auditReports.splice(index, 1);
-    }
-
-    // Save to local storage
-    window.saveData();
-
-    // Delete from Supabase if online
-    if (window.navigator.onLine && window.SupabaseClient && window.SupabaseClient.isInitialized) {
-        (async () => {
-            try {
-                // Delete the report
-                await window.SupabaseClient.db.delete('audit_reports', String(reportId));
-
-                // Update the plan if exists
-                if (relatedPlan) {
-                    await window.SupabaseClient.db.update('audit_plans', String(relatedPlan.id), {
-                        report_id: null,
-                        status: 'Scheduled'
-                    });
-                }
-
-                window.showNotification('Audit report deleted successfully', 'success');
-            } catch (error) {
-                console.error('Failed to delete from database:', error);
-                window.showNotification('Report deleted locally, but cloud sync failed', 'warning');
-            }
-        })();
-    } else {
-        window.showNotification('Audit report deleted (local only - offline)', 'success');
-    }
-
-    // Refresh the view
-    renderAuditExecutionEnhanced();
-}
-
-// Export functions for use in other modules (e.g., client-workspace.js)
-window.deleteAuditReport = deleteAuditReport;
-window.openEditReportModal = openEditReportModal;
-
-/**
- * Reconstruct a checklist template from saved checklistProgress data.
- * Used when the original checklist template is lost from both local and cloud storage.
- */
-function _reconstructChecklistFromProgress(report, planChecklistIds, plan) {
-    const progress = report.checklistProgress || [];
-    if (progress.length === 0) {
-        console.warn('[Execution] No checklistProgress data to reconstruct from.');
-        return;
-    }
-
-    // Group progress items by checklistId
-    const groupedById = {};
-    progress.forEach(item => {
-        if (item.isCustom) return; // Skip custom items
-        const clId = String(item.checklistId);
-        if (!groupedById[clId]) groupedById[clId] = [];
-        groupedById[clId].push(item);
-    });
-
-    const reconstructed = [];
-    Object.entries(groupedById).forEach(([clId, items]) => {
-        // Build hierarchical clause structure from progress items
-        const clauseGroups = {};
-        items.forEach(item => {
-            const clauseText = item.clause || '';
-            const mainClauseNum = clauseText.split('.')[0] || 'General';
-
-            if (!clauseGroups[mainClauseNum]) {
-                clauseGroups[mainClauseNum] = {
-                    mainClause: mainClauseNum,
-                    title: _getClauseTitle(mainClauseNum),
-                    subClauses: []
-                };
-            }
-            clauseGroups[mainClauseNum].subClauses.push({
-                clause: clauseText,
-                requirement: item.requirement || ''
-            });
-        });
-
-        const clauses = Object.values(clauseGroups).sort((a, b) => {
-            const na = parseFloat(a.mainClause) || 0;
-            const nb = parseFloat(b.mainClause) || 0;
-            return na - nb;
-        });
-
-        const checklist = {
-            id: clId,
-            name: `${plan?.standard || 'Audit'} Checklist (Recovered)`,
-            standard: plan?.standard || 'Unknown',
-            type: 'global',
-            clauses: clauses,
-            createdBy: 'System Recovery',
-            createdAt: new Date().toISOString().split('T')[0],
-            updatedAt: new Date().toISOString().split('T')[0],
-            _recovered: true
-        };
-
-        reconstructed.push(checklist);
-    });
-
-    if (reconstructed.length > 0) {
-        if (!state.checklists) state.checklists = [];
-        reconstructed.forEach(cl => {
-            // Don't duplicate if somehow already there
-            if (!state.checklists.some(c => String(c.id) === String(cl.id))) {
-                state.checklists.push(cl);
-            }
-        });
-        window.saveData();
-
-        // Also push recovered checklists to Supabase for persistence
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.syncChecklistsToSupabase(reconstructed)
-                .then(() => console.info('[Execution] Recovered checklists synced to Supabase.'))
-                .catch(err => console.warn('[Execution] Failed to sync recovered checklists:', err));
-        }
-
-        const totalItems = reconstructed.reduce((sum, cl) =>
-            sum + cl.clauses.reduce((s, c) => s + c.subClauses.length, 0), 0);
-        console.info(`[Execution] Reconstructed ${reconstructed.length} checklist(s) with ${totalItems} items from progress data.`);
-        window.showNotification?.(`Recovered ${reconstructed.length} checklist(s) from audit data`, 'success');
-
-        // Re-render with recovered checklists
-        const reportId = report.id;
-        setTimeout(() => renderExecutionDetail(reportId), 100);
-    }
-}
-
-function _getClauseTitle(clauseNum) {
-    const titles = {
-        '4': 'Context of the Organization', '5': 'Leadership', '6': 'Planning',
-        '7': 'Support', '8': 'Operation', '9': 'Performance Evaluation',
-        '10': 'Improvement', 'A': 'Annex A Controls', 'General': 'General Requirements'
-    };
-    return titles[clauseNum] || `Clause ${clauseNum}`;
-}
-
-function renderExecutionDetail(reportId) {
-    const report = state.auditReports.find(r => String(r.id) === String(reportId));
-    if (!report) return;
-
-    // Calculate Progress
-    // Calculate Progress
-    // Fetch Data & Calculate Progress
-    const plan = report.planId ? state.auditPlans.find(p => String(p.id) === String(report.planId)) : state.auditPlans.find(p => p.client === report.client);
-
-    // Fetch Client Departments & Designations
-    const clientData = state.clients.find(c => c.name === report.client);
-    const departments = clientData && clientData.departments && clientData.departments.length > 0
-        ? clientData.departments.map(d => d.name || d)
-        : ['Management', 'Production', 'Quality', 'Store', 'Maintenance', 'HR', 'Sales'];
-    // Collect designations from client designations + contact designations
-    const designations = Array.from(new Set([
-        ...((clientData && clientData.designations) || []).map(d => d.title || d),
-        ...((clientData && clientData.contacts) || []).map(c => c.designation).filter(Boolean)
-    ]));
-    // Collect audit team members
-    const auditTeam = [];
-    if (plan) {
-        if (plan.team && Array.isArray(plan.team)) {
-            plan.team.forEach((name, i) => auditTeam.push({ name, role: i === 0 ? 'Lead Auditor' : 'Team Auditor' }));
-        } else if (plan.auditors && Array.isArray(plan.auditors)) {
-            plan.auditors.forEach((id, i) => {
-                const a = (state.auditors || []).find(x => x.id === id);
-                if (a) auditTeam.push({ name: a.name, role: i === 0 ? 'Lead Auditor' : (a.role || 'Team Auditor') });
-            });
-        }
-        if (plan.lead && !auditTeam.some(a => a.name === plan.lead)) {
-            auditTeam.unshift({ name: plan.lead, role: 'Lead Auditor' });
-        }
-    }
-    // Client personnel for attendee picker
-    const clientPersonnel = ((clientData && clientData.contacts) || []).map(c => ({
-        name: c.name, role: c.designation || '', organization: clientData?.name || report.client
-    }));
-
-    const planChecklists = plan?.selectedChecklists || [];
-    const checklists = state.checklists || [];
-    const assignedChecklists = planChecklists.map(clId => checklists.find(c => String(c.id) === String(clId))).filter(c => c);
-
-    // Recovery: if plan has checklists but local state is missing them
-    if (assignedChecklists.length === 0 && planChecklists.length > 0) {
-        console.warn('[Execution] Missing checklists — plan IDs:', planChecklists, '| state has:', checklists.length);
-
-        // STRATEGY 1: Try Supabase recovery
-        if (window.SupabaseClient?.isInitialized && !window._checklistRecoveryAttempted) {
-            window._checklistRecoveryAttempted = true;
-            console.info('[Execution] Attempting checklist recovery from Supabase...');
-            window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
-                window._checklistRecoveryAttempted = false;
-                const recovered = (state.checklists || []).filter(c => planChecklists.includes(String(c.id)));
-                if (recovered.length > 0) {
-                    console.info('[Execution] Recovered', recovered.length, 'checklist(s) from Supabase.');
-                    renderExecutionDetail(reportId);
-                } else {
-                    // STRATEGY 2: Reconstruct from checklistProgress
-                    _reconstructChecklistFromProgress(report, planChecklists, plan);
-                }
-            }).catch(() => {
-                window._checklistRecoveryAttempted = false;
-                _reconstructChecklistFromProgress(report, planChecklists, plan);
-            });
-        } else if (!window._checklistRecoveryAttempted) {
-            // No Supabase — try direct reconstruction
-            _reconstructChecklistFromProgress(report, planChecklists, plan);
-        }
-    }
-    const customItems = report.customItems || [];
-
-    // Create lookup
-    const progressMap = {};
-    (report.checklistProgress || []).forEach(p => {
-        const key = p.isCustom ? `custom-${p.itemIdx}` : `${p.checklistId}-${p.itemIdx}`;
-        progressMap[key] = p;
-    });
-
-    // Calculate stats
-    const allItems = [];
-    const selectionMap = plan?.selectedChecklistItems || {};
-    const overridesMap = plan?.selectedChecklistOverrides || {};
-
-    assignedChecklists.forEach(cl => {
-        const allowedIds = selectionMap[cl.id]; // Array of strings/ints or undefined
-        const isSelective = Array.isArray(allowedIds) && allowedIds.length > 0;
-
-        if (cl.clauses) {
-            cl.clauses.forEach(clause => {
-                clause.subClauses.forEach((item, subIdx) => {
-                    const itemId = `${clause.mainClause}-${subIdx}`;
-                    // IF selective mode AND this ID is NOT in the list, skip it.
-                    if (isSelective && !allowedIds.includes(itemId)) {
-                        return;
-                    }
-
-                    allItems.push({ checklistId: cl.id, itemIdx: itemId });
-                });
-            });
-        } else {
-            (cl.items || []).forEach((item, idx) => {
-                const itemId = String(idx); // Standardize to string for comparison usually, but ID in UI was idx
-                // UI saved it as attribute, which is string.
-
-                if (isSelective && !allowedIds.map(String).includes(String(idx))) {
-                    return;
-                }
-                allItems.push({ checklistId: cl.id, itemIdx: idx });
-            });
-        }
-    });
-
-    customItems.forEach((item, idx) => {
-        allItems.push({ checklistId: 'custom', itemIdx: idx, isCustom: true });
-    });
-
-    const totalItems = allItems.length;
-    const conformCount = allItems.filter(item => {
-        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-        return progressMap[key]?.status === 'conform';
-    }).length;
-    const ncCount = allItems.filter(item => {
-        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-        return progressMap[key]?.status === 'nc';
-    }).length;
-    const naCount = allItems.filter(item => {
-        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-        return progressMap[key]?.status === 'na';
-    }).length;
-    const answeredCount = conformCount + ncCount + naCount;
-    const pendingCount = totalItems - answeredCount;
-    const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
-
-    // Sub-classify NC items: OBS/OFI vs actual NCs (Minor/Major)
-    const obsOfiCount = allItems.filter(item => {
-        const key = item.isCustom ? `custom-${item.itemIdx}` : `${item.checklistId}-${item.itemIdx}`;
-        const p = progressMap[key];
-        if (p?.status !== 'nc') return false;
-        const t = (p.ncrType || '').toLowerCase();
-        return t === 'observation' || t === 'ofi';
-    }).length;
-    const actualNCCount = ncCount - obsOfiCount;
-
-
-    const html = `
-        <div class="fade-in">
-            <div style="margin-bottom: 1.5rem;">
-                <button class="btn btn-secondary" data-action="handleBackToExecutionList" aria-label="Back">
-                    <i class="fa-solid fa-arrow-left" style="margin-right: 0.5rem;"></i> Back to Reports
-                </button>
-            </div>
-            
-            <div class="card" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <div>
-                        <h2 style="margin-bottom: 0.5rem;">Audit Execution: ${report.client}</h2>
-                        <p style="color: var(--text-secondary);">Audit Date: ${window.UTILS.formatDate(report.date)} | Status: ${report.status}</p>
-                    </div>
-                    <button class="btn btn-primary" data-action="generateAuditReport" data-id="${report.id}" aria-label="Export PDF">
-                        <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i> Generate Report
-                    </button>
-                </div>
-
-                    <!-- Progress Dashboard -->
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; margin-top: 1rem; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                        <div style="display: grid; grid-template-columns: 120px 1fr; gap: 2rem; align-items: center;">
-                            <!-- Progress Ring -->
-                            <div style="position: relative; width: 120px; height: 120px;">
-                                <svg class="progress-ring" width="120" height="120">
-                                    <circle class="progress-ring-circle" stroke="#ffffff33" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
-                                    <circle class="progress-ring-circle" stroke="#ffffff" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"
-                                        style="stroke-dasharray: ${2 * Math.PI * 52}; stroke-dashoffset: ${2 * Math.PI * 52 * (1 - progressPct / 100)}; stroke-linecap: round;"/>
-                                </svg>
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                                    <div style="font-size: 1.75rem; font-weight: bold;">${progressPct}%</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9;">Complete</div>
-                                </div>
-                            </div>
-                            
-                            <!-- Stats Grid -->
-                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
-                                <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${totalItems}</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Total Items</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(16, 185, 129, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${conformCount}</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Conformities</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(245, 158, 11, 0.35); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${obsOfiCount}</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">OBS / OFI</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(239, 68, 68, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${actualNCCount}</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">NC (Min/Maj)</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(156, 163, 175, 0.3); padding: 0.85rem 0.5rem; border-radius: 8px; backdrop-filter: blur(10px);">
-                                    <div style="font-size: 1.5rem; font-weight: bold;">${pendingCount}</div>
-                                    <div style="font-size: 0.7rem; opacity: 0.9; margin-top: 0.25rem;">Pending</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                
-
-            </div>
-
-            <div class="tab-container" style="border-bottom: 2px solid var(--border-color); margin-bottom: 1.5rem;">
-                <button class="tab-btn" data-tab="meetings" style="background: #eff6ff; color: #1d4ed8;">
-                    <i class="fa-solid fa-handshake" style="margin-right: 0.25rem;"></i>Meetings
-                </button>
-                <button class="tab-btn active" data-tab="checklist">Checklist</button>
-                <button class="tab-btn" data-tab="ncr">NCRs</button>
-                <button class="tab-btn" data-tab="capa">CAPA</button>
-                <button class="tab-btn" data-tab="review">
-                    <i class="fa-solid fa-clipboard-check" style="margin-right: 0.25rem;"></i> Review & Submit
-                </button>
-            </div>
-
-            <div id="tab-content"></div>
-        </div>
-    `;
-
-    window.contentArea.innerHTML = html;
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            renderExecutionTab(report, e.target.getAttribute('data-tab'), { assignedChecklists, progressMap, customItems, departments, designations, auditTeam, clientPersonnel, clientData, plan, selectionMap, overridesMap });
-        });
-    });
-
-    renderExecutionTab(report, 'checklist', { assignedChecklists, progressMap, customItems, departments, designations, auditTeam, clientPersonnel, clientData, plan, selectionMap, overridesMap });
-}
 
 function renderExecutionTab(report, tabName, contextData = {}) {
     const tabContent = document.getElementById('tab-content');
@@ -4005,6 +3146,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         const sections = [
             { id: 'audit-info', label: 'Audit Info', icon: 'fa-clipboard-list', color: '#2563eb' },
+            { id: 'objectives', label: 'Objectives & Methodology', icon: 'fa-bullseye', color: '#0891b2' },
             { id: 'summary', label: 'Summary', icon: 'fa-file-lines', color: '#059669' },
             { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
             { id: 'conformance', label: 'Conformance', icon: 'fa-circle-check', color: '#059669' },
@@ -4012,8 +3154,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             { id: 'ofi', label: 'OFI', icon: 'fa-lightbulb', color: '#06b6d4' },
             { id: 'findings', label: 'Findings', icon: 'fa-triangle-exclamation', color: '#dc2626' },
             { id: 'ncrs', label: 'NCRs', icon: 'fa-clipboard-check', color: '#ea580c' },
+            { id: 'corrective', label: 'Corrective Actions', icon: 'fa-wrench', color: '#be185d' },
             { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
-            { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' }
+            { id: 'changes', label: 'Changes', icon: 'fa-clock-rotate-left', color: '#78716c' },
+            { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' },
+            { id: 'signature', label: 'Signature', icon: 'fa-signature', color: '#1e293b' }
         ];
 
         window._reportSectionState = {};
@@ -4195,6 +3340,26 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 return '';
             })()}
                         </table>
+                    </div>
+                </div>
+                <!-- Objectives, Criteria & Methodology (from Plan) -->
+                <div class="rp-sec" id="sec-objectives">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#0891b2,#0e7490);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>AUDIT OBJECTIVES, CRITERIA & METHODOLOGY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;">
+                            <div>
+                                <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#0891b2;"><i class="fa-solid fa-bullseye" style="margin-right:0.4rem;"></i>Audit Objectives</h4>
+                                <div id="rp-objectives" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system'}</div>
+                            </div>
+                            <div>
+                                <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#6366f1;"><i class="fa-solid fa-scale-balanced" style="margin-right:0.4rem;"></i>Audit Criteria</h4>
+                                <div id="rp-criteria" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditCriteria || '• ' + (d.report.standard || 'Applicable ISO standard(s)') + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records'}</div>
+                            </div>
+                            <div>
+                                <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:0.4rem;"></i>Audit Methodology</h4>
+                                <div id="rp-methodology" class="rp-edit" contenteditable="true" style="white-space:pre-line;line-height:1.7;font-size:0.88rem;">${d.auditPlan?.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel at all levels\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence\n• Verification of corrective actions from previous audits'}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!-- 2: Exec Summary -->
@@ -4797,11 +3962,48 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-hdr" style="border-left-color:#ea580c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.85rem;"><strong>' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.8rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
                 </div>` : ''}
+                <!-- Corrective Action Requirements -->
+                ${(d.stats.majorNC + d.stats.minorNC) > 0 ? `
+                <div class="rp-sec" id="sec-corrective">
+                    <div class="rp-sec-hdr" style="border-left-color:#be185d;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CORRECTIVE ACTION REQUIREMENTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+                            <thead><tr style="background:#fdf2f8;"><th style="padding:10px 14px;text-align:left;width:10%;">NC Ref</th><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:10%;">Type</th><th style="padding:10px 14px;text-align:left;width:35%;">Corrective Action Required</th><th style="padding:10px 14px;text-align:left;width:15%;">Due Date</th><th style="padding:10px 14px;text-align:left;width:20%;">Verification Method</th></tr></thead>
+                            <tbody>${(() => {
+                    const ncItems = (d.report.checklistProgress || []).filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi');
+                    const ncrItems = d.report.ncrs || [];
+                    const allNCs = [...ncItems.map((item, i) => ({
+                        ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1),
+                        clause: item.clauseRef || item.clause || item.id,
+                        type: item.ncrType || item.severity || 'Minor',
+                        desc: item.ncrDescription || item.comment || item.requirement || '',
+                        dueDate: item.ncrType === 'Major' ? (() => { const dt = new Date(); dt.setDate(dt.getDate() + 30); return dt.toISOString().split('T')[0]; })() : (() => { const dt = new Date(); dt.setDate(dt.getDate() + 90); return dt.toISOString().split('T')[0]; })()
+                    })), ...ncrItems.map((ncr, i) => ({
+                        ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1),
+                        clause: ncr.clause || '',
+                        type: ncr.type || 'Minor',
+                        desc: ncr.description || '',
+                        dueDate: ncr.type === 'Major' ? (() => { const dt = new Date(); dt.setDate(dt.getDate() + 30); return dt.toISOString().split('T')[0]; })() : (() => { const dt = new Date(); dt.setDate(dt.getDate() + 90); return dt.toISOString().split('T')[0]; })()
+                    }))];
+                    if (allNCs.length === 0) return '<tr><td colspan="6" style="padding:20px;text-align:center;color:#94a3b8;">No corrective actions required</td></tr>';
+                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + nc.clause + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + (nc.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
+                })()}</tbody>
+                        </table>
+                        <div style="margin-top:1rem;padding:0.75rem;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><i class="fa-solid fa-clock" style="margin-right:0.4rem;"></i><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>
+                    </div>
+                </div>` : ''}
                 <!-- 8: Meetings -->
                 <div class="rp-sec" id="sec-meetings">
                     <div class="rp-sec-hdr" style="border-left-color:#0891b2;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CLOSING MEETING<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
+                    </div>
+                </div>
+                <!-- Changes Since Last Audit -->
+                <div class="rp-sec" id="sec-changes">
+                    <div class="rp-sec-hdr" style="border-left-color:#78716c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">11</span>CHANGES SINCE LAST AUDIT<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div id="rp-changes" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">${d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit. Click to edit if changes occurred.'}</div>
                     </div>
                 </div>
                 <!-- 7: Conclusion -->
@@ -4810,6 +4012,29 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-body">
                         <div style="margin-bottom:10px;"><strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;${d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;'}">${d.report.recommendation || 'Pending'}</span></div>
                         <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || 'Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. Click to edit this conclusion.'}</div>
+                    </div>
+                </div>
+                <!-- Signature Block -->
+                <div class="rp-sec" id="sec-signature">
+                    <div class="rp-sec-hdr" style="border-left-color:#1e293b;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">14</span>SIGNATURE & ATTESTATION<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
+                            <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+                                <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Lead Auditor</div>
+                                <div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;">${d.auditPlan?.team?.[0] || d.report.leadAuditor || 'Lead Auditor Name'}</div>
+                                <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
+                                <div style="font-size:0.8rem;color:#64748b;">Signature</div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <span id="rp-sig-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
+                            </div>
+                            <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+                                <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Technical Reviewer / Certification Manager</div>
+                                <div id="rp-reviewer-name" class="rp-edit" contenteditable="true" style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;min-height:22px;">${d.report.technicalReviewer || 'Click to enter reviewer name'}</div>
+                                <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
+                                <div style="font-size:0.8rem;color:#64748b;">Signature</div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <span id="rp-reviewer-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
+                            </div>
+                        </div>
+                        <div style="margin-top:1.5rem;padding:1rem;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body.</div>
                     </div>
                 </div>
             </div>
@@ -5708,14 +4933,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // TABLE OF CONTENTS
             + (function () {
                 let tocSections = [];
-                let colors = ['#2563eb', '#059669', '#7c3aed', '#059669', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#4338ca', '#c2410c'];
-                let descs = ['Organization details, scope, audit team and dates', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Closing meeting, certification recommendation and signatures', 'Photographic evidence from the audit'];
-                let names = ['AUDIT INFORMATION', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'AUDIT CONCLUSION & RECOMMENDATION', 'EVIDENCE GALLERY'];
-                let keys = ['audit-info', 'summary', 'charts', 'conformance', 'obs', 'ofi', 'findings', 'ncrs', 'conclusion', 'evidence'];
+                let colors = ['#2563eb', '#0891b2', '#059669', '#7c3aed', '#059669', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#be185d', '#78716c', '#4338ca', '#1e293b', '#c2410c'];
+                let descs = ['Organization details, scope, audit team and dates', 'Audit objectives, criteria and methodology', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Required corrective actions with due dates', 'Changes to management system since last audit', 'Closing meeting, certification recommendation', 'Signatures and attestation', 'Photographic evidence from the audit'];
+                let names = ['AUDIT INFORMATION', 'OBJECTIVES, CRITERIA & METHODOLOGY', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'CORRECTIVE ACTION REQUIREMENTS', 'CHANGES SINCE LAST AUDIT', 'AUDIT CONCLUSION & RECOMMENDATION', 'SIGNATURE & ATTESTATION', 'EVIDENCE GALLERY'];
+                let keys = ['audit-info', 'objectives', 'summary', 'charts', 'conformance', 'obs', 'ofi', 'findings', 'ncrs', 'corrective', 'changes', 'conclusion', 'signature', 'evidence'];
                 let num = 1;
                 for (var i = 0; i < keys.length; i++) {
                     let k = keys[i];
                     if (k === 'ncrs' && (!(d.report.ncrs || []).length)) continue;
+                    if (k === 'corrective' && !(d.stats.majorNC + d.stats.minorNC)) continue;
                     if (k === 'obs' && !obsOnlyRowsHtml) continue;
                     if (k === 'ofi' && !ofiOnlyRowsHtml) continue;
                     if (k === 'evidence') {
@@ -5748,8 +4974,15 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:10px;font-size:0.85rem;color:#334155;"><strong>Goods & Services:</strong> ' + d.client.goodsServices.map(g => g.name + (g.category ? ' (' + g.category + ')' : '')).join(', ') + '</div>' : '')
                 + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:6px;font-size:0.85rem;color:#334155;"><strong>Key Processes:</strong> ' + d.client.keyProcesses.map(p => (p.name || p)).join(', ') + '</div>' : '')
                 + '</div>' : '')
+            // SECTION: OBJECTIVES, CRITERIA & METHODOLOGY
+            + (en['objectives'] !== false ? '<div id="sec-objectives" class="sh page-break" style="background:#ecfeff;border-left-color:#0891b2;"><span class="sn" style="background:#0891b2;">2</span>AUDIT OBJECTIVES, CRITERIA & METHODOLOGY</div><div class="sb">'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0891b2;"><i class="fa-solid fa-bullseye" style="margin-right:4px;"></i>Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (d.auditPlan?.auditObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#6366f1;"><i class="fa-solid fa-scale-balanced" style="margin-right:4px;"></i>Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (d.auditPlan?.auditCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:4px;"></i>Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (d.auditPlan?.auditMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
+                + '</div></div>' : '')
             // SECTION 2
-            + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;"><span class="sn" style="background:#059669;">2</span>EXECUTIVE SUMMARY</div><div class="sb">'
+            + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;"><span class="sn" style="background:#059669;">3</span>EXECUTIVE SUMMARY</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || 'N/A') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
@@ -5809,14 +5042,33 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }).join('');
                 return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;"><span class="sn" style="background:#c2410c;"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
             })()
+            // SECTION: CORRECTIVE ACTION REQUIREMENTS
+            + ((d.stats.majorNC + d.stats.minorNC) > 0 && en['corrective'] !== false ? '<div id="sec-corrective" class="sh page-break" style="background:#fdf2f8;border-left-color:#be185d;"><span class="sn" style="background:#be185d;">10</span>CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
+                + '<table class="info-tbl"><thead><tr style="background:#fdf2f8;"><th style="width:12%;">NC Ref</th><th style="width:10%;">Clause</th><th style="width:10%;">Type</th><th style="width:35%;">Corrective Action Required</th><th style="width:13%;">Due Date</th><th style="width:20%;">Verification</th></tr></thead><tbody>'
+                + (function () { var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                + '</tbody></table>'
+                + '<div style="margin-top:12px;padding:10px;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
+                + '</div>' : '')
+            // SECTION: CHANGES SINCE LAST AUDIT
+            + (en['changes'] !== false ? '<div id="sec-changes" class="sh page-break" style="background:#f5f5f4;border-left-color:#78716c;"><span class="sn" style="background:#78716c;">11</span>CHANGES SINCE LAST AUDIT</div><div class="sb">'
+                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
+                + '</div>' : '')
             // SECTION 7
-            + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;"><span class="sn" style="background:#4338ca;">9</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
+            + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;"><span class="sn" style="background:#4338ca;">12</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || 'N/A') + '</td></tr></table></div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
+            // SECTION: SIGNATURE & ATTESTATION
+            + (en['signature'] !== false ? '<div id="sec-signature" class="sh page-break" style="background:#f8fafc;border-left-color:#1e293b;"><span class="sn" style="background:#1e293b;">13</span>SIGNATURE & ATTESTATION</div><div class="sb">'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + d.today + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.report.technicalReviewer || '____________________') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ____________________</div></div>'
+                + '</div>'
+                + '<div style="margin-top:20px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:4px;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
+                + '</div>' : '')
             + '</div>'
             // FOOTER
             + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
@@ -6248,4 +5500,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         window.saveChecklist(reportId);
     };
 
+}
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { _autoFillPersonnel, toggleAccordion, toggleAllAccordions, initClauseDragReorder, toggleSectionSelection, setChecklistStatus, updateAccordionCounter, addCustomQuestion, saveChecklist, filterChecklistItems, bulkUpdateStatus, submitToLeadAuditor, startDictation, _collectMeetingAttendees, addCustomMeetingAttendee, saveMeetingRecords, renderAuditExecutionEnhanced, renderAuditExecution, renderExecutionDetail, createNCR, editNCR, createCAPA, handleEvidenceUpload, viewEvidenceImage, viewEvidenceImageDirect, removeEvidence, removeEvidenceByIdx, viewEvidenceImageByUrl, _reportPreviewData, showReportPreviewModal, _initPreviewCharts, toggleReportSection, exportReportPDF, openCreateReportModal, openEditReportModal, handleCameraButton, captureWebcam, updateMeetingData };
 }
