@@ -4588,6 +4588,49 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 }));
             }
 
+            // Step 3: Generate AI-powered conclusion
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Generating conclusion...';
+            try {
+                const ncTotal = d.stats.majorNC + d.stats.minorNC;
+                const obsTotal = d.stats.observationCount + d.stats.ofiCount;
+                const conformRate = d.stats.totalItems > 0 ? Math.round((d.stats.conformCount / d.stats.totalItems) * 100) : 0;
+                const conclusionPrompt = `You are a Senior Lead Auditor at a top-tier Certification Body. Write a formal audit conclusion (150-200 words) for the following audit:
+
+Client: ${d.report.client}
+Standard: ${standardName}
+Audit Type: ${d.auditPlan?.auditType || d.auditPlan?.type || 'Certification Audit'}
+Items Audited: ${d.stats.totalItems} | Conforming: ${d.stats.conformCount} | NC: ${ncTotal} (${d.stats.majorNC} Major, ${d.stats.minorNC} Minor) | Observations: ${obsTotal}
+Recommendation: ${d.report.recommendation || 'Pending'}
+
+CRITICAL RULES — CCI Gold Standard:
+- Do NOT use percentage scoring or compliance percentages
+- Use legally defensible, accreditation-ready language
+- Follow ISO 17021 certification body reporting requirements
+
+Instructions:
+1. State whether the management system has demonstrated conformity with the standard
+2. Reference the number of non-conformities and observations raised
+3. ${ncTotal > 0 ? 'State that corrective actions must be submitted within the specified timeframes' : 'Note that no non-conformities were identified'}
+4. Conclude with the audit team's recommendation regarding ${d.report.recommendation === 'Recommended' ? 'continuation/granting of certification' : d.report.recommendation === 'Not Recommended' ? 'withholding certification pending corrective action' : 'the certification decision'}
+5. Use measured, authoritative language befitting 30+ years of audit experience
+
+Return ONLY the conclusion text, no JSON, no formatting.`;
+
+                const response = await window.AI_SERVICE.callProxyAPI(conclusionPrompt);
+                const conclusionText = window.AI_SERVICE.extractTextFromResponse ? window.AI_SERVICE.extractTextFromResponse(response) : (typeof response === 'string' ? response : '');
+                if (conclusionText && conclusionText.trim().length > 50) {
+                    const conclusionEl = document.getElementById('rp-conclusion');
+                    if (conclusionEl) {
+                        conclusionEl.innerHTML = conclusionText.trim();
+                        conclusionEl.style.background = '#f0fdf4';
+                        conclusionEl.style.borderColor = '#22c55e';
+                        setTimeout(() => { conclusionEl.style.background = ''; conclusionEl.style.borderColor = ''; }, 3000);
+                    }
+                }
+            } catch (conclusionErr) {
+                console.warn('AI conclusion generation error (continuing):', conclusionErr);
+            }
+
             // Update the findings table in the preview if visible
             const findingsBody = document.getElementById('findings-table-body');
             if (findingsBody && d.hydratedProgress) {
