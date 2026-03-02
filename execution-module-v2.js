@@ -4063,6 +4063,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div class="rp-sec-hdr" style="border-left-color:#4338ca;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">10</span>AUDIT CONCLUSION<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <div style="margin-bottom:10px;"><strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;${d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;'}">${d.report.recommendation || 'Pending'}</span></div>
+                        ${(function () {
+                            // Risk Assessment auto-callout
+                            const ncClauses = (d.report.checklistProgress || [])
+                                .filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi')
+                                .map(p => p.clauseRef || p.clause || '').filter(Boolean);
+                            const ncrClauses = (d.report.ncrs || []).map(n => n.clause || '').filter(Boolean);
+                            const allRiskClauses = [...new Set([...ncClauses, ...ncrClauses])];
+                            if (allRiskClauses.length === 0) return '';
+                            return '<div style="margin-bottom:14px;padding:14px;background:#fef2f2;border-radius:10px;border-left:4px solid #dc2626;"><div style="font-size:0.82rem;font-weight:700;color:#991b1b;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>RISK AREAS IDENTIFIED</div><div style="font-size:0.85rem;color:#7f1d1d;line-height:1.6;">The following clause areas have been identified as requiring management attention due to non-conformity findings: <strong>' + allRiskClauses.join(', ') + '</strong>. These areas should be prioritized for corrective action and root cause analysis to prevent recurrence.</div></div>';
+                        })()}
                         <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || 'Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. Click to edit this conclusion.'}</div>
                     </div>
                 </div>

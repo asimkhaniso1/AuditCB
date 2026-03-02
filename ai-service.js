@@ -397,6 +397,7 @@ Rules:
 7. Use ISO audit terminology consistently (conformity, non-conformity, objective evidence, systematic approach, effective implementation, continual improvement, opportunity for improvement)
 8. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
 9. Return plain text only
+10. CRITICAL — CCI Gold Standard: Do NOT use percentage scoring or compliance percentages. Do NOT mix clauses across different standards. Use legally defensible, accreditation-ready language suitable for ISO 17021 certification body reporting.
 
 ${kbContext ? `Standard Requirements (from Knowledge Base):
 ${kbContext.substring(0, 3000)}
@@ -478,6 +479,7 @@ Rules:
 10. Do NOT use markdown formatting (no **, ***, ##, or bullet symbols)
 11. Return plain text only
 12. Reference the organization's specific processes or products when the finding description provides that context
+13. CRITICAL — CCI Gold Standard: Do NOT use percentage scoring or compliance percentages. Do NOT mix clauses across different standards. Use legally defensible, accreditation-ready language suitable for ISO 17021 certification body reporting.
 
 ${kbContext ? `Standard Requirements (from Knowledge Base):
 ${kbContext.substring(0, 3000)}
