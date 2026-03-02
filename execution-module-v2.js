@@ -3150,6 +3150,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             { id: 'summary', label: 'Summary', icon: 'fa-file-lines', color: '#059669' },
             { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
             { id: 'conformance', label: 'Conformance', icon: 'fa-circle-check', color: '#059669' },
+            { id: 'prev-findings', label: 'Prev Findings', icon: 'fa-history', color: '#6366f1' },
             { id: 'obs', label: 'Observations', icon: 'fa-eye', color: '#8b5cf6' },
             { id: 'ofi', label: 'OFI', icon: 'fa-lightbulb', color: '#06b6d4' },
             { id: 'findings', label: 'Findings', icon: 'fa-triangle-exclamation', color: '#dc2626' },
@@ -3940,6 +3941,39 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             <thead><tr style="background:#f0fdf4;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Status</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
                             <tbody>${conformRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No conformance evidence recorded</td></tr>'}</tbody>
                         </table>
+                    </div>
+                </div>
+                <!-- Previous Findings Status -->
+                <div class="rp-sec" id="sec-prev-findings">
+                    <div class="rp-sec-hdr" style="border-left-color:#6366f1;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-history"></i></span>PREVIOUS FINDINGS STATUS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        ${(function () {
+                            // Look for previous reports for the same client
+                            const allReports = window.state?.auditReports || [];
+                            const prevReports = allReports
+                                .filter(r => r.clientId === d.report.clientId && String(r.id) !== String(d.report.id))
+                                .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+                            const prevReport = prevReports[0];
+                            if (!prevReport) {
+                                return '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>No previous audit reports found for this client. This section will auto-populate when prior audit data is available.</div>';
+                            }
+                            // Extract NCs from previous report
+                            const prevNCs = (prevReport.checklistProgress || [])
+                                .filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi');
+                            const prevNCRs = prevReport.ncrs || [];
+                            if (prevNCs.length === 0 && prevNCRs.length === 0) {
+                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || 'N/A') + '):</strong> No non-conformities were raised. Certification was recommended.</div>';
+                            }
+                            let rows = '';
+                            prevNCs.forEach(function (nc, i) {
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (nc.ncrType === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
+                            });
+                            prevNCRs.forEach(function (ncr, i) {
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (ncr.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
+                            });
+                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || 'N/A') + ' | ' + (prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
+                                + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                        })()}
                     </div>
                 </div>
                 <!-- 5: Observations -->
@@ -4950,19 +4984,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             + '<div style="font-size:2rem;font-weight:700;color:#2563eb;">' + d.report.client + '</div>'
             + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || 'N/A') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || 'N/A') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || 'N/A') + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
+            + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
+            + '</div>'
 
             + '</div>'
             // TABLE OF CONTENTS
             + (function () {
                 let tocSections = [];
-                let colors = ['#2563eb', '#0891b2', '#059669', '#7c3aed', '#059669', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#be185d', '#78716c', '#4338ca', '#1e293b', '#c2410c'];
-                let descs = ['Organization details, scope, audit team and dates', 'Audit objectives, criteria and methodology', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Required corrective actions with due dates', 'Changes to management system since last audit', 'Closing meeting, certification recommendation', 'Signatures and attestation', 'Photographic evidence from the audit'];
-                let names = ['AUDIT INFORMATION', 'OBJECTIVES, CRITERIA & METHODOLOGY', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'CORRECTIVE ACTION REQUIREMENTS', 'CHANGES SINCE LAST AUDIT', 'AUDIT CONCLUSION & RECOMMENDATION', 'SIGNATURE & ATTESTATION', 'EVIDENCE GALLERY'];
-                let keys = ['audit-info', 'objectives', 'summary', 'charts', 'conformance', 'obs', 'ofi', 'findings', 'ncrs', 'corrective', 'changes', 'conclusion', 'signature', 'evidence'];
+                let colors = ['#2563eb', '#0891b2', '#059669', '#7c3aed', '#059669', '#6366f1', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#be185d', '#78716c', '#4338ca', '#1e293b', '#c2410c'];
+                let descs = ['Organization details, scope, audit team and dates', 'Audit objectives, criteria and methodology', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Follow-up status of findings from previous audit', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Required corrective actions with due dates', 'Changes to management system since last audit', 'Closing meeting, certification recommendation', 'Signatures and attestation', 'Photographic evidence from the audit'];
+                let names = ['AUDIT INFORMATION', 'OBJECTIVES, CRITERIA & METHODOLOGY', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'PREVIOUS FINDINGS STATUS', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'CORRECTIVE ACTION REQUIREMENTS', 'CHANGES SINCE LAST AUDIT', 'AUDIT CONCLUSION & RECOMMENDATION', 'SIGNATURE & ATTESTATION', 'EVIDENCE GALLERY'];
+                let keys = ['audit-info', 'objectives', 'summary', 'charts', 'conformance', 'prev-findings', 'obs', 'ofi', 'findings', 'ncrs', 'corrective', 'changes', 'conclusion', 'signature', 'evidence'];
                 let num = 1;
                 for (var i = 0; i < keys.length; i++) {
                     let k = keys[i];
