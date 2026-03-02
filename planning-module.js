@@ -863,6 +863,26 @@ function viewAuditPlan(id) {
     let completedItems = 0;
     let totalItems = 0;
 
+    // Check if assigned checklists are missing from state
+    const resolvedChecklists = planChecklists.map(clId => checklists.find(c => String(c.id) === String(clId))).filter(Boolean);
+    const missingCount = planChecklists.length - resolvedChecklists.length;
+
+    if (missingCount > 0 && planChecklists.length > 0) {
+        console.warn('[PlanView] Missing checklists — plan IDs:', planChecklists, '| found:', resolvedChecklists.length, '| state has:', checklists.length);
+        // Attempt Supabase recovery (non-blocking)
+        if (window.SupabaseClient?.isInitialized && !window._planChecklistRecoveryAttempted) {
+            window._planChecklistRecoveryAttempted = true;
+            window.SupabaseClient.syncChecklistsFromSupabase().then(() => {
+                window._planChecklistRecoveryAttempted = false;
+                const recovered = (state.checklists || []).filter(c => planChecklists.includes(String(c.id)));
+                if (recovered.length > resolvedChecklists.length) {
+                    console.info('[PlanView] Recovered checklists from Supabase, re-rendering...');
+                    viewAuditPlan(plan.id);
+                }
+            }).catch(() => { window._planChecklistRecoveryAttempted = false; });
+        }
+    }
+
     // Sum total items from assigned checklists (support both old and new formats)
     planChecklists.forEach(clId => {
         const cl = checklists.find(c => String(c.id) === String(clId));
@@ -880,6 +900,12 @@ function viewAuditPlan(id) {
             }
         }
     });
+
+    // Fallback: if checklists are missing from state but report has progress data, use that count
+    if (totalItems === 0 && report && report.checklistProgress && report.checklistProgress.length > 0) {
+        totalItems = report.checklistProgress.length;
+        console.info('[PlanView] Using checklistProgress count as fallback:', totalItems);
+    }
 
     if (report && report.checklistProgress && totalItems > 0) {
         completedItems = report.checklistProgress.filter(p => p.status && p.status !== '').length;
