@@ -518,6 +518,11 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
     } else if (window.state.activeClientId) {
         const client = state.clients.find(c => String(c.id) === String(window.state.activeClientId));
         if (client) {
+            const clientSelect = document.getElementById('plan-client');
+            if (clientSelect) {
+                clientSelect.value = client.name;
+                clientSelect.disabled = true;
+            }
             updateClientDetails(client.name);
         }
     }
