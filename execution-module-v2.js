@@ -3319,18 +3319,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <div style="position:absolute;bottom:2rem;left:2.5rem;right:2.5rem;border-top:2px solid #e2e8f0;padding-top:1.5rem;">
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;font-size:0.8rem;color:#64748b;">
                             <div>
-                                <strong style="color:#1e293b;">Version:</strong> 1.0
+                                <strong style="color:#1e293b;">Document ID:</strong> RPT-${d.report.id.substring(0, 8)}
                             </div>
                             <div style="text-align:center;">
                                 <strong style="color:#1e293b;">Status:</strong> ${d.report.recommendation || 'Draft'}
                             </div>
                             <div style="text-align:right;">
-                                <strong style="color:#1e293b;">Page:</strong> 1 of ${sections.filter(s => !s.hide).length + 1}
+                                <strong style="color:#1e293b;">Classification:</strong> Confidential
                             </div>
                         </div>
-                        <div style="margin-top:1rem;padding:0.75rem;background:#fef3c7;border-radius:6px;text-align:center;font-size:0.75rem;color:#92400e;">
+                        <div style="margin-top:1rem;">
+                            <div style="font-size:0.75rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">Document Revision History</div>
+                            <table style="width:100%;font-size:0.75rem;border-collapse:collapse;">
+                                <thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Ver</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Date</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Author</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Description</th></tr></thead>
+                                <tbody>
+                                    <tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">1.0</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">${d.report.date || new Date().toLocaleDateString('en-GB')}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">${d.report.leadAuditor || 'Lead Auditor'}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">Initial issue — Draft for review</td></tr>
+                                    <tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:0.75rem;padding:0.75rem;background:#fef3c7;border-radius:6px;text-align:center;font-size:0.75rem;color:#92400e;">
                             <i class="fa-solid fa-lock" style="margin-right:0.25rem;"></i>
-                            <strong>Confidential Document</strong> — For authorized use only
+                            <strong>Confidential Document</strong> — For authorized use only. This report is the property of ${d.cbName || 'the Certification Body'}.
                         </div>
                     </div>
                 </div>
@@ -5078,7 +5088,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
-
+            + '<div style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;margin-bottom:10px;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + (d.report.recommendation || 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
+            + '<div style="font-size:0.68rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Document Revision History</div>'
+            + '<table style="width:100%;font-size:0.68rem;border-collapse:collapse;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Ver</th><th style="padding:4px 8px;text-align:left;">Date</th><th style="padding:4px 8px;text-align:left;">Author</th><th style="padding:4px 8px;text-align:left;">Description</th></tr></thead><tbody>'
+            + '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">1.0</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + (d.report.date || d.today) + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">Initial issue</td></tr>'
+            + '</tbody></table></div>'
             + '</div>'
             // TABLE OF CONTENTS
             + (function () {
