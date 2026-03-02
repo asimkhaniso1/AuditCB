@@ -295,6 +295,38 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             </div>
                         </div>
 
+                        <!-- Card: Audit Objectives, Criteria & Methodology (moved to main column for space) -->
+                        <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid #0891b2;">
+                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #0891b2;">
+                                <i class="fa-solid fa-bullseye"></i> Audit Objectives, Criteria & Methodology
+                            </h3>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Objectives</label>
+                                    <textarea class="form-control" id="plan-objectives" rows="5" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Define audit objectives...">• Determine conformity of the management system with audit criteria
+• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements
+• Evaluate the effectiveness of the management system in meeting its specified objectives
+• Identify areas for potential improvement of the management system</textarea>
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Criteria</label>
+                                    <textarea class="form-control" id="plan-criteria" rows="5" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Define audit criteria...">• Applicable ISO management system standard(s) as stated above
+• Organization's management system documentation (manuals, procedures, work instructions)
+• Applicable legal, statutory and regulatory requirements
+• Previous audit findings and corrective action records</textarea>
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1; margin: 0;">
+                                    <label style="font-size: 0.8rem;">Audit Methodology</label>
+                                    <textarea class="form-control" id="plan-methodology" rows="3" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Describe audit methodology...">• Risk-based sampling of processes, records, and documentation
+• Interviews with management and operational personnel at all levels
+• Observation of activities and work environment on-site
+• Review of documented information and objective evidence
+• Verification of corrective actions from previous audits</textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Card: Audit Team -->
                         <div class="card" style="margin: 0; padding: 1.5rem;">
                             <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-color);">
@@ -398,37 +430,6 @@ function renderCreateAuditPlanForm(preSelectedClientName = null) {
                             </div>
                         </div>
 
-                        <!-- Card: Audit Scope & Methodology -->
-                        <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid #0891b2;">
-                            <h3 style="margin: 0 0 1.25rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: #0891b2;">
-                                <i class="fa-solid fa-bullseye"></i> Audit Objectives, Criteria & Methodology
-                            </h3>
-                            
-                            <div style="display: grid; gap: 1rem;">
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Audit Objectives</label>
-                                    <textarea class="form-control" id="plan-objectives" rows="4" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Define audit objectives...">• Determine conformity of the management system with audit criteria
-• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements
-• Evaluate the effectiveness of the management system in meeting its specified objectives
-• Identify areas for potential improvement of the management system</textarea>
-                                </div>
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Audit Criteria</label>
-                                    <textarea class="form-control" id="plan-criteria" rows="3" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Define audit criteria...">• Applicable ISO management system standard(s) as stated above
-• Organization's management system documentation (manuals, procedures, work instructions)
-• Applicable legal, statutory and regulatory requirements
-• Previous audit findings and corrective action records</textarea>
-                                </div>
-                                <div class="form-group" style="margin: 0;">
-                                    <label style="font-size: 0.8rem;">Audit Methodology</label>
-                                    <textarea class="form-control" id="plan-methodology" rows="4" style="font-size: 0.82rem; line-height: 1.6;" placeholder="Describe audit methodology...">• Risk-based sampling of processes, records, and documentation
-• Interviews with management and operational personnel at all levels
-• Observation of activities and work environment on-site
-• Review of documented information and objective evidence
-• Verification of corrective actions from previous audits</textarea>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Card: Duration Calculation (SECOND) -->
                         <div class="card" style="margin: 0; padding: 1.5rem; border-top: 4px solid var(--primary-color);">
