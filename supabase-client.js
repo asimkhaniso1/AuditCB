@@ -1,5 +1,5 @@
 // ============================================
-// SUPABASE INTEGRATION MODULE
+// SUPABASE INTEGRATION MODULE (ESM-ready)
 // ============================================
 // Handles Supabase authentication and database operations
 
@@ -1900,6 +1900,15 @@ const SupabaseClient = {
 
             if (error) throw error;
 
+            // CRITICAL FIX: If incremental sync returns 0 but local state is empty,
+            // force a full sync by clearing timestamp and retrying
+            const localEmpty = !window.state.checklists || window.state.checklists.length === 0;
+            if (isIncremental && (!data || data.length === 0) && localEmpty) {
+                Logger.warn('Incremental checklist sync returned 0 but local state is empty — forcing full sync');
+                try { sessionStorage.removeItem('sync_ts_checklists'); } catch(e) {}
+                return this.syncChecklistsFromSupabase(); // Retry as full sync
+            }
+
             const cloudChecklists = (data || []).map(checklist => ({
                 id: checklist.id,
                 name: checklist.name,
@@ -2584,7 +2593,7 @@ const SupabaseClient = {
 
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.SupabaseClient = SupabaseClient;
 
 // Auto-initialize if Supabase is available
@@ -2600,3 +2609,8 @@ if (typeof supabase !== 'undefined') {
 }
 
 Logger.info('SupabaseClient module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SupabaseClient;
+}
