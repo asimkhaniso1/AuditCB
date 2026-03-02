@@ -3247,10 +3247,14 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div style="background:white;border-radius:12px;padding:3rem 2.5rem;margin-bottom:2rem;position:relative;min-height:600px;border:2px solid #e2e8f0;">
                     <!-- CB Branding Header -->
                     <div style="text-align:center;margin-bottom:3rem;">
+                        ${d.cbLogo ? `
+                        <img src="${d.cbLogo}" alt="CB Logo" style="height:80px;object-fit:contain;margin-bottom:1rem;">
+                        ` : `
                         <div style="width:80px;height:80px;margin:0 auto 1rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(37,99,235,0.3);">
                             <i class="fa-solid fa-certificate" style="color:white;font-size:2.5rem;"></i>
                         </div>
-                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">Company Certification</h1>
+                        `}
+                        <h1 style="margin:0 0 0.5rem;font-size:1.8rem;color:#1e293b;font-weight:700;">${d.cbName || 'Audit360 Suite'}</h1>
                         <div style="font-size:0.95rem;color:#64748b;font-weight:500;">ISO Certification Body</div>
                         <div style="width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);margin:1.5rem auto;border-radius:2px;"></div>
                     </div>
@@ -3264,12 +3268,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         </div>
                     </div>
                     
-                    <!-- Client Logo Placeholder -->
+                    <!-- Client Logo -->
                     <div style="text-align:center;margin:2rem 0;">
+                        ${d.clientLogo ? `
+                        <img src="${d.clientLogo}" alt="Client Logo" style="height:100px;object-fit:contain;">
+                        ` : `
                         <div style="width:120px;height:120px;margin:0 auto;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;">
                             <i class="fa-solid fa-building" style="font-size:2rem;color:#94a3b8;"></i>
                             <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;">Client Logo</div>
                         </div>
+                        `}
                     </div>
                     
                     <!-- Audit Details Grid -->
@@ -3281,7 +3289,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Date</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.date || 'N/A'}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.date || 'N/A'}${d.report.endDate ? ' — ' + d.report.endDate : ''}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Lead Auditor</div>
@@ -3291,6 +3299,16 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Report ID</div>
                                 <div style="font-size:1rem;color:#1e293b;font-weight:600;font-family:monospace;">#${d.report.id.substring(0, 10)}</div>
                             </div>
+                            ${d.auditPlan?.team && d.auditPlan.team.length > 1 ? `
+                            <div style="grid-column:span 2;">
+                                <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Team</div>
+                                <div style="font-size:0.95rem;color:#1e293b;font-weight:600;">${d.auditPlan.team.join(', ')}</div>
+                            </div>` : ''}
+                            ${d.auditPlan?.scope ? `
+                            <div style="grid-column:span 2;">
+                                <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Scope</div>
+                                <div style="font-size:0.9rem;color:#334155;line-height:1.5;">${typeof d.auditPlan.scope === 'string' ? d.auditPlan.scope : (d.client?.goodsServices || []).map(g => g.name).join(', ') || 'As per certification scope'}</div>
+                            </div>` : ''}
                         </div>
                     </div>
                     
