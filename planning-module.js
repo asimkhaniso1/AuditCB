@@ -1463,6 +1463,7 @@ window.renderConfigureChecklist = async function (planId) {
     // Get all checklists - don't filter by standard match
     // Users should see all available checklists when configuring an audit plan
     const checklists = state.checklists || [];
+    console.info('[ConfigChecklist] state.checklists count:', checklists.length, '| plan.selectedChecklists:', selectedIds);
 
     // For sorting/highlighting: extract plan standards for reference
     const client = state.clients.find(c => c.name === plan.client);
@@ -2616,8 +2617,8 @@ window.viewAuditPlan = viewAuditPlan;
 
 // Navigation Helpers (Integrated Lifecycle)
 window.navigateToAuditExecution = function (planId) {
-    let report = window.state.auditReports.find(r => r.planId === planId);
-    const plan = window.state.auditPlans.find(p => p.id === planId);
+    let report = window.state.auditReports.find(r => String(r.planId) === String(planId));
+    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
 
     if (!plan) {
         window.showNotification('Plan not found', 'error');
@@ -2646,22 +2647,27 @@ window.navigateToAuditExecution = function (planId) {
         window.showNotification('Audit started! Loading checklist...', 'success');
     }
 
-    // Switch to execution tab
+    // Switch to execution tab if available (global view)
     const tab = document.querySelector('[data-module="audit-execution"]');
-    if (tab) tab.click();
-
-    setTimeout(() => {
-        // Open specific audit
+    if (tab) {
+        tab.click();
+        setTimeout(() => {
+            if (window.renderExecutionDetail) {
+                window.renderExecutionDetail(String(report.id));
+            }
+        }, 200);
+    } else {
+        // Client workspace context — render directly
         if (window.renderExecutionDetail) {
-            window.renderExecutionDetail(report.id);
-        } else if (window.renderAuditExecutionEnhanced) {
-            window.renderAuditExecutionEnhanced(report.id);
+            window.renderExecutionDetail(String(report.id));
+        } else {
+            window.showNotification('Execution module not loaded. Please refresh the page.', 'error');
         }
-    }, 200);
+    }
 };
 
 window.navigateToReporting = function (planId) {
-    const report = window.state.auditReports.find(r => r.planId === planId);
+    const report = window.state.auditReports.find(r => String(r.planId) === String(planId));
     if (!report) {
         window.showNotification('No report data found. Please complete execution first.', 'warning');
         return;
