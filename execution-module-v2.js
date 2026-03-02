@@ -3159,7 +3159,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
             { id: 'changes', label: 'Changes', icon: 'fa-clock-rotate-left', color: '#78716c' },
             { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' },
-            { id: 'signature', label: 'Signature', icon: 'fa-signature', color: '#1e293b' }
+            { id: 'signature', label: 'Signature', icon: 'fa-signature', color: '#1e293b' },
+            { id: 'distribution', label: 'Distribution', icon: 'fa-share-nodes', color: '#0d9488' },
+            { id: 'annexures', label: 'Annexures', icon: 'fa-paperclip', color: '#9333ea' }
         ];
 
         window._reportSectionState = {};
@@ -4097,6 +4099,39 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             </div>
                         </div>
                         <div style="margin-top:1.5rem;padding:1rem;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body.</div>
+                    </div>
+                </div>
+                <!-- Distribution List -->
+                <div class="rp-sec" id="sec-distribution">
+                    <div class="rp-sec-hdr" style="border-left-color:#0d9488;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-share-nodes"></i></span>DISTRIBUTION LIST<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="margin-bottom:12px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>
+                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+                            <thead><tr style="background:#f0fdfa;"><th style="padding:10px 14px;text-align:left;width:5%;">#</th><th style="padding:10px 14px;text-align:left;width:30%;">Recipient</th><th style="padding:10px 14px;text-align:left;width:25%;">Role</th><th style="padding:10px 14px;text-align:left;width:25%;">Organization</th><th style="padding:10px 14px;text-align:left;width:15%;">Format</th></tr></thead>
+                            <tbody>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">1</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.leadAuditor || 'Lead Auditor'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Lead Auditor</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Original</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;" contenteditable="true" id="rp-dist-reviewer">${d.report.technicalReviewer || 'Technical Reviewer'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">3</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;" contenteditable="true" id="rp-dist-client">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Client Representative</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">4</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" contenteditable="true">Certification Records</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">File / Archive</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Archive</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- Annexures -->
+                <div class="rp-sec" id="sec-annexures">
+                    <div class="rp-sec-hdr" style="border-left-color:#9333ea;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-paperclip"></i></span>ANNEXURES / APPENDICES<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div id="rp-annexures" class="rp-edit" contenteditable="true" style="min-height:80px;line-height:1.8;color:#334155;">
+                            <div style="font-weight:600;margin-bottom:8px;">Annexure A — Audit Plan Reference</div>
+                            <div style="margin-bottom:6px;">• Plan Reference: ${d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A'}</div>
+                            <div style="margin-bottom:12px;">• Standard: ${d.report.standard || 'ISO Standard'}</div>
+                            <div style="font-weight:600;margin-bottom:8px;">Annexure B — Checklist Summary</div>
+                            <div style="margin-bottom:6px;">• Total Items Audited: ${d.stats.totalItems}</div>
+                            <div style="margin-bottom:6px;">• Conforming: ${d.stats.conformCount} | NC: ${d.stats.majorNC + d.stats.minorNC} | Observations: ${d.stats.observationCount} | OFI: ${d.stats.ofiCount}</div>
+                            <div style="margin-bottom:12px;">• N/A Items: ${d.stats.naCount}</div>
+                            <div style="font-weight:600;margin-bottom:8px;">Annexure C — Additional Documents</div>
+                            <div style="color:#94a3b8;font-style:italic;">Click to add any additional supporting documents, certificates, or reference materials</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -5048,10 +5083,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // TABLE OF CONTENTS
             + (function () {
                 let tocSections = [];
-                let colors = ['#2563eb', '#0891b2', '#059669', '#7c3aed', '#059669', '#6366f1', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#be185d', '#78716c', '#4338ca', '#1e293b', '#c2410c'];
-                let descs = ['Organization details, scope, audit team and dates', 'Audit objectives, criteria and methodology', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Follow-up status of findings from previous audit', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Required corrective actions with due dates', 'Changes to management system since last audit', 'Closing meeting, certification recommendation', 'Signatures and attestation', 'Photographic evidence from the audit'];
-                let names = ['AUDIT INFORMATION', 'OBJECTIVES, CRITERIA & METHODOLOGY', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'PREVIOUS FINDINGS STATUS', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'CORRECTIVE ACTION REQUIREMENTS', 'CHANGES SINCE LAST AUDIT', 'AUDIT CONCLUSION & RECOMMENDATION', 'SIGNATURE & ATTESTATION', 'EVIDENCE GALLERY'];
-                let keys = ['audit-info', 'objectives', 'summary', 'charts', 'conformance', 'prev-findings', 'obs', 'ofi', 'findings', 'ncrs', 'corrective', 'changes', 'conclusion', 'signature', 'evidence'];
+                let colors = ['#2563eb', '#0891b2', '#059669', '#7c3aed', '#059669', '#6366f1', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#be185d', '#78716c', '#4338ca', '#1e293b', '#0d9488', '#9333ea', '#c2410c'];
+                let descs = ['Organization details, scope, audit team and dates', 'Audit objectives, criteria and methodology', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Follow-up status of findings from previous audit', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Required corrective actions with due dates', 'Changes to management system since last audit', 'Closing meeting, certification recommendation', 'Signatures and attestation', 'Controlled distribution of this report', 'Supporting documents and appendices', 'Photographic evidence from the audit'];
+                let names = ['AUDIT INFORMATION', 'OBJECTIVES, CRITERIA & METHODOLOGY', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'PREVIOUS FINDINGS STATUS', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'CORRECTIVE ACTION REQUIREMENTS', 'CHANGES SINCE LAST AUDIT', 'AUDIT CONCLUSION & RECOMMENDATION', 'SIGNATURE & ATTESTATION', 'DISTRIBUTION LIST', 'ANNEXURES', 'EVIDENCE GALLERY'];
+                let keys = ['audit-info', 'objectives', 'summary', 'charts', 'conformance', 'prev-findings', 'obs', 'ofi', 'findings', 'ncrs', 'corrective', 'changes', 'conclusion', 'signature', 'distribution', 'annexures', 'evidence'];
                 let num = 1;
                 for (var i = 0; i < keys.length; i++) {
                     let k = keys[i];
@@ -5184,6 +5219,26 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</div>'
                 + '<div style="margin-top:20px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:4px;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
                 + '</div>' : '')
+            // SECTION: DISTRIBUTION LIST
+            + (en['distribution'] !== false ? '<div id="sec-distribution" class="sh page-break" style="background:#f0fdfa;border-left-color:#0d9488;"><span class="sn" style="background:#0d9488;">14</span>DISTRIBUTION LIST</div><div class="sb">'
+                + '<div style="margin-bottom:10px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>'
+                + '<table class="info-tbl"><thead><tr style="background:#f0fdfa;"><th style="width:5%;">#</th><th style="width:30%;">Recipient</th><th style="width:25%;">Role</th><th style="width:25%;">Organization</th><th style="width:15%;">Format</th></tr></thead><tbody>'
+                + '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (cbName || 'Certification Body') + '</td><td>Original</td></tr>'
+                + '<tr><td>2</td><td style="font-weight:600;">' + (editedReviewerName || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
+                + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
+                + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (cbName || 'Certification Body') + '</td><td>Archive</td></tr>'
+                + '</tbody></table></div>' : '')
+            // SECTION: ANNEXURES
+            + (en['annexures'] !== false ? '<div id="sec-annexures" class="sh page-break" style="background:#faf5ff;border-left-color:#9333ea;"><span class="sn" style="background:#9333ea;">15</span>ANNEXURES / APPENDICES</div><div class="sb">'
+                + '<div style="line-height:1.8;color:#334155;">'
+                + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
+                + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
+                + '<div style="margin-bottom:12px;">• Standard: ' + standard + '</div>'
+                + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
+                + '<div style="margin-bottom:4px;">• Total Items Audited: ' + d.stats.totalItems + '</div>'
+                + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.majorNC + d.stats.minorNC) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
+                + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
+                + '</div></div>' : '')
             + '</div>'
             // FOOTER
             + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
