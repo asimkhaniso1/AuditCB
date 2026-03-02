@@ -194,7 +194,15 @@
                 args.push(target.files[0]);
                 fn.apply(null, args);
             } else {
-                fn.call(target, target, target.dataset, e);
+                // Extract positional args like click handler does
+                let args = extractArgs(target);
+                if (args.length > 0) {
+                    // Resolve 'this.value' placeholders to actual element value
+                    args = args.map(function (a) { return a === 'this.value' ? target.value : a; });
+                    fn.apply(null, args);
+                } else {
+                    fn.call(target, target, target.dataset, e);
+                }
             }
         }
     });
