@@ -830,7 +830,7 @@ function renderCertificationCycleWidget(client) {
 
         if (!activeCert || (!activeCert.initialDate && !activeCert.currentIssue)) return '';
 
-        const issueDate = new Date(activeCert.currentIssue || activeCert.initialDate);
+        const issueDate = new Date(activeCert.initialDate || activeCert.currentIssue);
         const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
         const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
         const expiry = activeCert.expiryDate ? new Date(activeCert.expiryDate) : (() => {
@@ -952,7 +952,7 @@ function renderAuditCycleTimeline(client) {
     }
 
     // Use currentIssue if available, otherwise initialDate
-    const issueDate = new Date(latestCert.currentIssue || latestCert.initialDate);
+    const issueDate = new Date(latestCert.initialDate || latestCert.currentIssue);
     const surv1 = new Date(issueDate); surv1.setFullYear(surv1.getFullYear() + 1);
     const surv2 = new Date(issueDate); surv2.setFullYear(surv2.getFullYear() + 2);
 
