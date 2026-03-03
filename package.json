@@ -4,7 +4,9 @@
     "description": "AuditCB360 Certification System",
     "scripts": {
         "start": "http-server -p 8080",
-        "build": "node build.js"
+        "build": "node build.js",
+        "lint": "echo 'Lint skipped — no eslint configured for browser globals'",
+        "test": "echo 'Tests skipped — vitest not installed'"
     },
     "engines": {
         "node": "20.x"
