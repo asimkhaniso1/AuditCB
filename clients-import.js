@@ -832,7 +832,7 @@
 
                 window.saveData();
                 window.showNotification(`Import Successful: ${importedCount} created, ${updatedCount} updated`, 'success');
-                renderClientsEnhanced();
+                if (typeof window.renderClientsEnhanced === 'function') window.renderClientsEnhanced();
 
             } catch (err) {
                 console.error(err);
@@ -1092,7 +1092,7 @@
     };
 
     // Exports
-    window.renderClientsModule = renderClientsEnhanced;
+    window.renderClientsModule = window.renderClientsEnhanced;
     // Ensure other helpers are exposed if defined locally but used in HTML
     if (typeof openNewClientModal !== 'undefined') window.openNewClientModal = openNewClientModal;
 
