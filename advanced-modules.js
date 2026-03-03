@@ -1,4 +1,4 @@
-// Advanced Module Functions for AuditCB360
+// Advanced Module Functions for AuditCB360 (ESM-ready)
 // This file contains enhanced rendering functions for Auditors, Programmes, Planning, and Execution modules
 
 // ============================================
@@ -3339,3 +3339,7 @@ window.deleteAuditorDocument = async function (auditorId, docIdx) {
     if (window.showNotification) window.showNotification('Document deleted', 'info');
 };
 
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { openAddAuditorModal, toggleAuditorAnalytics, changeAuditorPage, changeAuditorItemsPerPage, deleteAuditor, renderMatrixTab, exportCompetenceMatrix, openMultiSiteSamplingCalculatorModal, applySamplingToPlan, randomlySelectSites, renderAuditorsEnhanced, renderAuditorDetail, renderCompetenceMatrix, calculateManDays, renderManDayCalculator, openEditAuditorModal, openAddTrainingModal, openUploadDocumentModal, clearAuditorUpcomingFilters, openAuditorUploadModal, openAddQualificationModal, addWitnessAudit, addPerformanceReview, addReportReview, renderMultiSiteSamplingCalculator };
+}

@@ -1,5 +1,5 @@
 // ============================================
-// VALIDATION UTILITY MODULE
+// VALIDATION UTILITY MODULE (ESM-ready)
 // ============================================
 // Comprehensive form validation for AuditCB360
 // Prevents XSS, injection, and data integrity issues
@@ -309,5 +309,10 @@ const Validator = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.Validator = Validator;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Validator;
+}

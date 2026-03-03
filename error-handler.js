@@ -1,5 +1,5 @@
 // ============================================
-// ERROR HANDLER UTILITY MODULE
+// ERROR HANDLER UTILITY MODULE (ESM-ready)
 // ============================================
 // Centralized error handling with user-friendly messages
 
@@ -176,14 +176,24 @@ const ErrorHandler = {
     },
 
     /**
-     * Report error to monitoring service
+     * Report error to Sentry monitoring service
+     * @param {Error} error - The error to report
+     * @param {string} context - Context string describing where the error occurred
      */
     reportError: function (error, context) {
-        if (!Logger.DEBUG_MODE) {
-            // TODO: Integrate with error monitoring service
-            // Example: Sentry.captureException(error, { tags: { context } });
-            Logger.debug('Would report to monitoring:', error, context);
+        // Report to Sentry if available (initialized in sentry-init.js)
+        if (window.Sentry && typeof window.Sentry.captureException === 'function') {
+            window.Sentry.setContext('error_context', {
+                module: context,
+                url: window.location.href,
+                timestamp: new Date().toISOString(),
+                user: window.state?.currentUser?.email || 'anonymous'
+            });
+            window.Sentry.captureException(error, {
+                tags: { context: context }
+            });
         }
+        Logger.debug('Error reported to monitoring:', context, error.message);
     },
 
     /**
@@ -252,8 +262,13 @@ const ErrorHandler = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.ErrorHandler = ErrorHandler;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ErrorHandler;
+}
 
 // Setup global error handlers
 window.addEventListener('error', (event) => {

@@ -1,5 +1,5 @@
 // ============================================
-// APPEALS & COMPLAINTS MODULE
+// APPEALS & COMPLAINTS MODULE (ESM-ready)
 // ISO 17021-1 Clause 9.10 & 9.11 Compliance
 // ============================================
 
@@ -1004,3 +1004,7 @@ window.managePanelRecords = function (appealId) {
 window.renderAppealsComplaintsModule = renderAppealsComplaintsModule;
 // Note: switchACTab already defined at line ~435
 
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { switchACTab, openNewAppealModal, openNewComplaintModal, viewAppealDetail, viewComplaintDetail, updateAppealStatus, updateComplaintStatus, printACRegister, editAppeal, editComplaint, managePanelRecords, renderAppealsComplaintsModule };
+}

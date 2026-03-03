@@ -1,5 +1,5 @@
 // ============================================
-// EXPORT MODULE - PDF & Excel Export
+// EXPORT MODULE - PDF & Excel Export (ESM-ready)
 // ============================================
 
 // Export to CSV (Excel-compatible)
@@ -414,3 +414,8 @@ window.exportClientsToPDF = exportClientsToPDF;
 window.exportAuditProgramToPDF = exportAuditProgramToPDF;
 window.exportDashboardToPDF = exportDashboardToPDF;
 window.addExportButtons = addExportButtons;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { exportToCSV, exportToPDF, exportClientsToCSV, exportAuditorsToCSV, exportAuditProgramsToCSV, exportClientsToPDF, exportAuditProgramToPDF, exportDashboardToPDF, addExportButtons };
+}

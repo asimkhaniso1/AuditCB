@@ -94,3 +94,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.head.appendChild(cjScript);
     }
 });
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DOMPurify;
+}

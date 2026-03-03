@@ -1,5 +1,5 @@
 // ============================================
-// SANITIZATION UTILITY MODULE
+// SANITIZATION UTILITY MODULE (ESM-ready)
 // ============================================
 // XSS Prevention using DOMPurify
 // Wrapper for consistent sanitization across app
@@ -243,5 +243,10 @@ if (!document.getElementById('validation-styles')) {
     document.head.appendChild(style);
 }
 
-// Export to window
+// Window export (used by all existing code)
 window.Sanitizer = Sanitizer;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Sanitizer;
+}

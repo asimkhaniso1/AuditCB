@@ -1,5 +1,5 @@
 // ============================================
-// SYSTEM DEFAULTS - MISSING FUNCTION FIX
+// SYSTEM DEFAULTS - MISSING FUNCTION FIX (ESM-ready)
 // ============================================
 
 function getDefaultsHTML() {
@@ -124,3 +124,8 @@ async function saveDefaultSettings() {
 }
 
 window.saveDefaultSettings = saveDefaultSettings;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = saveDefaultSettings;
+}

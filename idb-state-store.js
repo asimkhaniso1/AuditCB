@@ -1,5 +1,5 @@
 // ============================================
-// INDEXEDDB STATE STORE
+// INDEXEDDB STATE STORE (ESM-ready)
 // ============================================
 // Replaces localStorage for app state persistence.
 // IndexedDB has no practical size limit (typically 50%+ of disk),
@@ -263,3 +263,8 @@ const StateStore = {
 window.StateStore = StateStore;
 
 // Module loaded silently
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = StateStore;
+}

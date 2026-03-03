@@ -1,5 +1,5 @@
 // ============================================
-// IMPARTIALITY COMMITTEE MODULE
+// IMPARTIALITY COMMITTEE MODULE (ESM-ready)
 // ISO 17021-1 Clause 5.2
 // ============================================
 
@@ -1035,3 +1035,7 @@ window.deleteCommitteeMember = async function (id) {
     }
 };
 
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { switchImpartialityTab, openAddCommitteeMemberModal, openAddThreatModal, openAddMeetingModal, editCommitteeMember, viewMeeting, viewThreat, editThreat, editMeeting };
+}

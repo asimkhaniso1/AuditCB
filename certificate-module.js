@@ -1,5 +1,5 @@
 // ============================================
-// CERTIFICATE MANAGEMENT MODULE
+// CERTIFICATE MANAGEMENT MODULE (ESM-ready)
 // ============================================
 // Handles certificate generation, tracking, and lifecycle management
 
@@ -522,4 +522,9 @@ window.revokeCertificate = function (certId) {
 // Initialize certificates array in state if not exists
 if (!window.state.certificates) {
     window.state.certificates = [];
+}
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { generateCertificate, exportCertificatePDF, onload, renderCertificates, suspendCertificate, revokeCertificate };
 }

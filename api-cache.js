@@ -1,5 +1,5 @@
 // ============================================
-// API CACHE MANAGER
+// API CACHE MANAGER (ESM-ready)
 // Optimizes Supabase calls with intelligent caching
 // ============================================
 
@@ -315,3 +315,7 @@ window.CachedData = {
     }
 };
 
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CachedData;
+}

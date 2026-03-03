@@ -1,5 +1,5 @@
 // ============================================
-// CLIENTS LIST MODULE (Split from clients-module.js)
+// CLIENTS LIST MODULE (Split from clients-module.js) (ESM-ready)
 // ============================================
 // Handles client list view, search, filter, and pagination
 // Loaded AFTER clients-module.js - overrides the original function
@@ -286,7 +286,7 @@ window.changeClientItemsPerPage = function (val) {
     }
 };
 
-// Export to window (overrides clients-module.js version)
+// Window export (used by all existing code) (overrides clients-module.js version)
 window.renderClientsEnhanced = renderClientsEnhanced;
 
 Logger.info('Clients List module loaded (Dynamic Event Binding Fix - v3.1)');
@@ -416,3 +416,8 @@ window.archiveClient = function (clientId) {
         renderClientsEnhanced();
     }
 };
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = renderClientsEnhanced;
+}

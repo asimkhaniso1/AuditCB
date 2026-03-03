@@ -1,5 +1,5 @@
 // ============================================
-// NOTIFICATION SYSTEM MODULE
+// NOTIFICATION SYSTEM MODULE (ESM-ready)
 // ============================================
 // In-app notification center for important events
 
@@ -322,3 +322,8 @@ if (document.readyState === 'loading') {
 }
 
 Logger.info('Notification module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { toggleNotificationPanel, NotificationManager };
+}

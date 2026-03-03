@@ -1,14 +1,15 @@
 // ============================================
-// SUPABASE CONFIGURATION MODULE
+// SUPABASE CONFIGURATION MODULE (ESM-ready)
 // ============================================
 // Centralized Supabase configuration management
 // Version: 2.0 - Permanent credentials configured
 
 const SupabaseConfig = {
 
-    // Default Supabase credentials (permanent configuration)
-    _defaultUrl: 'https://dfzisgfpstrsyncfsxyb.supabase.co',
-    _defaultAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmemlzZ2Zwc3Ryc3luY2ZzeHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxODIyNDYsImV4cCI6MjA4Mjc1ODI0Nn0.TTbauCS-CscAeYGlgACJqDcagt_gf3YQSC0w80IgjIo',
+    // Supabase credentials must be provided via environment variables,
+    // localStorage, or settings. Never hardcode credentials in source.
+    _defaultUrl: null,
+    _defaultAnonKey: null,
 
     /**
      * Get Supabase URL
@@ -21,7 +22,7 @@ const SupabaseConfig = {
 
         // Try localStorage (manual configuration)
         const stored = localStorage.getItem('supabase_url');
-        // CRITICAL FIX: Only accept valid Supabase Cloud URLs
+        // Only accept valid Supabase Cloud URLs
         if (stored && stored.includes('supabase.co')) {
             return stored;
         }
@@ -31,8 +32,12 @@ const SupabaseConfig = {
             return window.state.settings.supabaseUrl;
         }
 
-        // Use default (permanent configuration)
-        return this._defaultUrl;
+        // No credentials configured
+        if (!this._warnedNoUrl) {
+            Logger.warn('Supabase URL not configured. Set via Settings → Supabase Configuration or build environment.');
+            this._warnedNoUrl = true;
+        }
+        return null;
     },
 
     /**
@@ -56,8 +61,12 @@ const SupabaseConfig = {
             return window.state.settings.supabaseAnonKey;
         }
 
-        // Use default (permanent configuration)
-        return this._defaultAnonKey;
+        // No credentials configured
+        if (!this._warnedNoKey) {
+            Logger.warn('Supabase anon key not configured. Set via Settings → Supabase Configuration or build environment.');
+            this._warnedNoKey = true;
+        }
+        return null;
     },
 
     /**
@@ -380,7 +389,12 @@ const SupabaseConfig = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.SupabaseConfig = SupabaseConfig;
 
 Logger.info('SupabaseConfig module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SupabaseConfig;
+}

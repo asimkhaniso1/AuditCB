@@ -1,22 +1,26 @@
 /**
- * AuditCB360 Logger Utility
+ * AuditCB360 Logger Utility (ESM-ready)
  * Handles application logging with debug mode support and log levels.
  * Replaces direct console.log calls to prevent info leakage in production.
- * 
+ *
  * Supports both:
  *   Logger.info('message')           - Simple message
  *   Logger.info('module', 'message') - Module-prefixed message
  */
 
-window.DEBUG_MODE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+const DEBUG_MODE = (typeof location !== 'undefined')
+    ? (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    : false;
 
-window.Logger = {
+const Logger = {
+    DEBUG_MODE,
+
     /**
      * Log debug information (only if DEBUG_MODE is true)
      * @param {...any} args - Either (message) or (module, message, data)
      */
     debug: (...args) => {
-        if (!window.DEBUG_MODE) return;
+        if (!DEBUG_MODE) return;
         const timestamp = new Date().toLocaleTimeString();
 
         if (args.length === 1) {
@@ -81,11 +85,20 @@ window.Logger = {
      * @param {...any} args - Any arguments
      */
     log: (...args) => {
-        if (window.DEBUG_MODE) {
+        if (DEBUG_MODE) {
             console.log(...args);
         }
     }
 };
 
-// Ensure Logger is available immediately
-if (window.DEBUG_MODE) console.log('[Logger] AuditCB360 Logger initialized (debug mode)');
+// Window exports (used by all existing code)
+window.DEBUG_MODE = DEBUG_MODE;
+window.Logger = Logger;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Logger, DEBUG_MODE };
+}
+
+// Init message
+if (DEBUG_MODE) console.log('[Logger] AuditCB360 Logger initialized (debug mode)');

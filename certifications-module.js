@@ -1,6 +1,6 @@
 
 // ============================================
-// AUDITCB360 - CERTIFICATION MODULE
+// AUDITCB360 - CERTIFICATION MODULE (ESM-ready)
 // ============================================
 
 // Initialize Certifications State if missing
@@ -1115,3 +1115,8 @@ window.updateCertExpiryDate = function () {
     // Format to YYYY-MM-DD
     expiryDateInput.value = expiryDate.toISOString().split('T')[0];
 };
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { switchCertTab, openIssueCertificateModal, deleteCertificate, viewCertificate, openCertActionModal, restoreCertificate, editCertificate, printCertificateRegister, toggleCertAnalytics, updatePublicDirectory, exportPublicDirectory, generateEmbedCode, updateCertExpiryDate };
+}

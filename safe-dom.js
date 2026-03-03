@@ -1,5 +1,5 @@
 // ============================================
-// SAFE DOM UTILITIES
+// SAFE DOM UTILITIES (ESM-ready)
 // ============================================
 // Safe DOM manipulation helpers to prevent XSS
 
@@ -32,12 +32,19 @@ const SafeDOM = {
                 ADD_ATTR: ['data-action', 'data-action-change', 'data-id', 'data-json', 'data-arg1', 'data-arg2', 'data-hash', 'data-module', 'data-subtab', 'tabindex', 'role', 'aria-label', 'aria-hidden', 'aria-expanded']
             }, config));
         } else {
-            // Fallback — sanitizer not loaded, use innerHTML directly but log warning
+            // Fallback — sanitizer not loaded, use basic escape to prevent XSS
             if (!SafeDOM._warnedNoSanitizer) {
-                Logger.warn('SafeDOM: No sanitizer available (DOMPurify not loaded). Using innerHTML directly.');
+                Logger.warn('SafeDOM: DOMPurify not loaded. Using basic HTML escape fallback — some safe HTML tags will be escaped.');
                 SafeDOM._warnedNoSanitizer = true;
             }
-            element.innerHTML = html;
+            // Basic entity escape: prevents script injection but also escapes safe tags.
+            // This is intentionally conservative — security over functionality.
+            element.innerHTML = String(html)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;');
         }
     },
 
@@ -333,7 +340,12 @@ const SafeDOM = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.SafeDOM = SafeDOM;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SafeDOM;
+}
 
 Logger.info('SafeDOM utilities loaded');

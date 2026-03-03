@@ -1,5 +1,5 @@
 // ============================================
-// DATA MIGRATION & MANAGEMENT MODULE
+// DATA MIGRATION & MANAGEMENT MODULE (ESM-ready)
 // ============================================
 // Handles migrating data from localStorage to Supabase
 // and managing local data cleanup
@@ -378,3 +378,8 @@ const DataMigration = {
 
 // Expose globally
 window.DataMigration = DataMigration;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DataMigration;
+}

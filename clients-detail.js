@@ -1,7 +1,7 @@
 // ============================================
 // CLIENTS DETAIL MODULE (Split from clients-module.js)
 // ============================================
-// Handles client detail view and tab navigation
+// Handles client detail view and tab navigation (ESM-ready)
 // Loaded AFTER clients-module.js - fixes bugs in original
 
 // Fix: Override switchClientDetailTab with corrected version
@@ -27,3 +27,8 @@ window.switchClientDetailTab = function (clientId, tabName) {
 // This module allows incremental refactoring without breaking existing code
 
 Logger.info('Clients Detail module loaded (split version)');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = switchClientDetailTab;
+}

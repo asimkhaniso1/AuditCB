@@ -1,5 +1,5 @@
 // ============================================
-// CLIENT WORKSPACE MODULE
+// CLIENT WORKSPACE MODULE (ESM-ready)
 // Client-centric navigation and workspace rendering
 // ============================================
 
@@ -1631,3 +1631,8 @@ window.initClientDashboardCharts = function (clientId) {
     }
 };
 // window.renderClientWorkspace export is not needed as selectClient handles it directly via renderClientSidebarMenu loops
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { populateClientSidebar, selectClient, backToDashboard, renderClientModule, switchClientOverviewTab, downloadReport, initClientDashboardCharts };
+}

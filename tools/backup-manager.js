@@ -351,14 +351,14 @@ const BackupManager = {
                 </div>
 
                 <div style="margin-bottom: 1rem;">
-                    <button onclick="BackupManager.createBackup('manual')" class="btn btn-primary">
+                    <button data-action="backupCreate" class="btn btn-primary">
                         <i class="fa-solid fa-plus"></i> Create Backup Now
                     </button>
-                    <button onclick="document.getElementById('import-backup-file').click()" class="btn btn-secondary">
+                    <button data-action="backupImportClick" class="btn btn-secondary">
                         <i class="fa-solid fa-upload"></i> Import Backup
                     </button>
                     <input type="file" id="import-backup-file" accept=".json" style="display: none;" 
-                           onchange="BackupManager.importBackup(this.files[0]).then(() => BackupManager.showBackupManager())">
+                           data-action-change="backupImportFile">
                 </div>
 
                 <table class="table">
@@ -379,15 +379,15 @@ const BackupManager = {
                                 <td>${backup.user}</td>
                                 <td>${(backup.size / 1024).toFixed(2)} KB</td>
                                 <td>
-                                    <button onclick="BackupManager.restoreBackup('${backup.key}')" 
+                                    <button data-action="backupRestore" data-id="${backup.key}" 
                                             class="btn btn-sm btn-success" title="Restore">
                                         <i class="fa-solid fa-undo"></i>
                                     </button>
-                                    <button onclick="BackupManager.exportBackup('${backup.key}')" 
+                                    <button data-action="backupExport" data-id="${backup.key}" 
                                             class="btn btn-sm btn-primary" title="Export">
                                         <i class="fa-solid fa-download"></i>
                                     </button>
-                                    <button onclick="BackupManager.deleteBackup('${backup.key}'); BackupManager.showBackupManager();" 
+                                    <button data-action="backupDelete" data-id="${backup.key}" 
                                             class="btn btn-sm btn-danger" title="Delete">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
@@ -409,6 +409,48 @@ const BackupManager = {
             const contentArea = document.getElementById('content-area');
             if (contentArea) {
                 SafeDOM.setHTML(contentArea, html);
+            }
+        }
+
+        // Delegated event listener for backup actions
+        const container = document.querySelector('.backup-manager');
+        if (container) {
+            container.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-action]');
+                if (!btn) return;
+                const action = btn.dataset.action;
+                const key = btn.dataset.id;
+
+                switch (action) {
+                    case 'backupCreate':
+                        BackupManager.createBackup('manual');
+                        BackupManager.showBackupManager();
+                        break;
+                    case 'backupImportClick':
+                        document.getElementById('import-backup-file')?.click();
+                        break;
+                    case 'backupRestore':
+                        BackupManager.restoreBackup(key);
+                        break;
+                    case 'backupExport':
+                        BackupManager.exportBackup(key);
+                        break;
+                    case 'backupDelete':
+                        BackupManager.deleteBackup(key);
+                        BackupManager.showBackupManager();
+                        break;
+                }
+            });
+
+            // Handle file import change event
+            const importInput = container.querySelector('#import-backup-file');
+            if (importInput) {
+                importInput.addEventListener('change', function () {
+                    if (this.files[0]) {
+                        BackupManager.importBackup(this.files[0])
+                            .then(() => BackupManager.showBackupManager());
+                    }
+                });
             }
         }
     }

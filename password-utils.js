@@ -1,40 +1,79 @@
 // ============================================
-// PASSWORD UTILITIES MODULE
+// PASSWORD UTILITIES MODULE (ESM-ready)
 // ============================================
 // Provides password hashing and validation using Web Crypto API
 
 const PasswordUtils = {
+    // PBKDF2 configuration
+    ITERATIONS: 100000,
+    KEY_LENGTH: 256, // bits
+    SALT_LENGTH: 16, // bytes
+
+    /** @deprecated Client-side password hashing is deprecated. Use Supabase Auth for production authentication. */
+    isDeprecated: true,
+
     /**
-     * Hash a password using SHA-256
+     * Hash a password using PBKDF2 with a random salt
      * @param {string} password - Plain text password
-     * @returns {Promise<string>} - Hex string hash
+     * @param {Uint8Array} [existingSalt] - Optional existing salt (for verification)
+     * @returns {Promise<{hash: string, salt: string}>} - Hex strings for hash and salt
      */
-    async hashPassword(password) {
+    async hashPassword(password, existingSalt = null) {
+        if (window.Logger) Logger.warn('PasswordUtils.hashPassword() is deprecated — use Supabase Auth for production.');
         try {
             const encoder = new TextEncoder();
-            const data = encoder.encode(password);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex;
+            const salt = existingSalt || crypto.getRandomValues(new Uint8Array(this.SALT_LENGTH));
+
+            // Import password as a CryptoKey
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+            );
+
+            // Derive bits using PBKDF2
+            const derivedBits = await crypto.subtle.deriveBits(
+                { name: 'PBKDF2', salt, iterations: this.ITERATIONS, hash: 'SHA-256' },
+                keyMaterial,
+                this.KEY_LENGTH
+            );
+
+            const hashHex = Array.from(new Uint8Array(derivedBits))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+            const saltHex = Array.from(salt)
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // Return combined format: salt:hash
+            return saltHex + ':' + hashHex;
         } catch (error) {
-            console.error('Password hashing failed:', error);
+            Logger.error('Password hashing failed:', error);
             throw new Error('Failed to hash password');
         }
     },
 
     /**
-     * Verify a password against a hash
-     * @param {string} password - Plain text password to verify
-     * @param {string} hash - Stored hash to compare against
-     * @returns {Promise<boolean>} - True if password matches
+     * @deprecated Use Supabase Auth for production. Retained for offline/demo only.
+     * Verify a password against a stored hash
      */
-    async verifyPassword(password, hash) {
+    async verifyPassword(password, storedHash) {
+        if (window.Logger) Logger.warn('PasswordUtils.verifyPassword() is deprecated — use Supabase Auth for production.');
         try {
-            const passwordHash = await this.hashPassword(password);
-            return passwordHash === hash;
+            if (storedHash.includes(':')) {
+                // New PBKDF2 format: salt_hex:hash_hex
+                const [saltHex, expectedHash] = storedHash.split(':');
+                const salt = new Uint8Array(saltHex.match(/.{2}/g).map(b => parseInt(b, 16)));
+                const result = await this.hashPassword(password, salt);
+                const [, computedHash] = result.split(':');
+                return computedHash === expectedHash;
+            } else {
+                // Legacy SHA-256 format (backward compatibility)
+                const encoder = new TextEncoder();
+                const data = encoder.encode(password);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashHex = Array.from(new Uint8Array(hashBuffer))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                return hashHex === storedHash;
+            }
         } catch (error) {
-            console.error('Password verification failed:', error);
+            Logger.error('Password verification failed:', error);
             return false;
         }
     },
@@ -170,5 +209,10 @@ const PasswordUtils = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.PasswordUtils = PasswordUtils;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PasswordUtils;
+}

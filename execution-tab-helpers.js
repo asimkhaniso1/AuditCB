@@ -1,5 +1,5 @@
 // ============================================
-// EXECUTION TAB HELPER - Checklist Item Renderer
+// EXECUTION TAB HELPER - Checklist Item Renderer (ESM-ready)
 // ============================================
 // Extracted from renderExecutionTab for better maintainability
 
@@ -123,3 +123,7 @@ window.renderChecklistItemRow = function (item, checklistId, idx, isCustom, prog
     `;
 };
 
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = renderChecklistItemRow;
+}

@@ -982,3 +982,7 @@ function renderAuditorWorkloadChart() {
 // Export function
 window.renderDashboardEnhanced = renderDashboardEnhanced;
 
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = renderDashboardEnhanced;
+}

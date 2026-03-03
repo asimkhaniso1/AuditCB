@@ -1,5 +1,5 @@
 // ============================================
-// MANAGEMENT REVIEW MODULE
+// MANAGEMENT REVIEW MODULE (ESM-ready)
 // ISO 17021-1 Clause 8.5
 // ============================================
 
@@ -734,3 +734,8 @@ Return JSON: {"internalAuditResults":"","customerFeedback":"","processPerformanc
         btn.innerHTML = originalHTML;
     }
 };
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { viewManagementReview, openNewManagementReviewModal, printManagementReview, editManagementReview };
+}

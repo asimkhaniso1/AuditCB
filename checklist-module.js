@@ -1,4 +1,4 @@
-// Checklist Library Module
+// Checklist Library Module (ESM-ready)
 // Manages audit checklists organized by ISO standard with Global/Custom types
 
 // DOM Elements retrieved locally to avoid collision with script.js
@@ -1636,3 +1636,8 @@ window.archiveChecklist = archiveChecklist;
 window.restoreChecklist = restoreChecklist;
 window.permanentDeleteChecklist = permanentDeleteChecklist;
 window.printChecklist = printChecklist;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { downloadChecklistTemplate, openImportChecklistModal, renderChecklistEditor, saveChecklistFromEditor, renderChecklistLibrary, openAddChecklistModal, openEditChecklistModal, viewChecklistDetail, deleteChecklist, archiveChecklist, restoreChecklist, permanentDeleteChecklist, printChecklist };
+}

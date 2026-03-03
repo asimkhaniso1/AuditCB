@@ -1,5 +1,5 @@
 // ============================================
-// API USAGE TRACKER MODULE
+// API USAGE TRACKER MODULE (ESM-ready)
 // Track Gemini API usage and estimate costs
 // ============================================
 
@@ -383,4 +383,9 @@ if (typeof window !== 'undefined') {
     } else {
         APIUsageTracker.init();
     }
+}
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = APIUsageTracker;
 }

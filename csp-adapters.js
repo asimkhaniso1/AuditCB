@@ -264,3 +264,8 @@
     });
 
 })();
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { toggleDisplay, toggleOrigNotes, viewEvidenceImageByUrlSelf, clickTab, setReportRecommendation, setGalleryMainSrc, toggleElementIfValue, toggleAccordion, toggleSubAccordion, toggleCheckboxStyle, formatDatePrev, updateCertFieldAndExpiry, finalizeOrgSetup, toggleClosedCAPAs, toggleClientDocsBody, navigateToAuditorDetail, clearActivityLogs, updateSkillValue, copyCertEmbed, handleDocFileChange, handleDocFileChangeAlways };
+}

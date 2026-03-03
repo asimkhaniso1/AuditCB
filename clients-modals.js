@@ -1,5 +1,5 @@
 // ============================================
-// CLIENTS MODALS MODULE (Split from clients-module.js)
+// CLIENTS MODALS MODULE (Split from clients-module.js) (ESM-ready)
 // ============================================
 // Foundation for modal functions - enables future refactoring
 // Currently exports references to the original functions
@@ -44,7 +44,7 @@ const ClientModals = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.ClientModals = ClientModals;
 
 // Re-export existing modal functions (from clients-module.js)
@@ -55,3 +55,8 @@ window.ClientModals = ClientModals;
 // window.addSite - defined in clients-module.js
 
 Logger.info('Clients Modals module loaded (utilities ready for future migration)');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ClientModals;
+}

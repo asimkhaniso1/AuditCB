@@ -1,4 +1,9 @@
-window.UTILS = {
+// ============================================
+// UTILITY FUNCTIONS MODULE (ESM-ready)
+// ============================================
+// Structured as a standalone const + window export.
+
+const UTILS = {
     escapeHtml: function (unsafe) {
         if (!unsafe) return '';
         if (typeof unsafe !== 'string') return String(unsafe);
@@ -13,7 +18,7 @@ window.UTILS = {
     formatDate: function (dateStr, specificFormat) {
         if (!dateStr) return '';
         const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+        if (isNaN(date.getTime())) return dateStr;
 
         const format = specificFormat || (window.state && window.state.cbSettings && window.state.cbSettings.dateFormat) || 'YYYY-MM-DD';
 
@@ -44,8 +49,6 @@ window.UTILS = {
     /**
      * Generate a human-readable plan reference.
      * Format: PLN-{ClientInitials}-{YYYY}-{NN}
-     * e.g.  PLN-PC-2026-01  (1st plan for "PC Connection" in 2026)
-     * Falls back to PLN-{first8chars} if plan data is missing.
      */
     getPlanRef: function (planOrId) {
         const plans = (window.state && window.state.auditPlans) || [];
@@ -54,12 +57,10 @@ window.UTILS = {
             plan = plans.find(function (p) { return String(p.id) === String(planOrId); });
         }
         if (!plan) {
-            // Fallback: show short id
             let rawId = typeof planOrId === 'string' ? planOrId : (planOrId && planOrId.id ? planOrId.id : '');
             return 'PLN-' + (rawId ? rawId.substring(0, 8) : '???');
         }
 
-        // Client initials: take first letter of each word, max 3 chars
         let clientName = plan.client || '';
         let initials = clientName
             .replace(/[^a-zA-Z0-9\s]/g, '')
@@ -70,7 +71,6 @@ window.UTILS = {
             .substring(0, 3);
         if (!initials) initials = 'XX';
 
-        // Year from plan date
         let year = '';
         if (plan.date) {
             let d = new Date(plan.date);
@@ -79,7 +79,6 @@ window.UTILS = {
             year = String(new Date().getFullYear());
         }
 
-        // Sequence: count plans for same client in same year, order by date
         let samePlans = plans
             .filter(function (p) {
                 return p.client === plan.client &&
@@ -93,3 +92,11 @@ window.UTILS = {
         return 'PLN-' + initials + '-' + year + '-' + seqStr;
     }
 };
+
+// Window export (used by all existing code)
+window.UTILS = UTILS;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = UTILS;
+}

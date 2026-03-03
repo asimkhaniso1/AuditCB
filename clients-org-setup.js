@@ -1,10 +1,13 @@
 /**
- * CLIENT MODULE FIXES - v5 (Complete with HTML Generators)
- * Exposes ALL functions to global scope that were accidentally privately scoped in clients-module.js
- * INCLUDES HTML Generators to ensure they bind to the global functions.
+ * CLIENT ORG SETUP MODULE (ESM-ready)
+ * Authoritative HTML generators and CRUD functions for the client
+ * Organisation Setup tab (sites, contacts, departments, goods/services,
+ * key processes, designations, certifications, and audit team).
+ *
+ * Note: This module loads AFTER clients-crud.js and clients-import.js,
+ * overriding their versions of these functions with the definitive
+ * implementations that include proper table styling and UUID handling.
  */
-if (window.Logger) Logger.debug('Modules', 'clients-module-fix.js loading...');
-
 // ============================================
 // 1. ORIGINAL FIXES (HTML GENERATORS - ORG SETUP)
 // ============================================
@@ -1374,4 +1377,9 @@ window.aiGenerateScope = async function (clientId, certIndex) {
     }
 };
 
-if (window.Logger) Logger.debug('Modules', 'clients-module-fix.js loaded successfully with HTML generators.');
+if (window.Logger) Logger.debug('Modules', 'clients-org-setup.js loaded successfully.');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { getClientOrgSetupHTML, setSetupWizardStep, getClientCertificatesHTML, generateCertificatesFromStandards, updateCertField, updateSiteScope, saveCertificateDetails, getClientSettingsHTML, _orgTableSearch, _orgViewItem, _orgPrintItem, getClientProfileHTML, getClientSitesHTML, getClientContactsHTML, getClientDepartmentsHTML, getClientGoodsServicesHTML, getClientKeyProcessesHTML, getClientDesignationsHTML, getClientAuditTeamHTML, addSite, bulkUploadSites, deleteSite, addDepartment, deleteDepartment, editDepartment, bulkUploadDepartments, addContactPerson, deleteContact, editContact, bulkUploadContacts, addClientDesignation, deleteClientDesignation, editClientDesignation, bulkUploadDesignations, addGoodsService, deleteGoodsService, editGoodsService, bulkUploadGoodsServices, addKeyProcess, deleteKeyProcess, editKeyProcess, bulkUploadKeyProcesses, openClientAuditorAssignmentModal, removeClientAuditorAssignment, editSite, handleClientLogoUpload };
+}

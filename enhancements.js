@@ -798,3 +798,8 @@
     }, true);
 
 })();
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { LazyChecklist, toggleShortcutHelp, getClauseAnalytics, renderClauseAnalyticsCard, exportChecklistPDF, ResponsiveHelper };
+}

@@ -1,5 +1,5 @@
 // ============================================
-// AUDIT LOGGING SYSTEM
+// AUDIT LOGGING SYSTEM (ESM-ready)
 // ============================================
 // ISO 17021-1 compliant audit trail for all data changes
 
@@ -463,7 +463,7 @@ const AuditLogger = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.AuditLogger = AuditLogger;
 
 // Auto-initialize
@@ -474,3 +474,8 @@ if (document.readyState === 'loading') {
 }
 
 Logger.info('AuditLogger module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AuditLogger;
+}

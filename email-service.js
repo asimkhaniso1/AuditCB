@@ -1,5 +1,5 @@
 // ============================================
-// EMAIL SERVICE - Client-Side Wrapper
+// EMAIL SERVICE - Client-Side Wrapper (ESM-ready)
 // ============================================
 // Provides a simple interface for sending emails via Supabase Edge Function
 
@@ -158,3 +158,8 @@ window.EmailService = {
 };
 
 Logger.info('Email Service loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = EmailService;
+}

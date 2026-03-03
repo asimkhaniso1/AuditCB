@@ -1,5 +1,5 @@
 // ============================================
-// AUDITOR FORM MODULE
+// AUDITOR FORM MODULE (ESM-ready)
 // ============================================
 // Handles adding/editing auditors in a full-page view
 // Includes tabbed interface for better organization and ISO compliance details
@@ -370,3 +370,8 @@ window.saveAuditorForm = function (auditorId) {
 // Globalize
 window.renderAuditorForm = renderAuditorForm;
 window.saveAuditorForm = window.saveAuditorForm;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { saveAuditorForm, renderAuditorForm };
+}

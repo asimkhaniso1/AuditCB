@@ -3,7 +3,7 @@
 // ISO 17021-1 Clause 9.9 & 8.7
 // ============================================
 
-// Initialize NCR-CAPA state
+// Initialize NCR-CAPA state (ESM-ready)
 if (!window.state.ncrs) {
     window.state.ncrs = [];
 }
@@ -1357,3 +1357,8 @@ window.updateCAPAProgress = function (ncrId) {
 // Export
 window.renderNCRCAPAModule = renderNCRCAPAModule;
 window.switchNCRTab = switchNCRTab;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { getNCRAuditPlanOptions, updateNCRAuditPlanOptions, initNCRAnalyticsCharts, openNewNCRModal, viewNCRDetails, editNCR, openAddCAPAModal, printNCRRegister, verifyCAPA, updateCAPAProgress, renderNCRCAPAModule, switchNCRTab };
+}

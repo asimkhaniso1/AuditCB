@@ -1,5 +1,5 @@
 // ============================================
-// RECORD RETENTION MODULE
+// RECORD RETENTION MODULE (ESM-ready)
 // ISO 17021-1 Clause 8.4 - Control of Records
 // ============================================
 
@@ -480,3 +480,8 @@ window.exportRetentionReport = function () {
 
 // Export the main function
 window.renderRecordRetentionModule = renderRecordRetentionModule;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { filterRetentionRecords, showArchiveOptions, openRetentionPolicyModal, exportRetentionReport, renderRecordRetentionModule };
+}

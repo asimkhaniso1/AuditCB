@@ -1,5 +1,5 @@
 // ============================================
-// EVENT MANAGER - Prevent Memory Leaks
+// EVENT MANAGER - Prevent Memory Leaks (ESM-ready)
 // ============================================
 // Utility to manage event listeners and prevent memory leaks
 
@@ -84,3 +84,8 @@
 
 
 })();
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = EventManager;
+}

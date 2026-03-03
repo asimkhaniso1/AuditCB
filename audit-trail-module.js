@@ -1,5 +1,5 @@
 // ============================================
-// AUDIT TRAIL MODULE
+// AUDIT TRAIL MODULE (ESM-ready)
 // ============================================
 // Tracks user actions for compliance and debugging
 
@@ -254,3 +254,8 @@ if (document.readyState === 'loading') {
 }
 
 Logger.info('AuditTrail module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { auditLog, AuditTrail };
+}

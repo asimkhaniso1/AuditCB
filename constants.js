@@ -1,4 +1,11 @@
-window.CONSTANTS = {
+// ============================================
+// CONSTANTS MODULE (ESM-ready)
+// ============================================
+// Structured as a standalone const + window export.
+// Ready for ES module migration — add `export default CONSTANTS`
+// once all script tags are converted to type="module".
+
+const CONSTANTS = {
     STATUS: {
         DRAFT: 'Draft',
         IN_PROGRESS: 'In Progress',
@@ -82,3 +89,11 @@ window.CONSTANTS = {
         INFO: 'var(--info-color)'
     }
 };
+
+// Window export (used by all existing code)
+window.CONSTANTS = CONSTANTS;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CONSTANTS;
+}

@@ -1,5 +1,5 @@
 // ============================================
-// FORM VALIDATION WRAPPER
+// FORM VALIDATION WRAPPER (ESM-ready)
 // ============================================
 // High-level validation helpers for common forms
 
@@ -317,7 +317,12 @@ const FormValidator = {
     }
 };
 
-// Export to window
+// Window export (used by all existing code)
 window.FormValidator = FormValidator;
 
 Logger.info('FormValidator module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = FormValidator;
+}

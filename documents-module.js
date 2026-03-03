@@ -1,5 +1,5 @@
 // ============================================
-// DOCUMENT MANAGEMENT MODULE
+// DOCUMENT MANAGEMENT MODULE (ESM-ready)
 // ============================================
 
 // Initial mock data for documents if not present
@@ -878,3 +878,8 @@ window.renderDocuments = renderDocuments;
 window.openUploadModal = openUploadModal;
 window.downloadDocument = downloadDocument;
 window.deleteDocument = deleteDocument;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { viewDocumentHistory, approveDocument, createNewRevision, switchDocumentTab, viewDocumentDetails, printMasterDocumentList, exportMasterDocumentList, renderDocuments, openUploadModal, downloadDocument, deleteDocument };
+}
