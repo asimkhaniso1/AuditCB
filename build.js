@@ -176,6 +176,27 @@ if (fs.existsSync(indexPath)) {
     fs.writeFileSync(indexPath, html, 'utf8');
     const htmlAfter = html.length;
     console.log(`   ✅ HTML minified: ${Math.round(htmlBefore / 1024)}KB → ${Math.round(htmlAfter / 1024)}KB (${Math.round((1 - htmlAfter / htmlBefore) * 100)}% smaller)`);
+
+    // 6. Inject environment variables (Supabase credentials from Vercel env vars)
+    const envVars = {
+        SUPABASE_URL: process.env.SUPABASE_URL || '',
+        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
+        SENTRY_DSN: process.env.SENTRY_DSN || ''
+    };
+
+    const hasEnvVars = envVars.SUPABASE_URL || envVars.SUPABASE_ANON_KEY;
+    if (hasEnvVars) {
+        const envScript = `<script>` +
+            (envVars.SUPABASE_URL ? `window.__SUPABASE_URL__="${envVars.SUPABASE_URL}";` : '') +
+            (envVars.SUPABASE_ANON_KEY ? `window.__SUPABASE_ANON_KEY__="${envVars.SUPABASE_ANON_KEY}";` : '') +
+            (envVars.SENTRY_DSN ? `window.__SENTRY_DSN__="${envVars.SENTRY_DSN}";` : '') +
+            `</script>`;
+        html = html.replace('</head>', envScript + '</head>');
+        fs.writeFileSync(indexPath, html, 'utf8');
+        console.log('   ✅ Injected environment variables (Supabase URL, Anon Key)');
+    } else {
+        console.log('   ℹ️  No SUPABASE_URL/SUPABASE_ANON_KEY env vars found — app will use localStorage fallback');
+    }
 }
 
 console.log('\n✅ Build complete! Output in dist/');

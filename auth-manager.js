@@ -67,10 +67,8 @@ const AuthManager = {
      * Demo login (for development/testing)
      */
     loginDemo: function (username, password) {
-        // Demo users removed - use Supabase authentication
-        // If you reach this code, Supabase is not configured
-        Logger.warn('Demo authentication disabled - please configure Supabase');
-        window.showNotification('Please configure Supabase for authentication or contact admin', 'error');
+        Logger.warn('Local authentication disabled — Supabase authentication required');
+        window.showNotification('Authentication requires Supabase. Please contact your administrator.', 'error');
         return null;
     },
 
@@ -253,7 +251,9 @@ const AuthManager = {
      * Generate simple token (for demo - use JWT in production)
      */
     generateToken: function () {
-        return 'demo_' + Math.random().toString(36).substr(2) + Date.now().toString(36);
+        const arr = new Uint8Array(24);
+        crypto.getRandomValues(arr);
+        return Array.from(arr, b => b.toString(36).padStart(2, '0')).join('').slice(0, 32);
     },
 
     /**
