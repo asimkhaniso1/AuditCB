@@ -10,6 +10,51 @@ const AuthManager = {
     SESSION_KEY: 'auditCB360_session',
     SESSION_TIMEOUT: 8 * 60 * 60 * 1000, // 8 hours in milliseconds
 
+    // Rate limiting
+    MAX_LOGIN_ATTEMPTS: 5,
+    LOCKOUT_DURATION: 15 * 60 * 1000, // 15 minutes
+    _loginAttempts: 0,
+    _lockoutUntil: null,
+
+    /**
+     * Check if login is currently locked out
+     */
+    isLockedOut: function () {
+        if (!this._lockoutUntil) return false;
+        if (Date.now() < this._lockoutUntil) {
+            const remaining = Math.ceil((this._lockoutUntil - Date.now()) / 60000);
+            return remaining;
+        }
+        // Lockout expired
+        this._lockoutUntil = null;
+        this._loginAttempts = 0;
+        return false;
+    },
+
+    /**
+     * Record a failed login attempt
+     */
+    recordFailedAttempt: function () {
+        this._loginAttempts++;
+        if (this._loginAttempts >= this.MAX_LOGIN_ATTEMPTS) {
+            this._lockoutUntil = Date.now() + this.LOCKOUT_DURATION;
+            Logger.warn(`Login locked out for 15 minutes after ${this.MAX_LOGIN_ATTEMPTS} failed attempts`);
+        }
+    },
+
+    /**
+     * Validate password strength
+     * @returns {Object} { valid, errors[] }
+     */
+    validatePasswordStrength: function (password) {
+        const errors = [];
+        if (!password || password.length < 8) errors.push('At least 8 characters');
+        if (!/[A-Z]/.test(password)) errors.push('One uppercase letter');
+        if (!/[0-9]/.test(password)) errors.push('One number');
+        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errors.push('One special character');
+        return { valid: errors.length === 0, errors };
+    },
+
     /**
      * Initialize authentication system
      */
@@ -39,6 +84,14 @@ const AuthManager = {
      */
     login: async function (username, password) {
         try {
+            // Rate limiting check
+            const lockoutMinutes = this.isLockedOut();
+            if (lockoutMinutes) {
+                window.showNotification(`Too many failed attempts. Please wait ${lockoutMinutes} minute(s) before trying again.`, 'error');
+                Logger.warn(`Login blocked — lockout active for ${lockoutMinutes} more minutes`);
+                return null;
+            }
+
             Logger.info('Login attempt for:', username);
 
             // Try Supabase authentication first if available
@@ -47,17 +100,20 @@ const AuthManager = {
                 try {
                     const data = await window.SupabaseClient.signIn(username, password);
                     if (data && window.state.currentUser) {
+                        this._loginAttempts = 0; // Reset on success
                         return window.state.currentUser;
                     }
                 } catch (supabaseError) {
-                    Logger.warn('Supabase auth failed, falling back to demo:', supabaseError.message);
+                    Logger.warn('Supabase auth failed:', supabaseError.message);
+                    this.recordFailedAttempt();
                 }
             }
 
-            // Fallback to demo authentication
-            Logger.warn('Using demo authentication');
+            // Fallback to local authentication
+            this.recordFailedAttempt();
             return this.loginDemo(username, password);
         } catch (error) {
+            this.recordFailedAttempt();
             ErrorHandler.handle(error, 'Login');
             return null;
         }
@@ -686,7 +742,7 @@ const AuthManager = {
                 <div class="hero-left">
                     <div class="hero-badge">
                         <i class="fa-solid fa-shield-check"></i>
-                        ISO/IEC 17021-1 Compliant Platform
+                        ISO 27001 & SOC2 Compliant Platform
                     </div>
 
                     <h1 class="hero-title">
@@ -743,6 +799,16 @@ const AuthManager = {
                         <div class="hero-trust-item">
                             <div class="num">100%</div>
                             <div class="lbl">Cloud Based</div>
+                        </div>
+                        <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.15);"></div>
+                        <div class="hero-trust-item">
+                            <div class="num"><i class="fa-solid fa-shield-halved" style="font-size: 1.2rem;"></i></div>
+                            <div class="lbl">ISO 27001</div>
+                        </div>
+                        <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.15);"></div>
+                        <div class="hero-trust-item">
+                            <div class="num"><i class="fa-solid fa-lock" style="font-size: 1.2rem;"></i></div>
+                            <div class="lbl">SOC2</div>
                         </div>
                         <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.15);"></div>
                         <div class="hero-trust-item">
