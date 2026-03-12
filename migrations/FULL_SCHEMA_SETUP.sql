@@ -378,19 +378,64 @@ DROP POLICY IF EXISTS "Authenticated Modify Plans" ON audit_plans;
 DROP POLICY IF EXISTS "Authenticated View Reports" ON audit_reports;
 DROP POLICY IF EXISTS "Authenticated Modify Reports" ON audit_reports;
 
--- Create permissive policies (RBAC enforced in app logic)
-CREATE POLICY "Allow all clients" ON clients FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all auditors" ON auditors FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all audit_plans" ON audit_plans FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all audit_reports" ON audit_reports FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all audit_findings" ON audit_findings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all checklists" ON checklists FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all settings" ON settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all certification_decisions" ON certification_decisions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all audit_log" ON audit_log FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all documents" ON documents FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all profiles" ON profiles FOR ALL USING (true) WITH CHECK (true);
+-- Create authenticated-only policies (RBAC enforced in app logic)
+-- Profiles: users can view all, but only insert/update own
+CREATE POLICY "auth_select_profiles" ON profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_profiles" ON profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+CREATE POLICY "auth_update_profiles" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+-- All other tables: authenticated users get full access
+CREATE POLICY "auth_select_clients" ON clients FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_clients" ON clients FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_clients" ON clients FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_clients" ON clients FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_auditors" ON auditors FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_auditors" ON auditors FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_auditors" ON auditors FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_auditors" ON auditors FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_audit_plans" ON audit_plans FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_audit_plans" ON audit_plans FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_audit_plans" ON audit_plans FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_audit_plans" ON audit_plans FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_audit_reports" ON audit_reports FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_audit_reports" ON audit_reports FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_audit_reports" ON audit_reports FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_audit_reports" ON audit_reports FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_audit_findings" ON audit_findings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_audit_findings" ON audit_findings FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_audit_findings" ON audit_findings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_audit_findings" ON audit_findings FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_checklists" ON checklists FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_checklists" ON checklists FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_checklists" ON checklists FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_checklists" ON checklists FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_settings" ON settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_settings" ON settings FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_settings" ON settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "auth_select_certification_decisions" ON certification_decisions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_certification_decisions" ON certification_decisions FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_certification_decisions" ON certification_decisions FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_certification_decisions" ON certification_decisions FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_audit_log" ON audit_log FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_audit_log" ON audit_log FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "auth_select_documents" ON documents FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_documents" ON documents FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_documents" ON documents FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_documents" ON documents FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "auth_select_notifications" ON notifications FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auth_insert_notifications" ON notifications FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "auth_update_notifications" ON notifications FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_delete_notifications" ON notifications FOR DELETE TO authenticated USING (true);
 
 -- ============================================
 -- PHASE 6: INDEXES (safe — column existence checked)
@@ -412,18 +457,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
 -- ============================================
 -- PHASE 7: GRANTS
 -- ============================================
-GRANT ALL ON public.clients TO anon, authenticated, service_role;
-GRANT ALL ON public.auditors TO anon, authenticated, service_role;
-GRANT ALL ON public.audit_plans TO anon, authenticated, service_role;
-GRANT ALL ON public.audit_reports TO anon, authenticated, service_role;
-GRANT ALL ON public.audit_findings TO anon, authenticated, service_role;
-GRANT ALL ON public.checklists TO anon, authenticated, service_role;
-GRANT ALL ON public.settings TO anon, authenticated, service_role;
-GRANT ALL ON public.certification_decisions TO anon, authenticated, service_role;
-GRANT ALL ON public.audit_log TO anon, authenticated, service_role;
-GRANT ALL ON public.documents TO anon, authenticated, service_role;
-GRANT ALL ON public.notifications TO anon, authenticated, service_role;
-GRANT ALL ON public.profiles TO anon, authenticated, service_role;
+GRANT ALL ON public.clients TO authenticated, service_role;
+GRANT ALL ON public.auditors TO authenticated, service_role;
+GRANT ALL ON public.audit_plans TO authenticated, service_role;
+GRANT ALL ON public.audit_reports TO authenticated, service_role;
+GRANT ALL ON public.audit_findings TO authenticated, service_role;
+GRANT ALL ON public.checklists TO authenticated, service_role;
+GRANT ALL ON public.settings TO authenticated, service_role;
+GRANT ALL ON public.certification_decisions TO authenticated, service_role;
+GRANT ALL ON public.audit_log TO authenticated, service_role;
+GRANT ALL ON public.documents TO authenticated, service_role;
+GRANT ALL ON public.notifications TO authenticated, service_role;
+GRANT ALL ON public.profiles TO authenticated, service_role;
 
 -- ============================================
 -- PHASE 8: AUTH TRIGGER (create profile on signup)
