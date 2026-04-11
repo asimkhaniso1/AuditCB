@@ -1,1 +1,487 @@
-const RETENTION_POLICY={auditReports:{period:6,label:"Audit Reports",description:"Full certification cycle + 1 year"},certifications:{period:6,label:"Certificates",description:"Full certification cycle + 1 year"},auditPlans:{period:6,label:"Audit Plans",description:"Full certification cycle + 1 year"},ncRecords:{period:6,label:"NC Records",description:"Full certification cycle + 1 year"},appeals:{period:7,label:"Appeals",description:"Resolution + 5 years"},complaints:{period:7,label:"Complaints",description:"Resolution + 5 years"},auditorRecords:{period:10,label:"Auditor Competence",description:"Employment + 5 years"},clientContracts:{period:10,label:"Client Contracts",description:"Contract end + 5 years"},impartialityRecords:{period:6,label:"Impartiality Records",description:"Full certification cycle + 1 year"}};function renderRecordRetentionModule(){window.state;const e=calculateRetentionStats(),t=`\n        <div class="fade-in">\n            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">\n                <div>\n                    <h2 style="margin: 0;">Record Retention Management</h2>\n                    <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">ISO 17021-1 Clause 8.4 - Control of Records</p>\n                </div>\n                <div style="display: flex; gap: 0.5rem;">\n                    <button class="btn btn-secondary" data-action="exportRetentionReport" aria-label="Export PDF">\n                        <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Report\n                    </button>\n                    <button class="btn btn-primary" data-action="openRetentionPolicyModal" aria-label="Settings">\n                        <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Configure Policy\n                    </button>\n                </div>\n            </div>\n            \n            \x3c!-- Summary Cards --\x3e\n            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">\n                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">\n                    <i class="fa-solid fa-database" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>\n                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #3b82f6;">${e.totalRecords}</p>\n                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Records</p>\n                </div>\n                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">\n                    <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>\n                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #10b981;">${e.withinPolicy}</p>\n                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Within Policy</p>\n                </div>\n                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">\n                    <i class="fa-solid fa-clock" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>\n                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #f59e0b;">${e.approachingExpiry}</p>\n                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Approaching Expiry</p>\n                </div>\n                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #dc2626;">\n                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: #dc2626; margin-bottom: 0.5rem;"></i>\n                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #dc2626;">${e.pastRetention}</p>\n                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Past Retention</p>\n                </div>\n            </div>\n            \n            \x3c!-- Retention Policy Overview --\x3e\n            <div class="card" style="margin-bottom: 1.5rem;">\n                <h3 style="margin: 0 0 1rem 0;">\n                    <i class="fa-solid fa-shield-halved" style="margin-right: 0.5rem; color: var(--primary-color);"></i>\n                    Retention Policy Overview\n                </h3>\n                <div class="table-container">\n                    <table>\n                        <thead>\n                            <tr>\n                                <th>Record Type</th>\n                                <th>Retention Period</th>\n                                <th>Description</th>\n                                <th>Total Records</th>\n                                <th>Status</th>\n                            </tr>\n                        </thead>\n                        <tbody>\n                            ${Object.entries(RETENTION_POLICY).map(([t,n])=>{const i=e.byType[t]||0,o=e.expiringByType[t]||0,r=e.expiredByType[t]||0;return`\n                                    <tr>\n                                        <td style="font-weight: 500;">${n.label}</td>\n                                        <td><span style="background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">${n.period} years</span></td>\n                                        <td style="color: var(--text-secondary); font-size: 0.9rem;">${n.description}</td>\n                                        <td>${i}</td>\n                                        <td>\n                                            ${r>0?`<span style="background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${r} expired</span>`:""}\n                                            ${o>0?`<span style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; margin-left: 0.25rem;">${o} expiring</span>`:""}\n                                            ${0===r&&0===o?'<span style="color: #10b981;"><i class="fa-solid fa-check"></i> OK</span>':""}\n                                        </td>\n                                    </tr>\n                                `}).join("")}\n                        </tbody>\n                    </table>\n                </div>\n            </div>\n            \n            \x3c!-- Records Requiring Attention --\x3e\n            <div class="card">\n                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">\n                    <h3 style="margin: 0;">\n                        <i class="fa-solid fa-exclamation-circle" style="margin-right: 0.5rem; color: #f59e0b;"></i>\n                        Records Requiring Attention\n                    </h3>\n                    <select id="retention-filter" class="form-control" style="width: auto;" data-action-change="filterRetentionRecords" data-id="this.value">\n                        <option value="all">All Records</option>\n                        <option value="expiring" selected>Approaching Expiry</option>\n                        <option value="expired">Past Retention</option>\n                    </select>\n                </div>\n                \n                <div id="retention-records-list">\n                    ${renderRetentionRecordsList(e.expiringRecords)}\n                </div>\n            </div>\n            \n            \x3c!-- ISO Info --\x3e\n            <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">\n                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">\n                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>\n                    <strong>ISO 17021-1 Clause 8.4:</strong> The CB shall establish procedures detailing identification, storage, protection, retrieval, retention time, and disposition of records. Records shall be retained for at least one full certification cycle.\n                </p>\n            </div>\n        </div>\n    `;window.contentArea.innerHTML=t}function calculateRetentionStats(){const e=window.state,t=new Date;let n=0,i=0,o=0,r=0,a={},d={},s={},l=[],c=[];const p=(e,p,m,y)=>{if(!e[m])return;const f=(e=>{if(!e)return 0;const n=new Date(e);return(t-n)/315576e5})(e[m]),g=RETENTION_POLICY[p];if(!g)return;a[p]=(a[p]||0)+1,n++;const h=g.period-f;h<0?(r++,s[p]=(s[p]||0)+1,c.push({type:g.label,name:e[y]||e.id||"Unknown",date:e[m],age:f.toFixed(1),yearsOver:Math.abs(h).toFixed(1)})):h<1?(o++,d[p]=(d[p]||0)+1,l.push({type:g.label,name:e[y]||e.id||"Unknown",date:e[m],age:f.toFixed(1),monthsRemaining:Math.round(12*h)})):i++};return(e.auditReports||[]).forEach(e=>p(e,"auditReports","date","client")),(e.certifications||[]).forEach(e=>p(e,"certifications","issueDate","client")),(e.auditPlans||[]).forEach(e=>p(e,"auditPlans","date","client")),(e.appeals||[]).forEach(e=>p(e,"appeals","dateReceived","subject")),(e.complaints||[]).forEach(e=>p(e,"complaints","dateReceived","subject")),(e.clients||[]).forEach(e=>{e.compliance?.contract?.signedDate&&p({...e,signedDate:e.compliance.contract.signedDate},"clientContracts","signedDate","name")}),{totalRecords:n,withinPolicy:i,approachingExpiry:o,pastRetention:r,byType:a,expiringByType:d,expiredByType:s,expiringRecords:l.sort((e,t)=>(e.monthsRemaining||0)-(t.monthsRemaining||0)),expiredRecords:c.sort((e,t)=>parseFloat(t.yearsOver)-parseFloat(e.yearsOver))}}function renderRetentionRecordsList(e){return e&&0!==e.length?`\n        <div class="table-container">\n            <table>\n                <thead>\n                    <tr>\n                        <th>Record Type</th>\n                        <th>Name/Reference</th>\n                        <th>Date</th>\n                        <th>Age (Years)</th>\n                        <th>Status</th>\n                        <th>Action</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    ${e.map(e=>`\n                        <tr>\n                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(e.type)}</span></td>\n                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(e.name)}</td>\n                            <td>${e.date}</td>\n                            <td>${e.age}</td>\n                            <td>\n                                ${e.yearsOver?`<span style="background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">\n                                        <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.25rem;"></i>${e.yearsOver}y overdue\n                                    </span>`:`<span style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">\n                                        <i class="fa-solid fa-clock" style="margin-right: 0.25rem;"></i>${e.monthsRemaining}mo remaining\n                                    </span>`}\n                            </td>\n                            <td>\n                                <button class="btn btn-sm btn-secondary" data-action="showArchiveOptions" data-arg1="${e.type}" data-arg2="decodeURIComponent('${encodeURIComponent(e.name)}')">\n                                    <i class="fa-solid fa-archive"></i>\n                                </button>\n                            </td>\n                        </tr>\n                    `).join("")}\n                </tbody>\n            </table>\n        </div>\n    `:'\n            <div style="text-align: center; padding: 3rem; background: #f0fdf4; border-radius: 8px;">\n                <i class="fa-solid fa-check-circle" style="font-size: 2.5rem; color: #10b981; margin-bottom: 1rem;"></i>\n                <p style="font-size: 1.1rem; font-weight: 500; color: #065f46; margin: 0;">All Records Within Policy</p>\n                <p style="color: #059669; margin: 0.5rem 0 0 0;">No records require immediate attention.</p>\n            </div>\n        '}window.filterRetentionRecords=function(e){const t=calculateRetentionStats();let n;n="expiring"===e?t.expiringRecords:"expired"===e?t.expiredRecords:[...t.expiringRecords,...t.expiredRecords],document.getElementById("retention-records-list").innerHTML=renderRetentionRecordsList(n)},window.showArchiveOptions=function(e,t){document.getElementById("modal-title").textContent="Archive/Dispose Record",document.getElementById("modal-body").innerHTML=`\n        <div style="margin-bottom: 1rem;">\n            <p><strong>Record Type:</strong> ${e}</p>\n            <p><strong>Reference:</strong> ${window.UTILS.escapeHtml(t)}</p>\n        </div>\n        <div class="form-group">\n            <label>Disposition Action</label>\n            <select id="archive-action" class="form-control">\n                <option value="archive">Archive (Move to long-term storage)</option>\n                <option value="extend">Extend Retention (Add 2 years)</option>\n                <option value="destroy">Destroy (Mark for secure deletion)</option>\n            </select>\n        </div>\n        <div class="form-group">\n            <label>Justification/Notes</label>\n            <textarea id="archive-notes" class="form-control" rows="3" placeholder="Document reason for this action..."></textarea>\n        </div>\n        <div style="padding: 1rem; background: #fef3c7; border-radius: 6px; margin-top: 1rem;">\n            <p style="margin: 0; font-size: 0.85rem; color: #92400e;">\n                <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>\n                Record disposition actions are logged for audit purposes per ISO 17021-1.\n            </p>\n        </div>\n    `,document.getElementById("modal-save").onclick=function(){const n=document.getElementById("archive-action").value,i=document.getElementById("archive-notes").value;window.state.dispositionLog||(window.state.dispositionLog=[]),window.state.dispositionLog.push({date:(new Date).toISOString().split("T")[0],recordType:e,recordName:t,action:n,notes:i,performedBy:window.state.currentUser?.name||"Admin"}),window.saveData(),window.closeModal(),window.showNotification("Record "+("archive"===n?"archived":"extend"===n?"retention extended":"marked for destruction"),"success"),renderRecordRetentionModule()},window.openModal()},window.openRetentionPolicyModal=function(){document.getElementById("modal-title").textContent="Retention Policy Configuration",document.getElementById("modal-body").innerHTML=`\n        <p style="margin-bottom: 1rem; color: var(--text-secondary);">\n            Configure retention periods for different record types. Changes apply immediately.\n        </p>\n        <div class="table-container" style="max-height: 400px; overflow-y: auto;">\n            <table>\n                <thead>\n                    <tr>\n                        <th>Record Type</th>\n                        <th>Retention (Years)</th>\n                        <th>ISO Minimum</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    ${Object.entries(RETENTION_POLICY).map(([e,t])=>`\n                        <tr>\n                            <td style="font-weight: 500;">${t.label}</td>\n                            <td>\n                                <input type="number" id="policy-${e}" class="form-control form-control-sm" \n                                    value="${t.period}" min="1" max="20" style="width: 80px;">\n                            </td>\n                            <td><span style="color: var(--text-secondary);">≥ 3 years</span></td>\n                        </tr>\n                    `).join("")}\n                </tbody>\n            </table>\n        </div>\n        <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 6px;">\n            <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">\n                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>\n                ISO 17021-1 requires minimum retention of one full certification cycle (typically 3 years).\n            </p>\n        </div>\n    `,document.getElementById("modal-save").textContent="Save Policy",document.getElementById("modal-save").onclick=function(){window.showNotification("Retention policy updated","success"),window.closeModal(),renderRecordRetentionModule()},window.openModal()},window.exportRetentionReport=function(){const e=calculateRetentionStats(),t=window.open("","_blank");t.document.write(`\n        <html>\n        <head>\n            <title>Record Retention Report</title>\n            <style>\n                body { font-family: Arial, sans-serif; padding: 40px; }\n                h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }\n                table { width: 100%; border-collapse: collapse; margin: 20px 0; }\n                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n                th { background: #f1f5f9; }\n                .stat-box { display: inline-block; padding: 15px 25px; margin: 5px; background: #f8fafc; border-radius: 8px; text-align: center; }\n                .stat-value { font-size: 2rem; font-weight: bold; color: #1e40af; }\n                .expired { background: #fee2e2; color: #dc2626; }\n                .expiring { background: #fef3c7; color: #d97706; }\n                @media print { body { padding: 20px; } }\n            </style>\n        </head>\n        <body>\n            <h1>📁 Record Retention Report</h1>\n            <p><strong>Generated:</strong> ${(new Date).toLocaleString()}</p>\n            <p><strong>Organization:</strong> AuditCB360 Certification Body</p>\n            \n            <h2>Summary Statistics</h2>\n            <div>\n                <div class="stat-box"><div class="stat-value">${e.totalRecords}</div>Total Records</div>\n                <div class="stat-box"><div class="stat-value">${e.withinPolicy}</div>Within Policy</div>\n                <div class="stat-box"><div class="stat-value">${e.approachingExpiry}</div>Approaching Expiry</div>\n                <div class="stat-box"><div class="stat-value">${e.pastRetention}</div>Past Retention</div>\n            </div>\n            \n            <h2>Records by Type</h2>\n            <table>\n                <tr><th>Record Type</th><th>Count</th><th>Retention Period</th><th>Expiring</th><th>Expired</th></tr>\n                ${Object.entries(RETENTION_POLICY).map(([t,n])=>`\n                    <tr>\n                        <td>${n.label}</td>\n                        <td>${e.byType[t]||0}</td>\n                        <td>${n.period} years</td>\n                        <td class="${(e.expiringByType[t]||0)>0?"expiring":""}">${e.expiringByType[t]||0}</td>\n                        <td class="${(e.expiredByType[t]||0)>0?"expired":""}">${e.expiredByType[t]||0}</td>\n                    </tr>\n                `).join("")}\n            </table>\n            \n            ${e.expiredRecords.length>0?`\n                <h2>Records Past Retention Period</h2>\n                <table>\n                    <tr><th>Type</th><th>Reference</th><th>Date</th><th>Age</th><th>Overdue</th></tr>\n                    ${e.expiredRecords.map(e=>`\n                        <tr class="expired">\n                            <td>${window.UTILS.escapeHtml(e.type)}</td>\n                            <td>${window.UTILS.escapeHtml(e.name)}</td>\n                            <td>${e.date}</td>\n                            <td>${e.age} years</td>\n                            <td>${e.yearsOver} years</td>\n                        </tr>\n                    `).join("")}\n                </table>\n            `:""}\n            \n            <hr style="margin-top: 40px;">\n            <p style="font-size: 0.9rem; color: #666;">\n                This report is generated for ISO 17021-1 Clause 8.4 compliance purposes.<br>\n                Retention policy: Records retained for minimum one full certification cycle (3 years).\n            </p>\n        </body>\n        </html>\n    `),t.document.close(),t.focus(),setTimeout(()=>t.print(),500)},window.renderRecordRetentionModule=renderRecordRetentionModule,"undefined"!=typeof module&&module.exports&&(module.exports={filterRetentionRecords:filterRetentionRecords,showArchiveOptions:showArchiveOptions,openRetentionPolicyModal:openRetentionPolicyModal,exportRetentionReport:exportRetentionReport,renderRecordRetentionModule:renderRecordRetentionModule});
+// ============================================
+// RECORD RETENTION MODULE (ESM-ready)
+// ISO 17021-1 Clause 8.4 - Control of Records
+// ============================================
+
+// Retention Policy Configuration (in years)
+const RETENTION_POLICY = {
+    auditReports: { period: 6, label: 'Audit Reports', description: 'Full certification cycle + 1 year' },
+    certifications: { period: 6, label: 'Certificates', description: 'Full certification cycle + 1 year' },
+    auditPlans: { period: 6, label: 'Audit Plans', description: 'Full certification cycle + 1 year' },
+    ncRecords: { period: 6, label: 'NC Records', description: 'Full certification cycle + 1 year' },
+    appeals: { period: 7, label: 'Appeals', description: 'Resolution + 5 years' },
+    complaints: { period: 7, label: 'Complaints', description: 'Resolution + 5 years' },
+    auditorRecords: { period: 10, label: 'Auditor Competence', description: 'Employment + 5 years' },
+    clientContracts: { period: 10, label: 'Client Contracts', description: 'Contract end + 5 years' },
+    impartialityRecords: { period: 6, label: 'Impartiality Records', description: 'Full certification cycle + 1 year' }
+};
+
+function renderRecordRetentionModule() {
+    const _state = window.state;
+
+    // Calculate record statistics
+    const stats = calculateRetentionStats();
+
+    const html = `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h2 style="margin: 0;">Record Retention Management</h2>
+                    <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">ISO 17021-1 Clause 8.4 - Control of Records</p>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" data-action="exportRetentionReport" aria-label="Export PDF">
+                        <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Report
+                    </button>
+                    <button class="btn btn-primary" data-action="openRetentionPolicyModal" aria-label="Settings">
+                        <i class="fa-solid fa-cog" style="margin-right: 0.5rem;"></i>Configure Policy
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #3b82f6;">
+                    <i class="fa-solid fa-database" style="font-size: 1.5rem; color: #3b82f6; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #3b82f6;">${stats.totalRecords}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Records</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #10b981;">
+                    <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #10b981;">${stats.withinPolicy}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Within Policy</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #f59e0b;">
+                    <i class="fa-solid fa-clock" style="font-size: 1.5rem; color: #f59e0b; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #f59e0b;">${stats.approachingExpiry}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Approaching Expiry</p>
+                </div>
+                <div class="card" style="margin: 0; text-align: center; border-left: 4px solid #dc2626;">
+                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 1.5rem; color: #dc2626; margin-bottom: 0.5rem;"></i>
+                    <p style="font-size: 2rem; font-weight: 700; margin: 0; color: #dc2626;">${stats.pastRetention}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Past Retention</p>
+                </div>
+            </div>
+            
+            <!-- Retention Policy Overview -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <h3 style="margin: 0 0 1rem 0;">
+                    <i class="fa-solid fa-shield-halved" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
+                    Retention Policy Overview
+                </h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Record Type</th>
+                                <th>Retention Period</th>
+                                <th>Description</th>
+                                <th>Total Records</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(RETENTION_POLICY).map(([key, policy]) => {
+        const count = stats.byType[key] || 0;
+        const expiring = stats.expiringByType[key] || 0;
+        const expired = stats.expiredByType[key] || 0;
+        return `
+                                    <tr>
+                                        <td style="font-weight: 500;">${policy.label}</td>
+                                        <td><span style="background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">${policy.period} years</span></td>
+                                        <td style="color: var(--text-secondary); font-size: 0.9rem;">${policy.description}</td>
+                                        <td>${count}</td>
+                                        <td>
+                                            ${expired > 0 ? `<span style="background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${expired} expired</span>` : ''}
+                                            ${expiring > 0 ? `<span style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; margin-left: 0.25rem;">${expiring} expiring</span>` : ''}
+                                            ${expired === 0 && expiring === 0 ? '<span style="color: #10b981;"><i class="fa-solid fa-check"></i> OK</span>' : ''}
+                                        </td>
+                                    </tr>
+                                `;
+    }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Records Requiring Attention -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">
+                        <i class="fa-solid fa-exclamation-circle" style="margin-right: 0.5rem; color: #f59e0b;"></i>
+                        Records Requiring Attention
+                    </h3>
+                    <select id="retention-filter" class="form-control" style="width: auto;" data-action-change="filterRetentionRecords" data-id="this.value">
+                        <option value="all">All Records</option>
+                        <option value="expiring" selected>Approaching Expiry</option>
+                        <option value="expired">Past Retention</option>
+                    </select>
+                </div>
+                
+                <div id="retention-records-list">
+                    ${renderRetentionRecordsList(stats.expiringRecords)}
+                </div>
+            </div>
+            
+            <!-- ISO Info -->
+            <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                    <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                    <strong>ISO 17021-1 Clause 8.4:</strong> The CB shall establish procedures detailing identification, storage, protection, retrieval, retention time, and disposition of records. Records shall be retained for at least one full certification cycle.
+                </p>
+            </div>
+        </div>
+    `;
+
+    window.contentArea.innerHTML = html;
+}
+
+function calculateRetentionStats() {
+    const state = window.state;
+    const today = new Date();
+
+    let totalRecords = 0;
+    let withinPolicy = 0;
+    let approachingExpiry = 0;
+    let pastRetention = 0;
+    let byType = {};
+    let expiringByType = {};
+    let expiredByType = {};
+    let expiringRecords = [];
+    let expiredRecords = [];
+
+    // Helper to calculate record age
+    const getRecordAge = (dateStr) => {
+        if (!dateStr) return 0;
+        const recordDate = new Date(dateStr);
+        return (today - recordDate) / (365.25 * 24 * 60 * 60 * 1000); // years
+    };
+
+    const checkRetention = (record, type, dateField, nameField) => {
+        if (!record[dateField]) return;
+        const age = getRecordAge(record[dateField]);
+        const policy = RETENTION_POLICY[type];
+        if (!policy) return;
+
+        byType[type] = (byType[type] || 0) + 1;
+        totalRecords++;
+
+        const yearsRemaining = policy.period - age;
+
+        if (yearsRemaining < 0) {
+            pastRetention++;
+            expiredByType[type] = (expiredByType[type] || 0) + 1;
+            expiredRecords.push({
+                type: policy.label,
+                name: record[nameField] || record.id || 'Unknown',
+                date: record[dateField],
+                age: age.toFixed(1),
+                yearsOver: Math.abs(yearsRemaining).toFixed(1)
+            });
+        } else if (yearsRemaining < 1) {
+            approachingExpiry++;
+            expiringByType[type] = (expiringByType[type] || 0) + 1;
+            expiringRecords.push({
+                type: policy.label,
+                name: record[nameField] || record.id || 'Unknown',
+                date: record[dateField],
+                age: age.toFixed(1),
+                monthsRemaining: Math.round(yearsRemaining * 12)
+            });
+        } else {
+            withinPolicy++;
+        }
+    };
+
+    // Check Audit Reports
+    (state.auditReports || []).forEach(r => checkRetention(r, 'auditReports', 'date', 'client'));
+
+    // Check Certifications
+    (state.certifications || []).forEach(c => checkRetention(c, 'certifications', 'issueDate', 'client'));
+
+    // Check Audit Plans
+    (state.auditPlans || []).forEach(p => checkRetention(p, 'auditPlans', 'date', 'client'));
+
+    // Check Appeals
+    (state.appeals || []).forEach(a => checkRetention(a, 'appeals', 'dateReceived', 'subject'));
+
+    // Check Complaints
+    (state.complaints || []).forEach(c => checkRetention(c, 'complaints', 'dateReceived', 'subject'));
+
+    // Check Client Contracts
+    (state.clients || []).forEach(c => {
+        if (c.compliance?.contract?.signedDate) {
+            checkRetention({ ...c, signedDate: c.compliance.contract.signedDate }, 'clientContracts', 'signedDate', 'name');
+        }
+    });
+
+    return {
+        totalRecords,
+        withinPolicy,
+        approachingExpiry,
+        pastRetention,
+        byType,
+        expiringByType,
+        expiredByType,
+        expiringRecords: expiringRecords.sort((a, b) => (a.monthsRemaining || 0) - (b.monthsRemaining || 0)),
+        expiredRecords: expiredRecords.sort((a, b) => parseFloat(b.yearsOver) - parseFloat(a.yearsOver))
+    };
+}
+
+function renderRetentionRecordsList(records) {
+    if (!records || records.length === 0) {
+        return `
+            <div style="text-align: center; padding: 3rem; background: #f0fdf4; border-radius: 8px;">
+                <i class="fa-solid fa-check-circle" style="font-size: 2.5rem; color: #10b981; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.1rem; font-weight: 500; color: #065f46; margin: 0;">All Records Within Policy</p>
+                <p style="color: #059669; margin: 0.5rem 0 0 0;">No records require immediate attention.</p>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Record Type</th>
+                        <th>Name/Reference</th>
+                        <th>Date</th>
+                        <th>Age (Years)</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${records.map(r => `
+                        <tr>
+                            <td><span class="badge" style="background: #e0f2fe; color: #0284c7;">${window.UTILS.escapeHtml(r.type)}</span></td>
+                            <td style="font-weight: 500;">${window.UTILS.escapeHtml(r.name)}</td>
+                            <td>${r.date}</td>
+                            <td>${r.age}</td>
+                            <td>
+                                ${r.yearsOver ?
+            `<span style="background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
+                                        <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.25rem;"></i>${r.yearsOver}y overdue
+                                    </span>` :
+            `<span style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
+                                        <i class="fa-solid fa-clock" style="margin-right: 0.25rem;"></i>${r.monthsRemaining}mo remaining
+                                    </span>`
+        }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" data-action="showArchiveOptions" data-arg1="${r.type}" data-arg2="decodeURIComponent('${encodeURIComponent(r.name)}')">
+                                    <i class="fa-solid fa-archive"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Filter records by status
+window.filterRetentionRecords = function (filter) {
+    const stats = calculateRetentionStats();
+    let records;
+
+    if (filter === 'expiring') {
+        records = stats.expiringRecords;
+    } else if (filter === 'expired') {
+        records = stats.expiredRecords;
+    } else {
+        records = [...stats.expiringRecords, ...stats.expiredRecords];
+    }
+
+    document.getElementById('retention-records-list').innerHTML = renderRetentionRecordsList(records);
+};
+
+// Show archive options modal
+window.showArchiveOptions = function (type, name) {
+    document.getElementById('modal-title').textContent = 'Archive/Dispose Record';
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem;">
+            <p><strong>Record Type:</strong> ${type}</p>
+            <p><strong>Reference:</strong> ${window.UTILS.escapeHtml(name)}</p>
+        </div>
+        <div class="form-group">
+            <label>Disposition Action</label>
+            <select id="archive-action" class="form-control">
+                <option value="archive">Archive (Move to long-term storage)</option>
+                <option value="extend">Extend Retention (Add 2 years)</option>
+                <option value="destroy">Destroy (Mark for secure deletion)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Justification/Notes</label>
+            <textarea id="archive-notes" class="form-control" rows="3" placeholder="Document reason for this action..."></textarea>
+        </div>
+        <div style="padding: 1rem; background: #fef3c7; border-radius: 6px; margin-top: 1rem;">
+            <p style="margin: 0; font-size: 0.85rem; color: #92400e;">
+                <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                Record disposition actions are logged for audit purposes per ISO 17021-1.
+            </p>
+        </div>
+    `;
+
+    document.getElementById('modal-save').onclick = function () {
+        const action = document.getElementById('archive-action').value;
+        const notes = document.getElementById('archive-notes').value;
+
+        // Log the disposition action
+        if (!window.state.dispositionLog) window.state.dispositionLog = [];
+        window.state.dispositionLog.push({
+            date: new Date().toISOString().split('T')[0],
+            recordType: type,
+            recordName: name,
+            action: action,
+            notes: notes,
+            performedBy: window.state.currentUser?.name || 'Admin'
+        });
+
+        window.saveData();
+        window.closeModal();
+        window.showNotification(`Record ${action === 'archive' ? 'archived' : action === 'extend' ? 'retention extended' : 'marked for destruction'}`, 'success');
+        renderRecordRetentionModule();
+    };
+
+    window.openModal();
+};
+
+// Open retention policy configuration modal
+window.openRetentionPolicyModal = function () {
+    document.getElementById('modal-title').textContent = 'Retention Policy Configuration';
+    document.getElementById('modal-body').innerHTML = `
+        <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+            Configure retention periods for different record types. Changes apply immediately.
+        </p>
+        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Record Type</th>
+                        <th>Retention (Years)</th>
+                        <th>ISO Minimum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(RETENTION_POLICY).map(([key, policy]) => `
+                        <tr>
+                            <td style="font-weight: 500;">${policy.label}</td>
+                            <td>
+                                <input type="number" id="policy-${key}" class="form-control form-control-sm" 
+                                    value="${policy.period}" min="1" max="20" style="width: 80px;">
+                            </td>
+                            <td><span style="color: var(--text-secondary);">≥ 3 years</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 6px;">
+            <p style="margin: 0; font-size: 0.85rem; color: #1d4ed8;">
+                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                ISO 17021-1 requires minimum retention of one full certification cycle (typically 3 years).
+            </p>
+        </div>
+    `;
+
+    document.getElementById('modal-save').textContent = 'Save Policy';
+    document.getElementById('modal-save').onclick = function () {
+        // In a real app, this would persist to backend
+        window.showNotification('Retention policy updated', 'success');
+        window.closeModal();
+        renderRecordRetentionModule();
+    };
+
+    window.openModal();
+};
+
+// Export retention report
+window.exportRetentionReport = function () {
+    const stats = calculateRetentionStats();
+    const printWindow = window.open('', '_blank');
+
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Record Retention Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 40px; }
+                h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f1f5f9; }
+                .stat-box { display: inline-block; padding: 15px 25px; margin: 5px; background: #f8fafc; border-radius: 8px; text-align: center; }
+                .stat-value { font-size: 2rem; font-weight: bold; color: #1e40af; }
+                .expired { background: #fee2e2; color: #dc2626; }
+                .expiring { background: #fef3c7; color: #d97706; }
+                @media print { body { padding: 20px; } }
+            </style>
+        </head>
+        <body>
+            <h1>📁 Record Retention Report</h1>
+            <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>Organization:</strong> AuditCB360 Certification Body</p>
+            
+            <h2>Summary Statistics</h2>
+            <div>
+                <div class="stat-box"><div class="stat-value">${stats.totalRecords}</div>Total Records</div>
+                <div class="stat-box"><div class="stat-value">${stats.withinPolicy}</div>Within Policy</div>
+                <div class="stat-box"><div class="stat-value">${stats.approachingExpiry}</div>Approaching Expiry</div>
+                <div class="stat-box"><div class="stat-value">${stats.pastRetention}</div>Past Retention</div>
+            </div>
+            
+            <h2>Records by Type</h2>
+            <table>
+                <tr><th>Record Type</th><th>Count</th><th>Retention Period</th><th>Expiring</th><th>Expired</th></tr>
+                ${Object.entries(RETENTION_POLICY).map(([key, policy]) => `
+                    <tr>
+                        <td>${policy.label}</td>
+                        <td>${stats.byType[key] || 0}</td>
+                        <td>${policy.period} years</td>
+                        <td class="${(stats.expiringByType[key] || 0) > 0 ? 'expiring' : ''}">${stats.expiringByType[key] || 0}</td>
+                        <td class="${(stats.expiredByType[key] || 0) > 0 ? 'expired' : ''}">${stats.expiredByType[key] || 0}</td>
+                    </tr>
+                `).join('')}
+            </table>
+            
+            ${stats.expiredRecords.length > 0 ? `
+                <h2>Records Past Retention Period</h2>
+                <table>
+                    <tr><th>Type</th><th>Reference</th><th>Date</th><th>Age</th><th>Overdue</th></tr>
+                    ${stats.expiredRecords.map(r => `
+                        <tr class="expired">
+                            <td>${window.UTILS.escapeHtml(r.type)}</td>
+                            <td>${window.UTILS.escapeHtml(r.name)}</td>
+                            <td>${r.date}</td>
+                            <td>${r.age} years</td>
+                            <td>${r.yearsOver} years</td>
+                        </tr>
+                    `).join('')}
+                </table>
+            ` : ''}
+            
+            <hr style="margin-top: 40px;">
+            <p style="font-size: 0.9rem; color: #666;">
+                This report is generated for ISO 17021-1 Clause 8.4 compliance purposes.<br>
+                Retention policy: Records retained for minimum one full certification cycle (3 years).
+            </p>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 500);
+};
+
+// Export the main function
+window.renderRecordRetentionModule = renderRecordRetentionModule;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { filterRetentionRecords, showArchiveOptions, openRetentionPolicyModal, exportRetentionReport, renderRecordRetentionModule };
+}

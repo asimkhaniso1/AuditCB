@@ -1,1 +1,351 @@
-const SafeDOM={setHTML:function(e,t,n={}){e?t?window.Sanitizer&&"function"==typeof window.Sanitizer.sanitizeHTML?e.innerHTML=window.Sanitizer.sanitizeHTML(t,n):void 0!==window.DOMPurify&&window.DOMPurify.sanitize?e.innerHTML=window.DOMPurify.sanitize(t,Object.assign({USE_PROFILES:{html:!0},ADD_ATTR:["data-action","data-action-change","data-id","data-json","data-arg1","data-arg2","data-hash","data-module","data-subtab","tabindex","role","aria-label","aria-hidden","aria-expanded"]},n)):(SafeDOM._warnedNoSanitizer||(Logger.warn("SafeDOM: DOMPurify not loaded. Using basic HTML escape fallback — some safe HTML tags will be escaped."),SafeDOM._warnedNoSanitizer=!0),e.innerHTML=String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;")):e.innerHTML="":Logger.warn("SafeDOM.setHTML: element is null")},setText:function(e,t){e?e.textContent=t||"":Logger.warn("SafeDOM.setText: element is null")},createElement:function(e,t="",n={},i=!1){const a=document.createElement(e);i?this.setHTML(a,t):this.setText(a,t);for(const[e,t]of Object.entries(n))this.setAttribute(a,e,t);return a},setAttribute:function(e,t,n){if(e)if("href"===t||"src"===t){const i=window.Sanitizer?.sanitizeURL(n)||n;e.setAttribute(t,i)}else"onclick"===t||t.startsWith("on")?Logger.warn("SafeDOM: Attempted to set event handler via attribute. Use addEventListener instead."):e.setAttribute(t,n)},appendHTML:function(e,t){if(!e)return;const n=document.createElement("div");for(this.setHTML(n,t);n.firstChild;)e.appendChild(n.firstChild)},prependHTML:function(e,t){if(!e)return;const n=document.createElement("div");for(this.setHTML(n,t);n.lastChild;)e.insertBefore(n.lastChild,e.firstChild)},clear:function(e){if(e)for(;e.firstChild;)e.removeChild(e.firstChild)},replace:function(e,t){e&&(this.clear(e),this.setHTML(e,t))},createButton:function(e,t,n="btn btn-primary"){const i=document.createElement("button");return i.textContent=e,i.className=n,"function"==typeof t&&i.addEventListener("click",t),i},createLink:function(e,t,n={}){const i=document.createElement("a");i.textContent=e;const a=window.Sanitizer?.sanitizeURL(t)||t;i.href=a;for(const[e,t]of Object.entries(n))"href"!==e&&i.setAttribute(e,t);return i},updateById:function(e,t){const n=document.getElementById(e);n?this.setHTML(n,t):Logger.warn(`SafeDOM.updateById: Element not found: ${e}`)},updateTextById:function(e,t){const n=document.getElementById(e);n?this.setText(n,t):Logger.warn(`SafeDOM.updateTextById: Element not found: ${e}`)},createTableRow:function(e){const t=document.createElement("tr");return e.forEach(e=>{const n=document.createElement("td");e.className&&(n.className=e.className),e.isHTML?this.setHTML(n,e.content):this.setText(n,e.content),t.appendChild(n)}),t},buildTemplate:function(e,t,n=[]){let i=e;for(const[e,a]of Object.entries(t)){const t=new RegExp(`{{${e}}}`,"g");let r;r=n.includes(e)?window.Sanitizer?.sanitizeHTML(a)||a:window.Sanitizer?.escapeHTML(a)||this.escapeHTML(a),i=i.replace(t,r)}return i},escapeHTML:function(e){const t=document.createElement("div");return t.textContent=e,t.innerHTML},on:function(e,t,n,i={}){if(!e||!n)return;e.addEventListener(t,e=>{try{n(e)}catch(e){ErrorHandler.handle(e,`Event: ${t}`)}},i)},delegate:function(e,t,n,i){e&&i&&e.addEventListener(n,e=>{const a=e.target.closest(t);if(a)try{i.call(a,e)}catch(e){ErrorHandler.handle(e,`Delegated Event: ${n}`)}})}};window.SafeDOM=SafeDOM,"undefined"!=typeof module&&module.exports&&(module.exports=SafeDOM),Logger.info("SafeDOM utilities loaded");
+// ============================================
+// SAFE DOM UTILITIES (ESM-ready)
+// ============================================
+// Safe DOM manipulation helpers to prevent XSS
+
+const SafeDOM = {
+
+    /**
+     * Safely set innerHTML with automatic sanitization
+     * @param {HTMLElement} element - Target element
+     * @param {string} html - HTML content
+     * @param {Object} config - DOMPurify config
+     */
+    setHTML: function (element, html, config = {}) {
+        if (!element) {
+            Logger.warn('SafeDOM.setHTML: element is null');
+            return;
+        }
+
+        if (!html) {
+            element.innerHTML = '';
+            return;
+        }
+
+        // Use Sanitizer API if available (future Chrome)
+        if (window.Sanitizer && typeof window.Sanitizer.sanitizeHTML === 'function') {
+            element.innerHTML = window.Sanitizer.sanitizeHTML(html, config);
+        } else if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            // DOMPurify — primary sanitizer
+            element.innerHTML = window.DOMPurify.sanitize(html, Object.assign({
+                USE_PROFILES: { html: true },
+                ADD_ATTR: ['data-action', 'data-action-change', 'data-id', 'data-json', 'data-arg1', 'data-arg2', 'data-hash', 'data-module', 'data-subtab', 'tabindex', 'role', 'aria-label', 'aria-hidden', 'aria-expanded']
+            }, config));
+        } else {
+            // Fallback — sanitizer not loaded, use basic escape to prevent XSS
+            if (!SafeDOM._warnedNoSanitizer) {
+                Logger.warn('SafeDOM: DOMPurify not loaded. Using basic HTML escape fallback — some safe HTML tags will be escaped.');
+                SafeDOM._warnedNoSanitizer = true;
+            }
+            // Basic entity escape: prevents script injection but also escapes safe tags.
+            // This is intentionally conservative — security over functionality.
+            element.innerHTML = String(html)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;');
+        }
+    },
+
+    /**
+     * Safely set text content (always safe)
+     * @param {HTMLElement} element 
+     * @param {string} text 
+     */
+    setText: function (element, text) {
+        if (!element) {
+            Logger.warn('SafeDOM.setText: element is null');
+            return;
+        }
+        element.textContent = text || '';
+    },
+
+    /**
+     * Create element with safe content
+     * @param {string} tagName 
+     * @param {string} content 
+     * @param {Object} attributes 
+     * @param {boolean} isHTML - If true, content is HTML; if false, plain text
+     */
+    createElement: function (tagName, content = '', attributes = {}, isHTML = false) {
+        const element = document.createElement(tagName);
+
+        // Set content
+        if (isHTML) {
+            this.setHTML(element, content);
+        } else {
+            this.setText(element, content);
+        }
+
+        // Set attributes safely
+        for (const [key, value] of Object.entries(attributes)) {
+            this.setAttribute(element, key, value);
+        }
+
+        return element;
+    },
+
+    /**
+     * Safely set attribute
+     * @param {HTMLElement} element 
+     * @param {string} name 
+     * @param {string} value 
+     */
+    setAttribute: function (element, name, value) {
+        if (!element) return;
+
+        // Sanitize based on attribute type
+        if (name === 'href' || name === 'src') {
+            const safeValue = window.Sanitizer?.sanitizeURL(value) || value;
+            element.setAttribute(name, safeValue);
+        } else if (name === 'onclick' || name.startsWith('on')) {
+            // Never set event handlers via attributes
+            Logger.warn('SafeDOM: Attempted to set event handler via attribute. Use addEventListener instead.');
+        } else {
+            element.setAttribute(name, value);
+        }
+    },
+
+    /**
+     * Safely append HTML to element
+     * @param {HTMLElement} parent 
+     * @param {string} html 
+     */
+    appendHTML: function (parent, html) {
+        if (!parent) return;
+
+        const temp = document.createElement('div');
+        this.setHTML(temp, html);
+
+        while (temp.firstChild) {
+            parent.appendChild(temp.firstChild);
+        }
+    },
+
+    /**
+     * Safely prepend HTML to element
+     * @param {HTMLElement} parent 
+     * @param {string} html 
+     */
+    prependHTML: function (parent, html) {
+        if (!parent) return;
+
+        const temp = document.createElement('div');
+        this.setHTML(temp, html);
+
+        while (temp.lastChild) {
+            parent.insertBefore(temp.lastChild, parent.firstChild);
+        }
+    },
+
+    /**
+     * Clear element content safely
+     * @param {HTMLElement} element 
+     */
+    clear: function (element) {
+        if (!element) return;
+
+        // Remove all children
+        while (element.firstChild) {
+            element.removeChild(element.firstChild);
+        }
+    },
+
+    /**
+     * Replace element content safely
+     * @param {HTMLElement} element 
+     * @param {string} html 
+     */
+    replace: function (element, html) {
+        if (!element) return;
+
+        this.clear(element);
+        this.setHTML(element, html);
+    },
+
+    /**
+     * Create safe button with event handler
+     * @param {string} text 
+     * @param {Function} onClick 
+     * @param {string} className 
+     */
+    createButton: function (text, onClick, className = 'btn btn-primary') {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.className = className;
+
+        if (typeof onClick === 'function') {
+            button.addEventListener('click', onClick);
+        }
+
+        return button;
+    },
+
+    /**
+     * Create safe link
+     * @param {string} text 
+     * @param {string} href 
+     * @param {Object} attributes 
+     */
+    createLink: function (text, href, attributes = {}) {
+        const link = document.createElement('a');
+        link.textContent = text;
+
+        // Sanitize URL
+        const safeHref = window.Sanitizer?.sanitizeURL(href) || href;
+        link.href = safeHref;
+
+        // Set additional attributes
+        for (const [key, value] of Object.entries(attributes)) {
+            if (key !== 'href') {
+                link.setAttribute(key, value);
+            }
+        }
+
+        return link;
+    },
+
+    /**
+     * Safely update element by ID
+     * @param {string} elementId 
+     * @param {string} html 
+     */
+    updateById: function (elementId, html) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            this.setHTML(element, html);
+        } else {
+            Logger.warn(`SafeDOM.updateById: Element not found: ${elementId}`);
+        }
+    },
+
+    /**
+     * Safely update element text by ID
+     * @param {string} elementId 
+     * @param {string} text 
+     */
+    updateTextById: function (elementId, text) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            this.setText(element, text);
+        } else {
+            Logger.warn(`SafeDOM.updateTextById: Element not found: ${elementId}`);
+        }
+    },
+
+    /**
+     * Create table row from data
+     * @param {Array} cells - Array of {content, isHTML, className}
+     */
+    createTableRow: function (cells) {
+        const row = document.createElement('tr');
+
+        cells.forEach(cell => {
+            const td = document.createElement('td');
+
+            if (cell.className) {
+                td.className = cell.className;
+            }
+
+            if (cell.isHTML) {
+                this.setHTML(td, cell.content);
+            } else {
+                this.setText(td, cell.content);
+            }
+
+            row.appendChild(td);
+        });
+
+        return row;
+    },
+
+    /**
+     * Build safe template with data
+     * @param {string} template - Template string with {{placeholders}}
+     * @param {Object} data - Data object
+     * @param {Array} htmlFields - Fields that contain HTML (will be sanitized)
+     */
+    buildTemplate: function (template, data, htmlFields = []) {
+        let result = template;
+
+        for (const [key, value] of Object.entries(data)) {
+            const placeholder = new RegExp(`{{${key}}}`, 'g');
+
+            let safeValue;
+            if (htmlFields.includes(key)) {
+                // Sanitize HTML fields
+                safeValue = window.Sanitizer?.sanitizeHTML(value) || value;
+            } else {
+                // Escape text fields
+                safeValue = window.Sanitizer?.escapeHTML(value) || this.escapeHTML(value);
+            }
+
+            result = result.replace(placeholder, safeValue);
+        }
+
+        return result;
+    },
+
+    /**
+     * Fallback HTML escape if Sanitizer not available
+     */
+    escapeHTML: function (text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    /**
+     * Add event listener with error handling
+     * @param {HTMLElement} element 
+     * @param {string} event 
+     * @param {Function} handler 
+     * @param {Object} options 
+     */
+    on: function (element, event, handler, options = {}) {
+        if (!element || !handler) return;
+
+        const safeHandler = (e) => {
+            try {
+                handler(e);
+            } catch (error) {
+                ErrorHandler.handle(error, `Event: ${event}`);
+            }
+        };
+
+        element.addEventListener(event, safeHandler, options);
+    },
+
+    /**
+     * Delegate event listener
+     * @param {HTMLElement} parent 
+     * @param {string} selector 
+     * @param {string} event 
+     * @param {Function} handler 
+     */
+    delegate: function (parent, selector, event, handler) {
+        if (!parent || !handler) return;
+
+        parent.addEventListener(event, (e) => {
+            const target = e.target.closest(selector);
+            if (target) {
+                try {
+                    handler.call(target, e);
+                } catch (error) {
+                    ErrorHandler.handle(error, `Delegated Event: ${event}`);
+                }
+            }
+        });
+    }
+};
+
+// Window export (used by all existing code)
+window.SafeDOM = SafeDOM;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SafeDOM;
+}
+
+Logger.info('SafeDOM utilities loaded');

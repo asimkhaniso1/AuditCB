@@ -1,1 +1,252 @@
-const Sanitizer={sanitizeHTML:(e,t={})=>{if(!e)return"";const i={ALLOWED_TAGS:["b","i","em","strong","a","p","br","ul","ol","li","span","div"],ALLOWED_ATTR:["href","title","target","class","style"],ALLOW_DATA_ATTR:!1,...t};return void 0!==window.DOMPurify&&window.DOMPurify.sanitize?window.DOMPurify.sanitize(e,i):(console.warn("DOMPurify not found. Using UTILS.escapeHtml fallback."),window.UTILS?window.UTILS.escapeHtml(e):Sanitizer.escapeHTML(e))},sanitizeText:e=>{if(!e)return"";let t=e;return void 0!==window.DOMPurify&&window.DOMPurify.sanitize&&(t=window.DOMPurify.sanitize(e,{ALLOWED_TAGS:[],ALLOWED_ATTR:[]})),Sanitizer.escapeHTML(t)},escapeHTML:e=>{if(!e)return"";const t=document.createElement("div");return t.textContent=e,t.innerHTML},sanitizeAttribute:e=>e?String(e).replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):"",sanitizeURL:e=>{if(!e)return"";return/^(javascript|data|vbscript):/i.test(String(e).trim())?(console.warn("Blocked dangerous URL:",e),""):void 0!==window.DOMPurify&&window.DOMPurify.sanitize?window.DOMPurify.sanitize(e,{ALLOWED_TAGS:[]}):e},sanitizeUrl:function(e){return this.sanitizeURL(e)},sanitizeEmail:e=>{if(!e)return"";let t=String(e).trim();return void 0!==window.DOMPurify&&window.DOMPurify.sanitize&&(t=window.DOMPurify.sanitize(t,{ALLOWED_TAGS:[],ALLOWED_ATTR:[]}).trim()),t},createElement:(e,t="",i={})=>{const n=document.createElement(e);n.textContent=t;for(const[e,t]of Object.entries(i))"href"===e?n.setAttribute(e,Sanitizer.sanitizeURL(t)):"style"===e||"class"===e?n.setAttribute(e,t):n.setAttribute(e,Sanitizer.sanitizeAttribute(t));return n},setInnerHTML:(e,t,i={})=>{e&&(e.innerHTML=Sanitizer.sanitizeHTML(t,i))},appendTextElement:(e,t,i)=>{const n=Sanitizer.createElement(t,i);return e.appendChild(n),n},sanitizeFormData:(e,t=[],i=[])=>{const n={};for(const[r,a]of Object.entries(e))t.includes(r)?n[r]=Sanitizer.sanitizeText(a):i.includes(r)?n[r]=Sanitizer.sanitizeHTML(a):n[r]=Sanitizer.sanitizeText(a);return n},prepareTemplateData:(e,t=[])=>{const i={...e};for(const e of t)i[e]&&(i[e]=Sanitizer.escapeHTML(i[e]));return i}};if(!document.getElementById("validation-styles")){const e=document.createElement("style");e.id="validation-styles",e.textContent="\n        .input-error {\n            border: 2px solid #dc2626 !important;\n            background: #fef2f2 !important;\n        }\n        \n        .error-message {\n            color: #dc2626;\n            font-size: 0.85rem;\n            margin-top: 0.25rem;\n            display: block;\n        }\n        \n        input.input-error:focus,\n        textarea.input-error:focus,\n        select.input-error:focus {\n            outline: 2px solid #dc2626;\n            outline-offset: 2px;\n        }\n    ",document.head.appendChild(e)}window.Sanitizer=Sanitizer,"undefined"!=typeof module&&module.exports&&(module.exports=Sanitizer);
+// ============================================
+// SANITIZATION UTILITY MODULE (ESM-ready)
+// ============================================
+// XSS Prevention using DOMPurify
+// Wrapper for consistent sanitization across app
+
+const Sanitizer = {
+
+    /**
+     * Sanitize HTML string to prevent XSS
+     * @param {string} dirty - Unsanitized HTML
+     * @param {Object} config - DOMPurify config (optional)
+     * @returns {string} - Sanitized HTML safe for innerHTML
+     */
+    sanitizeHTML: (dirty, config = {}) => {
+        if (!dirty) return '';
+
+        // Default config: Allow common formatting but block scripts
+        const defaultConfig = {
+            ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'span', 'div'],
+            ALLOWED_ATTR: ['href', 'title', 'target', 'class', 'style'],
+            ALLOW_DATA_ATTR: false,
+            ...config
+        };
+
+        // Safely check for window.DOMPurify
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            return window.DOMPurify.sanitize(dirty, defaultConfig);
+        }
+
+        console.warn('DOMPurify not found. Using UTILS.escapeHtml fallback.');
+        return window.UTILS ? window.UTILS.escapeHtml(dirty) : Sanitizer.escapeHTML(dirty);
+    },
+
+    /**
+     * Sanitize plain text (strips ALL HTML)
+     * Use for user-generated content that should be text-only
+     * @param {string} dirty - Unsanitized input
+     * @returns {string} - Plain text with HTML entities escaped
+     */
+    sanitizeText: (dirty) => {
+        if (!dirty) return '';
+
+        let clean = dirty;
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            clean = window.DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+        }
+
+        // Additional escaping for safety
+        return Sanitizer.escapeHTML(clean);
+    },
+
+    /**
+     * Manually escape HTML entities
+     * Equivalent to textContent but returns string
+     * @param {string} text - Text to escape
+     * @returns {string} - HTML-escaped text
+     */
+    escapeHTML: (text) => {
+        if (!text) return '';
+
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    /**
+     * Sanitize for use in HTML attributes
+     * @param {string} value - Attribute value
+     * @returns {string} - Safe attribute value
+     */
+    sanitizeAttribute: (value) => {
+        if (!value) return '';
+
+        return String(value)
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    },
+
+    /**
+     * Sanitize URL to prevent javascript: and data: URIs
+     * @param {string} url - URL to sanitize
+     * @returns {string} - Safe URL or empty string
+     */
+    sanitizeURL: (url) => {
+        if (!url) return '';
+
+        // Block dangerous protocols
+        const dangerous = /^(javascript|data|vbscript):/i;
+        if (dangerous.test(String(url).trim())) {
+            console.warn('Blocked dangerous URL:', url);
+            return '';
+        }
+
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            return window.DOMPurify.sanitize(url, { ALLOWED_TAGS: [] });
+        }
+
+        return url;
+    },
+
+    // Alias for lowercase 'url' (compatibility)
+    sanitizeUrl: function (url) {
+        return this.sanitizeURL(url);
+    },
+
+    /**
+     * Sanitize email address
+     * @param {string} email - Email to sanitize
+     * @returns {string} - Safe email or empty string
+     */
+    sanitizeEmail: (email) => {
+        if (!email) return '';
+
+        let clean = String(email).trim();
+        if (typeof window.DOMPurify !== 'undefined' && window.DOMPurify.sanitize) {
+            clean = window.DOMPurify.sanitize(clean, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim();
+        }
+
+        return clean;
+    },
+
+    /**
+     * Create safe DOM element with text content
+     * Preferred over innerHTML for user content
+     * @param {string} tagName - Element tag (e.g., 'div', 'span')
+     * @param {string} textContent - Text content
+     * @param {Object} attributes - Optional attributes
+     * @returns {HTMLElement} - Safe DOM element
+     */
+    createElement: (tagName, textContent = '', attributes = {}) => {
+        const element = document.createElement(tagName);
+        element.textContent = textContent; // Auto-escapes
+
+        // Apply attributes safely
+        for (const [key, value] of Object.entries(attributes)) {
+            if (key === 'href') {
+                element.setAttribute(key, Sanitizer.sanitizeURL(value));
+            } else if (key === 'style' || key === 'class') {
+                element.setAttribute(key, value); // These are safe
+            } else {
+                element.setAttribute(key, Sanitizer.sanitizeAttribute(value));
+            }
+        }
+
+        return element;
+    },
+
+    /**
+     * Safely set innerHTML with sanitization
+     * @param {HTMLElement} element - Target element
+     * @param {string} html - HTML content
+     * @param {Object} config - DOMPurify config
+     */
+    setInnerHTML: (element, html, config = {}) => {
+        if (!element) return;
+        element.innerHTML = Sanitizer.sanitizeHTML(html, config);
+    },
+
+    /**
+     * Safely append user content as text
+     * @param {HTMLElement} parent - Parent element
+     * @param {string} tagName - Child element tag
+     * @param {string} content - User content
+     * @returns {HTMLElement} - Created element
+     */
+    appendTextElement: (parent, tagName, content) => {
+        const element = Sanitizer.createElement(tagName, content);
+        parent.appendChild(element);
+        return element;
+    },
+
+    /**
+     * Sanitize form data object
+     * @param {Object} formData - Form data object
+     * @param {Array} textFields - Fields to treat as plain text (no HTML)
+     * @param {Array} htmlFields - Fields that can contain limited HTML
+     * @returns {Object} - Sanitized form data
+     */
+    sanitizeFormData: (formData, textFields = [], htmlFields = []) => {
+        const sanitized = {};
+
+        for (const [key, value] of Object.entries(formData)) {
+            if (textFields.includes(key)) {
+                sanitized[key] = Sanitizer.sanitizeText(value);
+            } else if (htmlFields.includes(key)) {
+                sanitized[key] = Sanitizer.sanitizeHTML(value);
+            } else {
+                // Default: treat as text
+                sanitized[key] = Sanitizer.sanitizeText(value);
+            }
+        }
+
+        return sanitized;
+    },
+
+    /**
+     * Build safe HTML template for auditor/client data
+     * Automatically escapes user-provided fields
+     * @param {Object} data - Data object
+     * @param {Array} unsafeFields - Fields containing user input
+     * @returns {Object} - Data with escaped fields
+     */
+    prepareTemplateData: (data, unsafeFields = []) => {
+        const prepared = { ...data };
+
+        for (const field of unsafeFields) {
+            if (prepared[field]) {
+                prepared[field] = Sanitizer.escapeHTML(prepared[field]);
+            }
+        }
+
+        return prepared;
+    }
+};
+
+// Add CSS for error styling
+if (!document.getElementById('validation-styles')) {
+    const style = document.createElement('style');
+    style.id = 'validation-styles';
+    style.textContent = `
+        .input-error {
+            border: 2px solid #dc2626 !important;
+            background: #fef2f2 !important;
+        }
+        
+        .error-message {
+            color: #dc2626;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+            display: block;
+        }
+        
+        input.input-error:focus,
+        textarea.input-error:focus,
+        select.input-error:focus {
+            outline: 2px solid #dc2626;
+            outline-offset: 2px;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Window export (used by all existing code)
+window.Sanitizer = Sanitizer;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Sanitizer;
+}
