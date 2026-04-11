@@ -402,7 +402,7 @@
 
             Promise.all(syncPromises).catch(error => {
                 console.error('Save Certificate Error:', error);
-                alert('Cloud Save Failed:\n' + (error.message || JSON.stringify(error)));
+                window.showNotification('Cloud save failed: ' + (error.message || 'Unknown error'), 'error');
             });
         } else {
             // Fallback for local-only

@@ -1164,8 +1164,8 @@ function renderAuditorTab(auditor, tabName) {
                                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                                         <i class="fa-solid fa-file-${d.type === 'pdf' ? 'pdf' : d.type === 'image' ? 'image' : 'alt'}" style="font-size: 1.5rem; color: ${d.type === 'pdf' ? 'var(--danger-color)' : 'var(--primary-color)'};"></i>
                                         <div>
-                                            <p style="font-weight: 500; margin: 0;">${d.name}</p>
-                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Uploaded: ${d.date} • ${d.size || '-'}</p>
+                                            <p style="font-weight: 500; margin: 0;">${window.UTILS.escapeHtml(d.name)}</p>
+                                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Uploaded: ${window.UTILS.escapeHtml(d.date || '')} • ${window.UTILS.escapeHtml(d.size || '-')}</p>
                                         </div>
                                     </div>
                                     <div style="display: flex; gap: 0.5rem;">
@@ -1370,8 +1370,8 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                             <tbody>
                                 ${state.auditors.map(auditor => `
                                     <tr>
-                                        <td style="font-weight: 500;">${auditor.name}</td>
-                                        <td><span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span></td>
+                                        <td style="font-weight: 500;">${window.UTILS.escapeHtml(auditor.name)}</td>
+                                        <td><span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${window.UTILS.escapeHtml(auditor.role)}</span></td>
                                         <td>${getExperienceBadge(auditor.experience)}</td>
                                         ${standards.map(std => {
                 const hasStd = auditor.standards && auditor.standards.some(s => s.includes(std.split(' ')[1]));
@@ -1457,14 +1457,14 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                                     <div style="display: flex; gap: 1rem; align-items: center;">
                                         ${auditor.pictureUrl ? `
-                                            <img src="${auditor.pictureUrl}" alt="${auditor.name}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
+                                            <img src="${window.UTILS.escapeHtml(auditor.pictureUrl)}" alt="${window.UTILS.escapeHtml(auditor.name)}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
                                         ` : `
                                             <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--primary-color); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 600;">
-                                                ${auditor.name.split(' ').map(n => n[0]).join('')}
+                                                ${window.UTILS.escapeHtml(auditor.name.split(' ').map(n => n[0]).join(''))}
                                             </div>
                                         `}
                                         <div>
-                                            <h4 style="margin: 0 0 0.25rem 0;">${auditor.name}</h4>
+                                            <h4 style="margin: 0 0 0.25rem 0;">${window.UTILS.escapeHtml(auditor.name)}</h4>
                                             <span style="background: ${auditor.role === 'Lead Auditor' ? 'var(--primary-color)' : 'var(--secondary-color)'}; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">${auditor.role}</span>
                                         </div>
                                     </div>
@@ -1476,7 +1476,7 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                                         <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-certificate" style="margin-right: 0.5rem;"></i>Standards</p>
                                         <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
                                             ${(auditor.standards || []).map(std =>
-                `<span style="background: var(--primary-color); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${std}</span>`
+                `<span style="background: var(--primary-color); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${window.UTILS.escapeHtml(std)}</span>`
             ).join('') || '<span style="color: var(--text-secondary);">None</span>'}
                                         </div>
                                     </div>
@@ -1493,7 +1493,7 @@ function renderMatrixTab(tabName, standards, industries, getExperienceBadge, get
                                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><i class="fa-solid fa-brain" style="margin-right: 0.5rem;"></i>Domain Expertise</p>
                                     <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
                                         ${auditor.domainExpertise.map(exp =>
-                `<span style="background: #ede9fe; color: #5b21b6; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${exp}</span>`
+                `<span style="background: #ede9fe; color: #5b21b6; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">${window.UTILS.escapeHtml(exp)}</span>`
             ).join('')}
                                     </div>
                                 </div>
@@ -2572,7 +2572,7 @@ window.openAuditorUploadModal = function (auditorId) {
 
             if (window.showNotification) window.showNotification('Document uploaded successfully', 'success');
         } else {
-            alert('Please enter a document name and select a file');
+            window.showNotification('Please enter a document name and select a file', 'warning');
         }
     };
 };

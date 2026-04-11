@@ -194,7 +194,7 @@
         if (!el.files || !el.files[0]) return;
         let file = el.files[0];
         if (file.size > 5242880) {
-            alert('File is too large! Max limit is 5MB.');
+            window.showNotification('File is too large! Max limit is 5MB.', 'error');
             el.value = '';
             let nameField = document.getElementById('doc-name');
             if (nameField) nameField.value = '';
@@ -212,7 +212,7 @@
         if (!el.files || !el.files[0]) return;
         let file = el.files[0];
         if (file.size > 5242880) {
-            alert('File is too large! Max limit is 5MB.');
+            window.showNotification('File is too large! Max limit is 5MB.', 'error');
             el.value = '';
             let nameField = document.getElementById('doc-name');
             if (nameField) nameField.value = '';
