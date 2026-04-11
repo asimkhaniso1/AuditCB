@@ -1,12 +1,18 @@
 export default async function handler(req, res) {
-    // CORS Headers for safety if called from different origin (optional but good practice)
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+    // CORS: restrict to same-origin or known deployment domains
+    const allowedOrigins = [
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+        process.env.CORS_ORIGIN || null,
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000'
+    ].filter(Boolean);
+    const origin = req.headers.origin || '';
+    const isAllowed = allowedOrigins.some(o => origin === o) || origin.endsWith('.vercel.app');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : allowedOrigins[0] || '');
+    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();

@@ -86,7 +86,35 @@ const CONSTANTS = {
         SUCCESS: 'var(--success-color)',
         DANGER: 'var(--danger-color)',
         WARNING: 'var(--warning-color)',
-        INFO: 'var(--info-color)'
+        INFO: 'var(--info-color)',
+        // Semantic hex colors (Slate palette)
+        TEXT_PRIMARY: '#1e293b',
+        TEXT_SECONDARY: '#475569',
+        TEXT_MUTED: '#64748b',
+        BORDER: '#e2e8f0',
+        BG_SURFACE: '#f8fafc',
+        BG_MUTED: '#f1f5f9',
+        // NCR severity colors
+        MAJOR: '#dc2626',
+        MINOR: '#d97706',
+        OBSERVATION: '#8b5cf6',
+        OFI: '#06b6d4',
+        CONFORM: '#10b981',
+        ACCENT: '#3b82f6'
+    },
+    NCR_COLORS: {
+        major: '#dc2626',
+        minor: '#d97706',
+        observation: '#8b5cf6',
+        ofi: '#06b6d4',
+        pending_classification: '#94a3b8'
+    },
+    Z_INDEX: {
+        DROPDOWN: 100,
+        MODAL: 9999,
+        MODAL_OVERLAY: 9998,
+        TOAST: 10000,
+        TOOLTIP: 10001
     }
 };
 

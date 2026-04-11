@@ -641,7 +641,7 @@ window.addSite = function (clientId) {
         if (name) {
             if (!client.sites) client.sites = [];
             const standards = Array.from(document.getElementById('site-standards').selectedOptions).map(o => o.value).join(', ');
-            const employees = parseInt(document.getElementById('site-employees', 10).value) || null;
+            const employees = parseInt(document.getElementById('site-employees').value, 10) || null;
             const shift = document.getElementById('site-shift').value || null;
             client.sites.push({
                 name,

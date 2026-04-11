@@ -22,10 +22,17 @@ const transporter = nodemailer.createTransport({
 });
 
 module.exports = async (req, res) => {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS: restrict to same-origin or known deployment domains
+    const allowedOrigins = [
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+        process.env.CORS_ORIGIN || null,
+        'http://localhost:3000', 'http://127.0.0.1:3000'
+    ].filter(Boolean);
+    const origin = req.headers.origin || '';
+    const isAllowed = allowedOrigins.some(o => origin === o) || origin.endsWith('.vercel.app');
+    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : allowedOrigins[0] || '');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     // Handle preflight
     if (req.method === 'OPTIONS') {

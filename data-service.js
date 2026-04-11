@@ -182,6 +182,33 @@
         return (window.state.auditPlans || []).find(p => String(p.id) === String(planId));
     }
 
+    // ---- Modal helper ----
+
+    /**
+     * Open the shared modal with a title, HTML body, and save handler.
+     * Eliminates the repeated 5-line modal setup boilerplate.
+     * @param {string} title - Modal title text
+     * @param {string} bodyHtml - HTML content for modal body
+     * @param {Function} [onSave] - Save button click handler (omit to hide save button)
+     */
+    function openFormModal(title, bodyHtml, onSave) {
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        if (modalTitle) modalTitle.textContent = title;
+        if (modalBody) modalBody.innerHTML = bodyHtml;
+        if (modalSave) {
+            if (onSave) {
+                modalSave.style.display = '';
+                modalSave.onclick = onSave;
+            } else {
+                modalSave.style.display = 'none';
+            }
+        }
+        if (window.openModal) window.openModal();
+    }
+
     // ---- Export ----
 
     window.DataService = {
@@ -202,6 +229,9 @@
         tableInsert,
         tableUpdate,
         tableDelete,
+
+        // UI helpers
+        openFormModal,
 
         // State lookups
         findClient,

@@ -2328,7 +2328,7 @@ window.handleIndustryChange = function (select) {
             const city = document.getElementById('site-city').value;
             const country = document.getElementById('site-country').value;
             const geotag = document.getElementById('site-geotag').value;
-            const employees = parseInt(document.getElementById('site-employees', 10).value) || null;
+            const employees = parseInt(document.getElementById('site-employees').value, 10) || null;
             const shift = document.getElementById('site-shift').value || null;
 
             if (name) {

@@ -1083,7 +1083,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         // Update card border color
                         const card = this.closest('.card');
                         if (card) {
-                            const colors = { major: '#dc2626', minor: '#d97706', observation: '#8b5cf6', ofi: '#06b6d4' };
+                            const colors = window.CONSTANTS.NCR_COLORS;
                             card.style.borderLeftColor = colors[newType] || '#8b5cf6';
                         }
 
