@@ -2113,6 +2113,7 @@ const SupabaseClient = {
      * Fetch documents from Supabase
      */
     async syncDocumentsFromSupabase() {
+        this._kbIdCache = null; // Reset KB lookup cache for fresh build
         if (!this.isInitialized) {
             Logger.warn('Supabase not initialized');
             return { added: 0, updated: 0 };
@@ -2171,20 +2172,28 @@ const SupabaseClient = {
 
                     if (collection) {
                         const docId = String(doc.id);
-                        const inKB = collection.some(k => String(k.id) === docId || k.cloudPath === doc.storage_path);
+                        // Use Set for O(1) lookup instead of O(n) .some()
+                        if (!this._kbIdCache) this._kbIdCache = new Set();
+                        if (!this._kbIdCache.size) {
+                            const allKB = [].concat(kb.standards || [], kb.sops || [], kb.policies || [], kb.marketing || []);
+                            allKB.forEach(k => { this._kbIdCache.add(String(k.id)); if (k.cloudPath) this._kbIdCache.add(k.cloudPath); });
+                        }
+                        const inKB = this._kbIdCache.has(docId) || (doc.storage_path && this._kbIdCache.has(doc.storage_path));
 
                         if (!inKB) {
                             collection.push({
                                 id: doc.id,
                                 name: doc.name,
-                                fileName: doc.name, // Fallback to name
+                                fileName: doc.name,
                                 uploadDate: mappedDoc.uploadDate,
-                                status: 'pending', // Needs analysis
+                                status: 'pending',
                                 fileSize: doc.file_size,
                                 cloudUrl: doc.url,
                                 cloudPath: doc.storage_path,
                                 clauses: []
                             });
+                            this._kbIdCache.add(docId);
+                            if (doc.storage_path) this._kbIdCache.add(doc.storage_path);
                             Logger.info(`Auto-added document to Knowledge Base: ${doc.name}`);
                         }
                     }
