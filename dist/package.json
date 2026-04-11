@@ -6,14 +6,17 @@
         "start": "http-server -p 8080",
         "build": "node build.js",
         "lint": "echo 'Lint skipped — no eslint configured for browser globals'",
-        "test": "echo 'Tests skipped — vitest not installed'"
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "engines": {
         "node": "20.x"
     },
     "devDependencies": {
+        "jsdom": "^29.0.2",
         "supabase": "^2.72.2",
-        "terser": "^5.46.0"
+        "terser": "^5.46.0",
+        "vitest": "^4.1.4"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.93.2",

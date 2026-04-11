@@ -54,7 +54,12 @@
       "Bash(node -c api/gemini.js)",
       "Bash(node -c api/send-email.js)",
       "Bash(node -c constants.js)",
-      "Bash(node -c data-service.js)"
+      "Bash(node -c data-service.js)",
+      "Bash(python3:*)",
+      "Bash(grep -l alert\\\\\\( c:/Users/Administrator/Documents/AuditCB-360/src/**/*.js)",
+      "Bash(node -e \"const p=require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\);const j=JSON.parse\\(p\\);console.log\\(JSON.stringify\\(j.scripts,null,2\\)\\)\")",
+      "Bash(node -e \"const p=require\\(''./package.json''\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(npm install:*)"
     ]
   }
 }
