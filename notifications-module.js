@@ -16,7 +16,7 @@ const NotificationManager = {
         if (saved) {
             try {
                 this.notifications = JSON.parse(saved);
-            } catch (e) {
+            } catch (_e) {
                 this.notifications = [];
             }
         }

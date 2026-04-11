@@ -224,13 +224,14 @@
 
     // ─── switchSettingsMainTab adapter (passes 'this' context) ──────
     // The original called switchSettingsMainTab('tab-id', this) where 'this' = button
-    let origSwitchSettingsMainTab = null;
+    let _origSwitchSettingsMainTab = null;
     window.addEventListener('DOMContentLoaded', function () {
-        origSwitchSettingsMainTab = window.switchSettingsMainTab;
+        _origSwitchSettingsMainTab = window.switchSettingsMainTab;
     });
 
     // Override for event-delegator compatibility
     let _origSwitchSettingsMainTabBound = false;
+    // eslint-disable-next-line no-unused-vars
     function ensureSwitchSettingsMainTabWrapped() {
         if (_origSwitchSettingsMainTabBound) return;
         let orig = window.switchSettingsMainTab;

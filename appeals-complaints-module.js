@@ -783,7 +783,7 @@ window.printACRegister = function (type) {
     const title = type === 'appeals' ? 'Appeals Register' : 'Complaints Register';
 
     const printWindow = window.open('', '', 'width=900,height=700');
-    let tableHTML = '';
+    let tableHTML;
 
     if (type === 'appeals') {
         tableHTML = `

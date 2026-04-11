@@ -17,7 +17,7 @@ const AuditTrail = {
         if (saved) {
             try {
                 this.logs = JSON.parse(saved);
-            } catch (e) {
+            } catch (_e) {
                 this.logs = [];
             }
         }
@@ -102,7 +102,7 @@ const AuditTrail = {
                 // Determine if table missing or permissions issue
                 console.warn('[AuditTrail] Cloud sync error:', error.message);
             }
-        } catch (err) {
+        } catch (_err) {
             // Silent fail for offline
             // console.debug('[AuditTrail] Offline, log saved locally only');
         }

@@ -1048,7 +1048,7 @@ window.bulkUploadKeyProcesses = function (clientId) {
 // ============================================
 
 window.openClientAuditorAssignmentModal = function (clientId, clientName) {
-    const client = window.DataService.findClient(clientId);
+    const _client = window.DataService.findClient(clientId);
     if (!window.state.auditors) { window.showNotification('No auditors loaded', 'error'); return; }
 
     window.openModal(`Assign Auditor to ${clientName}`, `

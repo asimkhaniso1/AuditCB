@@ -275,14 +275,14 @@ window.openIssueCertificateModal = function (reportId) {
     let prefillClient = '';
     let prefillStandard = '';
     let prefillScope = '';
-    let auditDate = '';
+    let _auditDate = '';
 
     // Find report data
     if (reportId) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (report) {
             prefillClient = report.client;
-            auditDate = report.date;
+            _auditDate = report.date;
 
             // Try to find plan for accurate scope/standard
             const plan = state.auditPlans.find(p => p.client === report.client);
@@ -515,7 +515,7 @@ window.openIssueCertificateModal = function (reportId) {
 
         // 4. Sanitize & Collect
         const clientIdx = document.getElementById('cert-client').selectedIndex;
-        const clientName = document.getElementById('cert-client').options[clientIdx].text;
+        const _clientName = document.getElementById('cert-client').options[clientIdx].text;
         const standard = document.getElementById('cert-standard').value;
         const issueDate = document.getElementById('cert-issue-date').value;
         const expiryDate = document.getElementById('cert-expiry-date').value;

@@ -150,7 +150,7 @@ function renderDocuments() {
     };
 
     const rows = filteredDocs.map(doc => {
-        const reviewStatus = getReviewStatus(doc.nextReviewDate);
+        const _reviewStatus = getReviewStatus(doc.nextReviewDate);
         return `
         <tr class="document-row" style="cursor: pointer;">
             <td>

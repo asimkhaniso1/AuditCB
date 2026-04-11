@@ -719,7 +719,7 @@ Example:
                             continue; // Try next model
                         }
                         lastError = new Error(data.error || `AI Service Error: ${response.status} `);
-                    } catch (e) {
+                    } catch (_e) {
                         // Change to warn to avoid scaring users when fallback is available
                         console.warn(`AI Proxy connection failed: ${response.status} ${response.statusText} - will attempt fallback.`);
                         lastError = new Error(`AI Service connection failed: ${response.status} ${response.statusText} `);
@@ -855,7 +855,7 @@ Example:
                         });
                     }
                     return AI_SERVICE.extractTextFromResponse(data);
-                } catch (e) {
+                } catch (_e) {
                     console.warn(`Dynamic model ${model} unavailable, trying next...`);
                 }
             }
@@ -910,7 +910,7 @@ Example:
                 }
                 return [json];
             }
-        } catch (e) { /* try next strategy */ }
+        } catch (_e) { /* try next strategy */ }
 
         // Strategy 2: Extract JSON array [...] from the text (greedy to handle nested objects)
         const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
@@ -918,7 +918,7 @@ Example:
             try {
                 const json = JSON.parse(arrayMatch[0]);
                 if (Array.isArray(json)) return json;
-            } catch (e) { /* try next strategy */ }
+            } catch (_e) { /* try next strategy */ }
         }
 
         // Strategy 3: Extract individual JSON objects and collect them
@@ -928,7 +928,7 @@ Example:
         while ((match = objRegex.exec(cleanText)) !== null) {
             try {
                 objects.push(JSON.parse(match[0]));
-            } catch (e) { /* skip invalid */ }
+            } catch (_e) { /* skip invalid */ }
         }
         if (objects.length > 0) return objects;
 

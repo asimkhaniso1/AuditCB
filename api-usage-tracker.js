@@ -335,7 +335,7 @@ const APIUsageTracker = {
                     if (!error) {
                         stats.tables[table] = count || 0;
                     }
-                } catch (e) {
+                } catch (_e) {
                     // Table might not exist, skip
                 }
             }
@@ -356,7 +356,7 @@ const APIUsageTracker = {
                             });
                             stats.storage.totalFiles += fileCount;
                             stats.storage.totalSizeMB += totalSize / (1024 * 1024);
-                        } catch (e) {
+                        } catch (_e) {
                             stats.storage.buckets.push({ name: bucket.name, files: 0, sizeMB: '0' });
                         }
                     }

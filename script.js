@@ -340,6 +340,7 @@ function getNextId(collection) {
     return items.length > 0 ? Math.max(...items.map(item => item.id)) + 1 : 1;
 }
 
+// eslint-disable-next-line no-unused-vars
 function addRecord(collection, data) {
     const newRecord = { id: getNextId(collection), ...data };
     state[collection].push(newRecord);
@@ -347,6 +348,7 @@ function addRecord(collection, data) {
     return newRecord;
 }
 
+// eslint-disable-next-line no-unused-vars
 function updateRecord(collection, id, data) {
     const index = state[collection].findIndex(item => String(item.id) === String(id));
     if (index !== -1) {
@@ -357,6 +359,7 @@ function updateRecord(collection, id, data) {
     return null;
 }
 
+// eslint-disable-next-line no-unused-vars
 function deleteRecord(collection, id) {
     const index = state[collection].findIndex(item => String(item.id) === String(id));
     if (index !== -1) {
@@ -407,7 +410,7 @@ function handleRouteChange() {
         return;
     }
     const hash = window.location.hash.substring(1); // Remove #
-    const [baseHash, queryString] = hash.split('?');
+    const [baseHash, _queryString] = hash.split('?');
 
     // Permission guard: check module access before rendering
     const AM = window.AuthManager;
@@ -589,7 +592,7 @@ async function renderModule(moduleName, syncHash = true) {
                     renderClients();
                 }
                 break;
-            case 'client-form':
+            case 'client-form': {
                 const clientId = urlParams.get('id');
                 if (typeof window.renderClientForm === 'function') {
                     window.renderClientForm(clientId);
@@ -597,6 +600,7 @@ async function renderModule(moduleName, syncHash = true) {
                     contentArea.innerHTML = '<div class="alert alert-danger">Client Form module not loaded</div>';
                 }
                 break;
+            }
             case 'auditors':
                 if (typeof renderAuditorsEnhanced === 'function') {
                     renderAuditorsEnhanced();
@@ -604,7 +608,7 @@ async function renderModule(moduleName, syncHash = true) {
                     renderAuditors();
                 }
                 break;
-            case 'auditor-form':
+            case 'auditor-form': {
                 const auditorId = urlParams.get('id');
                 if (typeof window.renderAuditorForm === 'function') {
                     window.renderAuditorForm(auditorId);
@@ -612,6 +616,7 @@ async function renderModule(moduleName, syncHash = true) {
                     contentArea.innerHTML = '<div class="alert alert-danger">Auditor Form module not loaded</div>';
                 }
                 break;
+            }
             case 'audit-programs':
                 if (typeof renderAuditProgramsEnhanced === 'function') {
                     renderAuditProgramsEnhanced();
@@ -737,7 +742,7 @@ async function renderModule(moduleName, syncHash = true) {
                     renderPlaceholder(moduleName);
                 }
                 break;
-            case 'settings':
+            case 'settings': {
                 // Restrict Settings access to Admin and Certification Manager only
                 const settingsRole = window.state.currentUser?.role;
                 const canAccessSettings = settingsRole === 'Admin' || settingsRole === 'Certification Manager';
@@ -759,6 +764,7 @@ async function renderModule(moduleName, syncHash = true) {
                     renderPlaceholder(moduleName);
                 }
                 break;
+            }
             default:
                 // Handle dynamic routes like client/123
                 if (moduleName.startsWith('client/')) {
@@ -942,6 +948,7 @@ function renderAuditExecution() {
     contentArea.innerHTML = '<p>Loading Audit Execution...</p>';
 }
 
+// eslint-disable-next-line no-unused-vars
 function renderCertification() {
     const rows = (state.certificationDecisions || []).map(decision => `
         <tr>
@@ -1128,8 +1135,9 @@ window.saveData = saveState;
 
 // Lazy-loading modal wrapper functions
 // These load modules on demand when create/add buttons are clicked
-const modalFunctionCache = {};
+const _modalFunctionCache = {};
 
+// eslint-disable-next-line no-unused-vars
 async function lazyLoadModal(modulePath, functionName) {
     // Load the module if not already loaded
     try {
@@ -1302,7 +1310,7 @@ window.switchUserRole = function (role) {
 
     window.showNotification(`Switched role to: ${role}`, 'info');
     // Re-render current module to reflect permissions
-    const hash = window.location.hash.substring(1) || 'dashboard';
+    const _hash = window.location.hash.substring(1) || 'dashboard';
     handleRouteChange();
 };
 

@@ -169,7 +169,7 @@ const SupabaseConfig = {
             }
 
             // Test by getting session (doesn't require auth)
-            const { data, error } = await client.auth.getSession();
+            const { data: _data, error } = await client.auth.getSession();
 
             if (error && error.message.includes('Invalid')) {
                 return {

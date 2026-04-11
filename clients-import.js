@@ -623,6 +623,7 @@
     };
 
     // Fallback: Download template as CSV
+    // eslint-disable-next-line no-unused-vars
     function downloadTemplateAsCSV() {
         const headers = ["Client Name", "Status", "Industry", "Employee Count", "Website", "Next Audit Date", "Applicable Standards", "Contact Name", "Contact Email", "Address", "City", "Country"];
         const row1 = ["Sample Corp", "Active", "Manufacturing", "100", "https://sample.com", "2025-01-01", "ISO 9001:2015", "John Doe", "john@sample.com", "123 Main St", "New York", "USA"];
@@ -1170,7 +1171,7 @@
 
     // Open modal to assign an auditor to this client
     window.openClientAuditorAssignmentModal = function (clientId, clientName) {
-        const client = window.DataService.findClient(clientId);
+        const _client = window.DataService.findClient(clientId);
         const auditors = window.state.auditors || [];
         const assignments = window.state.auditorAssignments || [];
         // Check if there are any auditors in the system

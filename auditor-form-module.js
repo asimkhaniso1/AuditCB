@@ -369,7 +369,7 @@ window.saveAuditorForm = function (auditorId) {
 
 // Globalize
 window.renderAuditorForm = renderAuditorForm;
-window.saveAuditorForm = window.saveAuditorForm;
+// window.saveAuditorForm is defined inline above and already on window
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {

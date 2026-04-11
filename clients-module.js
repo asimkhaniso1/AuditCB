@@ -264,7 +264,7 @@ function renderClientDetail(clientId, options = {}) {
     window.state.activeClientId = String(clientId);
 
     // Options: showAccountSetup (default: true), showAnalytics (default: true)
-    const showAccountSetup = options.showAccountSetup !== false;
+    const _showAccountSetup = options.showAccountSetup !== false;
     const showAnalytics = options.showAnalytics !== false;
 
     // Calculate performance metrics
@@ -571,6 +571,7 @@ function getClientSitesHTML(client) {
 }
 
 
+// eslint-disable-next-line no-unused-vars
 function getClientProfileHTML(client) {
     const profile = client.profile || '';
     const lastUpdated = client.profileUpdated ? new Date(client.profileUpdated).toLocaleString() : 'Never';
@@ -658,6 +659,7 @@ function getClientProfileHTML(client) {
     `;
 }
 
+// eslint-disable-next-line no-unused-vars
 function getClientContactsHTML(client) {
     return `
     <div class="card">
@@ -715,6 +717,7 @@ function getClientContactsHTML(client) {
     `;
 }
 
+// eslint-disable-next-line no-unused-vars
 function getClientDepartmentsHTML(client) {
     const departments = client.departments || [];
     return `
@@ -781,6 +784,7 @@ function getClientDepartmentsHTML(client) {
 // getClientOrgSetupHTML (Wizard Version) moved to end of file to avoid duplication conflicts
 
 // Goods/Services Step (AI-Populated)
+// eslint-disable-next-line no-unused-vars
 function getClientGoodsServicesHTML(client) {
     const items = client.goodsServices || [];
     return `
@@ -841,6 +845,7 @@ function getClientGoodsServicesHTML(client) {
 }
 
 // Key Processes Step (AI-Populated)
+// eslint-disable-next-line no-unused-vars
 function getClientKeyProcessesHTML(client) {
     const processes = client.keyProcesses || [];
     return `
@@ -901,6 +906,7 @@ function getClientKeyProcessesHTML(client) {
 }
 
 // Designations Step
+// eslint-disable-next-line no-unused-vars
 function getClientDesignationsHTML(client) {
     const designations = client.designations || [];
     return `
@@ -1054,7 +1060,7 @@ function getClientAuditsHTML(client) {
     });
 
     const openNCRs = allNCRs.filter(n => n.status === 'Open').length;
-    const closedNCRs = allNCRs.filter(n => n.status === 'Closed').length;
+    const _closedNCRs = allNCRs.filter(n => n.status === 'Closed').length;
     const majorNCRs = allNCRs.filter(n => n.type === 'major').length;
     const minorNCRs = allNCRs.filter(n => n.type === 'minor').length;
 
@@ -2244,6 +2250,7 @@ window.handleIndustryChange = function (select) {
 
 {
     // Add Site Modal
+    // eslint-disable-next-line no-unused-vars
     function addSite(clientId) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;

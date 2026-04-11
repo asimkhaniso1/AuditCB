@@ -21,7 +21,7 @@ function _fmtDate(raw) {
 }
 
 function renderChecklistLibrary() {
-    const contentArea = document.getElementById('content-area');
+    const _contentArea = document.getElementById('content-area');
     const userRole = (window.state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || window.state.settings?.isAdmin || false;
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER.toLowerCase());
@@ -48,7 +48,7 @@ function renderChecklistLibrary() {
     const archivedChecklists = filtered.filter(c => c.archived);
 
     const standards = window.state.cbSettings?.availableStandards || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 27001:2022', 'ISO 45001:2018'];
-    const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
+    const _auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
     const html = `
@@ -376,7 +376,7 @@ function openImportChecklistModal() {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
     const modalSave = document.getElementById('modal-save');
-    const modalCancel = document.getElementById('modal-cancel');
+    const _modalCancel = document.getElementById('modal-cancel');
 
     // Build standards list: cbSettings > KB docs > existing checklists > hardcoded fallback
     let standards = window.state.cbSettings?.availableStandards || [];
@@ -526,7 +526,7 @@ function openImportChecklistModal() {
                 const filename = `${sanitizedName}_${timestamp}.csv`;
                 const path = `checklists/${filename}`;
 
-                const { data, error } = await window.SupabaseClient.client.storage
+                const { data: _data, error } = await window.SupabaseClient.client.storage
                     .from('checklists')
                     .upload(path, file, {
                         cacheControl: '3600',
@@ -658,7 +658,7 @@ function setupCSVUpload() {
                 const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
 
                 if (parts.length >= 2) {
-                    let mainClause = '', mainTitle = '', clause = '', requirement = '';
+                    let mainClause = '', mainTitle = '', clause, requirement;
 
                     if (parts.length >= 4) {
                         // Full Hierarchical Format: MainClause, Title, SubClause, Requirement
@@ -728,7 +728,7 @@ function renderChecklistEditor(checklistId) {
     const isAdmin = userRole === 'admin' || state.settings?.isAdmin || false;
     const isCertManager = userRole === 'certification manager' || (window.CONSTANTS?.ROLES && userRole === window.CONSTANTS.ROLES.CERTIFICATION_MANAGER?.toLowerCase());
     const canEditGlobal = isCertManager || isAdmin;
-    const auditTypes = window.CONSTANTS?.AUDIT_TYPES || [];
+    const _auditTypes2 = window.CONSTANTS?.AUDIT_TYPES || [];
     const auditScopes = window.CONSTANTS?.AUDIT_SCOPES || [];
 
     // Get existing items if editing
@@ -880,7 +880,7 @@ function renderChecklistEditor(checklistId) {
 }
 
 function attachChecklistEditorListeners(checklistId) {
-    const isEdit = !!checklistId;
+    const _isEdit = !!checklistId;
 
     // Add row functionality
     document.getElementById('add-item-row')?.addEventListener('click', () => {
@@ -1160,7 +1160,7 @@ function openEditChecklistModal(id) {
 }
 
 function viewChecklistDetail(id) {
-    const contentArea = document.getElementById('content-area');
+    const _contentArea = document.getElementById('content-area');
     const checklist = state.checklists?.find(c => String(c.id) === String(id));
     if (!checklist) return;
 
@@ -1236,7 +1236,7 @@ function viewChecklistDetail(id) {
                             ${(mainClause.subClauses || []).map(sub => {
         // Check if sub-clause has nested items (new structure)
         const hasItems = sub.items && sub.items.length > 0;
-        const isSingleFlat = !hasItems && sub.requirement;
+        const _isSingleFlat = !hasItems && sub.requirement;
 
         if (hasItems) {
             return `

@@ -405,6 +405,7 @@ function renderNCRTable(ncrs) {
     `;
 }
 
+// eslint-disable-next-line no-unused-vars
 function filterNCRs() {
     const level = document.getElementById('filter-level').value;
     const severity = document.getElementById('filter-severity').value;
@@ -724,9 +725,9 @@ function getAnalyticsHTML() {
     const effectivenessRate = closed > 0 ? Math.round((effective / closed) * 100) : 0;
 
     // Severity Breakdown
-    const major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
-    const minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
-    const obs = ncrs.filter(n => {
+    const _major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
+    const _minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
+    const _obs = ncrs.filter(n => {
         const s = (n.severity || '').toLowerCase();
         return s === 'observation' || s === 'ofi' || s === 'observation/ofi';
     }).length;

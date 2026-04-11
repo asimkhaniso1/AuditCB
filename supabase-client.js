@@ -465,7 +465,7 @@ const SupabaseClient = {
             // CRITICAL: Save to IndexedDB (don't call saveData - it triggers upload!)
             try {
                 await window.StateStore.save(window.state);
-            } catch (saveErr) {
+            } catch (_saveErr) {
                 Logger.warn('IndexedDB save failed during cloud sync. State kept in memory only.');
             }
 
@@ -680,7 +680,7 @@ const SupabaseClient = {
                 const path = folder ? `${folder}/${filename}` : filename;
 
                 // Upload
-                const { data, error } = await SupabaseClient.client.storage
+                const { data: _data, error } = await SupabaseClient.client.storage
                     .from(bucket)
                     .upload(path, file, {
                         cacheControl: '3600',
@@ -732,7 +732,7 @@ const SupabaseClient = {
             const path = `client-logos/${clientId}_${timestamp}_${cleanFileName}`;
 
             try {
-                const { data, error } = await SupabaseClient.client.storage
+                const { data: _data2, error } = await SupabaseClient.client.storage
                     .from(bucket)
                     .upload(path, file, {
                         cacheControl: '3600',
@@ -807,7 +807,7 @@ const SupabaseClient = {
                 const path = `${reportType}/${filename}`;
 
                 // Upload to audit-reports bucket
-                const { data, error } = await SupabaseClient.client.storage
+                const { data: _data3, error } = await SupabaseClient.client.storage
                     .from('audit-reports')
                     .upload(path, pdfBlob, {
                         contentType: 'application/pdf',
@@ -1905,7 +1905,7 @@ const SupabaseClient = {
             const localEmpty = !window.state.checklists || window.state.checklists.length === 0;
             if (isIncremental && (!data || data.length === 0) && localEmpty) {
                 Logger.warn('Incremental checklist sync returned 0 but local state is empty — forcing full sync');
-                try { sessionStorage.removeItem('sync_ts_checklists'); } catch(e) {}
+                try { sessionStorage.removeItem('sync_ts_checklists'); } catch(_e) {}
                 return this.syncChecklistsFromSupabase(); // Retry as full sync
             }
 

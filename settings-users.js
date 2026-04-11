@@ -3,6 +3,7 @@
 // Extracted from settings-module.js for maintainability
 // ============================================
 
+// eslint-disable-next-line no-unused-vars
 function getUsersHTML() {
     // No demo users - users must come from Supabase or be added manually
     const users = window.state.users || [];

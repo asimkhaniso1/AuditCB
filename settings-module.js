@@ -1321,6 +1321,7 @@ function getDefaultsHTML() {
 // TAB 8: DATA BACKUP & MANAGEMENT
 // ============================================
 
+// eslint-disable-next-line no-unused-vars
 function getDataManagementHTML() {
     return `
         <div class="fade-in">
@@ -1590,7 +1591,7 @@ function backupData() {
         linkElement.setAttribute('download', exportFileDefaultName);
         linkElement.click();
         window.showNotification('Backup downloaded successfully', 'success');
-    } catch (error) {
+    } catch (_error) {
         window.showNotification('Failed to create backup', 'error');
     }
 }
@@ -1612,7 +1613,7 @@ function restoreData(input) {
                 window.showNotification('Data restored successfully. Reloading...', 'success');
                 setTimeout(() => location.reload(), 1500);
             }
-        } catch (error) {
+        } catch (_error) {
             window.showNotification('Failed to restore data: Invalid file', 'error');
         }
     };
@@ -2036,6 +2037,7 @@ window.restoreData = restoreData;
 // Manage which auditors are assigned to which clients
 // Auditors only see clients they are assigned to
 
+// eslint-disable-next-line no-unused-vars
 function getAssignmentsHTML() {
     const assignments = window.state.auditorAssignments || [];
     const auditors = window.state.auditors || [];
@@ -2839,7 +2841,7 @@ window.testAIConnection = async function () {
         let data;
         try {
             data = await response.json();
-        } catch (e) {
+        } catch (_e) {
             data = { error: 'Could not parse JSON response' };
         }
 

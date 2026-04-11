@@ -17,7 +17,7 @@ const RETENTION_POLICY = {
 };
 
 function renderRecordRetentionModule() {
-    const state = window.state;
+    const _state = window.state;
 
     // Calculate record statistics
     const stats = calculateRetentionStats();
@@ -285,7 +285,7 @@ function renderRetentionRecordsList(records) {
 // Filter records by status
 window.filterRetentionRecords = function (filter) {
     const stats = calculateRetentionStats();
-    let records = [];
+    let records;
 
     if (filter === 'expiring') {
         records = stats.expiringRecords;

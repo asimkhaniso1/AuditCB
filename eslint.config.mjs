@@ -135,7 +135,7 @@ export default [
         },
         rules: {
             // Relaxed for existing codebase — tighten over time
-            'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+            'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
             'no-undef': 'off', // 260+ window globals — re-enable after ES module migration
             'no-redeclare': 'off', // window globals are intentionally redeclared per-file
             'no-empty': ['warn', { allowEmptyCatch: true }],

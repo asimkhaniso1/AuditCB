@@ -2,6 +2,7 @@
 // SYSTEM DEFAULTS - MISSING FUNCTION FIX (ESM-ready)
 // ============================================
 
+// eslint-disable-next-line no-unused-vars
 function getDefaultsHTML() {
     const s = window.state.cbSettings || {};
     return `

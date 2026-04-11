@@ -116,7 +116,7 @@ const StateStore = {
             return new Promise((resolve) => {
                 try {
                     localStorage.setItem(this.LS_KEY, stateJSON);
-                } catch (quotaErr) {
+                } catch (_quotaErr) {
                     (window.Logger || console).warn('[StateStore] localStorage quota exceeded. State kept in memory only.');
                 }
                 resolve();
@@ -141,7 +141,7 @@ const StateStore = {
                     // Fallback to localStorage on write failure
                     try {
                         localStorage.setItem(this.LS_KEY, stateJSON);
-                    } catch (quotaErr) {
+                    } catch (_quotaErr) {
                         (window.Logger || console).warn('[StateStore] localStorage fallback also failed. State in memory only.');
                     }
                     resolve(); // Don't reject — best effort
@@ -218,7 +218,7 @@ const StateStore = {
                     try {
                         const saved = localStorage.getItem(this.LS_KEY);
                         resolve(saved ? JSON.parse(saved) : null);
-                    } catch (err) {
+                    } catch (_err) {
                         resolve(null);
                     }
                 };

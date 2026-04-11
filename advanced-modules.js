@@ -469,7 +469,7 @@ function renderAuditorTab(auditor, tabName) {
                 </div>
             `;
             break;
-        case 'activity':
+        case 'activity': {
             // Get upcoming audits for this auditor
             const today = new Date().toISOString().split('T')[0];
             const upcomingPlans = state.auditPlans.filter(p => {
@@ -669,7 +669,7 @@ function renderAuditorTab(auditor, tabName) {
             `;
 
             // Performance Reviews Section
-            const performanceReviewsHTML = `
+            const _performanceReviewsHTML = `
                 <div class="card" style="margin-top: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">
@@ -731,7 +731,7 @@ function renderAuditorTab(auditor, tabName) {
                 : '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No audit history available yet.</td></tr>';
 
             // Report Reviews Section
-            const reportReviewsHTML = `
+            const _reportReviewsHTML = `
                 <div class="card" style="margin-top: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">
@@ -780,7 +780,7 @@ function renderAuditorTab(auditor, tabName) {
             `;
 
             // Linked Complaints Section
-            const linkedComplaintsHTML = `
+            const _linkedComplaintsHTML = `
                 <div class="card" style="margin-top: 1.5rem; border-left: 4px solid ${linkedComplaints.length > 0 ? '#dc2626' : '#9ca3af'};">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">
@@ -850,7 +850,8 @@ function renderAuditorTab(auditor, tabName) {
             // Append only core activity sections
             tabContent.innerHTML += perfSummaryHTML + witnessAuditsHTML + auditHistoryHTML;
             break;
-        case 'performance':
+        }
+        case 'performance': {
             // Performance tab - Performance Reviews + Report Reviews
             const perfEvaluations = auditor.evaluations || { performanceReviews: [], reportReviews: [] };
             const perfReviews = perfEvaluations.performanceReviews || [];
@@ -951,7 +952,8 @@ function renderAuditorTab(auditor, tabName) {
                 </div>
             `;
             break;
-        case 'complaints':
+        }
+        case 'complaints': {
             // Complaints tab - Linked Complaints
             const complaintEvaluations = auditor.evaluations || { linkedComplaints: [] };
             const auditLinkedComplaints = complaintEvaluations.linkedComplaints || [];
@@ -1012,7 +1014,8 @@ function renderAuditorTab(auditor, tabName) {
                 </div>
             `;
             break;
-        case 'qualifications':
+        }
+        case 'qualifications': {
             // Get qualifications or generate from standards
             const qualifications = auditor.qualifications || auditor.standards.map(std => ({
                 standard: std,
@@ -1148,6 +1151,7 @@ function renderAuditorTab(auditor, tabName) {
                 </div>
             `;
             break;
+        }
 
         case 'clients':
             tabContent.innerHTML = getAuditorClientsTabHTML(auditor);
@@ -1601,7 +1605,7 @@ window.exportCompetenceMatrix = exportCompetenceMatrix;
 
 function calculateManDays(employees, sites, effectiveness, shiftWork, riskLevel) {
     // ISO 17021-1 base man-days table (simplified)
-    let baseDays = 0;
+    let baseDays;
 
     if (employees <= 10) baseDays = 2;
     else if (employees <= 25) baseDays = 3;
@@ -1849,11 +1853,13 @@ function renderManDayCalculator() {
     });
 }
 
-// Helper functions for calculator
+// Helper functions for calculator (called via data-action event delegation)
+// eslint-disable-next-line no-unused-vars
 function saveCalculationToPlan() {
     showNotification('Man-day calculation saved to draft audit plan', 'success');
 }
 
+// eslint-disable-next-line no-unused-vars
 function printCalculation() {
     window.print();
 }
@@ -2037,14 +2043,12 @@ window.randomlySelectSites = function () {
     checkboxes.forEach(cb => cb.checked = false);
 
     // Always select HQ if it exists (heuristic: Name contains HQ or Head)
-    let selectedCount = 0;
     const hqIndex = checkboxes.findIndex(cb => cb.dataset.name.toLowerCase().includes('hq') || cb.dataset.name.toLowerCase().includes('head'));
 
     const indicesToSelect = new Set();
 
     if (hqIndex !== -1) {
         indicesToSelect.add(hqIndex);
-        selectedCount++;
     }
 
     // Randomly select remaining

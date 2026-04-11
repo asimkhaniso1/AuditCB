@@ -8,12 +8,13 @@
 // resolveStandardName are all available via window.KB_HELPERS.*
 
 
+// eslint-disable-next-line no-unused-vars
 function renderExecutionTab(report, tabName, contextData = {}) {
     const tabContent = document.getElementById('tab-content');
 
     switch (tabName) {
-        case 'checklist':
-            const { assignedChecklists = [], progressMap = {}, customItems = [], departments = [], designations = [], auditTeam = [], clientPersonnel = [], clientData = null, plan = null, selectionMap = {}, overridesMap = {} } = contextData;
+        case 'checklist': {
+            const { assignedChecklists = [], progressMap = {}, customItems = [], departments: _departments = [], designations: _designations = [], auditTeam: _auditTeam = [], clientPersonnel = [], clientData = null, plan: _plan = null, selectionMap = {}, overridesMap = {} } = contextData;
 
             // Auto-fill designation and department when personnel name is selected
             window._autoFillPersonnel = function (suffix) {
@@ -118,8 +119,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     if (!uniqueId) return;
                     const personnelEl = document.getElementById('ncr-personnel-' + uniqueId);
                     if (!personnelEl) return; // No personnel field = not expanded NC form
-                    const desEl = document.getElementById('ncr-designation-' + uniqueId);
-                    const deptEl = document.getElementById('ncr-department-' + uniqueId);
+                    const _desEl = document.getElementById('ncr-designation-' + uniqueId);
+                    const _deptEl = document.getElementById('ncr-department-' + uniqueId);
 
                     // Check if already filled
                     const currentPersonnel = personnelEl.value || '';
@@ -162,7 +163,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     try {
                         const jsonStr = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
                         mappings = JSON.parse(jsonStr);
-                    } catch (e) {
+                    } catch (_e) {
                         // Try to extract JSON array
                         const match = response.match(/\[[\s\S]*\]/);
                         if (match) {
@@ -352,7 +353,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 `;
             };
 
-            let checklistHTML = '';
+            let checklistHTML;
 
             if (assignedChecklists.length > 0) {
                 checklistHTML = assignedChecklists.map(checklist => {
@@ -395,7 +396,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
                             const sectionId = `clause-${checklist.id}-${clause.mainClause}`;
                             const renderedItems = itemsToRender.map(obj => {
-                                const globalIdx = itemIdx++;
+                                const _globalIdx = itemIdx++;
                                 return renderRow(obj.item, checklist.id, obj.itemId, false);
                             }).join('');
 
@@ -406,7 +407,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                             });
                             const completed = sectionProgress.filter(s => s === 'conform' || s === 'nc' || s === 'na').length;
                             const total = itemsToRender.length;
-                            const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+                            const _progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
                             return `
                                         <div class="accordion-section" data-clause-id="${checklist.id}-${clause.mainClause}" style="margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
@@ -620,8 +621,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             }, 100);
 
             break;
+        }
 
-        case 'ncr':
+        case 'ncr': {
             // Combine Manual NCRs and Checklist-marked NCs for real-time display
             const manualNCRs = report.ncrs || [];
 
@@ -730,8 +732,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
             `;
             break;
+        }
 
-        case 'capa':
+        case 'capa': {
             const capas = report.capas || [];
             tabContent.innerHTML = `
                 <div class="card">
@@ -775,6 +778,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 </div>
             `;
             break;
+        }
 
         case 'observations':
             // Redirect to Unified Review Tab
@@ -852,7 +856,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const currentUserRole = window.state.currentUser?.role || 'Auditor';
             const canOneClickFinalize = ['Lead Auditor', 'Admin', 'Certification Manager', 'Manager'].includes(currentUserRole);
 
-            let primaryActionBtn = '';
+            let primaryActionBtn;
 
             if (report.status === window.CONSTANTS.STATUS.FINALIZED || report.status === window.CONSTANTS.STATUS.PUBLISHED) {
                 primaryActionBtn = `
@@ -1457,7 +1461,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         window.Logger.debug('Execution', 'Checkbox is checked:', isChecked);
 
         // Toggle items in this section
-        let count = 0;
+        let _count = 0;
         const items = section.querySelectorAll('.checklist-item');
         window.Logger.debug('Execution', 'Found items:', items.length);
         items.forEach(item => {
@@ -1465,7 +1469,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 item.classList.add('selected-item');
                 item.style.background = '#eff6ff'; // Light blue highlight
                 item.style.borderLeft = '4px solid var(--primary-color)';
-                count++;
+                _count++;
             } else {
                 item.classList.remove('selected-item');
                 item.style.background = ''; // Reset
@@ -1531,7 +1535,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const accordionContent = row.closest('.accordion-content');
         if (!accordionContent) return;
 
-        const sectionId = accordionContent.id;
+        const _sectionId = accordionContent.id;
         const items = accordionContent.querySelectorAll('.checklist-item');
         let completed = 0;
 
@@ -1917,7 +1921,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             const statusInput = document.getElementById('status-' + uniqueId);
             const status = statusInput?.value || '';
 
-            let shouldShow = false;
+            let shouldShow;
 
             if (filterType === 'all') {
                 shouldShow = true;
@@ -2492,6 +2496,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         };
     }
 
+    // eslint-disable-next-line no-unused-vars
     function saveObservations(reportId) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) return;

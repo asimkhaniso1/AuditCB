@@ -113,10 +113,10 @@ function renderDashboardEnhanced() {
     }
 
     // Destructure for use in the template below
-    const { totalClients, activeClients, inactiveClients, totalAuditors, leadAuditors,
+    const { totalClients, activeClients, inactiveClients: _inactiveClients, totalAuditors, leadAuditors: _leadAuditors,
         leadAuditorCount, supportAuditorCount, upcomingAudits, completedAudits,
-        draftPlans, completionRate, totalNCRs, majorNCRs, minorNCRs, openNCRs,
-        closedNCRs, overdueNCRs, complianceScoreSum, complianceCount,
+        draftPlans, completionRate, totalNCRs: _totalNCRs, majorNCRs, minorNCRs, openNCRs,
+        closedNCRs, overdueNCRs, complianceScoreSum: _complianceScoreSum, complianceCount: _complianceCount,
         avgComplianceScore, certificatesIssued } = stats;
 
     // Industry Distribution

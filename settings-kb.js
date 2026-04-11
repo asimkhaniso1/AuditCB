@@ -16,6 +16,7 @@ if (!window.state.knowledgeBase) {
     };
 }
 
+// eslint-disable-next-line no-unused-vars
 function getKnowledgeBaseHTML() {
     const kb = window.state.knowledgeBase;
     kb.standards = kb.standards || [];
@@ -397,13 +398,13 @@ window.uploadKnowledgeDoc = function (type) {
         }
 
         // Show processing state
-        const originalBtnText = saveBtn.textContent;
+        const _originalBtnText = saveBtn.textContent;
         saveBtn.textContent = 'Processing File...';
         saveBtn.disabled = true;
 
         const file = fileInput.files[0];
         let extractedText = null;
-        let docId = null;
+        let docId;
         let cloudUrl = null;
         let cloudPath = null;
 
@@ -1027,13 +1028,13 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
             if (jsonMatch) {
                 try {
                     batchClauses = JSON.parse(jsonMatch[0]);
-                } catch (parseErr) {
+                } catch (_parseErr) {
                     console.warn(`[KB Analysis] ${batch.label} JSON repair needed...`);
                     let jsonStr = jsonMatch[0];
                     const lastObj = jsonStr.lastIndexOf('}');
                     if (lastObj > 0) {
                         jsonStr = jsonStr.substring(0, lastObj + 1) + ']';
-                        try { batchClauses = JSON.parse(jsonStr); } catch (e2) { /* skip */ }
+                        try { batchClauses = JSON.parse(jsonStr); } catch (_e2) { /* skip */ }
                     }
                 }
             }
@@ -1051,7 +1052,7 @@ Return valid JSON only. No markdown formatting. No code blocks. No introductory 
                     });
                 });
                 window._kbProgress?.show(`${batch.label}: ${batchClauses.length} clauses extracted ✓`, batchEndPct);
-                const batchQs = batchClauses.reduce((sum, c) => sum + (c.checklistQuestions?.length || 0), 0);
+                const _batchQs = batchClauses.reduce((sum, c) => sum + (c.checklistQuestions?.length || 0), 0);
             } else {
                 window._kbProgress?.show(`${batch.label}: extraction failed ✗`, batchEndPct);
                 console.warn(`[KB Analysis] ${batch.label}: extraction failed`);
@@ -1640,7 +1641,7 @@ window.extractTextFromFile = async function (file) {
 
     try {
         return await Promise.race([extractionPromise(), timeoutPromise]);
-    } catch (e) {
+    } catch (_e) {
         return null;
     }
 };
@@ -1834,7 +1835,7 @@ window.deleteKnowledgeDoc = async function (type, id) {
     if (!confirm('Are you sure you want to delete this document from the Knowledge Base?')) return;
 
     const kb = window.state.knowledgeBase;
-    let doc = null;
+    let doc;
 
     // Find the document
     if (type === 'standard') {
@@ -1864,7 +1865,7 @@ window.deleteKnowledgeDoc = async function (type, id) {
         try {
             // Delete from storage if cloudPath exists
             if (doc.cloudPath) {
-                const { data, error } = await window.SupabaseClient.client.storage
+                const { data: _data, error } = await window.SupabaseClient.client.storage
                     .from('documents')
                     .remove([doc.cloudPath]);
                 if (error) {

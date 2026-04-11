@@ -134,7 +134,7 @@
                 try {
                     // 1. Compress
                     const compressedDataUrl = compressImage(img, file.type);
-                    const compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
+                    const _compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
 
                     let finalUrl = compressedDataUrl;
                     let isCloud = false;

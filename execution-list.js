@@ -249,6 +249,7 @@ function renderAuditExecutionEnhanced() {
     }
 }
 
+// eslint-disable-next-line no-unused-vars
 function openCreateReportModal() {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
@@ -747,7 +748,7 @@ function renderExecutionDetail(reportId) {
             });
         } else {
             (cl.items || []).forEach((item, idx) => {
-                const itemId = String(idx); // Standardize to string for comparison usually, but ID in UI was idx
+                const _itemId = String(idx); // Standardize to string for comparison usually, but ID in UI was idx
                 // UI saved it as attribute, which is string.
 
                 if (isSelective && !allowedIds.map(String).includes(String(idx))) {

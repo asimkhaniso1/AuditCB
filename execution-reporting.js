@@ -45,7 +45,7 @@
             try {
                 const dataUrl = await EvidenceDB.get(url);
                 return dataUrl || '';
-            } catch (e) { return ''; }
+            } catch (_e) { return ''; }
         };
         for (const item of hydratedProgress) {
             if (item.evidenceImage) item.evidenceImage = await resolveUrl(item.evidenceImage);
@@ -63,7 +63,7 @@
 
         // Attempt to get client details for address/logo if available
         const client = window.state.clients.find(c => c.name === report.client) || {};
-        const clientLogo = client.logoUrl || 'https://via.placeholder.com/150?text=Client+Logo';
+        const _clientLogo = client.logoUrl || 'https://via.placeholder.com/150?text=Client+Logo';
 
         // Get audit plan reference
         const auditPlan = report.planId ? window.DataService.findAuditPlan(report.planId) : null;
@@ -465,7 +465,7 @@
                                 <div id="rp-positive-obs" class="rp-edit" contenteditable="true" style="color:#15803d;font-size:0.9rem;line-height:1.7;">
                                     ${(function () {
                         let t = d.report.positiveObservations;
-                        let items = [];
+                        let items;
                         if (t.includes('\n')) {
                             items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[-.)]\s*/, '').trim()).filter(Boolean);
                         } else {
@@ -498,7 +498,7 @@
                                 <div id="rp-ofi" class="rp-edit" contenteditable="true" style="color:#92400e;font-size:0.9rem;line-height:1.7;">
                                     ${(function () {
                         let t = d.report.ofi;
-                        let items = [];
+                        let items;
                         if (Array.isArray(t)) {
                             items = t;
                         } else if (t.includes('\n')) {
@@ -1378,7 +1378,7 @@
         if (!report) { window.showNotification('Report not found.', 'error'); return; }
 
         const standardName = report.standard || '';
-        const checklistProgress = report.checklistProgress || [];
+        const _checklistProgress = report.checklistProgress || [];
 
         // Check AI service availability
         if (!window.AI_SERVICE) {
@@ -1649,7 +1649,7 @@
             try {
                 const ncTotal = d.stats.majorNC + d.stats.minorNC;
                 const obsTotal = d.stats.observationCount + d.stats.ofiCount;
-                const conformRate = d.stats.totalItems > 0 ? Math.round((d.stats.conformCount / d.stats.totalItems) * 100) : 0;
+                const _conformRate = d.stats.totalItems > 0 ? Math.round((d.stats.conformCount / d.stats.totalItems) * 100) : 0;
                 const conclusionPrompt = `You are a Senior Lead Auditor at a top-tier Certification Body. Write a formal audit conclusion (150-200 words) for the following audit:
 
 Client: ${d.report.client}
@@ -1849,7 +1849,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const editedReviewerName = document.getElementById('rp-reviewer-name')?.innerText || d.report.technicalReviewer || '';
         const editedSigDate = document.getElementById('rp-sig-date')?.innerText || new Date().toLocaleDateString('en-GB');
         const editedReviewerDate = document.getElementById('rp-reviewer-date')?.innerText || '';
-        const formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
+        const _formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
         // Rich text formatter for PDF: handles numbered lists, bullets, paragraphing, markdown
         const formatRichText = (text, color) => {
             if (!text) return '';
@@ -1953,7 +1953,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const standard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
         const cbName = d.cbSettings.cbName || '';
         const cbEmail = d.cbSettings.cbEmail || '';
-        const cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
+        const _cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
         // Helper: render all evidence images for PDF (string concat)
         let renderEvThumbsPdf = function (item) {
             let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);

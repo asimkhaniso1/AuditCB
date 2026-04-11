@@ -465,7 +465,7 @@ const AuthManager = {
 
         // Get CB settings for branding
         const cbName = window.state?.cbSettings?.cbName || 'Audit360 Suite';
-        const cbLogo = window.state?.cbSettings?.cbLogo || '';
+        const _cbLogo = window.state?.cbSettings?.cbLogo || '';
 
         contentArea.style.padding = '0';
         contentArea.style.overflow = 'hidden';

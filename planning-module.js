@@ -218,7 +218,7 @@ function deletePlan(planId) {
 }
 
 // Wizard State
-let currentPlanStep = 1;
+let _currentPlanStep = 1;
 window.editingPlanId = null;
 
 function renderCreateAuditPlanForm(preSelectedClientName = null) {
@@ -818,7 +818,7 @@ function autoCalculateDays() {
 
         const typeSelect = document.getElementById('plan-audit-type');
         const type = typeSelect ? typeSelect.value : 'Surveillance';
-        let days = 0;
+        let days;
 
         if (type.includes('Stage 1')) days = results.stage1;
         else if (type.includes('Stage 2') || type.includes('Recertification') || type.includes('Initial')) days = results.stage2; // Recert is typically full duration like Stage 2
@@ -860,7 +860,7 @@ function viewAuditPlan(id) {
 
     // Calculate Progress
     let progress = 0;
-    let completedItems = 0;
+    let completedItems;
     let totalItems = 0;
 
     // Check if assigned checklists are missing from state
@@ -922,7 +922,7 @@ function viewAuditPlan(id) {
     };
 
     // Helper to render checklist list
-    const checklistListHTML = planChecklists.length > 0 ? planChecklists.map(clId => {
+    const _checklistListHTML = planChecklists.length > 0 ? planChecklists.map(clId => {
         const cl = checklists.find(c => c.id === clId);
         if (!cl) return '';
         const itemCount = getChecklistItemCount(cl);
@@ -941,7 +941,7 @@ function viewAuditPlan(id) {
 
     // --- UI REDESIGN ---
     // Stepper Calculation
-    const phases = ['Draft', 'Confirmed', 'In Progress', 'Reporting', 'Completed']; // Mapping logic might need adjustment based on statuses
+    const _phases = ['Draft', 'Confirmed', 'In Progress', 'Reporting', 'Completed']; // Mapping logic might need adjustment based on statuses
 
     // Determine active step (0-indexed)
     let activeStep = 0;
@@ -961,7 +961,7 @@ function viewAuditPlan(id) {
             ${['Plan Created', 'Checklists Ready', 'Execution', 'Reporting', 'Audit Closed'].map((step, index) => {
         const isActive = index <= activeStep;
         const isCurrent = index === activeStep;
-        const color = isActive ? 'var(--primary-color)' : '#94a3b8';
+        const _color = isActive ? 'var(--primary-color)' : '#94a3b8';
         const bgColor = isActive ? 'var(--primary-color)' : '#e2e8f0';
 
         return `
@@ -2141,7 +2141,7 @@ window.printAuditPlanDetails = function (planId) {
                 </thead>
                 <tbody>
                     ${siteDetails.map((site, index) => {
-        let allocatedDays = 0;
+        let allocatedDays;
         if (totalEmployees > 0) {
             allocatedDays = (site.employees / totalEmployees) * plan.manDays;
         } else {
