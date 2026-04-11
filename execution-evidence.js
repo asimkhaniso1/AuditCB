@@ -226,7 +226,7 @@
     };
 
     // Compress image to reduce storage size
-    function compressImage(img, fileType) {
+    function compressImage(img, _fileType) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 

@@ -43,7 +43,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             };
 
             // AI Auto Map: Use AI to assign personnel/designation/department based on question context
-            window.autoMapPersonnel = async function (reportId) {
+            window.autoMapPersonnel = async function (_reportId) {
                 const allContacts = (clientData && clientData.contacts) || [];
                 const desigs = (clientData && clientData.designations) || [];
                 if (!allContacts.length) {
@@ -628,7 +628,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             // Get checklist-marked NCs from checklistProgress
             const checklistNCRs = (report.checklistProgress || [])
                 .filter(item => item.status === 'nc')
-                .map((item, idx) => {
+                .map((item, _idx) => {
                     // Resolve clause from checklist definition
                     let clauseText = 'Checklist Item';
                     let reqText = '';
@@ -2603,7 +2603,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             const items = section.querySelectorAll('.checklist-item');
 
-            items.forEach((item, idx) => {
+            items.forEach((item, _idx) => {
                 // Toggle the individual checkbox too
                 const itemCheckbox = item.querySelector('.item-checkbox');
                 if (itemCheckbox) {
@@ -2669,6 +2669,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         // Log all clicks for debugging
         if (btn.classList && (btn.classList.contains('btn-nc') || btn.classList.contains('btn-ok') || btn.classList.contains('btn-na'))) {
+            console.debug('[Execution] Status button clicked:', btn.className);
         }
 
         while (btn && btn.classList && !btn.classList.contains('status-btn')) {

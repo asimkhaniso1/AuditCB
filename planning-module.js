@@ -680,7 +680,7 @@ function updateClientDetails(clientName) {
             if (noSitesMessage) noSitesMessage.style.display = 'none';
             // Debugging
 
-            siteCheckboxes.innerHTML = client.sites.map((s, i) => `
+            siteCheckboxes.innerHTML = client.sites.map((s, _i) => `
                 <div style="padding: 10px; background: #fff; border-radius: 6px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; width: 100%; box-sizing: border-box;">
                     <input type="checkbox" class="site-checkbox" data-name="${s.name}" data-geotag="${s.geotag || ''}" data-employees="${s.employees || 0}" data-shift="${s.shift || 'No'}" data-standards="${s.standards || ''}" checked style="cursor: pointer; margin-top: 4px; width: 16px; height: 16px;">
                     <div style="overflow: hidden;">
@@ -1663,7 +1663,7 @@ window.renderConfigureChecklist = async function (planId) {
 
     // Add event listeners for table header select-all checkboxes
     document.querySelectorAll('.select-all-items-cb').forEach(cb => {
-        cb.addEventListener('change', (e) => {
+        cb.addEventListener('change', (_e) => {
             const clId = cb.getAttribute('data-checklist-id');
             const isChecked = cb.checked;
             document.querySelectorAll(`.item-select-cb[data-checklist-id="${clId}"]`).forEach(itemCb => {

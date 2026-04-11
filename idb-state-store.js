@@ -32,7 +32,7 @@ const StateStore = {
      * @returns {Promise<void>}
      */
     init: function () {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             // Feature detection
             if (!window.indexedDB) {
                 (window.Logger || console).warn('[StateStore] IndexedDB not available, falling back to localStorage');
@@ -124,7 +124,7 @@ const StateStore = {
         }
 
         // IndexedDB write
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             try {
                 const tx = this._db.transaction(this.STORE_NAME, 'readwrite');
                 const store = tx.objectStore(this.STORE_NAME);
@@ -172,7 +172,7 @@ const StateStore = {
         }
 
         // IndexedDB read
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             try {
                 const tx = this._db.transaction(this.STORE_NAME, 'readonly');
                 const store = tx.objectStore(this.STORE_NAME);

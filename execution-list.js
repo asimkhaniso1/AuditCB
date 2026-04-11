@@ -696,7 +696,7 @@ function renderExecutionDetail(reportId) {
         if (window.SupabaseClient?.isInitialized && !window._checklistRecoveryAttempted) {
             window._checklistRecoveryAttempted = true;
             console.info('[Execution] Attempting checklist recovery from Supabase...');
-            window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
+            window.SupabaseClient.syncChecklistsFromSupabase().then(_result => {
                 window._checklistRecoveryAttempted = false;
                 const recovered = (state.checklists || []).filter(c => planChecklists.includes(String(c.id)));
                 if (recovered.length > 0) {

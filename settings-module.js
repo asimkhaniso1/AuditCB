@@ -291,7 +291,7 @@ function getSettingsContent(mainTab, subTab) {
 }
 
 // Switch main tab
-window.switchSettingsMainTab = function (mainTab, btnElement) {
+window.switchSettingsMainTab = function (mainTab, _btnElement) {
     window.state.settingsMainTab = mainTab;
 
     // Set default sub-tab for the main tab
@@ -377,7 +377,7 @@ window.runSupabaseDiagnostics = async function () {
 };
 
 // Legacy function for compatibility
-function switchSettingsTab(tabName, btnElement) {
+function switchSettingsTab(tabName, _btnElement) {
     // Map old tab names to new structure
     const mapping = {
         'profile': { main: 'cb-profile', sub: 'profile' },
@@ -1223,7 +1223,7 @@ function getQualityPolicyHTML() {
                             </tr>
                         </thead>
                         <tbody>
-                            ${(settings.qualityObjectives || []).map((obj, idx) => `
+                            ${(settings.qualityObjectives || []).map((obj, _idx) => `
                                 <tr>
                                     <td>${window.UTILS.escapeHtml(obj.objective)}</td>
                                     <td><span class="badge bg-orange">${window.UTILS.escapeHtml(obj.target)}</span></td>

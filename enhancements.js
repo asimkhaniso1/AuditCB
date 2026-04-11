@@ -710,7 +710,7 @@
         if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
 
         // Browser display format: "16-Feb-2026" or "16 Feb 2026"
-        let m = text.match(/^(\d{1,2})[\-\s]([A-Za-z]+)[\-\s](\d{4})$/);
+        let m = text.match(/^(\d{1,2})[-\s]([A-Za-z]+)[-\s](\d{4})$/);
         if (m) {
             const mon = MONTH_MAP[m[2].toLowerCase()];
             if (mon) return `${m[3]}-${mon}-${m[1].padStart(2, '0')}`;
@@ -724,7 +724,7 @@
         }
 
         // dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
-        m = text.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+        m = text.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
         if (m) {
             const day = m[1].padStart(2, '0');
             const month = m[2].padStart(2, '0');
@@ -738,7 +738,7 @@
         }
 
         // yyyy/mm/dd
-        m = text.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+        m = text.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/);
         if (m) {
             return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
         }
@@ -792,7 +792,7 @@
                 if (clipText) {
                     applyDateToInput(input, clipText);
                 }
-            }).catch(function (err) {
+            }).catch(function (_err) {
             });
         }
     }, true);

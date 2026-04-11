@@ -136,7 +136,7 @@ const ErrorHandler = {
     /**
      * Setup retry when connection is restored
      */
-    setupRetryOnOnline: function (context) {
+    setupRetryOnOnline: function (_context) {
         const retryHandler = () => {
             Logger.info('Connection restored, retrying operation');
             window.showNotification('Connection restored!', 'success');

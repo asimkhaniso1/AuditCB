@@ -1755,6 +1755,7 @@ window.handleLoginSubmit = async function (form) {
                 // Sync users from Supabase
                 window.SupabaseClient.syncUsersFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase user sync failed:', err));
 
@@ -1769,29 +1770,33 @@ window.handleLoginSubmit = async function (form) {
                 // Sync auditors from Supabase
                 window.SupabaseClient.syncAuditorsFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase auditor sync failed:', err));
 
                 // Sync auditor assignments from Supabase
                 window.SupabaseClient.syncAuditorAssignmentsFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase auditor assignments sync failed:', err));
 
                 // Sync audit plans from Supabase
                 window.SupabaseClient.syncAuditPlansFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase audit plan sync failed:', err));
 
                 // Sync audit reports from Supabase
                 window.SupabaseClient.syncAuditReportsFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase audit report sync failed:', err));
 
                 // Sync checklists from Supabase (sync function handles full replacement)
-                window.SupabaseClient.syncChecklistsFromSupabase().then(result => {
+                window.SupabaseClient.syncChecklistsFromSupabase().then(_result => {
                     // Always re-render after sync since cloud replaces local data
                     if (window.renderChecklistLibrary) window.renderChecklistLibrary();
                     if (window.location.hash === '#planning' && window.renderPlanningModule) window.renderPlanningModule();
@@ -1809,12 +1814,14 @@ window.handleLoginSubmit = async function (form) {
                 // Sync documents from Supabase
                 window.SupabaseClient.syncDocumentsFromSupabase().then(result => {
                     if (result?.added > 0 || result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase document sync failed:', err));
 
                 // Sync certification decisions from Supabase
                 window.SupabaseClient.syncCertificationDecisionsFromSupabase().then(result => {
                     if (result?.updated > 0) {
+                        /* sync complete, no UI update needed */
                     }
                 }).catch(err => console.warn('Supabase certification decision sync failed:', err));
 

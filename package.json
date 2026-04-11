@@ -5,7 +5,7 @@
     "scripts": {
         "start": "http-server -p 8080",
         "build": "node build.js",
-        "lint": "eslint . --max-warnings 250",
+        "lint": "eslint . --max-warnings 170",
         "test": "vitest run",
         "test:watch": "vitest"
     },

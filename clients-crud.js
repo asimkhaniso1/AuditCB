@@ -175,7 +175,7 @@
                 const newSites = [];
                 let errors = 0;
 
-                lines.forEach((line, index) => {
+                lines.forEach((line, _index) => {
                     const parts = line.split(',').map(p => p.trim());
                     if (parts.length >= 1 && parts[0]) {
                         newSites.push({
@@ -339,7 +339,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
                 const newContacts = [];
                 let errors = 0;
 
-                lines.forEach((line, index) => {
+                lines.forEach((line, _index) => {
                     const parts = line.split(',').map(p => p.trim());
                     if (parts.length >= 1 && parts[0]) {
                         newContacts.push({
@@ -568,7 +568,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
                 const newDepartments = [];
                 let errors = 0;
 
-                lines.forEach((line, index) => {
+                lines.forEach((line, _index) => {
                     const parts = line.split(',').map(p => p.trim());
                     if (parts.length >= 1 && parts[0]) {
                         newDepartments.push({
@@ -733,7 +733,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
                 const newItems = [];
                 let errors = 0;
 
-                lines.forEach((line, index) => {
+                lines.forEach((line, _index) => {
                     const parts = line.split(',').map(p => p.trim());
                     if (parts.length >= 1 && parts[0]) {
                         newItems.push({
@@ -884,7 +884,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
                 const newProcesses = [];
                 let errors = 0;
 
-                lines.forEach((line, index) => {
+                lines.forEach((line, _index) => {
                     const parts = line.split(',').map(p => p.trim());
                     if (parts.length >= 1 && parts[0]) {
                         newProcesses.push({
@@ -1030,7 +1030,7 @@ CFO," style="font-family: monospace;"></textarea>
                 const newDesignations = [];
                 let errors = 0;
 
-                lines.forEach((line, index) => {
+                lines.forEach((line, _index) => {
                     const parts = line.split(',').map(p => p.trim());
                     if (parts.length >= 1 && parts[0]) {
                         newDesignations.push({

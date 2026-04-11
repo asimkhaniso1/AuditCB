@@ -2448,7 +2448,7 @@ window.openAddTrainingModal = openAddTrainingModal;
 window.openUploadDocumentModal = openUploadDocumentModal;
 
 // Clear upcoming audit filters and show all items
-window.clearAuditorUpcomingFilters = function (auditorId) {
+window.clearAuditorUpcomingFilters = function (_auditorId) {
     const dateFilter = document.getElementById('upcoming-date-filter');
     const locationFilter = document.getElementById('upcoming-location-filter');
     if (dateFilter) dateFilter.value = '';

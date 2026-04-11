@@ -589,7 +589,7 @@ function renderClientOverview(client) {
                 .sort((a, b) => new Date(a.date) - new Date(b.date))
                 .slice(0, 5);
             if (upcoming.length === 0) return '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No upcoming audits</p>';
-            return '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + upcoming.map((p, i) => {
+            return '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + upcoming.map((p, _i) => {
                 const daysUntil = Math.ceil((new Date(p.date) - new Date()) / 86400000);
                 const urgency = daysUntil < 0 ? '#ef4444' : daysUntil <= 7 ? '#f59e0b' : daysUntil <= 30 ? '#3b82f6' : '#10b981';
                 const label = daysUntil < 0 ? Math.abs(daysUntil) + 'd overdue' : daysUntil === 0 ? 'Today' : daysUntil + 'd away';
@@ -1302,7 +1302,7 @@ window.refreshClientSidebar = populateClientSidebar;
 
 // Export
 window.populateClientSidebar = populateClientSidebar;
-window.downloadReport = function (reportId) {
+window.downloadReport = function (_reportId) {
     window.showNotification('Preparing report download...', 'info');
     setTimeout(() => {
         window.showNotification('Report downloaded successfully (Simulated)', 'success');

@@ -585,7 +585,7 @@ function renderAuditTrendsChart() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                onClick: (e) => window.renderModule('audit-planning'), // Corrected module name if needed, assuming 'audit-planning' maps to something valid
+                onClick: (_e) => window.renderModule('audit-planning'), // Corrected module name if needed, assuming 'audit-planning' maps to something valid
                 onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
                 plugins: {
                     legend: {
@@ -643,7 +643,7 @@ function renderNCRDistributionChart(major, minor) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                onClick: (e) => window.renderModule('audit-reporting'),
+                onClick: (_e) => window.renderModule('audit-reporting'),
                 onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
                 plugins: {
                     legend: {
@@ -683,7 +683,7 @@ function renderIndustryChart(industryStats) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                onClick: (e) => window.renderModule('clients'),
+                onClick: (_e) => window.renderModule('clients'),
                 onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
                 plugins: {
                     legend: {
@@ -731,7 +731,7 @@ function renderStandardsChart(standardStats) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                onClick: (e) => window.renderModule('clients'),
+                onClick: (_e) => window.renderModule('clients'),
                 onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
                 plugins: {
                     legend: {

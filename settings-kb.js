@@ -1870,6 +1870,7 @@ window.deleteKnowledgeDoc = async function (type, id) {
                 if (error) {
                     console.error('[Delete] Storage deletion error:', error);
                 } else {
+                    console.debug('[Delete] Storage file removed:', doc.cloudPath);
                 }
             } else {
                 console.warn('[Delete] No cloudPath found for document:', doc);

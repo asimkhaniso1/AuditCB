@@ -89,7 +89,7 @@
             const matchingCert = (client.certificates || []).find(c => (c.standard || '').toLowerCase() === (report.standard || '').toLowerCase());
             if (matchingCert && matchingCert.siteScopes) {
                 // Combine all site scopes into one string
-                const scopeValues = Object.entries(matchingCert.siteScopes).filter(([k, v]) => v).map(([siteName, scopeText]) => siteName + ': ' + scopeText);
+                const scopeValues = Object.entries(matchingCert.siteScopes).filter(([_k, v]) => v).map(([siteName, scopeText]) => siteName + ': ' + scopeText);
                 client.certificationScope = scopeValues.length === 1 ? Object.values(matchingCert.siteScopes)[0] : scopeValues.join('; ') || '';
             }
             if (!client.certificationScope) {
@@ -467,7 +467,7 @@
                         let t = d.report.positiveObservations;
                         let items = [];
                         if (t.includes('\n')) {
-                            items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[\.)\-]\s*/, '').trim()).filter(Boolean);
+                            items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[-.)]\s*/, '').trim()).filter(Boolean);
                         } else {
                             // Flat text: split on sequential "N. " at sentence boundaries
                             let parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
@@ -502,7 +502,7 @@
                         if (Array.isArray(t)) {
                             items = t;
                         } else if (t.includes('\n')) {
-                            items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[\.)\-]\s*/, '').trim()).filter(Boolean);
+                            items = t.split(/\n+/).map(s => s.replace(/^\s*\d+[-.)]\s*/, '').trim()).filter(Boolean);
                         } else {
                             let parts = t.match(/(?:^|(?<=\.\s))\d+\.\s[\s\S]*?(?=(?:\.\s)\d+\.\s|$)/g);
                             if (parts && parts.length > 1) {
@@ -511,7 +511,7 @@
                                 items = [t.replace(/^\s*\d+\.\s*/, '').trim()];
                             }
                         }
-                        return items.map((ofi, idx) => `
+                        return items.map((ofi, _idx) => `
                                         <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;align-items:start;">
                                             <div style="min-width:32px;height:32px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;">
                                                 <i class="fa-solid fa-arrow-up" style="font-size:0.75rem;"></i>
@@ -1864,7 +1864,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 .replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>')
                 .trim();
             // Detect numbered items: "1. ...", "2) ...", "3- ..."
-            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):\-]\s*/);
+            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):-]\s*/);
             if (numbered.length > 2) {
                 let items = [];
                 for (let i = 1; i < numbered.length; i += 2) {
@@ -1881,11 +1881,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             }
             // Detect bullet items: "- ...", "• ...", "▸ ..."
             let lines = t.split(/\n+/).filter(s => s.trim().length > 0);
-            let bulletLines = lines.filter(s => /^\s*[\-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s/.test(s));
+            let bulletLines = lines.filter(s => /^\s*[-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s/.test(s));
             if (bulletLines.length > 1 && bulletLines.length >= lines.length * 0.5) {
                 return lines.map(line => {
-                    let isBullet = /^\s*[\-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s*/.test(line);
-                    let txt = line.replace(/^\s*[\-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s*/, '').trim();
+                    let isBullet = /^\s*[-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s*/.test(line);
+                    let txt = line.replace(/^\s*[-\u2022\u2023\u25B8\u25E6\u2013\u2014•]\s*/, '').trim();
                     if (isBullet) {
                         return '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;">'
                             + '<div style="min-width:8px;height:8px;background:' + clr + ';border-radius:50%;margin-top:7px;flex-shrink:0;opacity:0.6;"></div>'
@@ -1931,7 +1931,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 .trim();
             let items = [];
             // Try numbered splitting: "1. ...", "2) ...", "3- ..."
-            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):\-]\s*/);
+            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):-]\s*/);
             if (numbered.length > 2) {
                 for (let i = 1; i < numbered.length; i += 2) {
                     let txt = (numbered[i + 1] || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1939,7 +1939,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 }
             } else {
                 // Fall back to splitting on newlines
-                items = t.split(/\n+/).map(s => s.replace(/^\s*[\-\u2022\u2023\u25E6]\s*/, '').trim()).filter(s => s.length > 3);
+                items = t.split(/\n+/).map(s => s.replace(/^\s*[-\u2022\u2023\u25E6]\s*/, '').trim()).filter(s => s.length > 3);
             }
             if (items.length === 0) items = [t.replace(/\n/g, ' ').trim()];
             return items.map((obs, idx) => '<div style="display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;">'
@@ -2030,7 +2030,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const reportHtml = '<!DOCTYPE html><html><head>'
             + '<title>Audit Report — ' + d.report.client + '</title>'
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
-            + '<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>'
+            + '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>'
             + '<style>'
             + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'
@@ -2309,7 +2309,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '});'
             + '}catch(e){console.warn("TOC page calc:",e);}'
             + '},1200);'
-            + '<\/script></body></html>';
+            + '</script></body></html>';
 
         printWindow.document.write(reportHtml);
         printWindow.document.close();

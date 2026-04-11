@@ -484,7 +484,7 @@ function openUploadModal() {
     };
 }
 
-function downloadDocument(id) {
+function downloadDocument(_id) {
     showNotification('Downloading document...');
     // Simulation
 }

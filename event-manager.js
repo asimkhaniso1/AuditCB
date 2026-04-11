@@ -71,7 +71,7 @@
          * List all active listener keys (for debugging)
          */
         debug() {
-            this.listeners.forEach((listener, key) => {
+            this.listeners.forEach((_listener, _key) => {
             });
             return Array.from(this.listeners.keys());
         }

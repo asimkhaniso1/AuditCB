@@ -35,7 +35,7 @@ const Validator = {
      * Validate phone number (flexible international format)
      */
     phone: (value, fieldName = 'Phone') => {
-        const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
+        const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
         if (!phoneRegex.test(value.replace(/\s/g, ''))) {
             return { valid: false, error: `${fieldName} must be a valid phone number` };
         }

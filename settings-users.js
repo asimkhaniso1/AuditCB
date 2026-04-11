@@ -234,7 +234,7 @@ window.openAddUserModal = function (userId = null) {
 };
 
 // Helper to ensure auditor profile exists for Auditor/Lead Auditor roles
-async function ensureAuditorProfile(userId, userName) {
+async function ensureAuditorProfile(userId, _userName) {
     if (!userId || !window.SupabaseClient?.isInitialized) return;
 
     try {
@@ -260,6 +260,7 @@ async function ensureAuditorProfile(userId, userName) {
         if (error) {
             console.warn('Auto-creating auditor profile failed (might already exist):', error.message);
         } else {
+            console.debug('Auditor profile ensured successfully');
         }
     } catch (e) {
         console.warn('Error in ensureAuditorProfile:', e);

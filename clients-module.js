@@ -1540,7 +1540,7 @@ window.renderAddClient = function () {
                         <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
                             <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 0.75rem;">Applicable Standards <span class="text-danger">*</span></label>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-                                ${standardsToShow.map((std, i) => `
+                                ${standardsToShow.map((std, _i) => `
                                     <label class="standard-checkbox-btn" style="cursor: pointer;">
                                         <input type="checkbox" name="client_standards" value="${std}" style="display: none;" data-action-change="toggleCheckboxStyle">
                                         <span style="display: inline-block; padding: 0.4rem 0.8rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 0.85rem; color: #64748b; transition: all 0.2s;">
