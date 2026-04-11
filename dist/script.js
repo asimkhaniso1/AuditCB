@@ -1041,6 +1041,9 @@ function showNotification(message, type = 'success') {
 }
 
 // Modal Helpers
+// Track element that opened modal for focus restore
+let _modalPreviousFocus = null;
+
 function openModal(title, body, onSave) {
     if (title) {
         document.getElementById('modal-title').textContent = title;
@@ -1052,7 +1055,17 @@ function openModal(title, body, onSave) {
         const saveBtn = document.getElementById('modal-save');
         saveBtn.onclick = onSave;
     }
+    _modalPreviousFocus = document.activeElement;
     document.getElementById('modal-overlay').classList.remove('hidden');
+    // Focus first focusable element in modal
+    setTimeout(() => {
+        const modal = document.querySelector('.modal-content');
+        if (modal) {
+            const focusable = modal.querySelector('input:not([type="hidden"]), select, textarea, button, [tabindex]:not([tabindex="-1"])');
+            if (focusable) focusable.focus();
+            else document.getElementById('modal-close').focus();
+        }
+    }, 50);
 }
 
 function closeModal() {
@@ -1061,8 +1074,14 @@ function closeModal() {
     document.getElementById('modal-title').textContent = 'Modal Title';
     document.getElementById('modal-body').innerHTML = '';
     document.getElementById('modal-save').onclick = null;
-    document.getElementById('modal-save').textContent = 'Save'; // Reset button text
-    document.getElementById('modal-save').style.display = ''; // Reset visibility for next modal
+    document.getElementById('modal-save').textContent = 'Save';
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').className = 'btn btn-primary';
+    // Restore focus to trigger element
+    if (_modalPreviousFocus && _modalPreviousFocus.focus) {
+        _modalPreviousFocus.focus();
+        _modalPreviousFocus = null;
+    }
 }
 
 // Export to window for global access
@@ -1071,6 +1090,24 @@ window.closeModal = closeModal;
 
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+// Escape key closes modal; Tab traps focus inside
+document.addEventListener('keydown', (e) => {
+    const overlay = document.getElementById('modal-overlay');
+    if (!overlay || overlay.classList.contains('hidden')) return;
+    if (e.key === 'Escape') { closeModal(); return; }
+    if (e.key === 'Tab') {
+        const modal = document.querySelector('.modal-content');
+        if (!modal) return;
+        const focusable = modal.querySelectorAll('input:not([type="hidden"]), select, textarea, button, [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+});
+
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
     if (e.target === document.getElementById('modal-overlay')) {
         closeModal();
