@@ -114,7 +114,7 @@
     window.setSetupWizardStep = function (clientId, step) {
         step = parseInt(step, 10); // DOM data-arg2 returns strings
         if (step < 1 || step > 7 || isNaN(step)) return;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (client) {
             client._wizardStep = step;
             const tabContent = document.getElementById('tab-content');
@@ -282,7 +282,7 @@
     }
 
     window.generateCertificatesFromStandards = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         const allStandards = new Set();
@@ -309,11 +309,7 @@
             }
         });
 
-        window.saveData();
-        // Sync to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-        }
+        window.DataService.syncClient(client);
         renderClientDetail(clientId);
         // Switch to scopes tab
         setTimeout(() => {
@@ -323,7 +319,7 @@
     };
 
     window.updateCertField = function (clientId, certIndex, field, value) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (client && client.certificates && client.certificates[certIndex]) {
             client.certificates[certIndex][field] = value;
             // Autosave turned off to allow bulk edits, but for single inputs we might want to save?
@@ -352,7 +348,7 @@
     };
 
     window.updateSiteScope = function (clientId, certIndex, siteName, value) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (client && client.certificates && client.certificates[certIndex]) {
             if (!client.certificates[certIndex].siteScopes) {
                 client.certificates[certIndex].siteScopes = {};
@@ -362,7 +358,7 @@
     };
 
     window.saveCertificateDetails = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         // Save locally first
@@ -374,8 +370,7 @@
 
             // 1. Sync the CLIENT object (so data.certificates JSONB persists dates)
             syncPromises.push(
-                window.SupabaseClient.upsertClient(client)
-                    .catch(err => console.error('[saveCertificateDetails] Client sync failed:', err))
+                window.DataService.syncClient(client, { saveLocal: false, silent: true })
             );
 
             // 2. Sync individual certs to certification_decisions table
@@ -416,7 +411,7 @@
     };
 
     window.viewCertRevisionHistory = function (clientId, certIndex) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.certificates || !client.certificates[certIndex]) return;
 
         const cert = client.certificates[certIndex];
@@ -481,7 +476,7 @@
     };
 
     window.addCertRevision = function (clientId, certIndex) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.certificates || !client.certificates[certIndex]) return;
 
         const cert = client.certificates[certIndex];
@@ -514,7 +509,7 @@
     };
 
     window.deleteCertificationScope = function (clientId, certIndex) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.certificates || !client.certificates[certIndex]) return;
 
         const cert = client.certificates[certIndex];
@@ -847,7 +842,7 @@
     // ============================================
 
     window.openImportAccountSetupModal = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -975,7 +970,7 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const client = window.state.clients.find(c => String(c.id) === String(clientId));
+                const client = window.DataService.findClient(clientId);
 
                 if (!client) throw new Error("Client not found");
 
@@ -1136,14 +1131,10 @@
 
         const reader = new FileReader();
         reader.onload = function (e) {
-            const client = window.state.clients.find(c => String(c.id) === String(clientId));
+            const client = window.DataService.findClient(clientId);
             if (client) {
                 client.logoUrl = e.target.result;
-                window.saveData();
-                // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client);
                 const preview = document.getElementById('edit-client-logo-preview');
                 if (preview) {
                     preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
@@ -1157,15 +1148,17 @@
     };
 
     function updateClientWorkspaceHeader(clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         const logoContainer = document.getElementById('cb-logo-display');
         if (logoContainer) {
             if (client.logoUrl) {
-                logoContainer.innerHTML = `<img src="${client.logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${client.name}">`;
+                logoContainer.innerHTML = `<img src="${window.UTILS.escapeHtml(client.logoUrl)}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS.escapeHtml(client.name)}">`;
             } else {
-                logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${client.name.length > 20 ? client.name.substring(0, 20) + '...' : client.name}</h1>`;
+                const eName = window.UTILS.escapeHtml(client.name);
+                const truncated = eName.length > 20 ? eName.substring(0, 20) + '...' : eName;
+                logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${truncated}</h1>`;
             }
         }
     }
@@ -1177,7 +1170,7 @@
 
     // Open modal to assign an auditor to this client
     window.openClientAuditorAssignmentModal = function (clientId, clientName) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         const auditors = window.state.auditors || [];
         const assignments = window.state.auditorAssignments || [];
         // Check if there are any auditors in the system
@@ -1240,20 +1233,14 @@
             // Add new assignment
             window.state.auditorAssignments.push(assignment);
 
-            window.saveData();
-
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.syncAuditorAssignmentsToSupabase([assignment])
-                    .catch(e => console.error('Auditor assignment sync failed:', e));
-            }
+            window.DataService.syncAuditorAssignments();
 
             window.closeModal();
 
             // Direct UI Refresh
             const container = document.getElementById('client-audit-team-container');
             if (container) {
-                const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
+                const updatedClient = window.DataService.findClient(clientId);
                 // parse the string returned by getClientAuditTeamHTML or just replace outerHTML
                 // getClientAuditTeamHTML returns a template string starting with <div class="card" id="...">
                 container.outerHTML = getClientAuditTeamHTML(updatedClient);
@@ -1274,7 +1261,7 @@
 
     // Remove auditor assignment from a client
     window.removeClientAuditorAssignment = function (clientId, auditorId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         const auditor = window.state.auditors.find(a => String(a.id) === String(auditorId));
 
         if (!client || !auditor) {
@@ -1306,17 +1293,12 @@ Note: All audit history and records will be RETAINED. The auditor will still hav
             }
 
             window.saveData();
-
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.deleteAuditorAssignment(aid, cid)
-                    .catch(e => console.error('Auditor assignment removal failed:', e));
-            }
+            window.DataService.deleteAuditorAssignment(aid, cid);
 
             // Direct UI Refresh
             const container = document.getElementById('client-audit-team-container');
             if (container) {
-                const updatedClient = window.state.clients.find(c => String(c.id) === String(clientId));
+                const updatedClient = window.DataService.findClient(clientId);
                 container.outerHTML = getClientAuditTeamHTML(updatedClient);
             } else {
                 // Fallback

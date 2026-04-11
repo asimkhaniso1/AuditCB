@@ -39,7 +39,7 @@ function renderClientsEnhanced() {
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 6px; overflow: hidden; background: #fff; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;">
                         ${client.logoUrl
-            ? `<img src="${client.logoUrl}" style="width: 100%; height: 100%; object-fit: contain;">`
+            ? `<img src="${window.UTILS.escapeHtml(client.logoUrl)}" style="width: 100%; height: 100%; object-fit: contain;">`
             : `<i class="fa-solid fa-building" style="font-size: 0.9rem; color: #cbd5e1;"></i>`
         }
                     </div>
@@ -257,7 +257,7 @@ window.changeClientItemsPerPage = function (val) {
 };
 
 function renderClientDetail(clientId, options = {}) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
 
     // Set active client ID so tabs like "Account Setup" are visible
@@ -368,7 +368,7 @@ function renderClientDetail(clientId, options = {}) {
 }
 
 window.switchClientDetailTab = function (clientId, tabName) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -2245,7 +2245,7 @@ window.handleIndustryChange = function (select) {
 {
     // Add Site Modal
     function addSite(clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         const modalTitle = document.getElementById('modal-title');
@@ -2356,7 +2356,7 @@ window.handleIndustryChange = function (select) {
 
     // Upload Document Modal
     window.openClientDocumentModal = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         const modalTitle = document.getElementById('modal-title');
@@ -2461,7 +2461,7 @@ window.handleIndustryChange = function (select) {
 
     // View Document Notes
     window.viewDocumentNotes = function (clientId, docId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.documents) return;
         const doc = client.documents.find(d => d.id === docId);
         if (!doc) return;
@@ -2493,7 +2493,7 @@ window.handleIndustryChange = function (select) {
 
     // Delete Document Helper
     window.deleteDocument = function (clientId, docId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.documents) return;
 
         if (confirm('Are you sure you want to delete this document?')) {

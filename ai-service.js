@@ -83,7 +83,7 @@ window.KB_HELPERS = {
 
         // Get linked audit plan
         const plan = (reportData.planId && window.state?.auditPlans)
-            ? window.state.auditPlans.find(p => String(p.id) === String(reportData.planId))
+            ? window.DataService.findAuditPlan(reportData.planId)
             : null;
 
         if (plan) {
@@ -558,7 +558,7 @@ Return a raw JSON array with 'id' and 'text' fields only:
         // Get Audit Plan Objectives, Criteria, Methodology context
         let planScopeContext = '';
         if (reportData.planId && window.state?.auditPlans) {
-            const plan = window.state.auditPlans.find(p => String(p.id) === String(reportData.planId));
+            const plan = window.DataService.findAuditPlan(reportData.planId);
             if (plan) {
                 const parts = [];
                 if (plan.auditObjectives) parts.push(`Audit Objectives:\n${plan.auditObjectives}`);
@@ -947,7 +947,7 @@ window.AI_SERVICE = AI_SERVICE;
 
 // 1. Finalize & Publish (One-Click Workflow)
 window.finalizeAndPublish = function (reportId) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+    const report = window.DataService.findAuditReport(reportId);
     if (!report) return;
 
     if (!confirm('Are you sure you want to finalize and publish this report? This will lock the audit.')) return;
@@ -983,7 +983,7 @@ window.finalizeAndPublish = function (reportId) {
 
 // 2. AI Auto-Analysis for Findings
 window.runFollowUpAIAnalysis = async function (reportId) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+    const report = window.DataService.findAuditReport(reportId);
     if (!report) return;
 
     const btn = document.querySelector(`button[data-action="runFollowUpAIAnalysis"][data-id="${reportId}"]`);
@@ -1068,7 +1068,7 @@ window.runFollowUpAIAnalysis = async function (reportId) {
 
 // 3. AI Auto-Summary Generation
 window.runAutoSummary = async function (reportId) {
-    const report = window.state.auditReports.find(r => String(r.id) === String(reportId));
+    const report = window.DataService.findAuditReport(reportId);
     if (!report) return;
 
     const btn = document.querySelector(`button[data-action="runAutoSummary"][data-id="${reportId}"]`);
@@ -1080,7 +1080,7 @@ window.runAutoSummary = async function (reportId) {
     try {
         // Gather compliant items for Positive Observations using shared helper
         const compliantItems = [];
-        const plan = window.state.auditPlans.find(p => p.id === report.planId) || {};
+        const plan = window.DataService.findAuditPlan(report.planId) || {};
         const assignedChecklists = (window.state.checklists || []).filter(c => plan.checklistIds?.includes(c.id));
 
         if (report.checklistProgress) {

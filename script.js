@@ -61,44 +61,32 @@ function getVisibleClients() {
 
     if (!user) return allClients; // No user = show all (demo mode)
 
-    // Roles that see ALL clients (management roles)
-    // defined in lowercase for case-insensitive comparison
-    const fullAccessRoles = ['admin', 'certification manager', 'super admin'];
+    // Use AuthManager for role checks (single source of truth)
+    const AM = window.AuthManager;
 
-    // Roles that only see ASSIGNED clients (auditor roles)
-    const filteredRoles = ['lead auditor', 'auditor', 'technical expert'];
-
-    const userRole = (user.role || '').toLowerCase();
-
-    // CRITICAL FIX: Force Admin access for main account regardless of role sync status
-    if (user.email === 'info@companycertification.com' || userRole === 'admin' || fullAccessRoles.includes(userRole)) {
+    // Admin and management roles see all clients
+    if (AM && AM.hasRole(['admin', 'certification manager', 'super admin'])) {
         return allClients;
     }
 
-    // Auditors (Lead Auditor, Auditor, Technical Expert) see only assigned clients
-    if (filteredRoles.includes(userRole)) {
-        // Get assignments for this user (using user ID directly)
+    // Auditors see only assigned clients
+    if (AM && AM.hasRole(['lead auditor', 'auditor', 'technical expert'])) {
         const assignments = window.state.auditorAssignments || [];
         const assignedClientIds = assignments
             .filter(a => String(a.auditorId) === String(user.id))
             .map(a => String(a.clientId));
 
-        // If no assignments, return empty array (no clients visible)
         if (assignedClientIds.length === 0) {
             console.info(`User ${user.name} (${user.role}) has no client assignments`);
             return [];
         }
 
-        // Filter clients based on assignments
         return allClients.filter(client => assignedClientIds.includes(String(client.id)));
     }
 
-    // Client Role sees ONLY their own organization
-    if (user.role === 'Client') {
-        // In a real app, user would be linked to client ID.
-        // For demo, we match by name or assume single client context if implemented?
-        // Simplistic check: if user.name matches client name or contact
-        return allClients.filter(c => c.name === user.name || c.contacts.some(contact => contact.email === user.email));
+    // Client role sees only their own organization
+    if (AM && AM.hasRole('client')) {
+        return allClients.filter(c => c.name === user.name || (c.contacts || []).some(contact => contact.email === user.email));
     }
 
     return []; // Default: no access

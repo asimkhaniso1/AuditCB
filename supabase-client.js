@@ -325,13 +325,13 @@ const SupabaseClient = {
     _getSyncTimestamp(table) {
         try {
             return sessionStorage.getItem(`sync_ts_${table}`) || null;
-        } catch (e) { return null; }
+        } catch (e) { Logger.debug('sessionStorage read failed (private mode?)', e.message); return null; }
     },
 
     _setSyncTimestamp(table) {
         try {
             sessionStorage.setItem(`sync_ts_${table}`, new Date().toISOString());
-        } catch (e) { /* ignore */ }
+        } catch (e) { Logger.debug('sessionStorage write failed (private mode?)', e.message); }
     },
 
     _clearSyncTimestamps() {
@@ -343,7 +343,7 @@ const SupabaseClient = {
             }
             keys.forEach(k => sessionStorage.removeItem(k));
             Logger.info('Sync timestamps cleared — next sync will be full');
-        } catch (e) { /* ignore */ }
+        } catch (e) { Logger.debug('sessionStorage clear failed (private mode?)', e.message); }
     },
 
     /**

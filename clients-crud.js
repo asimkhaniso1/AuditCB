@@ -13,7 +13,7 @@
     // Edit Site Modal
     window.editSite = function (clientId, siteIndex) {
         if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) return;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.sites || !client.sites[siteIndex]) return;
 
         const site = client.sites[siteIndex];
@@ -102,9 +102,7 @@
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 renderClientDetail(clientId);
                 window.showNotification('Site updated successfully');
@@ -117,7 +115,7 @@
     // Delete Site
     window.deleteSite = function (clientId, siteIndex) {
         if (!window.AuthManager || !window.AuthManager.canPerform('create', 'client')) return;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.sites) return;
 
         if (confirm('Are you sure you want to delete this site?')) {
@@ -135,7 +133,7 @@
 
     // Bulk Upload Sites
     window.bulkUploadSites = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -209,9 +207,7 @@
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 renderClientDetail(clientId);
                 window.setSetupWizardStep(clientId, 2);
@@ -225,7 +221,7 @@
 
     // Edit Contact Modal
     window.editContact = function (clientId, contactIndex) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.contacts || !client.contacts[contactIndex]) return;
 
         const contact = client.contacts[contactIndex];
@@ -269,9 +265,7 @@
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 renderClientDetail(clientId);
                 window.showNotification('Contact updated successfully');
@@ -283,7 +277,7 @@
 
     // Delete Contact
     window.deleteContact = function (clientId, contactIndex) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.contacts) return;
 
         if (confirm('Are you sure you want to delete this contact?')) {
@@ -301,7 +295,7 @@
 
     // Bulk Upload Contacts/Personnel
     window.bulkUploadContacts = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -374,9 +368,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 window.setSetupWizardStep(clientId, 5);
 
@@ -446,9 +438,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 if (document.getElementById('tab-organization')) {
                     const ul = document.querySelector('#tab-organization .card:first-child ul') || document.querySelector('#tab-organization ul');
@@ -503,9 +493,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 renderClientDetail(clientId);
                 renderClientTab(client, 'departments');
@@ -535,7 +523,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
     }
 
     function bulkUploadDepartments(clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -608,9 +596,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
                 window.saveData();
 
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 window.setSetupWizardStep(clientId, 3);
 
@@ -631,7 +617,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
     // GOODS/SERVICES CRUD FUNCTIONS
     // ============================================
     window.addGoodsService = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal('Add Goods/Service', `
@@ -669,7 +655,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
     };
 
     window.editGoodsService = function (clientId, index) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.goodsServices || !client.goodsServices[index]) return;
         const item = client.goodsServices[index];
         window.openModal('Edit Goods/Service', `
@@ -687,7 +673,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
 
     window.deleteGoodsService = function (clientId, index) {
         if (!confirm('Delete this item?')) return;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (client && client.goodsServices) {
             client.goodsServices.splice(index, 1);
             window.saveData();
@@ -702,7 +688,7 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
 
     // Bulk Upload Goods/Services
     window.bulkUploadGoodsServices = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -774,9 +760,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
 
                 window.saveData();
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 window.setSetupWizardStep(clientId, 6);
 
@@ -790,7 +774,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
     // KEY PROCESSES CRUD FUNCTIONS
     // ============================================
     window.addKeyProcess = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
         window.openModal('Add Key Process', `
         <form id="process-form">
@@ -815,7 +799,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
     };
 
     window.editKeyProcess = function (clientId, index) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
         const proc = client.keyProcesses[index];
         window.openModal('Edit Key Process', `
@@ -839,7 +823,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
 
     window.deleteKeyProcess = function (clientId, index) {
         if (!confirm('Delete this process?')) return;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (client && client.keyProcesses) {
             client.keyProcesses.splice(index, 1);
             window.saveData();
@@ -854,7 +838,7 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
 
     // Bulk Upload Key Processes
     window.bulkUploadKeyProcesses = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -927,9 +911,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
 
                 window.saveData();
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 window.setSetupWizardStep(clientId, 7);
 
@@ -943,7 +925,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
     // DESIGNATIONS CRUD FUNCTIONS
     // ============================================
     window.addClientDesignation = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
         const deptOptions = (client.departments || []).map(d => `<option value="${window.UTILS.escapeHtml(d.name)}">${window.UTILS.escapeHtml(d.name)}</option>`).join('');
         window.openModal('Add Designation', `
@@ -986,7 +968,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
 
     window.deleteClientDesignation = function (clientId, index) {
         if (!confirm('Delete this designation?')) return;
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (client && client.designations) {
             client.designations.splice(index, 1);
             window.saveData();
@@ -1001,7 +983,7 @@ HR Management, Support," style="font-family: monospace;"></textarea>
 
     // Bulk Upload Designations
     window.bulkUploadDesignations = function (clientId) {
-        const client = window.state.clients.find(c => String(c.id) === String(clientId));
+        const client = window.DataService.findClient(clientId);
         if (!client) return;
 
         window.openModal(
@@ -1074,9 +1056,7 @@ CFO," style="font-family: monospace;"></textarea>
 
                 window.saveData();
                 // Sync to Supabase
-                if (window.SupabaseClient?.isInitialized) {
-                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
-                }
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 window.setSetupWizardStep(clientId, 4);
 

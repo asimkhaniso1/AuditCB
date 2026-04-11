@@ -112,9 +112,7 @@ async function saveDefaultSettings() {
         window.saveData();
 
         // Sync to Supabase
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
-        }
+        await window.DataService.syncSettings({ saveLocal: false });
 
         window.showNotification('System defaults saved successfully', 'success');
     } catch (error) {

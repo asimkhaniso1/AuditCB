@@ -148,7 +148,7 @@ async function persistNCR(ncr) {
 window.getNCRAuditPlanOptions = function (clientId) {
     if (!clientId) return '';
 
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     const clientName = client ? client.name : '';
 
     const plans = (window.state.auditPlans || []).filter(p =>
@@ -1031,7 +1031,7 @@ window.openNewNCRModal = function () {
 
 async function saveNewNCR() {
     const clientId = document.getElementById('ncr-client').value;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     const clientName = client ? client.name : 'Unknown';
 
     const ncrData = {

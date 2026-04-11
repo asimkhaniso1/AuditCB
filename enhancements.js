@@ -176,7 +176,7 @@
             backdrop-filter: blur(8px); box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         `;
-        toast.innerHTML = `<i class="fa-solid ${icon}"></i> Navigated to <strong>${label}</strong>`;
+        toast.innerHTML = `<i class="fa-solid ${window.UTILS.escapeHtml(icon)}"></i> Navigated to <strong>${window.UTILS.escapeHtml(label)}</strong>`;
         document.body.appendChild(toast);
 
         requestAnimationFrame(() => {

@@ -6,7 +6,7 @@
 
 // Fix: Override switchClientDetailTab with corrected version
 window.switchClientDetailTab = function (clientId, tabName) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {

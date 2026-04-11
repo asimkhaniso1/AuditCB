@@ -81,7 +81,7 @@ window.getClientOrgSetupHTML.renderWizardStep = function (client, step) {
 window.setSetupWizardStep = function (clientId, step) {
     step = parseInt(step, 10); // DOM data-arg2 returns strings
     if (step < 1 || step > 7 || isNaN(step)) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (client) {
         client._wizardStep = step;
         const tabContent = document.getElementById('tab-content');
@@ -172,7 +172,7 @@ window.getClientCertificatesHTML = function (client) {
 };
 
 window.generateCertificatesFromStandards = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     const allStandards = new Set();
     if (client.standard) client.standard.split(',').map(s => s.trim()).forEach(s => allStandards.add(s));
@@ -184,13 +184,13 @@ window.generateCertificatesFromStandards = function (clientId) {
         }
     });
     if (window.saveData) window.saveData();
-    if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+    window.DataService.syncClient(client, { saveLocal: false });
     if (window.renderClientDetail) renderClientDetail(clientId);
     setTimeout(() => document.querySelector('.tab-btn[data-tab="scopes"]')?.click(), 100);
     if (window.showNotification) window.showNotification('Certificate records generated');
 };
-window.updateCertField = function (clientId, certIndex, field, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) client.certificates[certIndex][field] = value; };
-window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.state.clients.find(c => String(c.id) === String(clientId)); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
+window.updateCertField = function (clientId, certIndex, field, value) { const client = window.DataService.findClient(clientId); if (client) client.certificates[certIndex][field] = value; };
+window.updateSiteScope = function (clientId, certIndex, siteName, value) { const client = window.DataService.findClient(clientId); if (client) { if (!client.certificates[certIndex].siteScopes) client.certificates[certIndex].siteScopes = {}; client.certificates[certIndex].siteScopes[siteName] = value; } };
 window.saveCertificateDetails = function (clientId) { if (window.saveData) window.saveData(); if (window.showNotification) window.showNotification('Saved', 'success'); };
 window.getClientSettingsHTML = function (client) {
     return `
@@ -609,7 +609,7 @@ window.getClientAuditTeamHTML = function (client) {
 // ============================================
 
 window.addSite = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
     const stdHtml = stdOptions.map(function (std) {
@@ -656,7 +656,7 @@ window.addSite = function (clientId) {
             const siteTotal = client.sites.reduce((sum, s) => sum + (parseInt(s.employees, 10) || 0), 0);
             if (siteTotal > 0) client.employees = siteTotal;
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             if (window.renderClientDetail) renderClientDetail(clientId);
             if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 2);
@@ -666,7 +666,7 @@ window.addSite = function (clientId) {
 };
 
 window.bulkUploadSites = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Bulk Upload Sites', `
         <div style="margin-bottom: 1rem;"><p style="color: grey;">Format: Name, Address, City</p></div>
@@ -681,7 +681,7 @@ window.bulkUploadSites = function (clientId) {
             if (parts[0]) client.sites.push({ name: parts[0].trim(), address: parts[1]?.trim() || '', city: parts[2]?.trim() || '' });
         });
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal();
         window.setSetupWizardStep(clientId, 2);
         window.showNotification('Sites uploaded');
@@ -690,8 +690,8 @@ window.bulkUploadSites = function (clientId) {
 
 window.deleteSite = function (clientId, index) {
     if (!confirm('Delete?')) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
-    if (client && client.sites) { client.sites.splice(index, 1); window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client); renderClientDetail(clientId); window.showNotification('Deleted'); }
+    const client = window.DataService.findClient(clientId);
+    if (client && client.sites) { client.sites.splice(index, 1); window.saveData(); window.DataService.syncClient(client, { saveLocal: false }); renderClientDetail(clientId); window.showNotification('Deleted'); }
 };
 
 // ============================================
@@ -699,7 +699,7 @@ window.deleteSite = function (clientId, index) {
 // ============================================
 
 window.addDepartment = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Add Department',
         `<form><div class="form-group"><label>Name *</label><input type="text" id="dept-name" class="form-control"></div>
@@ -710,7 +710,7 @@ window.addDepartment = function (clientId) {
                 if (!client.departments) client.departments = [];
                 client.departments.push({ name, head: document.getElementById('dept-head').value });
                 window.saveData();
-                if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+                window.DataService.syncClient(client, { saveLocal: false });
                 window.closeModal();
                 if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 3);
                 else renderClientDetail(clientId);
@@ -720,17 +720,17 @@ window.addDepartment = function (clientId) {
 };
 
 window.deleteDepartment = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (client && client.departments && confirm('Delete?')) {
         client.departments.splice(index, 1);
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         renderClientDetail(clientId);
         window.showNotification('Department deleted');
     }
 };
 window.editDepartment = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client || !client.departments || !client.departments[index]) return;
     const dept = client.departments[index];
     window.openModal('Edit Department', `
@@ -740,7 +740,7 @@ window.editDepartment = function (clientId, index) {
         if (name) {
             client.departments[index] = { name, head: document.getElementById('dept-head').value };
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 3);
             else renderClientDetail(clientId);
@@ -749,13 +749,13 @@ window.editDepartment = function (clientId, index) {
     });
 };
 window.bulkUploadDepartments = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Bulk Upload Departments', `<textarea id="bulk-dept" rows="5" class="form-control" placeholder="Name, Head"></textarea>`, () => {
         const lines = document.getElementById('bulk-dept').value.split('\n');
         if (!client.departments) client.departments = [];
         lines.forEach(l => { const p = l.split(','); if (p[0]) client.departments.push({ name: p[0].trim(), head: p[1]?.trim() || '' }); });
-        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.saveData(); window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal(); window.setSetupWizardStep(clientId, 3);
     });
 };
@@ -765,7 +765,7 @@ window.bulkUploadDepartments = function (clientId) {
 // ============================================
 
 window.addContactPerson = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '">' + (d.name || '') + '</option>').join('');
     const desigs = (client.designations || []).map(d => '<option value="' + (d.title || d.name || '').replace(/"/g, '&quot;') + '">' + (d.title || d.name || '') + '</option>').join('');
@@ -792,7 +792,7 @@ window.addContactPerson = function (clientId) {
                 phone: document.getElementById('contact-phone').value
             });
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.showNotification('Contact added');
             if (window.renderClientDetail) renderClientDetail(clientId);
@@ -800,16 +800,16 @@ window.addContactPerson = function (clientId) {
     });
 };
 window.deleteContact = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (client && client.contacts && confirm('Delete?')) {
         client.contacts.splice(index, 1);
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         renderClientDetail(clientId);
     }
 };
 window.editContact = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client || !client.contacts || !client.contacts[index]) return;
     const ct = client.contacts[index];
     const depts = (client.departments || []).map(d => '<option value="' + (d.name || '').replace(/"/g, '&quot;') + '"' + ((ct.department === d.name) ? ' selected' : '') + '>' + (d.name || '') + '</option>').join('');
@@ -836,7 +836,7 @@ window.editContact = function (clientId, index) {
                 phone: document.getElementById('contact-phone').value
             };
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 5);
             else renderClientDetail(clientId);
@@ -845,7 +845,7 @@ window.editContact = function (clientId, index) {
     });
 };
 window.bulkUploadContacts = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Bulk Contacts', `
         <div style="margin-bottom:1rem"><p style="color:grey;font-size:0.85rem">Format: <strong>Name, Designation, Department, Email</strong></p></div>
@@ -865,7 +865,7 @@ Sarah Ali, Production Head, Production, sarah@example.com"></textarea>`, () => {
             }
         });
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal();
         if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 5);
         else renderClientDetail(clientId);
@@ -877,7 +877,7 @@ Sarah Ali, Production Head, Production, sarah@example.com"></textarea>`, () => {
 // ============================================
 
 window.addClientDesignation = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Add Designation', `<form><div class="form-group"><label>Title *</label><input id="des-title" class="form-control"></div></form>`, () => {
         const title = document.getElementById('des-title').value;
@@ -885,7 +885,7 @@ window.addClientDesignation = function (clientId) {
             if (!client.designations) client.designations = [];
             client.designations.push({ title });
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.setSetupWizardStep(clientId, 4);
             window.showNotification('Designation added');
@@ -893,16 +893,16 @@ window.addClientDesignation = function (clientId) {
     });
 };
 window.deleteClientDesignation = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (client && client.designations && confirm('Delete?')) {
         client.designations.splice(index, 1);
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         window.setSetupWizardStep(clientId, 4);
     }
 };
 window.editClientDesignation = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client || !client.designations || !client.designations[index]) return;
     const des = client.designations[index];
     window.openModal('Edit Designation', `
@@ -911,7 +911,7 @@ window.editClientDesignation = function (clientId, index) {
         if (title) {
             client.designations[index] = { title };
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.setSetupWizardStep(clientId, 4);
             window.showNotification('Designation updated');
@@ -919,13 +919,13 @@ window.editClientDesignation = function (clientId, index) {
     });
 };
 window.bulkUploadDesignations = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Bulk Designations', `<textarea id="bulk-des" rows="5" class="form-control" placeholder="Title"></textarea>`, () => {
         const lines = document.getElementById('bulk-des').value.split('\n');
         if (!client.designations) client.designations = [];
         lines.forEach(l => { if (l.trim()) client.designations.push({ title: l.trim() }); });
-        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.saveData(); window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal(); window.setSetupWizardStep(clientId, 4);
     });
 };
@@ -934,7 +934,7 @@ window.bulkUploadDesignations = function (clientId) {
 // 7. GOODS & PROCESSES
 // ============================================
 window.addGoodsService = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Add Goods/Service', `<form><div class="form-group"><label>Name</label><input id="goods-name" class="form-control"></div><div class="form-group"><label>Category</label><select id="goods-cat" class="form-control"><option>Product</option><option>Service</option></select></div></form>`, () => {
         const name = document.getElementById('goods-name').value;
@@ -942,7 +942,7 @@ window.addGoodsService = function (clientId) {
             if (!client.goodsServices) client.goodsServices = [];
             client.goodsServices.push({ name, category: document.getElementById('goods-cat').value });
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.setSetupWizardStep(clientId, 6);
             window.showNotification('Added');
@@ -950,16 +950,16 @@ window.addGoodsService = function (clientId) {
     });
 };
 window.deleteGoodsService = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (client && client.goodsServices) {
         client.goodsServices.splice(index, 1);
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         window.setSetupWizardStep(clientId, 6);
     }
 };
 window.editGoodsService = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client || !client.goodsServices || !client.goodsServices[index]) return;
     const item = client.goodsServices[index];
     window.openModal('Edit Goods/Service', `
@@ -969,7 +969,7 @@ window.editGoodsService = function (clientId, index) {
         if (name) {
             client.goodsServices[index] = { name, category: document.getElementById('goods-cat').value };
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.setSetupWizardStep(clientId, 6);
             window.showNotification('Updated');
@@ -977,19 +977,19 @@ window.editGoodsService = function (clientId, index) {
     });
 };
 window.bulkUploadGoodsServices = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Bulk Goods', `<textarea id="bulk-goods" rows="5" class="form-control" placeholder="Name, Category"></textarea>`, () => {
         const lines = document.getElementById('bulk-goods').value.split('\n');
         if (!client.goodsServices) client.goodsServices = [];
         lines.forEach(l => { const p = l.split(','); if (p[0]) client.goodsServices.push({ name: p[0].trim(), category: p[1]?.trim() || 'Product' }); });
-        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.saveData(); window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal(); window.setSetupWizardStep(clientId, 6);
     });
 };
 
 window.addKeyProcess = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Add Process', `<form><div class="form-group"><label>Name</label><input id="proc-name" class="form-control"></div><div class="form-group"><label>Category</label><select id="proc-cat" class="form-control"><option>Core</option><option>Support</option></select></div></form>`, () => {
         const name = document.getElementById('proc-name').value;
@@ -997,7 +997,7 @@ window.addKeyProcess = function (clientId) {
             if (!client.keyProcesses) client.keyProcesses = [];
             client.keyProcesses.push({ name, category: document.getElementById('proc-cat').value });
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.setSetupWizardStep(clientId, 7);
             window.showNotification('Added');
@@ -1005,16 +1005,16 @@ window.addKeyProcess = function (clientId) {
     });
 };
 window.deleteKeyProcess = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (client && client.keyProcesses) {
         client.keyProcesses.splice(index, 1);
         window.saveData();
-        if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         window.setSetupWizardStep(clientId, 7);
     }
 };
 window.editKeyProcess = function (clientId, index) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client || !client.keyProcesses || !client.keyProcesses[index]) return;
     const proc = client.keyProcesses[index];
     window.openModal('Edit Process', `
@@ -1024,7 +1024,7 @@ window.editKeyProcess = function (clientId, index) {
         if (name) {
             client.keyProcesses[index] = { name, category: document.getElementById('proc-cat').value };
             window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             window.closeModal();
             window.setSetupWizardStep(clientId, 7);
             window.showNotification('Updated');
@@ -1032,13 +1032,13 @@ window.editKeyProcess = function (clientId, index) {
     });
 };
 window.bulkUploadKeyProcesses = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
     window.openModal('Bulk Processes', `<textarea id="bulk-proc" rows="5" class="form-control" placeholder="Name, Category"></textarea>`, () => {
         const lines = document.getElementById('bulk-proc').value.split('\n');
         if (!client.keyProcesses) client.keyProcesses = [];
         lines.forEach(l => { const p = l.split(','); if (p[0]) client.keyProcesses.push({ name: p[0].trim(), category: p[1]?.trim() || 'Core' }); });
-        window.saveData(); if (window.SupabaseClient?.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.saveData(); window.DataService.syncClient(client, { saveLocal: false });
         window.closeModal(); window.setSetupWizardStep(clientId, 7);
     });
 };
@@ -1048,7 +1048,7 @@ window.bulkUploadKeyProcesses = function (clientId) {
 // ============================================
 
 window.openClientAuditorAssignmentModal = function (clientId, clientName) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!window.state.auditors) { window.showNotification('No auditors loaded', 'error'); return; }
 
     window.openModal(`Assign Auditor to ${clientName}`, `
@@ -1066,8 +1066,7 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
                 auditorId: String(auditorId),
                 assignedAt: new Date().toISOString()
             });
-            window.saveData();
-            if (window.SupabaseClient?.isInitialized) window.SupabaseClient.syncAuditorAssignmentsToSupabase(window.state.auditorAssignments);
+            window.DataService.syncAuditorAssignments();
             window.closeModal();
             if (window.renderClientDetail) renderClientDetail(clientId);
             if (document.getElementById('client-audit-team-container')) {
@@ -1084,7 +1083,7 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
     if (!confirm('Remove assignment?')) return;
     window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => !(String(a.clientId) === String(clientId) && String(a.auditorId) === String(auditorId)));
     window.saveData();
-    if (window.SupabaseClient?.isInitialized) window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId);
+    window.DataService.deleteAuditorAssignment(auditorId, clientId);
     if (window.renderClientDetail) renderClientDetail(clientId);
     window.showNotification('Removed');
 };
@@ -1094,7 +1093,7 @@ window.removeClientAuditorAssignment = function (clientId, auditorId) {
 // ============================================
 window.editSite = function (clientId, siteIndex) {
     if (!window.AuthManager || !window.AuthManager.canPerform('edit', 'client')) return;
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client || !client.sites || !client.sites[siteIndex]) return;
     const site = client.sites[siteIndex];
     const modalTitle = document.getElementById('modal-title');
@@ -1137,15 +1136,12 @@ window.editSite = function (clientId, siteIndex) {
         let city = document.getElementById('site-city').value;
         let country = document.getElementById('site-country').value;
         let geotag = document.getElementById('site-geotag').value;
-        let employees = parseInt(document.getElementById('site-employees', 10).value) || null;
+        let employees = parseInt(document.getElementById('site-employees').value, 10) || null;
         let shift = document.getElementById('site-shift').value || null;
         if (name) {
             let standards = Array.from(document.getElementById('site-standards').selectedOptions).map(function (o) { return o.value }).join(', ');
             client.sites[siteIndex] = Object.assign({}, site, { name: name, address: address, city: city, country: country, geotag: geotag, employees: employees, shift: shift, standards: standards });
-            window.saveData();
-            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(function (err) { console.error('Supabase sync failed:', err) });
-            }
+            window.DataService.syncClient(client);
             window.closeModal();
             if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
             window.showNotification('Site updated successfully');
@@ -1172,10 +1168,7 @@ window.handleClientLogoUpload = function (input, clientId) {
         let client = window.state.clients.find(function (c) { return String(c.id) === String(clientId); });
         if (client) {
             client.logoUrl = e.target.result;
-            window.saveData();
-            if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(function (err) { console.error('Supabase sync failed:', err); });
-            }
+            window.DataService.syncClient(client);
             let preview = document.getElementById('edit-client-logo-preview') || document.getElementById('client-logo-preview-img');
             if (preview) {
                 if (preview.tagName === 'DIV') {
@@ -1248,7 +1241,7 @@ window.generateCompanyProfile = async function (clientId) {
             client.profile = cleanResult;
             client.profileUpdated = new Date().toISOString();
             window.saveData();
-            if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
+            window.DataService.syncClient(client, { saveLocal: false });
             if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
             if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 1);
             window.showNotification('AI Company profile generated successfully!', 'success');
@@ -1291,7 +1284,7 @@ window.generateCompanyProfile = async function (clientId) {
     client.profile = parts.join('\n');
     client.profileUpdated = new Date().toISOString();
     window.saveData();
-    if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
+    window.DataService.syncClient(client, { saveLocal: false });
     if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
     if (window.setSetupWizardStep) window.setSetupWizardStep(clientId, 1);
     window.showNotification('Company profile generated from template.', 'success');
@@ -1368,7 +1361,7 @@ window.aiGenerateScope = async function (clientId, certIndex) {
         });
 
         window.saveData();
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) window.SupabaseClient.upsertClient(client);
+        window.DataService.syncClient(client, { saveLocal: false });
         if (typeof renderClientDetail === 'function') renderClientDetail(clientId);
         window.showNotification('AI certification scope generated successfully!', 'success');
     } catch (err) {

@@ -188,10 +188,12 @@ function renderClientSidebarMenu(clientId) {
     const logoContainer = document.getElementById('cb-logo-display');
     if (logoContainer && client) {
         if (client.logoUrl) {
-            logoContainer.innerHTML = `<img src="${client.logoUrl}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${client.name}">`;
+            logoContainer.innerHTML = `<img src="${window.UTILS.escapeHtml(client.logoUrl)}" style="max-height: 40px; max-width: 180px; object-fit: contain;" alt="${window.UTILS.escapeHtml(client.name)}">`;
         } else {
             // Show client name as text
-            logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${client.name.length > 20 ? client.name.substring(0, 20) + '...' : client.name}</h1>`;
+            const eName = window.UTILS.escapeHtml(client.name);
+            const truncated = eName.length > 20 ? eName.substring(0, 20) + '...' : eName;
+            logoContainer.innerHTML = `<i class="fa-solid fa-building" style="color: var(--primary-color);"></i><h1 style="font-size: 1rem;">${truncated}</h1>`;
         }
     }
 

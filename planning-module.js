@@ -879,7 +879,7 @@ function viewAuditPlan(id) {
                     console.info('[PlanView] Recovered checklists from Supabase, re-rendering...');
                     viewAuditPlan(plan.id);
                 }
-            }).catch(() => { window._planChecklistRecoveryAttempted = false; });
+            }).catch(err => { console.warn('[PlanView] Checklist recovery failed:', err.message); window._planChecklistRecoveryAttempted = false; });
         }
     }
 
@@ -2554,7 +2554,7 @@ async function generateAIAgenda() {
                 if (!r.status || (r.status !== 'Finalized' && r.status !== 'Approved' && r.status !== 'Published')) return false;
                 // Match standard: report.standard OR linked plan.standard
                 const rStd = (r.standard || '').toLowerCase();
-                const linkedPlan = (r.planId && window.state.auditPlans) ? window.state.auditPlans.find(p => String(p.id) === String(r.planId)) : null;
+                const linkedPlan = r.planId ? window.DataService.findAuditPlan(r.planId) : null;
                 const pStd = (linkedPlan?.standard || '').toLowerCase();
                 return standardTokens.some(tok => rStd.includes(tok) || pStd.includes(tok));
             })
@@ -2618,7 +2618,7 @@ window.viewAuditPlan = viewAuditPlan;
 // Navigation Helpers (Integrated Lifecycle)
 window.navigateToAuditExecution = function (planId) {
     let report = window.state.auditReports.find(r => String(r.planId) === String(planId));
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
 
     if (!plan) {
         window.showNotification('Plan not found', 'error');
@@ -2831,7 +2831,7 @@ window.renderMultiSiteSamplingCalculator = renderMultiSiteSamplingCalculator;
  * ISO 17021-1 Stage 1: Document Review & Readiness Assessment
  */
 window.renderPreAuditReview = function (planId) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan) {
         window.showNotification('Audit plan not found', 'error');
         return;
@@ -3096,7 +3096,7 @@ window.renderPreAuditReview = function (planId) {
  * Update Pre-Audit item status
  */
 window.updatePreAuditItem = function (planId, itemId, status) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
 
     if (!plan.preAudit.documentReview[itemId]) {
@@ -3112,7 +3112,7 @@ window.updatePreAuditItem = function (planId, itemId, status) {
  * Update Pre-Audit item notes
  */
 window.updatePreAuditNotes = function (planId, itemId, notes) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
 
     if (!plan.preAudit.documentReview[itemId]) {
@@ -3128,7 +3128,7 @@ window.updatePreAuditNotes = function (planId, itemId, notes) {
  * Update readiness decision
  */
 window.updateReadinessDecision = function (planId, decision) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
 
     plan.preAudit.readinessDecision = decision;
@@ -3139,7 +3139,7 @@ window.updateReadinessDecision = function (planId, decision) {
  * Update readiness notes
  */
 window.updateReadinessNotes = function (planId, notes) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
 
     plan.preAudit.notes = notes;
@@ -3150,7 +3150,7 @@ window.updateReadinessNotes = function (planId, notes) {
  * Save Pre-Audit review progress
  */
 window.savePreAuditReview = function (planId) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
 
     plan.preAudit.status = 'In Progress';
@@ -3162,7 +3162,7 @@ window.savePreAuditReview = function (planId) {
  * Complete Pre-Audit review
  */
 window.completePreAuditReview = function (planId) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) return;
 
     // Validation
@@ -3187,7 +3187,7 @@ window.completePreAuditReview = function (planId) {
  * Export Pre-Audit PDF Report
  */
 window.exportPreAuditPDF = function (planId) {
-    const plan = window.state.auditPlans.find(p => String(p.id) === String(planId));
+    const plan = window.DataService.findAuditPlan(planId);
     if (!plan || !plan.preAudit) {
         window.showNotification('Pre-Audit data not found', 'error');
         return;

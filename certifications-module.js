@@ -555,14 +555,7 @@ window.openIssueCertificateModal = function (reportId) {
         window.saveData();
 
         // Sync to Supabase
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            window.SupabaseClient.upsertCertificate(newCert)
-                .then(() => window.showNotification('Certificate saved to cloud', 'success'))
-                .catch(err => {
-                    console.error('Sync failed:', err);
-                    window.showNotification(`Saved locally, but Cloud Sync Failed: ${err.message || JSON.stringify(err)}`, 'error');
-                });
-        }
+        window.DataService.syncCertificate(newCert, { saveLocal: false });
 
         window.closeModal();
         renderCertificationModule();
@@ -579,14 +572,11 @@ window.deleteCertificate = function (certId) {
         window.saveData();
 
         // Remove from Cloud
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            window.SupabaseClient.deleteCertificate(certId).then(() => {
+        window.DataService.deleteCertificate(certId).then(synced => {
+            if (synced) {
                 window.showNotification('Certificate deleted from cloud', 'success');
-            }).catch(err => {
-                console.error('Delete failed:', err);
-                window.showNotification('Deleted locally but cloud delete failed', 'warning');
-            });
-        }
+            }
+        });
 
         renderCertificationModule();
     }

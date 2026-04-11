@@ -560,11 +560,8 @@ window.saveCBProfile = function () {
 
         window.saveData();
 
-        // Explicitly sync settings to Supabase when user saves
-        if (window.SupabaseClient?.isInitialized) {
-            window.SupabaseClient.syncSettingsToSupabase(window.state.settings)
-                .catch(e => console.warn('Settings Supabase sync failed:', e));
-        }
+        // Sync settings to Supabase
+        window.DataService.syncSettings({ saveLocal: false });
 
         window.showNotification('CB Profile saved successfully', 'success');
 
@@ -770,7 +767,7 @@ window.addStandardToMasterlist = function () {
             window.saveData();
 
             if (window.SupabaseClient?.isInitialized) {
-                try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+                await window.DataService.syncSettings({ saveLocal: false, silent: true });
             }
 
             window.closeModal();
@@ -885,7 +882,7 @@ window.addGlobalDesignation = function () {
         window.saveData();
 
         if (window.SupabaseClient?.isInitialized) {
-            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+            await window.DataService.syncSettings({ saveLocal: false, silent: true });
         }
 
         window.closeModal();
@@ -942,7 +939,7 @@ window.deleteGlobalDesignation = async function (id) {
         window.saveData();
 
         if (window.SupabaseClient?.isInitialized) {
-            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+            await window.DataService.syncSettings({ saveLocal: false, silent: true });
         }
 
         switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
@@ -1683,7 +1680,7 @@ window.addCBSite = function () {
         window.saveData();
 
         if (window.SupabaseClient?.isInitialized) {
-            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+            await window.DataService.syncSettings({ saveLocal: false, silent: true });
         }
 
         window.closeModal();
@@ -1753,7 +1750,7 @@ window.editCBSite = function (idx) {
         window.saveData();
 
         if (window.SupabaseClient?.isInitialized) {
-            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+            await window.DataService.syncSettings({ saveLocal: false, silent: true });
         }
 
         window.closeModal();
@@ -1770,7 +1767,7 @@ window.deleteCBSite = async function (idx) {
         window.saveData();
 
         if (window.SupabaseClient?.isInitialized) {
-            try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+            await window.DataService.syncSettings({ saveLocal: false, silent: true });
         }
 
         switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
@@ -1797,7 +1794,7 @@ window.saveAccreditation = async function () {
     window.saveData();
 
     if (window.SupabaseClient?.isInitialized) {
-        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        await window.DataService.syncSettings({ saveLocal: false, silent: true });
     }
 
     window.showNotification('Accreditation settings saved', 'success');
@@ -1813,7 +1810,7 @@ window.saveQualityPolicy = async function () {
     window.saveData();
 
     if (window.SupabaseClient?.isInitialized) {
-        try { await window.SupabaseClient.syncSettingsToSupabase(window.state.settings); } catch (e) { console.warn(e); }
+        await window.DataService.syncSettings({ saveLocal: false, silent: true });
     }
 
     window.showNotification('Quality Policy saved', 'success');
@@ -2254,17 +2251,7 @@ async function saveAssignment() {
         notes: notes
     });
 
-    window.saveData();
-
-    // Sync with Supabase
-    if (window.SupabaseClient?.isInitialized) {
-        try {
-            await window.SupabaseClient.syncAuditorAssignmentsToSupabase(window.state.auditorAssignments);
-        } catch (error) {
-            console.error('Failed to sync assignments to Supabase:', error);
-            window.showNotification('Assignment saved locally, but cloud sync failed.', 'warning');
-        }
-    }
+    await window.DataService.syncAuditorAssignments();
 
     window.closeModal();
     switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
@@ -2353,16 +2340,7 @@ This only removes future access to new client data.`;
             a => !(a.auditorId === auditorId && a.clientId === clientId)
         );
         window.saveData();
-
-        // Sync delete to Supabase
-        if (window.SupabaseClient?.isInitialized) {
-            try {
-                await window.SupabaseClient.deleteAuditorAssignment(auditorId, clientId);
-            } catch (error) {
-                console.error('Failed to remove assignment from Supabase:', error);
-                window.showNotification('Assignment removed locally, but cloud sync failed.', 'warning');
-            }
-        }
+        await window.DataService.deleteAuditorAssignment(auditorId, clientId);
 
         switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
         window.showNotification('Assignment removed. Historical audit records retained.', 'success');
@@ -2866,12 +2844,12 @@ window.testAIConnection = async function () {
         }
 
         if (response.ok) {
-            resultDiv.innerHTML = `< span style = "color: green; font-weight: bold;" >✅ Success(Status ${status})</span > <br>Response: ${JSON.stringify(data, null, 2)}`;
+            resultDiv.innerHTML = `<span style="color: green; font-weight: bold;">✅ Success (Status ${parseInt(status, 10) || 0})</span><br>Response: <pre>${window.UTILS.escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
         } else {
-            resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Failed (Status ${status})</span><br>Error: ${JSON.stringify(data, null, 2)}`;
+            resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Failed (Status ${parseInt(status, 10) || 0})</span><br>Error: <pre>${window.UTILS.escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
         }
     } catch (error) {
-        resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Network Error</span><br>${error.message}`;
+        resultDiv.innerHTML = `<span style="color: red; font-weight: bold;">❌ Network Error</span><br>${window.UTILS.escapeHtml(error.message)}`;
     }
 };
 

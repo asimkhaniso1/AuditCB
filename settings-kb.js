@@ -468,13 +468,7 @@ window.uploadKnowledgeDoc = function (type) {
         }
 
         // Sync metadata to settings table
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            try {
-                await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
-            } catch (e) {
-                console.warn('Metadata sync failed:', e);
-            }
-        }
+        await window.DataService.syncSettings({ saveLocal: false, silent: true });
     };
 
     window.openModal();
@@ -713,13 +707,7 @@ window.analyzeStandard = async function (docId, mode, auditType, clientId) {
     }
 
     // Sync metadata
-    if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-        try {
-            await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
-        } catch (e) {
-            console.warn('Metadata sync failed:', e);
-        }
-    }
+    await window.DataService.syncSettings({ saveLocal: false, silent: true });
 };
 
 // Re-analyze a standard (for deeper extraction)
@@ -795,13 +783,7 @@ window.analyzeDocument = async function (type, docId) {
         window.showNotification(`${doc.name} analyzed! ${doc.clauses.length} sections indexed.`, 'success');
 
         // Sync metadata
-        if (window.SupabaseClient && window.SupabaseClient.isInitialized) {
-            try {
-                await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
-            } catch (e) {
-                console.warn('Metadata sync failed:', e);
-            }
-        }
+        await window.DataService.syncSettings({ saveLocal: false, silent: true });
     }, 300);
 };
 
@@ -1900,7 +1882,7 @@ window.deleteKnowledgeDoc = async function (type, id) {
                 .eq('id', id);
 
             // Sync settings (KB metadata)
-            await window.SupabaseClient.syncSettingsToSupabase(window.state.settings);
+            await window.DataService.syncSettings({ saveLocal: false, silent: true });
         } catch (e) {
             console.error('Cloud deletion failed:', e);
             window.showNotification('Document deleted locally, but cloud sync failed', 'warning');

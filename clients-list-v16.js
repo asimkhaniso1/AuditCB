@@ -397,7 +397,7 @@ window.deleteClient = async function (clientId) {
 };
 
 window.archiveClient = function (clientId) {
-    const client = window.state.clients.find(c => String(c.id) === String(clientId));
+    const client = window.DataService.findClient(clientId);
     if (!client) return;
 
     if (!confirm(`Are you sure you want to archive client '${client.name}'? The client will be hidden from active lists but data is preserved.`)) {
