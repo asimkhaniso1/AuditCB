@@ -54,7 +54,7 @@ export default [
                 Sentry: 'readonly',
                 Chart: 'readonly',
 
-                // App globals (window.*)
+                // App globals — core services (window.*)
                 Logger: 'writable',
                 DEBUG_MODE: 'writable',
                 CONSTANTS: 'writable',
@@ -72,6 +72,59 @@ export default [
                 DataMigration: 'writable',
                 DataService: 'writable',
                 StateStore: 'writable',
+                AI_SERVICE: 'writable',
+                AuditLogger: 'writable',
+                KB_HELPERS: 'writable',
+                EvidenceDB: 'writable',
+                CachedData: 'writable',
+
+                // App globals — state & UI functions
+                state: 'writable',
+                saveData: 'writable',
+                showNotification: 'writable',
+                openModal: 'writable',
+                closeModal: 'writable',
+                debounce: 'readonly',
+
+                // App globals — render functions (cross-module)
+                renderClientDetail: 'writable',
+                renderClientTab: 'writable',
+                renderClientsEnhanced: 'writable',
+                renderClientModule: 'writable',
+                renderSettings: 'writable',
+                renderDashboardEnhanced: 'writable',
+                renderExecutionDetail: 'writable',
+                renderAuditExecutionEnhanced: 'writable',
+                renderChecklistLibrary: 'writable',
+                renderCertificationModule: 'writable',
+                renderAuditPlanningEnhanced: 'writable',
+                renderAuditProgramsEnhanced: 'writable',
+                renderAuditorsEnhanced: 'writable',
+                renderDocumentsEnhanced: 'writable',
+                renderAppealsComplaintsModule: 'writable',
+                renderImpartialityModule: 'writable',
+                renderManagementReviewModule: 'writable',
+                renderRecordRetentionModule: 'writable',
+                renderNCRCAPAModule: 'writable',
+                renderExecutionTab: 'writable',
+
+                // App globals — settings sub-tabs
+                switchSettingsSubTab: 'writable',
+                switchSettingsMainTab: 'writable',
+                switchSettingsTab: 'writable',
+                switchClientDetailTab: 'writable',
+
+                // Browser APIs not in default globals
+                pdfjsLib: 'readonly',
+                mammoth: 'readonly',
+                atob: 'readonly',
+                prompt: 'readonly',
+                onload: 'writable',
+                event: 'readonly',
+                File: 'readonly',
+                caches: 'readonly',
+                DecompressionStream: 'readonly',
+                URLSearchParams: 'readonly',
 
                 // Node.js (for CommonJS exports at bottom of files)
                 module: 'readonly',
@@ -83,8 +136,8 @@ export default [
         rules: {
             // Relaxed for existing codebase — tighten over time
             'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-            'no-undef': 'warn',
-            'no-redeclare': 'warn',
+            'no-undef': 'off', // 260+ window globals — re-enable after ES module migration
+            'no-redeclare': 'off', // window globals are intentionally redeclared per-file
             'no-empty': ['warn', { allowEmptyCatch: true }],
             'no-prototype-builtins': 'off',
             'no-useless-escape': 'warn',
