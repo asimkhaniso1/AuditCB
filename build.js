@@ -14,7 +14,7 @@ const SRC = __dirname;
 const DIST = path.join(__dirname, 'dist');
 
 // Files/dirs to skip when copying to dist
-const SKIP = new Set(['dist', 'node_modules', '.git', '.agent', '.gemini', 'migrations', 'docs', 'tools', 'supabase']);
+const SKIP = new Set(['dist', 'node_modules', '.git', '.agent', '.gemini', '.claude', 'migrations', 'docs', 'tools', 'supabase', 'coverage']);
 
 // 1. Clean dist
 if (fs.existsSync(DIST)) {
