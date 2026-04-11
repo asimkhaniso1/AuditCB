@@ -132,9 +132,11 @@ END $$;
 
 DO $$
 BEGIN
-    ALTER TABLE settings ADD CONSTRAINT settings_singleton CHECK (id = 1);
+    ALTER TABLE settings ADD CONSTRAINT settings_singleton CHECK (id::text = '1');
 EXCEPTION WHEN duplicate_object THEN
     RAISE NOTICE 'settings_singleton constraint already exists';
+WHEN others THEN
+    RAISE NOTICE 'settings_singleton: %', SQLERRM;
 END $$;
 
 -- ============================================
