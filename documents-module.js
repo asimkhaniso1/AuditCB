@@ -413,12 +413,7 @@ function getDocumentIcon(type) {
 }
 
 function openUploadModal() {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Upload Document';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Upload Document', `
         <form id="upload-form">
             <div class="form-group">
                 <label>Document Title</label>
@@ -454,11 +449,7 @@ function openUploadModal() {
                 </select>
             </div>
         </form>
-    `;
-
-    openModal();
-
-    modalSave.onclick = () => {
+    `, () => {
         const title = document.getElementById('doc-title').value;
         const type = document.getElementById('doc-type').value;
         const client = document.getElementById('doc-client').value;
@@ -481,7 +472,7 @@ function openUploadModal() {
             renderDocuments();
             showNotification('Document uploaded successfully');
         }
-    };
+    });
 }
 
 function downloadDocument(_id) {

@@ -1866,15 +1866,6 @@ function printCalculation() {
 
 
 window.openMultiSiteSamplingCalculatorModal = function () {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    // Hide standard save button as the calculator has its own interactions
-    if (modalSave) modalSave.style.display = 'none';
-
-    modalTitle.innerHTML = '<i class="fa-solid fa-calculator" style="margin-right:0.5rem"></i>Multi-Site Sampling (IAF MD 1)';
-
     // Helper to count sites from the planning form if available
     let totalSitesDefault = 10;
     const sitesContainer = document.getElementById('site-checkboxes');
@@ -1884,7 +1875,7 @@ window.openMultiSiteSamplingCalculatorModal = function () {
         if (count > 0) totalSitesDefault = count;
     }
 
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Multi-Site Sampling (IAF MD 1)', `
         <div style="padding: 0 0.5rem;">
             <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
                 Calculate minimum site sampling requirements for multi-site certification (IAF MD 1:2018).
@@ -1965,9 +1956,7 @@ window.openMultiSiteSamplingCalculatorModal = function () {
                 </div>
             </div>
         </div>
-    `;
-
-    window.openModal();
+    `);
 
     // Event Listener for Calculation
     setTimeout(() => {
@@ -2072,15 +2061,10 @@ function openEditAuditorModal(auditorId) {
     const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
     const industries = ['Manufacturing', 'Automotive', 'Aerospace', 'IT', 'Financial Services', 'Healthcare', 'Pharmaceutical', 'Food & Beverage', 'Construction', 'Chemicals', 'Oil & Gas', 'Logistics', 'Retail', 'Education'];
     const auditorIndustries = auditor.industries || [];
 
-    modalTitle.textContent = 'Edit Auditor';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Edit Auditor', `
         < form id = "auditor-form" style = "max-height: 70vh; overflow-y: auto;" >
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <!-- Basic Info -->
@@ -2174,11 +2158,7 @@ function openEditAuditorModal(auditorId) {
                 </div>
             </div>
         </form >
-        `;
-
-    window.openModal();
-
-    modalSave.onclick = () => {
+        `, () => {
         // 1. Define Fields
         const fieldIds = {
             name: 'auditor-name',
@@ -2263,19 +2243,14 @@ function openEditAuditorModal(auditorId) {
         window.closeModal();
         renderAuditorDetail(auditorId);
         window.showNotification('Auditor updated successfully', 'success');
-    };
+    });
 }
 // Add Training Modal
 function openAddTrainingModal(auditorId) {
     const auditor = state.auditors.find(a => a.id === auditorId);
     if (!auditor) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Add Training Record';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Add Training Record', `
         <form id="training-form">
             <div class="form-group">
                 <label>Course Name <span style="color: var(--danger-color);">*</span></label>
@@ -2302,11 +2277,7 @@ function openAddTrainingModal(auditorId) {
                 <input type="file" class="form-control" id="training-file" accept=".pdf,.jpg,.jpeg,.png">
             </div>
         </form>
-        `;
-
-    window.openModal();
-
-    modalSave.onclick = async () => {
+        `, async () => {
         const course = document.getElementById('training-course').value;
         const provider = document.getElementById('training-provider').value;
         const date = document.getElementById('training-date').value;
@@ -2316,8 +2287,8 @@ function openAddTrainingModal(auditorId) {
         const file = fileInput.files[0];
 
         if (course) {
-            modalSave.disabled = true;
-            modalSave.textContent = 'Saving...';
+            const modalSave = document.getElementById('modal-save');
+            if (modalSave) { modalSave.disabled = true; modalSave.textContent = 'Saving...'; }
 
             let cloudUrl = null;
             let cloudPath = null;
@@ -2378,7 +2349,7 @@ function openAddTrainingModal(auditorId) {
         } else {
             window.showNotification('Course name is required', 'error');
         }
-    };
+    });
 }
 
 // Upload Document Modal
@@ -2386,12 +2357,7 @@ function openUploadDocumentModal(auditorId) {
     const auditor = state.auditors.find(a => a.id === auditorId);
     if (!auditor) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Upload Document';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Upload Document', `
         < form id = "document-form" >
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
@@ -2411,11 +2377,7 @@ function openUploadDocumentModal(auditorId) {
                 <small style="color: var(--text-secondary);">Accepted: PDF, Images, Word documents</small>
             </div>
         </form >
-        `;
-
-    window.openModal();
-
-    modalSave.onclick = () => {
+        `, () => {
         const name = document.getElementById('doc-name').value;
         const type = document.getElementById('doc-type').value;
         const fileInput = document.getElementById('doc-file');
@@ -2437,7 +2399,7 @@ function openUploadDocumentModal(auditorId) {
         } else {
             window.showNotification('Document name is required', 'error');
         }
-    };
+    });
 }
 
 // Export functions to global scope
@@ -2470,12 +2432,7 @@ window.openAuditorUploadModal = function (auditorId) {
     const auditor = state.auditors.find(a => String(a.id) === String(auditorId));
     if (!auditor) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Upload Auditor Document';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Upload Auditor Document', `
         < form id = "upload-form" >
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
@@ -2499,11 +2456,7 @@ window.openAuditorUploadModal = function (auditorId) {
                 <input type="file" id="doc-file" style="display: none;" data-action-change="handleDocFileChangeAlways">
             </div>
         </form >
-        `;
-
-    window.openModal();
-
-    modalSave.onclick = async () => {
+        `, async () => {
         const name = document.getElementById('doc-name').value;
         const type = document.getElementById('doc-type').value;
         const fileInput = document.getElementById('doc-file');
@@ -2511,8 +2464,8 @@ window.openAuditorUploadModal = function (auditorId) {
 
         if (name && file) {
             // Processing state
-            modalSave.disabled = true;
-            modalSave.textContent = 'Uploading...';
+            const modalSave = document.getElementById('modal-save');
+            if (modalSave) { modalSave.disabled = true; modalSave.textContent = 'Uploading...'; }
 
             let cloudUrl = null;
             let cloudPath = null;
@@ -2578,7 +2531,7 @@ window.openAuditorUploadModal = function (auditorId) {
         } else {
             window.showNotification('Please enter a document name and select a file', 'warning');
         }
-    };
+    });
 };
 
 // Note: deleteAuditorDocument, addWitnessAudit, addPerformanceReview

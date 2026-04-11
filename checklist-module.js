@@ -373,11 +373,6 @@ window.downloadChecklistTemplate = downloadChecklistTemplate;
 
 // Import Checklist Modal - allows bulk import from CSV
 function openImportChecklistModal() {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-    const _modalCancel = document.getElementById('modal-cancel');
-
     // Build standards list: cbSettings > KB docs > existing checklists > hardcoded fallback
     let standards = window.state.cbSettings?.availableStandards || [];
     if (!standards.length) standards = state.settings?.standards || [];
@@ -393,8 +388,7 @@ function openImportChecklistModal() {
     const isCertManager = userRole === window.CONSTANTS?.ROLES?.CERTIFICATION_MANAGER;
     const canEditGlobal = isCertManager || isAdmin;
 
-    modalTitle.textContent = 'Import Checklist from CSV';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Import Checklist from CSV', `
         <div style="margin-bottom: 1.5rem;">
             <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
                 <i class="fa-solid fa-lightbulb" style="color: #0284c7; margin-right: 0.5rem;"></i>
@@ -441,60 +435,8 @@ function openImportChecklistModal() {
                 <div id="import-preview-content" style="max-height: 200px; overflow-y: auto; background: #f8fafc; padding: 0.75rem; border-radius: 6px; font-size: 0.85rem;"></div>
             </div>
         </form>
-    `;
-
-    window.openModal();
-
-    // File input change handler - show preview
-    document.getElementById('import-checklist-file')?.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function (event) {
-            const text = event.target.result;
-            const lines = text.split(/\r\n|\n/).filter(l => l.trim());
-
-            const previewDiv = document.getElementById('import-preview');
-            const previewContent = document.getElementById('import-preview-content');
-
-            if (lines.length > 0) {
-                previewDiv.style.display = 'block';
-                const previewLines = lines.slice(0, 6);
-                previewContent.innerHTML = `
-                    <div style="margin-bottom: 0.5rem; color: var(--text-secondary);">
-                        Found <strong>${lines.length - 1}</strong> items (excluding header)
-                    </div>
-                    <table style="width: 100%; font-size: 0.8rem;">
-                        <thead>
-                            <tr style="background: #e2e8f0;">
-                                <th style="padding: 4px 8px;">Clause</th>
-                                <th style="padding: 4px 8px;">Requirement</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${previewLines.map((line, idx) => {
-                    if (idx === 0 && (line.toLowerCase().includes('clause') || line.toLowerCase().includes('requirement'))) {
-                        return ''; // Skip header
-                    }
-                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
-                    if (parts.length >= 2) {
-                        return `<tr><td style="padding: 4px 8px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(parts[0])}</td><td style="padding: 4px 8px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(parts[1].substring(0, 60))}${parts[1].length > 60 ? '...' : ''}</td></tr>`;
-                    }
-                    return '';
-                }).join('')}
-                            ${lines.length > 6 ? '<tr><td colspan="2" style="padding: 4px 8px; text-align: center; color: var(--text-secondary);">... and more</td></tr>' : ''}
-                        </tbody>
-                    </table>
-                `;
-            }
-        };
-        reader.readAsText(file);
-    });
-
-    modalSave.textContent = 'Import Checklist';
-    modalSave.style.display = 'inline-block';
-    modalSave.onclick = async () => {
+    `, async () => {
+        const modalSave = document.getElementById('modal-save');
         const name = document.getElementById('import-checklist-name').value.trim();
         const standard = document.getElementById('import-checklist-standard').value;
         const type = document.getElementById('import-checklist-type').value;
@@ -513,8 +455,7 @@ function openImportChecklistModal() {
         const file = fileInput.files[0];
 
         // Show processing state
-        modalSave.textContent = 'Processing...';
-        modalSave.disabled = true;
+        if (modalSave) { modalSave.textContent = 'Processing...'; modalSave.disabled = true; }
 
         // Upload file to Supabase Storage
         let cloudUrl = null;
@@ -569,8 +510,7 @@ function openImportChecklistModal() {
 
             if (rawRows.length === 0) {
                 window.showNotification('No valid items found in the CSV file', 'error');
-                modalSave.textContent = 'Import Checklist';
-                modalSave.disabled = false;
+                if (modalSave) { modalSave.textContent = 'Import Checklist'; modalSave.disabled = false; }
                 return;
             }
 
@@ -625,7 +565,58 @@ function openImportChecklistModal() {
             window.showNotification(`Imported checklist "${name}" with ${rawRows.length} items (${statusMsg})`, 'success');
         };
         reader.readAsText(file);
-    };
+    });
+
+    // File input change handler - show preview
+    document.getElementById('import-checklist-file')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split(/\r\n|\n/).filter(l => l.trim());
+
+            const previewDiv = document.getElementById('import-preview');
+            const previewContent = document.getElementById('import-preview-content');
+
+            if (lines.length > 0) {
+                previewDiv.style.display = 'block';
+                const previewLines = lines.slice(0, 6);
+                previewContent.innerHTML = `
+                    <div style="margin-bottom: 0.5rem; color: var(--text-secondary);">
+                        Found <strong>${lines.length - 1}</strong> items (excluding header)
+                    </div>
+                    <table style="width: 100%; font-size: 0.8rem;">
+                        <thead>
+                            <tr style="background: #e2e8f0;">
+                                <th style="padding: 4px 8px;">Clause</th>
+                                <th style="padding: 4px 8px;">Requirement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${previewLines.map((line, idx) => {
+                    if (idx === 0 && (line.toLowerCase().includes('clause') || line.toLowerCase().includes('requirement'))) {
+                        return ''; // Skip header
+                    }
+                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
+                    if (parts.length >= 2) {
+                        return `<tr><td style="padding: 4px 8px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(parts[0])}</td><td style="padding: 4px 8px; border-bottom: 1px solid #e2e8f0;">${window.UTILS.escapeHtml(parts[1].substring(0, 60))}${parts[1].length > 60 ? '...' : ''}</td></tr>`;
+                    }
+                    return '';
+                }).join('')}
+                            ${lines.length > 6 ? '<tr><td colspan="2" style="padding: 4px 8px; text-align: center; color: var(--text-secondary);">... and more</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                `;
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    // Update button text to 'Import Checklist'
+    const modalSave = document.getElementById('modal-save');
+    if (modalSave) modalSave.textContent = 'Import Checklist';
 }
 
 window.openImportChecklistModal = openImportChecklistModal;

@@ -209,6 +209,34 @@
         if (window.openModal) window.openModal();
     }
 
+    // ---- Confirm action helper ----
+
+    /**
+     * Replace browser's blocking confirm() with a styled modal.
+     * @param {string} message - Confirmation message to display
+     * @param {Function} onConfirm - Callback executed when user confirms
+     */
+    function confirmAction(message, onConfirm) {
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalSave = document.getElementById('modal-save');
+
+        if (modalTitle) modalTitle.textContent = 'Confirm Action';
+        if (modalBody) modalBody.innerHTML = '<div style="padding: 1rem; text-align: center;"><i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; color: var(--warning-color); margin-bottom: 1rem;"></i><p style="font-size: 1rem; margin: 0;">' + (window.UTILS ? window.UTILS.escapeHtml(message) : message) + '</p></div>';
+        if (modalSave) {
+            modalSave.textContent = 'Confirm';
+            modalSave.style.display = '';
+            modalSave.className = 'btn btn-danger';
+            modalSave.onclick = () => {
+                if (window.closeModal) window.closeModal();
+                modalSave.textContent = 'Save';
+                modalSave.className = 'btn btn-primary';
+                onConfirm();
+            };
+        }
+        if (window.openModal) window.openModal();
+    }
+
     // ---- Export ----
 
     window.DataService = {
@@ -232,6 +260,7 @@
 
         // UI helpers
         openFormModal,
+        confirmAction,
 
         // State lookups
         findClient,

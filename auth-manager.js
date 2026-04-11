@@ -407,14 +407,8 @@ const AuthManager = {
      * Show session timeout warning modal
      */
     showSessionWarning: function (minutesLeft) {
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        if (!modalTitle || !modalBody) return;
-
-        modalTitle.textContent = 'Session Expiring Soon';
-        modalBody.innerHTML = `
+        const self = this;
+        window.DataService.openFormModal('Session Expiring Soon', `
             <div style="text-align: center; padding: 1rem;">
                 <i class="fa-solid fa-clock" style="font-size: 3rem; color: #f59e0b; margin-bottom: 1rem;"></i>
                 <h4 style="margin-bottom: 0.5rem;">Your session will expire in ~${minutesLeft} minute(s)</h4>
@@ -422,18 +416,16 @@ const AuthManager = {
                     Click "Stay Logged In" to extend your session, or you will be automatically logged out.
                 </p>
             </div>
-        `;
-
-        modalSave.textContent = 'Stay Logged In';
-        modalSave.style.display = 'inline-block';
-        modalSave.onclick = () => {
-            this.extendSession();
+        `, () => {
+            self.extendSession();
             window._sessionWarningShown = false;
             window.closeModal();
             window.showNotification('Session extended successfully', 'success');
-        };
+        });
 
-        window.openModal();
+        // Update button text
+        const modalSave = document.getElementById('modal-save');
+        if (modalSave) modalSave.textContent = 'Stay Logged In';
     },
 
 

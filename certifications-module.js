@@ -268,10 +268,6 @@ window.switchCertTab = function (btn, tabId) {
 };
 
 window.openIssueCertificateModal = function (reportId) {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
     let prefillClient = '';
     let prefillStandard = '';
     let prefillScope = '';
@@ -297,8 +293,7 @@ window.openIssueCertificateModal = function (reportId) {
         }
     }
 
-    modalTitle.textContent = 'Issue ISO Certificate';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Issue ISO Certificate', `
         <form id="cert-issue-form">
             <div class="form-group">
                 <label>Certificate ID (Auto-generated)</label>
@@ -376,98 +371,7 @@ window.openIssueCertificateModal = function (reportId) {
                 </div>
             </div>
         </form>
-    `;
-
-    // Logic to handle Client Change -> Populate Sites
-    const clientSelect = document.getElementById('cert-client');
-    const sitesContainer = document.getElementById('site-selection-container');
-    const sitesList = document.getElementById('cert-sites-list');
-    const scopeInput = document.getElementById('cert-scope');
-
-    function loadSitesForClient(clientName) {
-        const client = state.clients.find(c => c.name === clientName);
-        sitesList.innerHTML = ''; // Clear
-
-        if (client && client.sites && client.sites.length > 0) {
-            sitesContainer.style.display = 'block';
-            client.sites.forEach((site, index) => {
-                const siteId = `site-${index}`;
-                // Default check 'Head Office' or first site
-                const isChecked = index === 0;
-
-                const div = document.createElement('div');
-                div.style.cssText = 'display: flex; align-items: start; gap: 0.5rem; font-size: 0.9rem;';
-                div.innerHTML = `
-                    <input type="checkbox" id="${siteId}" value="${index}" ${isChecked ? 'checked' : ''} style="margin-top: 4px;">
-                    <label for="${siteId}" style="cursor: pointer; line-height: 1.4;">
-                        <strong>${window.UTILS.escapeHtml(site.name)}</strong><br>
-                        <span style="color: var(--text-secondary); font-size: 0.85rem;">${window.UTILS.escapeHtml(site.address)}, ${window.UTILS.escapeHtml(site.city)}</span>
-                    </label>
-                `;
-                sitesList.appendChild(div);
-
-                // Add listener to update scope
-                div.querySelector('input').addEventListener('change', updateScopeFromSites);
-            });
-            // Initial update if scope is empty
-            if (!scopeInput.value.trim()) {
-                updateScopeFromSites();
-            }
-        } else {
-            sitesContainer.style.display = 'none';
-        }
-    }
-
-    function updateScopeFromSites() {
-        const client = state.clients.find(c => c.name === clientSelect.value);
-        if (!client || !client.sites) return;
-
-        const selectedIndices = Array.from(sitesList.querySelectorAll('input:checked')).map(input => parseInt(input.value, 10));
-        const selectedSites = client.sites.filter((_, i) => selectedIndices.includes(i));
-
-        if (selectedSites.length > 0) {
-            const baseScope = "Activities performed at: " + selectedSites.map(s => `${s.name} (${s.city})`).join(', ');
-            scopeInput.value = baseScope;
-        }
-    }
-
-    // Attach Listener
-    if (clientSelect) {
-        clientSelect.addEventListener('change', (e) => {
-            loadSitesForClient(e.target.value);
-        });
-    }
-
-    // Trigger immediately if client prefilled
-    if (prefillClient) {
-        // Wait for modal to be potentially in DOM or just run it
-        // Since we building string, we run this AFTER openModal usually, but here we are modifying the function body
-        // We need to run this *after* the HTML is in the DOM.
-    }
-
-    // Note: The original code does `contentArea.innerHTML = html` or similar, but this is a modal.
-    // The previous code block ended with `window.openModal()`.
-    // We need to execute the listeners AFTER the modal content is set.
-
-    // Changing the logic: We inject the HTML into the modal container first.
-    // The original code uses `modalBody.innerHTML = ...`. 
-    // So we should execute our logic AFTER that assignment.
-
-    window.openModal('certificate-action-modal');
-
-    // Make sure we run logic after modal is open and elements exist
-    setTimeout(() => {
-        if (prefillClient) loadSitesForClient(prefillClient);
-    }, 100);
-
-
-    // Auto-update expiry date when issue date changes
-    const issueDateInput = document.getElementById('cert-issue-date');
-    if (issueDateInput) {
-        issueDateInput.addEventListener('change', window.updateCertExpiryDate);
-    }
-
-    modalSave.onclick = () => {
+    `, () => {
         // 1. Define Fields
         const fieldIds = {
             client: 'cert-client',
@@ -562,7 +466,93 @@ window.openIssueCertificateModal = function (reportId) {
         // Also pop up the certificate immediately
         window.viewCertificate(newCert.id);
         window.showNotification('Certificate issued successfully', 'success');
-    };
+    });
+
+    // Logic to handle Client Change -> Populate Sites
+    const clientSelect = document.getElementById('cert-client');
+    const sitesContainer = document.getElementById('site-selection-container');
+    const sitesList = document.getElementById('cert-sites-list');
+    const scopeInput = document.getElementById('cert-scope');
+
+    function loadSitesForClient(clientName) {
+        const client = state.clients.find(c => c.name === clientName);
+        sitesList.innerHTML = ''; // Clear
+
+        if (client && client.sites && client.sites.length > 0) {
+            sitesContainer.style.display = 'block';
+            client.sites.forEach((site, index) => {
+                const siteId = `site-${index}`;
+                // Default check 'Head Office' or first site
+                const isChecked = index === 0;
+
+                const div = document.createElement('div');
+                div.style.cssText = 'display: flex; align-items: start; gap: 0.5rem; font-size: 0.9rem;';
+                div.innerHTML = `
+                    <input type="checkbox" id="${siteId}" value="${index}" ${isChecked ? 'checked' : ''} style="margin-top: 4px;">
+                    <label for="${siteId}" style="cursor: pointer; line-height: 1.4;">
+                        <strong>${window.UTILS.escapeHtml(site.name)}</strong><br>
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">${window.UTILS.escapeHtml(site.address)}, ${window.UTILS.escapeHtml(site.city)}</span>
+                    </label>
+                `;
+                sitesList.appendChild(div);
+
+                // Add listener to update scope
+                div.querySelector('input').addEventListener('change', updateScopeFromSites);
+            });
+            // Initial update if scope is empty
+            if (!scopeInput.value.trim()) {
+                updateScopeFromSites();
+            }
+        } else {
+            sitesContainer.style.display = 'none';
+        }
+    }
+
+    function updateScopeFromSites() {
+        const client = state.clients.find(c => c.name === clientSelect.value);
+        if (!client || !client.sites) return;
+
+        const selectedIndices = Array.from(sitesList.querySelectorAll('input:checked')).map(input => parseInt(input.value, 10));
+        const selectedSites = client.sites.filter((_, i) => selectedIndices.includes(i));
+
+        if (selectedSites.length > 0) {
+            const baseScope = "Activities performed at: " + selectedSites.map(s => `${s.name} (${s.city})`).join(', ');
+            scopeInput.value = baseScope;
+        }
+    }
+
+    // Attach Listener
+    if (clientSelect) {
+        clientSelect.addEventListener('change', (e) => {
+            loadSitesForClient(e.target.value);
+        });
+    }
+
+    // Trigger immediately if client prefilled
+    if (prefillClient) {
+        // Wait for modal to be potentially in DOM or just run it
+        // Since we building string, we run this AFTER openModal usually, but here we are modifying the function body
+        // We need to run this *after* the HTML is in the DOM.
+    }
+
+    // Note: The original code does `contentArea.innerHTML = html` or similar, but this is a modal.
+    // The previous code block ended with `window.openModal()`.
+    // We need to execute the listeners AFTER the modal content is set.
+
+    // Changing the logic: We inject the HTML into the modal container first.
+    // The original code uses `modalBody.innerHTML = ...`. 
+    // So we should execute our logic AFTER that assignment.
+
+    // Make sure we run logic after modal is open and elements exist
+    setTimeout(() => {
+        if (prefillClient) loadSitesForClient(prefillClient);
+    }, 100);
+
+    // Auto-update expiry date when issue date changes
+    const issueDateInput = document.getElementById('cert-issue-date');
+    if (issueDateInput) {
+        issueDateInput.addEventListener('change', window.updateCertExpiryDate);
+    }
 };
 
 window.deleteCertificate = function (certId) {

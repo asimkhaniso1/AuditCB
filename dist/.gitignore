@@ -25,3 +25,5 @@ coverage/
 .gemini/
 .vscode/
 .idea/
+coverage
+.claude/

@@ -1096,16 +1096,12 @@ window.editSite = function (clientId, siteIndex) {
     const client = window.DataService.findClient(clientId);
     if (!client || !client.sites || !client.sites[siteIndex]) return;
     const site = client.sites[siteIndex];
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-    modalTitle.textContent = 'Edit Site Location';
     const stdOptions = ((window.state.cbSettings && window.state.cbSettings.standardsOffered) || ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 22000:2018', 'ISO 50001:2018', 'ISO 13485:2016']);
     const stdHtml = stdOptions.map(function (std) {
         let sel = (site.standards || client.standard || '').includes(std) ? 'selected' : '';
         return '<option value="' + std + '" ' + sel + '>' + std + '</option>';
     }).join('');
-    modalBody.innerHTML = '<form id="site-form">' +
+    window.DataService.openFormModal('Edit Site Location', '<form id="site-form">' +
         '<div class="form-group"><label>Site Name <span style="color:var(--danger-color)">*</span></label>' +
         '<input type="text" class="form-control" id="site-name" value="' + (site.name || '') + '" required></div>' +
         '<div class="form-group"><label>Address</label>' +
@@ -1128,9 +1124,8 @@ window.editSite = function (clientId, siteIndex) {
         '<div class="form-group"><label>Geotag</label><div style="display:flex;gap:0.5rem">' +
         '<input type="text" class="form-control" id="site-geotag" value="' + (site.geotag || '') + '">' +
         '<button type="button" class="btn btn-secondary" data-action="getGeolocation" data-id="site-geotag">' +
-        '<i class="fa-solid fa-location-crosshairs"></i></button></div></div></form>';
-    window.openModal();
-    modalSave.onclick = function () {
+        '<i class="fa-solid fa-location-crosshairs"></i></button></div></div></form>',
+    function () {
         let name = document.getElementById('site-name').value;
         let address = document.getElementById('site-address').value;
         let city = document.getElementById('site-city').value;
@@ -1148,7 +1143,7 @@ window.editSite = function (clientId, siteIndex) {
         } else {
             window.showNotification('Site name is required', 'error');
         }
-    };
+    });
 };
 
 // ============================================

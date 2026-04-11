@@ -1562,12 +1562,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Add Custom Question';
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Add Custom Question', `
         <form id="custom-question-form">
             <div class="form-group">
                 <label>Clause Number/Title <span style="color: var(--danger-color);">*</span></label>
@@ -1578,11 +1573,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <textarea class="form-control" id="custom-req" rows="3" placeholder="Enter the audit question or requirement..." required></textarea>
             </div>
         </form>
-    `;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+    `, () => {
             const clause = document.getElementById('custom-clause').value;
             const req = document.getElementById('custom-req').value;
 
@@ -1597,7 +1588,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             } else {
                 window.showNotification('Please fill in both fields', 'error');
             }
-        };
+        });
     };
 
     window.saveChecklist = function (reportId) {
@@ -2113,12 +2104,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (!report) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Create Non-Conformity Report';
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Create Non-Conformity Report', `
         <form id="ncr-form">
             <div class="form-group">
                 <label>Type <span style="color: var(--danger-color);">*</span></label>
@@ -2147,7 +2133,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <label>Evidence / Objective Evidence</label>
                 <textarea class="form-control" id="ncr-evidence" rows="2" placeholder="What evidence supports this finding?"></textarea>
             </div>
-            
+
             <!-- Cross-Reference Fields -->
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group" style="margin-bottom: 0;">
@@ -2166,7 +2152,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     <input type="text" class="form-control" id="ncr-department-modal" readonly style="background:#f1f5f9;" placeholder="Auto-filled">
                 </div>
             </div>
-            
+
             <div class="form-group" style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1;">
                 <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600;">Multimedia Evidence</label>
                 <div style="display: flex; gap: 10px; align-items: center;">
@@ -2179,9 +2165,64 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <div id="image-preview" style="margin-top: 10px;"></div>
             </div>
         </form>
-    `;
+    `, () => {
+            // 1. Define Fields
+            const fieldIds = {
+                description: 'ncr-description',
+                type: 'ncr-type'
+            };
 
-        window.openModal();
+            // 2. Define Rules
+            const rules = {
+                description: [
+                    { rule: 'required', fieldName: 'Description' },
+                    { rule: 'noHtmlTags' }
+                ],
+                type: [{ rule: 'required', fieldName: 'Type' }]
+            };
+
+            // 3. Validate
+            const result = Validator.validateFormElements(fieldIds, rules);
+            if (!result.valid) {
+                Validator.displayErrors(result.errors, fieldIds);
+                window.showNotification('Please fix the form errors', 'error');
+                return;
+            }
+            Validator.clearErrors(fieldIds);
+
+            // 4. Sanitize Input
+            const type = document.getElementById('ncr-type').value;
+            const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
+            const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
+            const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
+            const evidenceImage = Sanitizer.sanitizeURL(document.getElementById('ncr-evidence-image-url').value);
+            const personnel = Sanitizer.sanitizeText(document.getElementById('ncr-personnel-modal')?.value || '');
+            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-modal')?.value || '');
+            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-modal')?.value || '');
+
+            // 5. Save
+            if (!report.ncrs) report.ncrs = [];
+            report.ncrs.push({
+                type,
+                clause,
+                description,
+                evidence,
+                evidenceImage,
+                transcript: description,
+                personnel,
+                designation,
+                department,
+                status: 'Open',
+                createdAt: new Date().toISOString()
+            });
+            report.findings = report.ncrs.length;
+
+            window.saveData();
+
+            window.closeModal();
+            renderExecutionDetail(reportId);
+            window.showNotification('NCR created successfully with evidence', 'success');
+        });
 
         // Voice Dictation Logic for Modal
         const micBtn = document.getElementById('mic-btn-modal');
@@ -2261,64 +2302,6 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             };
         }
 
-        modalSave.onclick = () => {
-            // 1. Define Fields
-            const fieldIds = {
-                description: 'ncr-description',
-                type: 'ncr-type'
-            };
-
-            // 2. Define Rules
-            const rules = {
-                description: [
-                    { rule: 'required', fieldName: 'Description' },
-                    { rule: 'noHtmlTags' }
-                ],
-                type: [{ rule: 'required', fieldName: 'Type' }]
-            };
-
-            // 3. Validate
-            const result = Validator.validateFormElements(fieldIds, rules);
-            if (!result.valid) {
-                Validator.displayErrors(result.errors, fieldIds);
-                window.showNotification('Please fix the form errors', 'error');
-                return;
-            }
-            Validator.clearErrors(fieldIds);
-
-            // 4. Sanitize Input
-            const type = document.getElementById('ncr-type').value;
-            const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
-            const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
-            const evidence = Sanitizer.sanitizeText(document.getElementById('ncr-evidence').value);
-            const evidenceImage = Sanitizer.sanitizeURL(document.getElementById('ncr-evidence-image-url').value);
-            const personnel = Sanitizer.sanitizeText(document.getElementById('ncr-personnel-modal')?.value || '');
-            const designation = Sanitizer.sanitizeText(document.getElementById('ncr-designation-modal')?.value || '');
-            const department = Sanitizer.sanitizeText(document.getElementById('ncr-department-modal')?.value || '');
-
-            // 5. Save
-            if (!report.ncrs) report.ncrs = [];
-            report.ncrs.push({
-                type,
-                clause,
-                description,
-                evidence,
-                evidenceImage,
-                transcript: description,
-                personnel,
-                designation,
-                department,
-                status: 'Open',
-                createdAt: new Date().toISOString()
-            });
-            report.findings = report.ncrs.length;
-
-            window.saveData();
-
-            window.closeModal();
-            renderExecutionDetail(reportId);
-            window.showNotification('NCR created successfully with evidence', 'success');
-        };
     }
 
     // Edit existing NCR
@@ -2327,12 +2310,8 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         if (!report || !report.ncrs || !report.ncrs[ncrIdx]) return;
 
         const ncr = report.ncrs[ncrIdx];
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
 
-        modalTitle.textContent = 'Edit NCR-' + String(ncrIdx + 1).padStart(3, '0');
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Edit NCR-' + String(ncrIdx + 1).padStart(3, '0'), `
     <form id="ncr-form">
         <div class="form-group">
             <label>Type <span style="color: var(--danger-color);">*</span></label>
@@ -2390,11 +2369,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         <input type="hidden" id="ncr-evidence-image-url" value="${window.UTILS.escapeHtml(ncr.evidenceImage || '')}">
         ${ncr.evidenceImage ? '<div style="margin-top: 0.5rem;"><img src="' + ncr.evidenceImage + '" style="max-height: 100px; border-radius: 6px; border: 1px solid #e2e8f0;"></div>' : ''}
     </form>
-`;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+`, () => {
             const type = document.getElementById('ncr-type').value;
             const clause = Sanitizer.sanitizeText(document.getElementById('ncr-clause').value);
             const description = Sanitizer.sanitizeText(document.getElementById('ncr-description').value);
@@ -2429,7 +2404,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             window.closeModal();
             renderExecutionDetail(reportId);
             window.showNotification('NCR updated successfully', 'success');
-        };
+        });
     }
 
     function createCAPA(reportId) {
@@ -2438,12 +2413,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
         const ncrs = report.ncrs || [];
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Create CAPA';
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Create CAPA', `
         <form id="capa-form">
             <div class="form-group">
                 <label>Linked NCR</label>
@@ -2465,11 +2435,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 <input type="date" class="form-control" id="capa-due">
             </div>
         </form>
-    `;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+    `, () => {
             const linkedNCR = document.getElementById('capa-ncr').value;
             const rootCause = document.getElementById('capa-root-cause').value;
             const actionPlan = document.getElementById('capa-action').value;
@@ -2493,7 +2459,7 @@ function renderExecutionTab(report, tabName, contextData = {}) {
             } else {
                 window.showNotification('Please fill in all required fields', 'error');
             }
-        };
+        });
     }
 
     // eslint-disable-next-line no-unused-vars

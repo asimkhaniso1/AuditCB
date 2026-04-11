@@ -2255,19 +2255,13 @@ window.handleIndustryChange = function (select) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Add Site Location';
-
         const standardsToShow = (window.state.cbSettings && window.state.cbSettings.standardsOffered && window.state.cbSettings.standardsOffered.length > 0)
             ? window.state.cbSettings.standardsOffered
             : ((window.state.cbSettings && window.state.cbSettings.availableStandards && window.state.cbSettings.availableStandards.length > 0)
                 ? window.state.cbSettings.availableStandards
                 : ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018", "ISO 27001:2022", "ISO 22000:2018", "ISO 50001:2018", "ISO 13485:2016"]);
 
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Add Site Location', `
         <form id="site-form">
             <div class="form-group">
                 <label>Site Name <span style="color: var(--danger-color);">*</span></label>
@@ -2287,7 +2281,7 @@ window.handleIndustryChange = function (select) {
                     <input type="text" class="form-control" id="site-country" placeholder="Country">
                 </div>
             </div>
-            
+
             <div style="border-top: 1px solid var(--border-color); margin: 1rem 0; padding-top: 1rem;">
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"><i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>Optional: Site-specific details for man-day calculation</p>
                 <div class="form-group">
@@ -2325,11 +2319,7 @@ window.handleIndustryChange = function (select) {
                 </div>
             </div>
         </form >
-    `;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+    `, () => {
             const name = document.getElementById('site-name').value;
             const address = document.getElementById('site-address').value;
             const city = document.getElementById('site-city').value;
@@ -2358,7 +2348,7 @@ window.handleIndustryChange = function (select) {
             } else {
                 window.showNotification('Site name is required', 'error');
             }
-        };
+        });
     }
 
     // Upload Document Modal
@@ -2366,12 +2356,7 @@ window.handleIndustryChange = function (select) {
         const client = window.DataService.findClient(clientId);
         if (!client) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Add Client Document';
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Add Client Document', `
         <form id="upload-form">
             <div class="form-group">
                 <label>Document Name <span style="color: var(--danger-color);">*</span></label>
@@ -2419,11 +2404,7 @@ window.handleIndustryChange = function (select) {
                 <input type="file" id="doc-file" style="display: none;" data-action-change="handleDocFileChange">
             </div>
         </form >
-    `;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+    `, () => {
             const name = document.getElementById('doc-name').value;
             const category = document.getElementById('doc-category').value;
             const revision = document.getElementById('doc-revision').value;
@@ -2463,7 +2444,7 @@ window.handleIndustryChange = function (select) {
             } else {
                 alert('Please enter a document name');
             }
-        };
+        });
     }
 
     // View Document Notes
@@ -2473,12 +2454,7 @@ window.handleIndustryChange = function (select) {
         const doc = client.documents.find(d => d.id === docId);
         if (!doc) return;
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = doc.name;
-        modalBody.innerHTML = `
+        window.DataService.openFormModal(doc.name, `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Category</strong><div>${window.UTILS.escapeHtml(doc.category || 'General')}</div></div>
                 <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Revision</strong><div style="font-family: monospace;">${window.UTILS.escapeHtml(doc.revision || '-')}</div></div>
@@ -2486,16 +2462,7 @@ window.handleIndustryChange = function (select) {
                 <div><strong style="color: var(--text-secondary); font-size: 0.82rem;">Date Added</strong><div>${window.UTILS.escapeHtml(doc.date || '-')}</div></div>
             </div>
             ${doc.notes ? `<div style="margin-top: 0.5rem;"><strong style="color: var(--text-secondary); font-size: 0.82rem;">Notes / Key Excerpts</strong><div style="margin-top: 0.5rem; padding: 1rem; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 6px 6px 0; font-size: 0.9rem; line-height: 1.7; white-space: pre-wrap;">${window.UTILS.escapeHtml(doc.notes)}</div></div>` : '<p style="color: #94a3b8; font-size: 0.9rem;">No notes added for this document.</p>'}
-        `;
-        modalSave.style.display = 'none';
-        window.openModal();
-        // Restore save button visibility on close
-        const origClose = window.closeModal;
-        window.closeModal = function () {
-            modalSave.style.display = '';
-            window.closeModal = origClose;
-            origClose();
-        };
+        `);
     };
 
     // Delete Document Helper

@@ -251,14 +251,9 @@ function renderAuditExecutionEnhanced() {
 
 // eslint-disable-next-line no-unused-vars
 function openCreateReportModal() {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
     // Filter out plans that already have a report OR are marked Completed
     const allOpenPlans = state.auditPlans.filter(p => !p.reportId && p.status !== 'Completed');
     allOpenPlans.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    modalTitle.innerHTML = '<i class="fa-solid fa-play"></i> Start New Audit';
 
     // Helpers exposed for HTML interaction
     window.selectAuditPlan = (id) => {
@@ -306,7 +301,7 @@ function openCreateReportModal() {
     const activeClient = window.state.activeClientId ? state.clients.find(c => c.id === window.state.activeClientId) : null;
     const initialClientName = activeClient ? activeClient.name : '';
 
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Start New Audit', `
         <div style="margin-bottom: 1rem;">
             <label style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filter by Company:</label>
             <select class="form-control" id="start-audit-client-filter" data-action-change="filterAuditPlansStart" data-id="this.value" style="margin-bottom: 1rem; border-color: var(--primary-color);" ${activeClient ? 'disabled' : ''}>
@@ -331,19 +326,19 @@ function openCreateReportModal() {
                 </table>
             </div>
         </div>
-        
+
         <div id="confirm-section" style="display: none; border-top: 1px solid #e2e8f0; padding-top: 1rem; animation: fadeIn 0.3s;">
             <div style="background: #f0fdf4; padding: 0.75rem; border-radius: 6px; border: 1px solid #bbf7d0; margin-bottom: 1rem;">
                 <i class="fa-solid fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i> Ready to start audit for <strong id="plan-display"></strong>
             </div>
-            
+
             <input type="hidden" id="report-plan">
-            
+
             <div class="form-group">
                 <label>Confirm Execution Date</label>
                 <input type="date" class="form-control" id="report-date" required>
             </div>
-            
+
             <div class="form-group">
                  <label>Initial Status</label>
                  <select class="form-control" id="report-status">
@@ -352,18 +347,7 @@ function openCreateReportModal() {
                 </select>
             </div>
         </div>
-    `;
-    window.openModal();
-
-    // Auto-filter if in client context
-    if (initialClientName) {
-        window.filterAuditPlansStart(initialClientName);
-    }
-
-    // Update button text to 'Start Audit'
-    document.getElementById('modal-save').textContent = 'Start Audit';
-
-    modalSave.onclick = () => {
+    `, () => {
         const planId = document.getElementById('report-plan').value;
         const date = document.getElementById('report-date').value;
         const status = document.getElementById('report-status')?.value || window.CONSTANTS.STATUS.IN_PROGRESS;
@@ -430,7 +414,15 @@ function openCreateReportModal() {
         } else {
             window.showNotification('Please select an Audit Plan from the list', 'error');
         }
-    };
+    });
+
+    // Auto-filter if in client context
+    if (initialClientName) {
+        window.filterAuditPlansStart(initialClientName);
+    }
+
+    // Update button text to 'Start Audit'
+    document.getElementById('modal-save').textContent = 'Start Audit';
 }
 
 
@@ -438,12 +430,7 @@ function openEditReportModal(reportId) {
     const report = state.auditReports.find(r => String(r.id) === String(reportId));
     if (!report) return;
 
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modalSave = document.getElementById('modal-save');
-
-    modalTitle.textContent = 'Edit Report Basic Info';
-    modalBody.innerHTML = `
+    window.DataService.openFormModal('Edit Report Basic Info', `
         <form id="report-form">
             <div class="form-group">
                 <label>Client</label>
@@ -462,11 +449,7 @@ function openEditReportModal(reportId) {
                 </select>
             </div>
         </form>
-    `;
-
-    window.openModal();
-
-    modalSave.onclick = () => {
+    `, () => {
         const date = document.getElementById('report-date').value;
         const status = document.getElementById('report-status').value;
 
@@ -479,7 +462,7 @@ function openEditReportModal(reportId) {
             renderAuditExecutionEnhanced();
             window.showNotification('Report info updated successfully');
         }
-    };
+    });
 }
 
 function deleteAuditReport(reportId) {

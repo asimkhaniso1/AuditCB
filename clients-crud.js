@@ -18,12 +18,7 @@
 
         const site = client.sites[siteIndex];
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Edit Site Location';
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Edit Site Location', `
         <form id="site-form">
             <div class="form-group">
                 <label>Site Name <span style="color: var(--danger-color);">*</span></label>
@@ -43,7 +38,7 @@
                     <input type="text" class="form-control" id="site-country" value="${site.country || ''}">
                 </div>
             </div>
-            
+
             <div style="border-top: 1px solid var(--border-color); margin: 1rem 0; padding-top: 1rem;">
                 <div class="form-group">
                     <label>Applicable Standards</label>
@@ -80,11 +75,7 @@
                 </div>
             </div>
         </form >
-    `;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+    `, () => {
             const name = document.getElementById('site-name').value;
             const address = document.getElementById('site-address').value;
             const city = document.getElementById('site-city').value;
@@ -109,7 +100,7 @@
             } else {
                 window.showNotification('Site name is required', 'error');
             }
-        };
+        });
     };
 
     // Delete Site
@@ -118,7 +109,7 @@
         const client = window.DataService.findClient(clientId);
         if (!client || !client.sites) return;
 
-        if (confirm('Are you sure you want to delete this site?')) {
+        window.DataService.confirmAction('Are you sure you want to delete this site?', () => {
             client.sites.splice(siteIndex, 1);
             window.saveData();
 
@@ -128,7 +119,7 @@
             }
             renderClientDetail(clientId);
             window.showNotification('Site deleted');
-        }
+        });
     };
 
     // Bulk Upload Sites
@@ -226,12 +217,7 @@
 
         const contact = client.contacts[contactIndex];
 
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
-        modalTitle.textContent = 'Edit Contact Person';
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Edit Contact Person', `
         <form id="contact-form">
             <div class="form-group">
                 <label>Name <span style="color: var(--danger-color);">*</span></label>
@@ -250,11 +236,7 @@
                 <input type="email" class="form-control" id="contact-email" value="${contact.email || ''}">
             </div>
         </form >
-    `;
-
-        window.openModal();
-
-        modalSave.onclick = () => {
+    `, () => {
             const name = document.getElementById('contact-name').value;
             const designation = document.getElementById('contact-designation').value;
             const phone = document.getElementById('contact-phone').value;
@@ -272,7 +254,7 @@
             } else {
                 window.showNotification('Name is required', 'error');
             }
-        };
+        });
     };
 
     // Delete Contact
@@ -280,7 +262,7 @@
         const client = window.DataService.findClient(clientId);
         if (!client || !client.contacts) return;
 
-        if (confirm('Are you sure you want to delete this contact?')) {
+        window.DataService.confirmAction('Are you sure you want to delete this contact?', () => {
             client.contacts.splice(contactIndex, 1);
             window.saveData();
 
@@ -290,7 +272,7 @@
             }
             renderClientDetail(clientId);
             window.showNotification('Contact deleted');
-        }
+        });
     };
 
     // Bulk Upload Contacts/Personnel
@@ -508,7 +490,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
 
         const dept = client.departments[deptIndex];
 
-        if (confirm(`Are you sure you want to delete the department "${dept.name}" ? `)) {
+        window.DataService.confirmAction(`Are you sure you want to delete the department "${dept.name}" ? `, () => {
             client.departments.splice(deptIndex, 1);
             window.saveData();
 
@@ -519,7 +501,7 @@ Bob Johnson, Production Head, bob@company.com," style="font-family: monospace;">
             renderClientDetail(clientId);
             renderClientTab(client, 'departments');
             window.showNotification('Department deleted successfully');
-        }
+        });
     }
 
     function bulkUploadDepartments(clientId) {
@@ -672,18 +654,19 @@ Human Resources, Bob Johnson, 8" style="font-family: monospace;"></textarea>
     };
 
     window.deleteGoodsService = function (clientId, index) {
-        if (!confirm('Delete this item?')) return;
-        const client = window.DataService.findClient(clientId);
-        if (client && client.goodsServices) {
-            client.goodsServices.splice(index, 1);
-            window.saveData();
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        window.DataService.confirmAction('Delete this item?', () => {
+            const client = window.DataService.findClient(clientId);
+            if (client && client.goodsServices) {
+                client.goodsServices.splice(index, 1);
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.setSetupWizardStep(clientId, 6);
+                window.showNotification('Goods/Service deleted');
             }
-            window.setSetupWizardStep(clientId, 6);
-            window.showNotification('Goods/Service deleted');
-        }
+        });
     };
 
     // Bulk Upload Goods/Services
@@ -822,18 +805,19 @@ Machined Parts, Goods, Precision CNC components" style="font-family: monospace;"
     };
 
     window.deleteKeyProcess = function (clientId, index) {
-        if (!confirm('Delete this process?')) return;
-        const client = window.DataService.findClient(clientId);
-        if (client && client.keyProcesses) {
-            client.keyProcesses.splice(index, 1);
-            window.saveData();
-            // Sync to Supabase
-            if (window.SupabaseClient?.isInitialized) {
-                window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+        window.DataService.confirmAction('Delete this process?', () => {
+            const client = window.DataService.findClient(clientId);
+            if (client && client.keyProcesses) {
+                client.keyProcesses.splice(index, 1);
+                window.saveData();
+                // Sync to Supabase
+                if (window.SupabaseClient?.isInitialized) {
+                    window.SupabaseClient.upsertClient(client).catch(err => console.error('Supabase sync failed:', err));
+                }
+                window.setSetupWizardStep(clientId, 7);
+                window.showNotification('Process deleted');
             }
-            window.setSetupWizardStep(clientId, 7);
-            window.showNotification('Process deleted');
-        }
+        });
     };
 
     // Bulk Upload Key Processes

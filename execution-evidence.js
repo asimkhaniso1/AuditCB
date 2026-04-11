@@ -543,19 +543,13 @@
     };
 
     window.openWebcamModal = async function (uniqueId) {
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalSave = document.getElementById('modal-save');
-
         // Cleanup any existing stream first
         if (window.activeWebcamStream) {
             window.activeWebcamStream.getTracks().forEach(track => track.stop());
             window.activeWebcamStream = null;
         }
 
-        modalTitle.textContent = 'Capture from Webcam';
-
-        modalBody.innerHTML = `
+        window.DataService.openFormModal('Capture from Webcam', `
             < div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
                 <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                     <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
@@ -564,14 +558,11 @@
                 <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
                 <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
             </div >
-            `;
+            `, () => window.captureWebcam(uniqueId));
 
-        // Configure "Capture" button
-        modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
-        modalSave.onclick = () => window.captureWebcam(uniqueId);
-
-        // Show modal BEFORE requesting media
-        if (window.openModal) window.openModal();
+        // Configure "Capture" button label
+        const modalSave = document.getElementById('modal-save');
+        if (modalSave) modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
