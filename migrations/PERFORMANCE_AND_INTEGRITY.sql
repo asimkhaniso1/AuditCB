@@ -55,20 +55,30 @@ EXCEPTION WHEN undefined_table THEN
     RAISE NOTICE 'audit_findings table not found — skipping indexes';
 END $$;
 
--- audit_reports: filtered by client_id, audit_plan_id
-CREATE INDEX IF NOT EXISTS idx_reports_client_id ON audit_reports(client_id);
-CREATE INDEX IF NOT EXISTS idx_reports_audit_plan_id ON audit_reports(audit_plan_id);
+-- audit_reports: filtered by client_id, audit_plan_id (columns may not exist)
+DO $$ BEGIN
+    CREATE INDEX IF NOT EXISTS idx_reports_client_id ON audit_reports(client_id);
+EXCEPTION WHEN undefined_column THEN RAISE NOTICE 'audit_reports.client_id not found'; END $$;
+DO $$ BEGIN
+    CREATE INDEX IF NOT EXISTS idx_reports_audit_plan_id ON audit_reports(audit_plan_id);
+EXCEPTION WHEN undefined_column THEN RAISE NOTICE 'audit_reports.audit_plan_id not found'; END $$;
 
 -- audit_plans: filtered by lead_auditor
-CREATE INDEX IF NOT EXISTS idx_plans_lead_auditor ON audit_plans(lead_auditor);
+DO $$ BEGIN
+    CREATE INDEX IF NOT EXISTS idx_plans_lead_auditor ON audit_plans(lead_auditor);
+EXCEPTION WHEN undefined_column THEN RAISE NOTICE 'audit_plans.lead_auditor not found'; END $$;
 
 -- documents: sorted by created_at, filtered by uploaded_by
-CREATE INDEX IF NOT EXISTS idx_documents_created ON documents(created_at);
-CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by);
+DO $$ BEGIN
+    CREATE INDEX IF NOT EXISTS idx_documents_created ON documents(created_at);
+    CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by);
+EXCEPTION WHEN undefined_column OR undefined_table THEN RAISE NOTICE 'documents column not found'; END $$;
 
 -- audit_log: filtered by entity_type, timestamp
-CREATE INDEX IF NOT EXISTS idx_audit_log_entity_type ON audit_log(entity_type);
-CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+DO $$ BEGIN
+    CREATE INDEX IF NOT EXISTS idx_audit_log_entity_type ON audit_log(entity_type);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+EXCEPTION WHEN undefined_column OR undefined_table THEN RAISE NOTICE 'audit_log column not found'; END $$;
 
 -- certification_decisions: filtered by client
 DO $$ BEGIN
@@ -145,49 +155,62 @@ REVOKE UPDATE, DELETE ON public.audit_log FROM authenticated;
 -- Don't drop duplicate columns (would break existing code), but create
 -- a function to keep them in sync via trigger.
 
--- Sync plan_id ↔ audit_plan_id on audit_reports
-CREATE OR REPLACE FUNCTION public.sync_report_plan_ids()
-RETURNS TRIGGER AS $$
+-- Sync plan_id ↔ audit_plan_id on audit_reports (only if both columns exist)
+DO $$
 BEGIN
-    -- Keep both columns in sync: prefer plan_id as canonical
-    IF NEW.plan_id IS NOT NULL AND NEW.audit_plan_id IS NULL THEN
-        NEW.audit_plan_id := NEW.plan_id;
-    ELSIF NEW.audit_plan_id IS NOT NULL AND NEW.plan_id IS NULL THEN
-        NEW.plan_id := NEW.audit_plan_id;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_reports' AND column_name='audit_plan_id')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_reports' AND column_name='plan_id') THEN
+
+        CREATE OR REPLACE FUNCTION public.sync_report_plan_ids()
+        RETURNS TRIGGER AS $fn$
+        BEGIN
+            IF NEW.plan_id IS NOT NULL AND NEW.audit_plan_id IS NULL THEN
+                NEW.audit_plan_id := NEW.plan_id;
+            ELSIF NEW.audit_plan_id IS NOT NULL AND NEW.plan_id IS NULL THEN
+                NEW.plan_id := NEW.audit_plan_id;
+            END IF;
+            IF NEW.client_id IS NOT NULL AND NEW.client IS NULL THEN
+                NEW.client := (SELECT name FROM clients WHERE id = NEW.client_id LIMIT 1);
+            END IF;
+            RETURN NEW;
+        END;
+        $fn$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS sync_report_ids ON audit_reports;
+        CREATE TRIGGER sync_report_ids
+            BEFORE INSERT OR UPDATE ON audit_reports
+            FOR EACH ROW EXECUTE FUNCTION public.sync_report_plan_ids();
+    ELSE
+        RAISE NOTICE 'audit_reports missing plan_id or audit_plan_id — skipping sync trigger';
     END IF;
+END $$;
 
-    -- Sync client columns
-    IF NEW.client_id IS NOT NULL AND NEW.client IS NULL THEN
-        NEW.client := (SELECT name FROM clients WHERE id = NEW.client_id LIMIT 1);
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS sync_report_ids ON audit_reports;
-CREATE TRIGGER sync_report_ids
-    BEFORE INSERT OR UPDATE ON audit_reports
-    FOR EACH ROW EXECUTE FUNCTION public.sync_report_plan_ids();
-
--- Sync client ↔ client_id on audit_plans
-CREATE OR REPLACE FUNCTION public.sync_plan_client_ids()
-RETURNS TRIGGER AS $$
+-- Sync client ↔ client_id on audit_plans (only if columns exist)
+DO $$
 BEGIN
-    IF NEW.client_id IS NOT NULL AND NEW.client_name IS NULL THEN
-        NEW.client_name := (SELECT name FROM clients WHERE id = NEW.client_id LIMIT 1);
-    END IF;
-    IF NEW.client_id IS NOT NULL AND NEW.client IS NULL THEN
-        NEW.client := NEW.client_name;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_plans' AND column_name='client_id')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_plans' AND column_name='client') THEN
 
-DROP TRIGGER IF EXISTS sync_plan_ids ON audit_plans;
-CREATE TRIGGER sync_plan_ids
-    BEFORE INSERT OR UPDATE ON audit_plans
-    FOR EACH ROW EXECUTE FUNCTION public.sync_plan_client_ids();
+        CREATE OR REPLACE FUNCTION public.sync_plan_client_ids()
+        RETURNS TRIGGER AS $fn$
+        BEGIN
+            IF NEW.client_id IS NOT NULL THEN
+                IF NEW.client IS NULL THEN
+                    NEW.client := (SELECT name FROM clients WHERE id = NEW.client_id LIMIT 1);
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $fn$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS sync_plan_ids ON audit_plans;
+        CREATE TRIGGER sync_plan_ids
+            BEFORE INSERT OR UPDATE ON audit_plans
+            FOR EACH ROW EXECUTE FUNCTION public.sync_plan_client_ids();
+    ELSE
+        RAISE NOTICE 'audit_plans missing client_id or client — skipping sync trigger';
+    END IF;
+END $$;
 
 -- ============================================
 -- 7. VERIFY
