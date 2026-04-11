@@ -1,1 +1,638 @@
-!function(){"use strict";const e={DB_NAME:"AuditCB_Evidence",STORE_NAME:"images",DB_VERSION:1,_db:null,async open(){return this._db?this._db:new Promise((e,t)=>{const n=indexedDB.open(this.DB_NAME,this.DB_VERSION);n.onupgradeneeded=e=>{e.target.result.createObjectStore(this.STORE_NAME)},n.onsuccess=t=>{this._db=t.target.result,e(this._db)},n.onerror=e=>t(e.target.error)})},async put(e,t){const n=await this.open();return new Promise((i,o)=>{const a=n.transaction(this.STORE_NAME,"readwrite");a.objectStore(this.STORE_NAME).put(t,e),a.oncomplete=()=>i(e),a.onerror=e=>o(e.target.error)})},async get(e){const t=await this.open();return new Promise((n,i)=>{const o=t.transaction(this.STORE_NAME,"readonly").objectStore(this.STORE_NAME).get(e);o.onsuccess=()=>n(o.result||null),o.onerror=e=>i(e.target.error)})},async remove(e){const t=await this.open();return new Promise((n,i)=>{const o=t.transaction(this.STORE_NAME,"readwrite");o.objectStore(this.STORE_NAME).delete(e),o.oncomplete=()=>n(),o.onerror=e=>i(e.target.error)})}};let t;window._EvidenceDB=e,window.resolveEvidenceUrl=async function(t){if(!t||!t.startsWith("idb://"))return t;try{return await e.get(t)||t}catch(e){return console.warn("Failed to resolve evidence URL:",t,e),t}},window.resolveAllIdbThumbs=async function(){const t=document.querySelectorAll("img[data-idb-key]");for(const n of t){const t=n.dataset.idbKey;if(t)try{const i=await e.get(t);i&&(n.src=i,n.style.background="",n.dataset.idbKey="")}catch(e){window.Logger&&window.Logger.debug("Evidence","IDB thumb resolve failed:",e.message)}}};new MutationObserver(()=>{clearTimeout(t),t=setTimeout(()=>window.resolveAllIdbThumbs(),300)}).observe(document.body,{childList:!0,subtree:!0}),window.handleEvidenceUpload=function(t,n){const i=n.files[0];if(!i)return;if(!i.type.startsWith("image/"))return window.showNotification("Please select an image file","error"),void(n.value="");if(i.size>5242880)return window.showNotification("Image exceeds 5MB limit","error"),void(n.value="");const o=document.getElementById("evidence-preview-"+t);o&&(o.style.display="block",o.innerHTML='\n            <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); text-align: center;">\n                <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color);"></i>\n                <span style="margin-left: 0.5rem; font-size: 0.85rem;">Compressing & Uploading...</span>\n            </div>\n        ');const a=new FileReader;a.onload=function(a){const r=new Image;r.onload=async function(){try{const n=function(e){const t=document.createElement("canvas"),n=t.getContext("2d"),i=600;let o=e.width,a=e.height;(o>i||a>i)&&(o>a?(a=Math.round(a*i/o),o=i):(o=Math.round(o*i/a),a=i));return t.width=o,t.height=a,n.drawImage(e,0,0,o,a),t.toDataURL("image/jpeg",.5)}(r,i.type);Math.round(3*n.length/4/1024);let a=n,d=!1,c=n;if(window.navigator.onLine&&window.SupabaseClient)try{if(window.SupabaseClient.isInitialized||(console.warn("[Evidence Upload] Supabase not initialized - trying to wait..."),await new Promise(e=>setTimeout(e,1e3))),window.SupabaseClient.isInitialized){const e=n.split(",")[1],o=atob(e),r=n.match(/data:([^;]+)/),s=r?r[1]:i.type,l=new ArrayBuffer(o.length),m=new Uint8Array(l);for(let e=0;e<o.length;e++)m[e]=o.charCodeAt(e);const u=new Blob([l],{type:s}),w=new File([u],i.name,{type:s}),p=await window.SupabaseClient.storage.uploadAuditImage(w,"ncr-evidence",t+"-"+Date.now());p&&p.url?(a=p.url,c=p.url,d=!0):console.warn("[Evidence Upload] No URL returned - result was:",JSON.stringify(p))}else console.warn("[Evidence Upload] Supabase still not initialized after wait")}catch(e){console.error("[Evidence Upload] Failed:",e.message||e),console.warn("[Evidence Upload] Falling back to IndexedDB")}if(!d)try{const i="idb://evidence-"+t+"-"+Date.now();await e.put(i,n),a=i}catch(e){console.error("[Evidence Upload] IndexedDB store failed:",e),a=n}if(o){o.style.display="flex";const e=o.querySelectorAll(".ev-thumb").length,n=c.replace(/'/g,"\\'"),i=document.createElement("div");i.className="ev-thumb",i.dataset.idx=e,i.dataset.saveUrl=a,i.style.cssText="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;",i.innerHTML=`\n                            <img src="${c}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${n}"/>\n                            <button type="button" data-action="removeEvidenceByIdx" data-arg1="${t}" data-arg2="${e}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>\n                        `,o.appendChild(i)}const s=document.getElementById("evidence-data-"+t);s&&(s.value="attached"),window.showNotification(d?"Image uploaded to cloud":"Image saved locally","success")}catch(e){console.error("Image processing error:",e),window.showNotification("Error processing image","error"),o&&(o.style.display="none"),n.value=""}},r.src=a.target.result},a.readAsDataURL(i)},window.viewEvidenceImage=function(e){let t=document.getElementById("evidence-img-"+e);if(!t){console.warn(`[viewEvidenceImage] Element 'evidence-img-${e}' not found. Searching by context...`);const n=document.getElementById("img-"+e);if(n){const e=n.closest(".ncr-panel")||n.parentElement.parentElement;if(e){const n=e.querySelector('img[id^="evidence-img-"]');n&&(t=n)}}}if(!t&&(0===e||"0"===e)){const e=document.querySelector('img[id^="evidence-img-"]');e&&(t=e)}if(!t)return console.error("[viewEvidenceImage] Image element DEFINITELY not found for:",e),void window.showNotification("Error: Image element not found. Please refresh and try again.","error");if(!t.src||""===t.src||t.src.includes("placeholder"))return console.warn("[viewEvidenceImage] Image source is empty or invalid"),void window.showNotification("No image source found","warning");const n=document.createElement("div");n.id="evidence-modal-overlay",n.style.cssText="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);",n.onclick=function(){n.remove()},n.innerHTML=`\n        <div style="position: relative; max-width: 90%; max-height: 90%;">\n            <img src="${t.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">\n            <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">\n                <i class="fa-solid fa-times"></i>\n            </button>\n        </div>\n    `,document.body.appendChild(n)},window.viewEvidenceImageDirect=function(e){const t=window._evidenceCache&&window._evidenceCache[e];if(!t)return void window.showNotification("Evidence image not found. Please view from the Checklist tab.","warning");const n=Array.isArray(t)?t:[t],i=document.createElement("div");i.id="evidence-modal-overlay",i.style.cssText="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);",i.onclick=function(e){e.target===i&&i.remove()},i.innerHTML=`\n            <div style="position: relative; max-width: 90%; max-height: 80vh;" data-action="stopProp">\n                <img id="ev-gallery-main" src="${n[0]}" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">\n                <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">\n                    <i class="fa-solid fa-times"></i>\n                </button>\n            </div>\n            ${n.length>1?`<div style="display: flex; gap: 8px; margin-top: 12px;" data-action="stopProp">\n                ${n.map((e,t)=>`<img src="${e}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid ${0===t?"white":"transparent"}; opacity: ${0===t?"1":"0.6"};" data-action="setGalleryMainSrc"\\'")}'; this.parentElement.querySelectorAll('img').forEach(t=>{t.style.border='2px solid transparent';t.style.opacity='0.6';}); this.style.border='2px solid white'; this.style.opacity='1';">`).join("")}\n            </div>`:""}\n            <p style="color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 8px;">${n.length} photo${n.length>1?"s":""} • Click outside to close</p>\n        `,document.body.appendChild(i)},window.removeEvidence=function(e){const t=document.getElementById("evidence-preview-"+e),n=document.getElementById("evidence-data-"+e),i=document.getElementById("img-"+e);t&&(t.style.display="none",t.innerHTML=""),n&&(n.value=""),i&&(i.value=""),window.showNotification("Evidence image removed","info")},window.removeEvidenceByIdx=function(e,t){const n=document.getElementById("evidence-preview-"+e);if(!n)return;const i=n.querySelectorAll(".ev-thumb");if(i[t]&&i[t].remove(),0===n.querySelectorAll(".ev-thumb").length){n.style.display="none";const t=document.getElementById("evidence-data-"+e);t&&(t.value="")}},window.viewEvidenceImageByUrl=function(e){if(!e)return;const t=document.createElement("div");t.style.cssText="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; cursor: pointer;",t.onclick=()=>t.remove(),t.innerHTML=`\n            <img src="${e}" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">\n            <button style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;">×</button>\n        `,document.body.appendChild(t)},window.activeAuditScreenStream=null,window.captureScreenEvidence=async function(t){if(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)try{let n=window.activeAuditScreenStream,i=!1;n&&n.active||(window.showNotification("Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.","info"),n=await navigator.mediaDevices.getDisplayMedia({video:{cursor:"always"},audio:!1}),window.activeAuditScreenStream=n,i=!0,n.getVideoTracks()[0].onended=()=>{window.activeAuditScreenStream=null,window.showNotification("Screen sharing session ended.","info")});const o=document.createElement("video");o.srcObject=n,o.muted=!0,o.play(),await new Promise(e=>setTimeout(e,i?500:200));const a=document.createElement("canvas");a.width=o.videoWidth,a.height=o.videoHeight,a.getContext("2d").drawImage(o,0,0);const r=a.toDataURL("image/jpeg",.8);o.pause(),o.srcObject=null,o.remove();let d=r,c=r,s=!1;if(window.navigator.onLine&&window.SupabaseClient)try{if(window.SupabaseClient.isInitialized||await new Promise(e=>setTimeout(e,1e3)),window.SupabaseClient.isInitialized){const e=r.split(",")[1],n=atob(e),i=new ArrayBuffer(n.length),o=new Uint8Array(i);for(let e=0;e<n.length;e++)o[e]=n.charCodeAt(e);const a=new Blob([i],{type:"image/jpeg"}),l=new File([a],"screen-capture-"+Date.now()+".jpg",{type:"image/jpeg"}),m=await window.SupabaseClient.storage.uploadAuditImage(l,"ncr-evidence",t+"-sc-"+Date.now());m&&m.url&&(d=m.url,c=m.url,s=!0)}}catch(e){console.error("[Screen Capture] Cloud upload failed:",e.message)}if(!s)try{const n="idb://evidence-"+t+"-sc-"+Date.now();await e.put(n,r),d=n}catch(e){console.error("[Screen Capture] IndexedDB store failed:",e),d=r}const l=document.getElementById("evidence-preview-"+t);if(l){l.style.display="flex";const e=l.querySelector(".fa-spinner");e&&e.closest("div")?.remove();const n=l.querySelectorAll(".ev-thumb").length,i=c.replace(/'/g,"\\'"),o=document.createElement("div");o.className="ev-thumb",o.dataset.idx=n,o.dataset.saveUrl=d,o.style.cssText="position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;",o.innerHTML=`\n                    <img src="${c}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${i}"/>\n                    <button type="button" data-action="removeEvidenceByIdx" data-arg1="${t}" data-arg2="${n}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">×</button>\n                `,l.appendChild(o)}const m=document.getElementById("evidence-data-"+t);m&&(m.value="attached"),window.showNotification(s?"Screen captured & uploaded to cloud":"Screen captured & saved locally","success")}catch(e){"NotAllowedError"!==e.name&&(console.error(e),window.showNotification("Capture failed: "+e.message,"error"))}else window.showNotification("Screen capture is not supported in this environment (needs HTTPS).","error")},window.renderExecutionDetail=renderExecutionDetail,window.activeWebcamStream=null,window.handleCameraButton=function(e){if(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)){const t=document.getElementById("cam-"+e);t&&t.click()}else window.openWebcamModal(e)},window.openWebcamModal=async function(e){window.activeWebcamStream&&(window.activeWebcamStream.getTracks().forEach(e=>e.stop()),window.activeWebcamStream=null),window.DataService.openFormModal("Capture from Webcam",'\n            < div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;" >\n                <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">\n                    <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>\n                    <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>\n                </div>\n                <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>\n                <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>\n            </div >\n            ',()=>window.captureWebcam(e));const t=document.getElementById("modal-save");t&&(t.innerHTML='<i class="fa-solid fa-camera"></i> Capture');try{const e=await navigator.mediaDevices.getUserMedia({video:!0});window.activeWebcamStream=e;const t=document.getElementById("webcam-video"),n=document.getElementById("webcam-loading");t&&(t.srcObject=e,t.onloadedmetadata=()=>{n&&(n.style.display="none")})}catch(e){const t=document.getElementById("webcam-error"),n=document.getElementById("webcam-loading");n&&(n.style.display="none"),t&&(t.style.display="block",t.textContent="Could not access webcam: "+(e.message||e.name)),console.error("Webcam error:",e)}},window.captureWebcam=function(e){const t=document.getElementById("webcam-video");if(t&&window.activeWebcamStream)try{const n=document.createElement("canvas");n.width=t.videoWidth,n.height=t.videoHeight;const i=n.getContext("2d");i.translate(n.width,0),i.scale(-1,1),i.drawImage(t,0,0);const o=n.toDataURL("image/jpeg",.8);window.activeWebcamStream.getTracks().forEach(e=>e.stop()),window.activeWebcamStream=null;const a=document.getElementById("evidence-preview-"+e),r=document.getElementById("evidence-img-"+e),d=document.getElementById("evidence-data-"+e),c=document.getElementById("evidence-size-"+e);r&&(r.src=o),a&&(a.style.display="block"),d&&(d.value="attached"),c&&(c.textContent="Captured from Webcam"),window.closeModal&&window.closeModal()}catch(e){console.error("Capture failed:",e),window.showNotification("Failed to capture image","error")}}}(),"undefined"!=typeof module&&module.exports&&(module.exports={handleEvidenceUpload:window.handleEvidenceUpload,viewEvidenceImage:window.viewEvidenceImage,viewEvidenceImageDirect:window.viewEvidenceImageDirect,removeEvidence:window.removeEvidence,removeEvidenceByIdx:window.removeEvidenceByIdx,viewEvidenceImageByUrl:window.viewEvidenceImageByUrl,captureScreenEvidence:window.captureScreenEvidence,handleCameraButton:window.handleCameraButton,captureWebcam:window.captureWebcam});
+// ============================================
+// EXECUTION MODULE - Evidence & Media Handling
+// ============================================
+// Extracted from execution-module-v2.js for maintainability.
+// Contains: EvidenceDB (IndexedDB), image upload/compression,
+//   evidence viewing/removal, screen capture, webcam capture.
+
+(function () {
+    'use strict';
+
+    // ============================================
+    // EVIDENCE IMAGE HANDLING (Compression & Upload)
+    // ============================================
+    // IndexedDB Image Store — avoids localStorage 5MB limit
+    // ============================================
+    const EvidenceDB = {
+        DB_NAME: 'AuditCB_Evidence',
+        STORE_NAME: 'images',
+        DB_VERSION: 1,
+        _db: null,
+        async open() {
+            if (this._db) return this._db;
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    e.target.result.createObjectStore(this.STORE_NAME);
+                };
+                req.onsuccess = (e) => { this._db = e.target.result; resolve(this._db); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        },
+        async put(key, dataUrl) {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readwrite');
+                tx.objectStore(this.STORE_NAME).put(dataUrl, key);
+                tx.oncomplete = () => resolve(key);
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        },
+        async get(key) {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readonly');
+                const req = tx.objectStore(this.STORE_NAME).get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = (e) => reject(e.target.error);
+            });
+        },
+        async remove(key) {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(this.STORE_NAME, 'readwrite');
+                tx.objectStore(this.STORE_NAME).delete(key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        }
+    };
+    window._EvidenceDB = EvidenceDB;
+
+    // Resolve idb:// references to displayable blob URLs
+    window.resolveEvidenceUrl = async function (url) {
+        if (!url || !url.startsWith('idb://')) return url;
+        try {
+            const dataUrl = await EvidenceDB.get(url);
+            return dataUrl || url;
+        } catch (e) {
+            console.warn('Failed to resolve evidence URL:', url, e);
+            return url;
+        }
+    };
+
+    // Post-render: resolve all idb:// thumbnails in the DOM
+    window.resolveAllIdbThumbs = async function () {
+        const idbImgs = document.querySelectorAll('img[data-idb-key]');
+        for (const img of idbImgs) {
+            const key = img.dataset.idbKey;
+            if (!key) continue;
+            try {
+                const dataUrl = await EvidenceDB.get(key);
+                if (dataUrl) {
+                    img.src = dataUrl;
+                    img.style.background = '';
+                    img.dataset.idbKey = ''; // mark as resolved
+                }
+            } catch (e) { if (window.Logger) window.Logger.debug('Evidence', 'IDB thumb resolve failed:', e.message); }
+        }
+    };
+    // Auto-resolve when DOM updates (debounced)
+    let _idbResolveTimer;
+    const _idbObserver = new MutationObserver(() => {
+        clearTimeout(_idbResolveTimer);
+        _idbResolveTimer = setTimeout(() => window.resolveAllIdbThumbs(), 300);
+    });
+    _idbObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Handle evidence image upload with compression and 5MB limit
+    window.handleEvidenceUpload = function (uniqueId, input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            window.showNotification('Please select an image file', 'error');
+            input.value = '';
+            return;
+        }
+
+        // Validate file size (5MB max)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            window.showNotification('Image exceeds 5MB limit', 'error');
+            input.value = '';
+            return;
+        }
+
+        // Show loading indicator
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        if (previewDiv) {
+            previewDiv.style.display = 'block';
+            previewDiv.innerHTML = `
+            <div style="padding: 1rem; background: #f8fafc; border-radius: var(--radius-sm); text-align: center;">
+                <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color);"></i>
+                <span style="margin-left: 0.5rem; font-size: 0.85rem;">Compressing & Uploading...</span>
+            </div>
+        `;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = async function () {
+                try {
+                    // 1. Compress
+                    const compressedDataUrl = compressImage(img, file.type);
+                    const _compressedSize = Math.round((compressedDataUrl.length * 3 / 4) / 1024);
+
+                    let finalUrl = compressedDataUrl;
+                    let isCloud = false;
+                    let displayUrl = compressedDataUrl; // always use this for thumbnail display
+
+                    // 2. Upload to Supabase (if online)
+                    if (window.navigator.onLine && window.SupabaseClient) {
+                        try {
+                            if (!window.SupabaseClient.isInitialized) {
+                                console.warn('[Evidence Upload] Supabase not initialized - trying to wait...');
+                                await new Promise(r => setTimeout(r, 1000));
+                            }
+                            if (window.SupabaseClient.isInitialized) {
+                                // Convert DataURL to Blob (CSP-safe, no fetch on data: URLs)
+                                const b64 = compressedDataUrl.split(',')[1];
+                                const byteStr = atob(b64);
+                                const mimeMatch = compressedDataUrl.match(/data:([^;]+)/);
+                                const mime = mimeMatch ? mimeMatch[1] : file.type;
+                                const ab = new ArrayBuffer(byteStr.length);
+                                const ia = new Uint8Array(ab);
+                                for (let bi = 0; bi < byteStr.length; bi++) ia[bi] = byteStr.charCodeAt(bi);
+                                const blob = new Blob([ab], { type: mime });
+                                const uploadFile = new File([blob], file.name, { type: mime });
+
+                                const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-' + Date.now());
+                                if (result && result.url) {
+                                    finalUrl = result.url;
+                                    displayUrl = result.url;
+                                    isCloud = true;
+                                } else {
+                                    console.warn('[Evidence Upload] No URL returned - result was:', JSON.stringify(result));
+                                }
+                            } else {
+                                console.warn('[Evidence Upload] Supabase still not initialized after wait');
+                            }
+                        } catch (uploadErr) {
+                            console.error('[Evidence Upload] Failed:', uploadErr.message || uploadErr);
+                            console.warn('[Evidence Upload] Falling back to IndexedDB');
+                        }
+                    }
+
+                    // 2b. If cloud failed, store in IndexedDB (avoids localStorage overflow)
+                    if (!isCloud) {
+                        try {
+                            const idbKey = 'idb://evidence-' + uniqueId + '-' + Date.now();
+                            await EvidenceDB.put(idbKey, compressedDataUrl);
+                            finalUrl = idbKey; // small string for state/localStorage
+                        } catch (idbErr) {
+                            console.error('[Evidence Upload] IndexedDB store failed:', idbErr);
+                            // Last resort: keep base64 in state (may hit quota)
+                            finalUrl = compressedDataUrl;
+                        }
+                    }
+
+                    // 3. Append to multi-image preview strip
+                    if (previewDiv) {
+                        previewDiv.style.display = 'flex';
+                        const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
+                        const newIdx = existingThumbs.length;
+                        const safeDisplay = displayUrl.replace(/'/g, "\\'");
+                        const thumb = document.createElement('div');
+                        thumb.className = 'ev-thumb';
+                        thumb.dataset.idx = newIdx;
+                        thumb.dataset.saveUrl = finalUrl; // store URL/idb-key for saving
+                        thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
+                        thumb.innerHTML = `
+                            <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
+                            <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${newIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
+                        `;
+                        previewDiv.appendChild(thumb);
+                    }
+
+                    // 4. Update Hidden Inputs
+                    const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+                    if (evidenceData) evidenceData.value = 'attached';
+
+                    window.showNotification(isCloud ? 'Image uploaded to cloud' : 'Image saved locally', 'success');
+
+                } catch (err) {
+                    console.error('Image processing error:', err);
+                    window.showNotification('Error processing image', 'error');
+                    if (previewDiv) previewDiv.style.display = 'none';
+                    input.value = '';
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Compress image to reduce storage size
+    function compressImage(img, _fileType) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Calculate new dimensions (max 600px on longest side — keeps ~20-40KB per image)
+        const maxDimension = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+            } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+            }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to JPEG with 0.5 quality — good enough for evidence, saves storage
+        return canvas.toDataURL('image/jpeg', 0.5);
+    }
+
+    // View evidence image in full size (modal/popup)
+    // View evidence image in full size (modal/popup)
+    // View evidence image in full size (modal/popup)
+    window.viewEvidenceImage = function (uniqueId) {
+
+        // Strategy 1: Standard ID
+        let imgEl = document.getElementById('evidence-img-' + uniqueId);
+
+        // Strategy 2: If uniqueId looks like "0" (index-only), try to find it via the row container
+        if (!imgEl) {
+            console.warn(`[viewEvidenceImage] Element 'evidence-img-${uniqueId}' not found. Searching by context...`);
+
+            // Try to find the file input which usually has the same ID suffix
+            const fileInput = document.getElementById('img-' + uniqueId);
+            if (fileInput) {
+                // Look for sibling/cousin image in the same container
+                const container = fileInput.closest('.ncr-panel') || fileInput.parentElement.parentElement;
+                if (container) {
+                    const nearbyImg = container.querySelector('img[id^="evidence-img-"]');
+                    if (nearbyImg) {
+                        imgEl = nearbyImg;
+                    }
+                }
+            }
+        }
+
+        if (!imgEl) {
+            // Strategy 3: Try to find ANY evidence image if we are desperate and uniqueId is just '0'
+            if (uniqueId === 0 || uniqueId === '0') {
+                const firstImg = document.querySelector('img[id^="evidence-img-"]');
+                if (firstImg) {
+                    imgEl = firstImg;
+                }
+            }
+        }
+
+        if (!imgEl) {
+            console.error('[viewEvidenceImage] Image element DEFINITELY not found for:', uniqueId);
+            window.showNotification('Error: Image element not found. Please refresh and try again.', 'error');
+            return;
+        }
+
+        if (!imgEl.src || imgEl.src === '' || imgEl.src.includes('placeholder')) {
+            console.warn('[viewEvidenceImage] Image source is empty or invalid');
+            window.showNotification('No image source found', 'warning');
+            return;
+        }
+
+
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'evidence-modal-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
+        overlay.onclick = function () { overlay.remove(); };
+
+        // Create image container
+        overlay.innerHTML = `
+        <div style="position: relative; max-width: 90%; max-height: 90%;">
+            <img src="${imgEl.src}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
+            <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+    `;
+
+        document.body.appendChild(overlay);
+    };
+
+    // View evidence image directly from cached data (used in Review tab)
+    window.viewEvidenceImageDirect = function (findingId) {
+        const cached = window._evidenceCache && window._evidenceCache[findingId];
+        if (!cached) {
+            window.showNotification('Evidence image not found. Please view from the Checklist tab.', 'warning');
+            return;
+        }
+        // Handle both old (string) and new (array) formats
+        const srcs = Array.isArray(cached) ? cached : [cached];
+        const overlay = document.createElement('div');
+        overlay.id = 'evidence-modal-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; cursor: pointer; backdrop-filter: blur(5px);';
+        overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+        overlay.innerHTML = `
+            <div style="position: relative; max-width: 90%; max-height: 80vh;" data-action="stopProp">
+                <img id="ev-gallery-main" src="${srcs[0]}" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain;">
+                <button data-action="removeGrandparent" data-stop-prop="true" style="position: absolute; top: -15px; right: -15px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: #333;" aria-label="Close">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            ${srcs.length > 1 ? `<div style="display: flex; gap: 8px; margin-top: 12px;" data-action="stopProp">
+                ${srcs.map((s, i) => `<img src="${s}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid ${i === 0 ? 'white' : 'transparent'}; opacity: ${i === 0 ? '1' : '0.6'};" data-action="setGalleryMainSrc"\\'")}'; this.parentElement.querySelectorAll('img').forEach(t=>{t.style.border='2px solid transparent';t.style.opacity='0.6';}); this.style.border='2px solid white'; this.style.opacity='1';">`).join('')}
+            </div>` : ''}
+            <p style="color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 8px;">${srcs.length} photo${srcs.length > 1 ? 's' : ''} \u2022 Click outside to close</p>
+        `;
+        document.body.appendChild(overlay);
+    };
+
+    // Remove evidence image
+    window.removeEvidence = function (uniqueId) {
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+        const fileInput = document.getElementById('img-' + uniqueId);
+
+        if (previewDiv) { previewDiv.style.display = 'none'; previewDiv.innerHTML = ''; }
+        if (evidenceData) evidenceData.value = '';
+        if (fileInput) fileInput.value = '';
+
+        window.showNotification('Evidence image removed', 'info');
+    };
+
+    // Remove a specific image by index from the multi-image strip
+    window.removeEvidenceByIdx = function (uniqueId, idx) {
+        const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+        if (!previewDiv) return;
+        const thumbs = previewDiv.querySelectorAll('.ev-thumb');
+        if (thumbs[idx]) thumbs[idx].remove();
+        // If no thumbs left, hide preview and clear data
+        if (previewDiv.querySelectorAll('.ev-thumb').length === 0) {
+            previewDiv.style.display = 'none';
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+            if (evidenceData) evidenceData.value = '';
+        }
+    };
+
+    // View any evidence image by URL in a lightbox overlay
+    window.viewEvidenceImageByUrl = function (url) {
+        if (!url) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; cursor: pointer;';
+        overlay.onclick = () => overlay.remove();
+        overlay.innerHTML = `
+            <img src="${url}" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <button style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;">\u00d7</button>
+        `;
+        document.body.appendChild(overlay);
+    };
+    window.activeAuditScreenStream = null;
+
+    window.captureScreenEvidence = async function (uniqueId) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            window.showNotification('Screen capture is not supported in this environment (needs HTTPS).', 'error');
+            return;
+        }
+
+        try {
+            let stream = window.activeAuditScreenStream;
+            let isNew = false;
+
+            // Check active stream
+            if (!stream || !stream.active) {
+                window.showNotification('Select the Remote Audit Window (Zoom/Teams) once. It will stay active for easy capture.', 'info');
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: false
+                });
+                window.activeAuditScreenStream = stream;
+                isNew = true;
+
+                // Handle stop sharing
+                stream.getVideoTracks()[0].onended = () => {
+                    window.activeAuditScreenStream = null;
+                    window.showNotification('Screen sharing session ended.', 'info');
+                };
+            }
+
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.muted = true;
+            video.play();
+
+            // Wait for buffer
+            await new Promise(r => setTimeout(r, isNew ? 500 : 200));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Cleanup video element (keep stream alive for reuse)
+            video.pause();
+            video.srcObject = null;
+            video.remove();
+
+            // Store the image (Supabase or IndexedDB)
+            let finalUrl = dataUrl;
+            let displayUrl = dataUrl;
+            let isCloud = false;
+
+            if (window.navigator.onLine && window.SupabaseClient) {
+                try {
+                    if (!window.SupabaseClient.isInitialized) {
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    if (window.SupabaseClient.isInitialized) {
+                        // Convert DataURL to Blob (CSP-safe, no fetch on data: URLs)
+                        const b64 = dataUrl.split(',')[1];
+                        const byteStr = atob(b64);
+                        const ab = new ArrayBuffer(byteStr.length);
+                        const ia = new Uint8Array(ab);
+                        for (let bi = 0; bi < byteStr.length; bi++) ia[bi] = byteStr.charCodeAt(bi);
+                        const blob = new Blob([ab], { type: 'image/jpeg' });
+                        const uploadFile = new File([blob], 'screen-capture-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                        const result = await window.SupabaseClient.storage.uploadAuditImage(uploadFile, 'ncr-evidence', uniqueId + '-sc-' + Date.now());
+                        if (result && result.url) {
+                            finalUrl = result.url;
+                            displayUrl = result.url;
+                            isCloud = true;
+                        }
+                    }
+                } catch (uploadErr) {
+                    console.error('[Screen Capture] Cloud upload failed:', uploadErr.message);
+                }
+            }
+
+            // Fallback to IndexedDB
+            if (!isCloud) {
+                try {
+                    const idbKey = 'idb://evidence-' + uniqueId + '-sc-' + Date.now();
+                    await EvidenceDB.put(idbKey, dataUrl);
+                    finalUrl = idbKey;
+                } catch (idbErr) {
+                    console.error('[Screen Capture] IndexedDB store failed:', idbErr);
+                    finalUrl = dataUrl;
+                }
+            }
+
+            // Append thumbnail to multi-image preview strip
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            if (previewDiv) {
+                previewDiv.style.display = 'flex';
+                // Remove any loading spinner if present
+                const spinner = previewDiv.querySelector('.fa-spinner');
+                if (spinner) spinner.closest('div')?.remove();
+
+                const existingThumbs = previewDiv.querySelectorAll('.ev-thumb');
+                const newIdx = existingThumbs.length;
+                const safeDisplay = displayUrl.replace(/'/g, "\\'");
+                const thumb = document.createElement('div');
+                thumb.className = 'ev-thumb';
+                thumb.dataset.idx = newIdx;
+                thumb.dataset.saveUrl = finalUrl;
+                thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
+                thumb.innerHTML = `
+                    <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
+                    <button type="button" data-action="removeEvidenceByIdx" data-arg1="${uniqueId}" data-arg2="${newIdx}" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;">\u00d7</button>
+                `;
+                previewDiv.appendChild(thumb);
+            }
+
+            // Update hidden input
+            const evidenceData = document.getElementById('evidence-data-' + uniqueId);
+            if (evidenceData) evidenceData.value = 'attached';
+
+            window.showNotification(isCloud ? 'Screen captured & uploaded to cloud' : 'Screen captured & saved locally', 'success');
+
+        } catch (err) {
+            if (err.name !== 'NotAllowedError') {
+                console.error(err);
+                window.showNotification('Capture failed: ' + err.message, 'error');
+            }
+        }
+    };
+    window.renderExecutionDetail = renderExecutionDetail;
+
+    // Toggle selection of all items in a section
+    // toggleSectionSelection defined earlier at line ~1586 (removed duplicate with broken selectors)
+
+    // ============================================
+    // Webcam Handling for Desktop 'Camera' Button
+    // ============================================
+    window.activeWebcamStream = null;
+
+    window.handleCameraButton = function (uniqueId) {
+        // Check if mobile device (simple check)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            // Use the native input for mobile (file picker / camera app)
+            const inp = document.getElementById('cam-' + uniqueId);
+            if (inp) inp.click();
+        } else {
+            // Use Webcam Modal for desktop
+            window.openWebcamModal(uniqueId);
+        }
+    };
+
+    window.openWebcamModal = async function (uniqueId) {
+        // Cleanup any existing stream first
+        if (window.activeWebcamStream) {
+            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
+        }
+
+        window.DataService.openFormModal('Capture from Webcam', `
+            < div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;" >
+                <div style="position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    <div id="webcam-loading" style="position: absolute; color: white;">Accessing Camera...</div>
+                </div>
+                <div id="webcam-error" style="color: var(--danger-color); display: none; text-align: center;"></div>
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">Ensure your browser has camera permissions enabled.</p>
+            </div >
+            `, () => window.captureWebcam(uniqueId));
+
+        // Configure "Capture" button label
+        const modalSave = document.getElementById('modal-save');
+        if (modalSave) modalSave.innerHTML = '<i class="fa-solid fa-camera"></i> Capture';
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            window.activeWebcamStream = stream;
+
+            const video = document.getElementById('webcam-video');
+            const loading = document.getElementById('webcam-loading');
+
+            if (video) {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    if (loading) loading.style.display = 'none';
+                };
+            }
+        } catch (err) {
+            const errDiv = document.getElementById('webcam-error');
+            const loading = document.getElementById('webcam-loading');
+            if (loading) loading.style.display = 'none';
+
+            if (errDiv) {
+                errDiv.style.display = 'block';
+                errDiv.textContent = 'Could not access webcam: ' + (err.message || err.name);
+            }
+            console.error("Webcam error:", err);
+        }
+    };
+
+    window.captureWebcam = function (uniqueId) {
+        const video = document.getElementById('webcam-video');
+        if (!video || !window.activeWebcamStream) return;
+
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const ctx = canvas.getContext('2d');
+            // Mirror the capture if the video was mirrored
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Stop stream
+            window.activeWebcamStream.getTracks().forEach(track => track.stop());
+            window.activeWebcamStream = null;
+
+            // Update UI
+            const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
+            const imgElem = document.getElementById('evidence-img-' + uniqueId);
+            const dataInput = document.getElementById('evidence-data-' + uniqueId);
+            const sizeElem = document.getElementById('evidence-size-' + uniqueId);
+
+            if (imgElem) imgElem.src = dataUrl;
+            if (previewDiv) previewDiv.style.display = 'block';
+            if (dataInput) dataInput.value = 'attached';
+            if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
+
+            // Close modal
+            if (window.closeModal) window.closeModal();
+        } catch (e) {
+            console.error("Capture failed:", e);
+            window.showNotification("Failed to capture image", "error");
+        }
+    };
+
+})();
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam };
+}

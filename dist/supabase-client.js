@@ -1,1 +1,2618 @@
-const SupabaseClient={client:null,isInitialized:!1,init:function(){try{const e=window.SupabaseConfig?.getUrl(),t=window.SupabaseConfig?.getAnonKey();return e&&t?(this.client=supabase.createClient(e,t),this.isInitialized=!0,Logger.info("Supabase client initialized successfully"),this.setupAuthListener(),!0):(Logger.warn("Supabase credentials not configured. Using localStorage fallback."),this.isInitialized=!1,!1)}catch(e){return Logger.error("Failed to initialize Supabase:",e),this.isInitialized=!1,!1}},setupAuthListener:function(){this.client&&this.client.auth.onAuthStateChange((e,t)=>{Logger.info("Auth state changed:",e),"SIGNED_IN"===e&&t?this.handleSignIn(t):"SIGNED_OUT"===e?this.handleSignOut():"TOKEN_REFRESHED"===e&&Logger.info("Token refreshed")})},handleSignIn:async function(e){const t=e.user;let i=t.user_metadata?.role,a=t.user_metadata?.permissions;const n=window.state?.cbSettings?.cbEmail?.toLowerCase()||"",s=(window.state?.users||[]).filter(e=>"Admin"===e.role).map(e=>e.email?.toLowerCase());n&&s.push(n),s.includes(t.email.toLowerCase())?(i="Admin",a=["all"]):i||(i="Auditor",a=["view_assigned"]),window.state.currentUser={id:t.id,email:t.email,name:t.user_metadata?.name||t.email,role:i,permissions:a},Logger.info("User signed in:",window.state.currentUser.email,"Initial Role:",i);try{Logger.info("Loading user data from Supabase..."),await this.loadUserDataFromCloud(),Logger.info("User data loaded successfully from cloud");const e=window.state?.users?.find(e=>e.email?.toLowerCase()===window.state.currentUser.email.toLowerCase());if(e&&e.role){window.state.currentUser.role=e.role,window.state.currentUser.name=e.name||window.state.currentUser.name;const t={Admin:["all"],"Certification Manager":["view_all","edit_clients","approve_reports","manage_auditors"],"Lead Auditor":["view_assigned","edit_reports","create_ncr"],Auditor:["view_assigned"]};window.state.currentUser.permissions=t[e.role]||["view_assigned"],Logger.info("Role updated from user management:",e.role)}}catch(e){Logger.warn("Failed to load cloud data, using local data:",e.message)}"function"==typeof window.populateClientSidebar&&(window.populateClientSidebar(),Logger.info("Client sidebar refreshed after sign-in"));const r=document.getElementById("sidebar"),o=document.querySelector(".main-header");r&&(r.style.display=""),o&&(o.style.display="");const d=document.getElementById("app-container");d&&(d.classList.remove("auth-pending"),d.classList.add("auth-ready")),""===window.location.hash||"#login"===window.location.hash?window.location.hash="dashboard":"#dashboard"===window.location.hash&&window.renderModule&&(Logger.info("Re-rendering dashboard with fresh cloud data..."),window.renderModule("dashboard"))},handleSignOut:function(){window.state.currentUser=null,Logger.info("User signed out"),window.location.hash="login",window.AuthManager&&window.AuthManager.showLoginScreen()},async signIn(e,t){if(!this.isInitialized)return Logger.warn("Supabase not initialized, using demo auth"),null;try{const{data:i,error:a}=await this.client.auth.signInWithPassword({email:e,password:t});if(a)throw a;return Logger.info("Sign in successful"),i}catch(e){throw Logger.error("Sign in failed:",e),e}},async signUp(e,t,i={},a={}){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),null;try{const{data:n,error:s}=await this.client.auth.signUp({email:e,password:t,options:{data:i,...a}});if(s)throw s;return Logger.info("Sign up successful"),n}catch(e){throw Logger.error("Sign up failed:",e),e}},async signOut(){if(this.isInitialized)try{const{error:e}=await this.client.auth.signOut();if(e)throw e;Logger.info("Sign out successful")}catch(e){throw Logger.error("Sign out failed:",e),e}else Logger.warn("Supabase not initialized")},async getSession(){if(!this.isInitialized)return null;try{const{data:e,error:t}=await this.client.auth.getSession();if(t)throw t;return e.session}catch(e){return Logger.error("Get session failed:",e),null}},async getUser(){if(!this.isInitialized)return null;try{const{data:e,error:t}=await this.client.auth.getUser();if(t)throw t;return e.user}catch(e){return Logger.error("Get user failed:",e),null}},from(e){if(!this.client)throw Logger.error("Supabase client not initialized"),new Error("Supabase not initialized");return this.client.from(e)},async insert(e,t){return this.db.insert(e,t)},async update(e,t,i){if(void 0===i&&"object"==typeof t){const i=t.id;return this.db.update(e,i,t)}return this.db.update(e,t,i)},async delete(e,t){return this.db.delete(e,t)},async select(e,t){return this.db.select(e,t)},_getSyncTimestamp(e){try{return sessionStorage.getItem(`sync_ts_${e}`)||null}catch(e){return Logger.debug("sessionStorage read failed (private mode?)",e.message),null}},_setSyncTimestamp(e){try{sessionStorage.setItem(`sync_ts_${e}`,(new Date).toISOString())}catch(e){Logger.debug("sessionStorage write failed (private mode?)",e.message)}},_clearSyncTimestamps(){try{const e=[];for(let t=0;t<sessionStorage.length;t++){const i=sessionStorage.key(t);i.startsWith("sync_ts_")&&e.push(i)}e.forEach(e=>sessionStorage.removeItem(e)),Logger.info("Sync timestamps cleared — next sync will be full")}catch(e){Logger.debug("sessionStorage clear failed (private mode?)",e.message)}},_buildSyncQuery(e){const t=this._getSyncTimestamp(e);let i=this.client.from(e).select("*");return t&&(i=i.gte("updated_at",t)),{query:i,isIncremental:!!t,lastSync:t}},async loadUserDataFromCloud(){if(this.isInitialized)try{window._dataFullyLoaded=!1;const e=performance.now();Logger.info("Loading user data from Supabase cloud (parallel)...");const t={clients:{added:0,updated:0},auditors:{added:0,updated:0},users:{added:0,updated:0},settings:!1,documents:{added:0,updated:0},auditorAssignments:{added:0,updated:0}},[i,a,n,s,r,o,d,l,c,u]=await Promise.allSettled([this.syncClientsFromSupabase(),this.syncAuditorsFromSupabase(),this.syncUsersFromSupabase(),this.syncSettingsFromSupabase(),this.syncDocumentsFromSupabase(),this.syncAuditorAssignmentsFromSupabase(),this.syncAuditPlansFromSupabase(),this.syncAuditReportsFromSupabase(),this.syncChecklistsFromSupabase(),this.syncCertificationDecisionsFromSupabase()]);if("fulfilled"===i.status?t.clients=i.value:(Logger.warn("Clients sync failed:",i.reason),window.showNotification("Failed to sync clients from cloud. Using local data.","warning")),"fulfilled"===a.status?t.auditors=a.value:(Logger.warn("Auditors sync failed:",a.reason),window.showNotification("Failed to sync auditors from cloud. Using local data.","warning")),"fulfilled"===n.status?t.users=n.value:Logger.warn("Users sync failed:",n.reason),"fulfilled"===s.status?t.settings=s.value?.updated||!1:Logger.warn("Settings sync failed:",s.reason),"fulfilled"===r.status?t.documents=r.value:Logger.warn("Documents sync failed:",r.reason),"fulfilled"===o.status?(t.auditorAssignments=o.value,Logger.info("Auditor assignments synced:",t.auditorAssignments)):Logger.warn("Auditor assignments sync failed:",o.reason),"rejected"===d.status&&(Logger.warn("Audit Plans sync failed:",d.reason),window.showNotification("Failed to sync audit plans. Working offline.","warning")),"rejected"===l.status&&(Logger.warn("Audit Reports sync failed:",l.reason),window.showNotification("Failed to sync audit reports. Working offline.","warning")),"rejected"===c.status&&Logger.warn("Checklists sync failed:",c.reason),"rejected"===u.status&&Logger.warn("Certification Decisions sync failed:",u.reason),window.state.clients&&window.state.certifications){const e=new Map;window.state.certifications.forEach(t=>{const i=String(t.client);e.has(i)||e.set(i,[]),e.get(i).push(t)});let t=0;window.state.clients.forEach(i=>{const a=e.get(i.name)||[],n=e.get(String(i.id))||[],s=[...a,...n.filter(e=>!a.includes(e))];s.length>0&&(i.certificates=s,t++)}),Logger.info(`Hydrated certificates for ${t} clients`)}try{await window.StateStore.save(window.state)}catch(e){Logger.warn("IndexedDB save failed during cloud sync. State kept in memory only.")}const g=((performance.now()-e)/1e3).toFixed(1);return Logger.info(`Cloud data load complete in ${g}s:`,t),t}catch(e){throw Logger.error("Failed to load user data from cloud:",e),window.showNotification("Failed to connect to cloud database. Working offline.","error"),e}finally{window._dataFullyLoaded=!0}else Logger.warn("Supabase not initialized, skipping cloud data load")},db:{insert:async function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, using localStorage"),null;try{const{data:i,error:a}=await SupabaseClient.client.from(e).insert(t).select();if(a)throw a;return i}catch(t){throw Logger.error(`Insert to ${e} failed:`,t),t}},upsert:async function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, using localStorage"),null;try{const{data:i,error:a}=await SupabaseClient.client.from(e).upsert(t).select();if(a)throw a;return i}catch(t){throw Logger.error(`Upsert to ${e} failed:`,t),t}},update:async function(e,t,i){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, using localStorage"),null;try{const{data:a,error:n}=await SupabaseClient.client.from(e).update(i).eq("id",t).select();if(n)throw n;return a}catch(t){throw Logger.error(`Update ${e} failed:`,t),t}},delete:async function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, using localStorage"),null;try{const{error:i}=await SupabaseClient.client.from(e).delete().eq("id",t);if(i)throw i;return!0}catch(t){throw Logger.error(`Delete from ${e} failed:`,t),t}},select:async function(e,t={}){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, using localStorage"),null;try{let i=SupabaseClient.client.from(e).select("*");for(const[e,a]of Object.entries(t))i=i.eq(e,a);const{data:a,error:n}=await i;if(n)throw n;return a}catch(t){throw Logger.error(`Select from ${e} failed:`,t),t}},getById:async function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, using localStorage"),null;try{const{data:i,error:a}=await SupabaseClient.client.from(e).select("*").eq("id",t).single();if(a)throw a;return i}catch(t){throw Logger.error(`Get from ${e} failed:`,t),t}}},storage:{upload:async function(e,t,i){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),null;try{const{data:a,error:n}=await SupabaseClient.client.storage.from(e).upload(t,i,{cacheControl:"3600",upsert:!0});if(n)throw n;return Logger.info("File uploaded:",t),a}catch(e){throw Logger.error("File upload failed:",e),e}},uploadGenericFile:async function(e,t,i,a=""){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),null;try{const n=Date.now(),s=e.name?e.name.replace(/[^a-zA-Z0-9.-]/g,"_"):"unnamed_file",r=`${a?`${a}_`:""}${n}_${s}`,o=i?`${i}/${r}`:r,{data:d,error:l}=await SupabaseClient.client.storage.from(t).upload(o,e,{cacheControl:"3600",upsert:!0});if(l)throw l;let c;const{data:u}=SupabaseClient.client.storage.from(t).getPublicUrl(o);return c=u&&u.publicUrl?u.publicUrl:await this.getSignedUrl(t,o),Logger.info(`File uploaded to ${t}:`,o),{url:c,path:o,fileName:e.name||r}}catch(e){return Logger.error("File upload failed:",e),null}},uploadClientLogo:async function(e,t){if(!SupabaseClient.isInitialized)return null;const i="audit-logos",a=`client-logos/${t}_${Date.now()}_${e.name?e.name.replace(/[^a-zA-Z0-9.-]/g,"_"):"logo"}`;try{const{data:t,error:n}=await SupabaseClient.client.storage.from(i).upload(a,e,{cacheControl:"3600",upsert:!0});if(n)throw console.error("[SupabaseStorage] Upload Action Error:",n),n;const{data:s}=SupabaseClient.client.storage.from(i).getPublicUrl(a);if(s&&s.publicUrl)return Logger.info("Client logo uploaded (public):",s.publicUrl),{url:s.publicUrl,path:a};return{url:await this.getSignedUrl(i,a,31536e3),path:a}}catch(t){Logger.error("Client logo upload failed:",t);const n=t.message||t.error_description||JSON.stringify(t);let s="";return n.includes("policies")&&(s='\nHINT: Storage bucket policies may be blocking writes. Check "audit-logos" bucket permissions.'),n.includes("403")&&(s="\nHINT: 403 Forbidden - Permission denied. Check role permissions on storage objects."),n.includes("bucket")&&(s="\nHINT: Bucket might not exist or is not public."),n.includes("Payload Too Large")&&(s="\nHINT: File size too large."),window.alert(`LOGO UPLOAD FAILED:\n${n}${s}\n\nCheck console for details.`),console.error("[SupabaseStorage] Full Error Metadata:",{error:t,bucket:i,path:a,fileType:e.type,fileSize:e.size}),null}},uploadAuditImage:async function(e,t,i){return this.uploadGenericFile(e,"audit-images",t,i)},uploadAuditReport:async function(e,t,i,a){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized, report saved locally only"),null;try{const n=(new Date).toISOString().split("T")[0],s=`${t}_${i.replace(/[^a-zA-Z0-9]/g,"_").substring(0,50)}_${a}_${n}.pdf`,r=`${t}/${s}`,{data:o,error:d}=await SupabaseClient.client.storage.from("audit-reports").upload(r,e,{contentType:"application/pdf",cacheControl:"31536000",upsert:!0});if(d)throw d;const l=await this.getSignedUrl("audit-reports",r,2592e3);return Logger.info("Audit report uploaded:",r),window.AuditLogger&&AuditLogger.log("upload","report",a,{},{summary:`Uploaded ${t} for ${i}`,path:r,size:e.size}),{url:l,path:r,filename:s}}catch(e){return Logger.error("Audit report upload failed:",e),null}},download:async function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),null;try{const{data:i,error:a}=await SupabaseClient.client.storage.from(e).download(t);if(a)throw a;return i}catch(e){throw Logger.error("File download failed:",e),e}},getPublicUrl:function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),null;const{data:i}=SupabaseClient.client.storage.from(e).getPublicUrl(t);return i.publicUrl},getSignedUrl:async function(e,t,i=3600){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),null;try{const{data:a,error:n}=await SupabaseClient.client.storage.from(e).createSignedUrl(t,i);if(n)throw n;return a.signedUrl}catch(e){return Logger.error("Get signed URL failed:",e),null}},deleteFile:async function(e,t){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),!1;try{const{error:i}=await SupabaseClient.client.storage.from(e).remove([t]);if(i)throw i;return Logger.info("File deleted:",t),!0}catch(e){return Logger.error("File delete failed:",e),!1}},listFiles:async function(e,t=""){if(!SupabaseClient.isInitialized)return Logger.warn("Supabase not initialized"),[];try{const{data:i,error:a}=await SupabaseClient.client.storage.from(e).list(t);if(a)throw a;return i}catch(e){return Logger.error("List files failed:",e),[]}}},async upsertUserProfile(e){if(!this.isInitialized)return Logger.warn("Supabase not initialized for user sync"),null;try{let t;t=e.id&&"string"==typeof e.id&&e.id.includes("-")?e.id:crypto.randomUUID();const i={id:t,email:e.email,full_name:e.name,role:e.role,avatar_url:e.avatar||null,updated_at:(new Date).toISOString()},{data:a,error:n}=await this.client.from("profiles").upsert(i,{onConflict:"email"}).select().single();if(n)throw n;return Logger.info("User profile synced:",e.email),a}catch(e){throw Logger.error("Failed to upsert user profile:",e),e}},async fetchUserProfiles(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),[];try{const{query:e,isIncremental:t}=this._buildSyncQuery("profiles"),{data:i,error:a}=await e.order("full_name",{ascending:!0});if(a)throw a;return this._setSyncTimestamp("profiles"),Logger.info(`Fetched user profiles (${t?"incremental":"full"}): ${i?.length||0}`),i||[]}catch(e){return Logger.error("Failed to fetch user profiles:",e),[]}},async syncUsersToSupabase(e){if(!this.isInitialized)throw new Error("Supabase not initialized");const t={success:0,failed:0,errors:[]};for(const i of e)try{await this.upsertUserProfile(i),t.success++}catch(e){t.failed++,t.errors.push({email:i.email,error:e.message})}return Logger.info(`User sync complete: ${t.success} synced, ${t.failed} failed`),t},async syncUsersFromSupabase(){if(!this.isInitialized)throw new Error("Supabase not initialized");const e=await this.fetchUserProfiles();if(!e.length)return{added:0,updated:0};const t=window.state.users||[];let i=0,a=0;return e.forEach(e=>{const n=t.find(t=>t.email===e.email);n?(n.name=e.full_name,n.role=e.role,n.avatar=e.avatar_url,a++):(t.push({id:e.id,email:e.email,name:e.full_name,role:e.role,status:"Active",avatar:e.avatar_url}),i++)}),window.state.users=t,window.saveData(),Logger.info(`Synced from Supabase: ${i} added, ${a} updated`),{added:i,updated:a}},async upsertClient(e){if(this.isInitialized)try{const t={id:String(e.id),name:e.name,standard:e.standard,status:e.status,type:e.type,website:e.website||null,employees:e.employees||0,shifts:e.shifts||"No",industry:e.industry||null,contacts:e.contacts||[],sites:e.sites||[],departments:e.departments||[],designations:e.designations||[],goods_services:e.goodsServices||[],key_processes:e.keyProcesses||[],contact_person:e.contactPerson||e.contacts?.[0]?.name||null,logo_url:e.logoUrl||null,created_by:e.createdBy||window.state?.currentUser?.id||null,updated_at:(new Date).toISOString(),data:{profile:e.profile||null,profileUpdated:e.profileUpdated||null,profileHistory:e.profileHistory||[],certificates:e.certificates||[],nextAudit:e.nextAudit||null}},{data:i,error:a}=await this.client.from("clients").upsert(t,{onConflict:"id"}).select();if(a)throw console.error("[upsertClient] Supabase Error:",a),a;return Logger.info("Client saved to Supabase:",e.name),i}catch(e){throw Logger.error("Failed to save client:",e),e}},async syncClientsToSupabase(e){if(this.isInitialized)try{if(Logger.info("Replacing all clients in database..."),e?.length>0){const t=e.map(e=>({id:String(e.id),name:e.name,standard:e.standard,status:e.status,type:e.type,website:e.website||null,employees:e.employees||0,shifts:e.shifts||"No",industry:e.industry||null,contacts:e.contacts||[],sites:e.sites||[],departments:e.departments||[],designations:e.designations||[],goods_services:e.goodsServices||[],key_processes:e.keyProcesses||[],contact_person:e.contactPerson||null,logo_url:e.logoUrl||null,updated_at:(new Date).toISOString(),data:{profile:e.profile||null,profileUpdated:e.profileUpdated||null,profileHistory:e.profileHistory||[],certificates:e.certificates||[],nextAudit:e.nextAudit||null}})),{error:i}=await this.client.from("clients").upsert(t);if(i)throw i}Logger.info(`✅ Database updated: ${e?.length||0} clients`)}catch(e){throw Logger.error("Failed to sync clients:",e),e}},async syncAuditorsToSupabase(e){if(this.isInitialized&&e?.length)try{for(const t of e){const e={id:t.id,name:t.name,role:t.role,email:t.email||null,phone:t.phone||null,location:t.location||null,experience:t.experience||0,standards:t.standards||[],expertise:t.domainExpertise||t.expertise||[],industries:t.industries||[],man_day_rate:t.manDayRate||0,education:t.education||null,rating:t.customerRating||0,status:t.status||"Active",updated_at:(new Date).toISOString()};await this.client.from("auditors").upsert(e,{onConflict:"id"})}Logger.info(`Synced ${e.length} auditors to Supabase`)}catch(e){throw Logger.error("Failed to sync auditors:",e),e}},async syncClientsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("clients"),{data:i,error:a}=await e.order("name",{ascending:!0});if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=window.state.clients||[];let s=0,r=0;return i.forEach(e=>{const t={id:e.id,name:e.name,standard:e.standard,status:e.status,type:e.type,website:e.website,employees:e.employees,shifts:e.shifts,industry:e.industry,contacts:e.contacts||[],sites:e.sites||[],departments:e.departments||[],designations:e.designations||[],goodsServices:e.goods_services||[],keyProcesses:e.key_processes||[],contactPerson:e.contact_person,updatedAt:e.updated_at,logoUrl:e.logo_url,profile:e.data&&e.data.profile||null,profileUpdated:e.data&&e.data.profileUpdated||null,profileHistory:e.data&&e.data.profileHistory||[],certificates:e.data&&e.data.certificates||[],nextAudit:e.data&&e.data.nextAudit||null},i=n.find(t=>String(t.id)===String(e.id));i?(Object.assign(i,t),r++):(n.push(t),s++)}),window.state.clients=n,this._setSyncTimestamp("clients"),Logger.info(`Synced clients (${t?"delta":"full"}): ${s} added, ${r} updated`),"function"==typeof window.populateClientSidebar&&(window.populateClientSidebar(),Logger.info("Client sidebar refreshed after sync")),{added:s,updated:r}}catch(e){return Logger.error("Failed to fetch clients from Supabase:",e),{added:0,updated:0}}},async syncAuditorsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("auditors"),{data:i,error:a}=await e.order("name",{ascending:!0});if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=window.state.auditors||[];let s=0,r=0;i.forEach(e=>{const t=n.find(t=>String(t.id)===String(e.id));if(t)Object.assign(t,e),r++;else{const t={id:e.id,name:e.name,role:e.role,email:e.email,phone:e.phone,location:e.location,experience:e.experience,standards:e.standards||[],domainExpertise:e.expertise||[],industries:e.industries||[],manDayRate:e.man_day_rate,education:e.education,customerRating:e.rating,status:e.status};n.push(t),s++}});const o=window.state.users||[];return n.forEach(e=>{if(e.email){const t=o.find(t=>t.email?.toLowerCase()===e.email.toLowerCase());t&&(e.userId=t.id||t.supabaseId)}}),window.state.auditors=n,this._setSyncTimestamp("auditors"),Logger.info(`Synced auditors (${t?"delta":"full"}): ${s} added, ${r} updated`),{added:s,updated:r}}catch(e){return Logger.error("Failed to fetch auditors from Supabase:",e),{added:0,updated:0}}},async syncAuditorAssignmentsToSupabase(e){if(this.isInitialized&&e?.length)try{Logger.info(`[syncAuditorAssignmentsToSupabase] Syncing ${e.length} assignments...`);for(const t of e){const e={id:t.id||Date.now(),auditor_id:String(t.auditorId),user_id:t.userId||null,client_id:String(t.clientId),role:t.role||"Auditor",assigned_by:t.assignedBy||"System",assigned_at:t.assignedAt||(new Date).toISOString(),updated_at:(new Date).toISOString()};Logger.info("[syncAuditorAssignmentsToSupabase] Upserting assignment:",e);const{data:i,error:a}=await this.client.from("auditor_assignments").upsert(e,{onConflict:"id"});if(a)throw Logger.error("[syncAuditorAssignmentsToSupabase] Upsert failed:",a),a;Logger.info("[syncAuditorAssignmentsToSupabase] Assignment synced successfully:",i)}Logger.info(`✓ Synced ${e.length} assignments to Supabase`)}catch(e){throw Logger.error("[syncAuditorAssignmentsToSupabase] Failed to sync assignments:",e),console.error("Full error details:",e),e}else Logger.warn("Supabase not initialized or no assignments to sync")},async syncAuditorAssignmentsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("auditor_assignments"),{data:i,error:a}=await e;if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=window.state.auditorAssignments||[];let s=0,r=0;return i.forEach(e=>{const t=n.find(t=>String(t.auditorId)===String(e.auditor_id)&&String(t.clientId)===String(e.client_id)),i={id:e.id,auditorId:String(e.auditor_id),userId:e.user_id,clientId:String(e.client_id),role:e.role||"Auditor",assignedBy:e.assigned_by,assignedAt:e.assigned_at};t?(Object.assign(t,i),r++):(n.push(i),s++)}),window.state.auditorAssignments=n,window.saveData(),this._setSyncTimestamp("auditor_assignments"),Logger.info(`Synced assignments (${t?"delta":"full"}): ${s} added, ${r} updated`),{added:s,updated:r}}catch(e){return Logger.error("Failed to fetch assignments from Supabase:",e),{added:0,updated:0}}},async deleteAuditorAssignment(e,t){if(!this.isInitialized)return null;try{const{error:i}=await this.client.from("auditor_assignments").delete().match({auditor_id:e,client_id:t});if(i)throw i;return Logger.info(`Deleted assignment for auditor ${e} and client ${t}`),!0}catch(e){throw Logger.error("Failed to delete assignment:",e),e}},async syncAuditPlansToSupabase(e){if(this.isInitialized&&e?.length)try{for(const t of e){const e=Array.isArray(t.auditors)?t.auditors.map(e=>String(e)):[],i=Array.isArray(t.auditTeam)?t.auditTeam.map(e=>String("object"==typeof e&&(e.id||e.name)||e)):[],a=Array.isArray(t.selectedChecklists)&&t.selectedChecklists.length>0?t.selectedChecklists:Array.isArray(t.checklistIds)?t.checklistIds:[],n={id:String(t.id),client_name:t.client||t.clientName||null,client_id:t.clientId?String(t.clientId):null,standard:t.standard||null,date:t.date||null,auditor_ids:e,status:t.status||"Planned",objectives:t.objectives||null,scope:t.scope||null,man_days:Number(t.manDays)||0,selected_checklists:a,start_date:t.date||t.startDate||null,end_date:t.endDate||t.date||null,lead_auditor:t.leadAuditor||null,audit_team:i,pre_audit:t.preAudit||null,updated_at:(new Date).toISOString()};await this.client.from("audit_plans").upsert(n,{onConflict:"id"})}Logger.info(`Synced ${e.length} audit plans to Supabase`)}catch(e){throw Logger.error("Failed to sync audit plans:",e),e}},async syncAuditReportsToSupabase(e){if(this.isInitialized&&e?.length)try{for(const t of e){const e=Array.isArray(t.ncrs)?t.ncrs:[],i={id:String(t.id),client_id:t.clientId?String(t.clientId):null,date:t.date||null,status:t.status||"Draft",findings:Number(t.findings)||0,conclusion:t.conclusion||null,recommendation:t.recommendation||null,ncrs:e,audit_type:t.auditType||null,lead_auditor:t.leadAuditor||null,audit_plan_id:t.auditPlanId?String(t.auditPlanId):null,opening_meeting:t.openingMeeting||{},closing_meeting:t.closingMeeting||{},checklist_progress:t.checklistProgress||[],custom_items:t.customItems||[],updated_at:(new Date).toISOString()};await this.client.from("audit_reports").upsert(i,{onConflict:"id"})}Logger.info(`Synced ${e.length} audit reports to Supabase`)}catch(e){throw Logger.error("Failed to sync audit reports:",e),e}},async upsertAuditReport(e,t){if(!this.isInitialized)return Logger.warn("Supabase not initialized for upsertAuditReport"),!1;try{const i={updated_at:(new Date).toISOString()};void 0!==t.openingMeeting&&(i.opening_meeting=t.openingMeeting),void 0!==t.closingMeeting&&(i.closing_meeting=t.closingMeeting),void 0!==t.checklistProgress&&(i.checklist_progress=t.checklistProgress),void 0!==t.customItems&&(i.custom_items=t.customItems),void 0!==t.ncrs&&(i.ncrs=t.ncrs),void 0!==t.status&&(i.status=t.status),void 0!==t.conclusion&&(i.conclusion=t.conclusion),void 0!==t.recommendation&&(i.recommendation=t.recommendation);const{error:a}=await this.client.from("audit_reports").update(i).eq("id",String(e));if(a)throw a;return Logger.info(`upsertAuditReport: updated report ${e}`,Object.keys(i)),!0}catch(e){return Logger.error("upsertAuditReport failed:",e),!1}},async syncAuditPlansFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("audit_plans"),{data:i,error:a}=await e.order("date",{ascending:!1});if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=window.state.auditPlans||[];let s=0,r=0;return i.forEach(e=>{const t=e.data||{},i={...t,id:e.id,client:e.client_name||e.client||t.client,clientName:e.client_name||t.clientName,clientId:e.client_id||t.clientId,date:e.date||t.date,status:e.status||t.status,auditType:e.audit_type||t.auditType,standard:e.standard||t.standard,scope:e.scope||t.scope,objectives:e.objectives||t.objectives,manDays:e.man_days||t.manDays,auditors:e.auditor_ids||t.auditors||[],checklistIds:(e.selected_checklists?.length?e.selected_checklists:null)||t.selectedChecklists||t.checklistIds||[],selectedChecklists:(e.selected_checklists?.length?e.selected_checklists:null)||t.selectedChecklists||[],selectedChecklistItems:t.selectedChecklistItems||{},selectedChecklistOverrides:t.selectedChecklistOverrides||{},checklistConfig:e.checklist_config||t.checklistConfig||[],startDate:e.start_date||t.startDate,endDate:e.end_date||t.endDate,leadAuditor:e.lead_auditor||t.leadAuditor,auditTeam:e.audit_team||t.auditTeam||[],preAudit:e.pre_audit||t.preAudit||null},a=n.find(t=>String(t.id)===String(e.id));a?(Object.assign(a,i),r++):(n.push(i),s++)}),window.state.auditPlans=n,this._setSyncTimestamp("audit_plans"),Logger.info(`Synced audit plans (${t?"delta":"full"}): ${s} added, ${r} updated`),{added:s,updated:r}}catch(e){return Logger.error("Failed to fetch audit plans from Supabase:",e),{added:0,updated:0}}},async syncAuditReportsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("audit_reports"),{data:i,error:a}=await e.order("date",{ascending:!1});if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=window.state.auditReports||[];let s=0,r=0;return i.forEach(e=>{const t=e.data||{},i={...t,id:e.id,planId:e.plan_id||e.audit_plan_id||t.planId,clientId:e.client_id||t.clientId,client:e.client_name||t.client,date:e.date||e.audit_date||t.date,status:e.status||t.status,auditType:e.audit_type||e.auditType||t.auditType,leadAuditor:e.lead_auditor||e.leadAuditor||t.leadAuditor,findings:e.findings||e.findings_count||t.findings||0,conformities:e.conformities||t.conformities||0,conclusion:e.conclusion||t.conclusion,recommendation:e.recommendation||t.recommendation,checklistProgress:e.checklist_progress||e.checklist_data||t.checklistProgress||[],customItems:e.custom_items||t.customItems||[],openingMeeting:e.opening_meeting||t.openingMeeting||{},closingMeeting:e.closing_meeting||t.closingMeeting||{},ncrs:e.ncrs||t.ncrs||[]},a=n.find(t=>String(t.id)===String(e.id));a?(Object.assign(a,i),r++):(n.push(i),s++)}),window.state.auditReports=n,this._setSyncTimestamp("audit_reports"),Logger.info(`Synced audit reports (${t?"delta":"full"}): ${s} added, ${r} updated`),{added:s,updated:r}}catch(e){return Logger.error("Failed to fetch audit reports from Supabase:",e),{added:0,updated:0}}},async syncChecklistsToSupabase(e){if(this.isInitialized&&e?.length)try{for(const t of e){const e={id:t.id,name:t.name,standard:t.standard,type:t.type||"global",audit_type:t.auditType||null,audit_scope:t.auditScope||null,created_by:t.createdBy||null,clauses:t.clauses||[],updated_at:(new Date).toISOString()};await this.client.from("checklists").upsert(e,{onConflict:"id"})}Logger.info(`Synced ${e.length} checklists to Supabase`)}catch(e){throw Logger.error("Failed to sync checklists:",e),e}},async syncChecklistsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("checklists"),{data:i,error:a}=await e.order("name",{ascending:!0});if(a)throw a;const n=!window.state.checklists||0===window.state.checklists.length;if(t&&(!i||0===i.length)&&n){Logger.warn("Incremental checklist sync returned 0 but local state is empty — forcing full sync");try{sessionStorage.removeItem("sync_ts_checklists")}catch(e){}return this.syncChecklistsFromSupabase()}const s=(i||[]).map(e=>({id:e.id,name:e.name,standard:e.standard,type:e.type,auditType:e.audit_type,auditScope:e.audit_scope,createdBy:e.created_by,clientName:e.client_name||null,clientId:e.client_id||null,clauses:e.clauses,createdAt:e.created_at,updatedAt:e.updated_at})),r=(window.state.checklists||[]).length,o=s.length;let d=0,l=0;if(t&&o>0){const e=window.state.checklists||[];s.forEach(t=>{const i=e.findIndex(e=>String(e.id)===String(t.id));-1!==i?(e[i]=t,l++):(e.push(t),d++)}),window.state.checklists=e}else window.state.checklists=s,d=Math.max(0,o-r),l=Math.min(r,o);return this._setSyncTimestamp("checklists"),Logger.info(`Synced checklists (${t?"delta":"full"}): ${o} fetched, ${d} added, ${l} updated`),{added:d,updated:l}}catch(e){return Logger.error("Failed to fetch checklists from Supabase:",e),{added:0,updated:0}}},async syncSettingsToSupabase(e){if(this.isInitialized)try{const t=e?.standards||window.state.settings?.standards||[],i=e?.roles||window.state.settings?.roles||[],a=e?.isAdmin||window.state.settings?.isAdmin||!1;let n=window.state.settingsId;if(!n){const{data:e}=await this.client.from("settings").select("id").limit(1).maybeSingle();e&&(n=e.id)}const s={...n?{id:n}:{},standards:t,roles:i,is_admin:a,cb_settings:window.state.cbSettings||{},organization:window.state.orgStructure||[],policies:window.state.cbPolicies||{},knowledge_base:window.state.knowledgeBase||{},updated_at:(new Date).toISOString()};Logger.debug("Sync","Syncing Settings to Supabase:",s);const{data:r,error:o}=await this.client.from("settings").upsert(s).select().single();if(o)throw Logger.error("Sync","Supabase Settings Sync Error:",o.message),o;r&&r.id&&(window.state.settingsId=r.id),Logger.info("Synced settings to Supabase")}catch(e){throw Logger.error("Failed to sync settings:",e),e}},async syncSettingsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{updated:!1};try{const{data:e,error:t}=await this.client.from("settings").select("*").limit(1).maybeSingle();if(t)throw t;return e?(window.state.settingsId=e.id,window.state.settings={standards:e.standards||[],roles:e.roles||[],isAdmin:e.is_admin||!1},e.cb_settings&&(window.state.cbSettings=e.cb_settings),e.organization&&(window.state.orgStructure=e.organization),e.policies&&(window.state.cbPolicies=e.policies),e.knowledge_base&&(window.state.knowledgeBase=e.knowledge_base),Logger.info("Synced settings from Supabase (Singleton)"),"function"==typeof window.updateCBLogoDisplay&&window.updateCBLogoDisplay(),{updated:!0}):{updated:!1}}catch(e){return Logger.error("Failed to fetch settings from Supabase:",e),{updated:!1}}},async syncDocumentsToSupabase(e){if(this.isInitialized&&e?.length)try{for(const t of e){const e={id:t.id,name:t.name,type:t.type||null,url:t.url||null,uploaded_by:t.uploadedBy||null,uploaded_at:t.uploadedAt||(new Date).toISOString(),updated_at:(new Date).toISOString()};await this.client.from("documents").upsert(e,{onConflict:"id"})}Logger.info(`Synced ${e.length} documents to Supabase`)}catch(e){throw Logger.error("Failed to sync documents:",e),e}},async syncDocumentsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("documents"),{data:i,error:a}=await e.order("uploaded_at",{ascending:!1});if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=window.state.documents||[];let s=0,r=0;return i.forEach(e=>{const t=n.find(t=>String(t.id)===String(e.id)),i={id:e.id,name:e.name,type:e.type,url:e.url,storagePath:e.storage_path,folder:e.folder,fileSize:e.file_size,uploadedBy:e.uploaded_by,uploadedAt:e.uploaded_at,uploadDate:e.uploaded_at?new Date(e.uploaded_at).toISOString().split("T")[0]:null};t?(Object.assign(t,i),r++):(n.push(i),s++);if(e.folder&&["standard","sop","policy","marketing"].includes(e.folder)){window.state.knowledgeBase||(window.state.knowledgeBase={standards:[],sops:[],policies:[],marketing:[]});const t=window.state.knowledgeBase;let a;if("standard"===e.folder?a=t.standards:"sop"===e.folder?a=t.sops:"policy"===e.folder?a=t.policies:"marketing"===e.folder&&(a=t.marketing),a){const t=String(e.id);a.some(i=>String(i.id)===t||i.cloudPath===e.storage_path)||(a.push({id:e.id,name:e.name,fileName:e.name,uploadDate:i.uploadDate,status:"pending",fileSize:e.file_size,cloudUrl:e.url,cloudPath:e.storage_path,clauses:[]}),Logger.info(`Auto-added document to Knowledge Base: ${e.name}`))}}}),window.state.documents=n,this._setSyncTimestamp("documents"),Logger.info(`Synced documents (${t?"delta":"full"}): ${s} added, ${r} updated`),{added:s,updated:r}}catch(e){return Logger.error("Failed to fetch documents from Supabase:",e),{added:0,updated:0}}},async syncCertificationDecisionsToSupabase(e){if(this.isInitialized&&e?.length)try{for(const t of e){const e={client:t.client,standard:t.standard,date:t.date,decision:t.decision,updated_at:(new Date).toISOString()};await this.client.from("certification_decisions").upsert(e,{onConflict:"client,standard,date"})}Logger.info(`Synced ${e.length} certification decisions to Supabase`)}catch(e){throw Logger.error("Failed to sync certification decisions:",e),e}},async syncCertificationDecisionsFromSupabase(){if(!this.isInitialized)return Logger.warn("Supabase not initialized"),{added:0,updated:0};try{const{query:e,isIncremental:t}=this._buildSyncQuery("certification_decisions"),{data:i,error:a}=await e.order("date",{ascending:!1});if(a)throw a;if(!i||!i.length)return{added:0,updated:0};const n=i.filter(e=>e.id&&e.status).map(e=>({id:e.id,client:e.client,standard:e.standard,issueDate:e.issue_date,expiryDate:e.expiry_date,status:e.status,scope:e.scope,history:e.history||[],decisionRecord:e.decision_record||{},certificateNo:e.decision_record?.certificate_no||"",revision:e.decision_record?.revision||"00",siteScopes:e.decision_record?.site_scopes||{},initialDate:e.decision_record?.initial_date||"",currentIssue:e.decision_record?.current_issue||""}));return window.state.certificationDecisions=i,n.length>0&&(window.state.certifications=n),this._setSyncTimestamp("certification_decisions"),Logger.info(`Synced cert decisions (${t?"delta":"full"}): ${i.length} rows (${n.length} active certs)`),{added:0,updated:i.length}}catch(e){return Logger.error("Failed to fetch certification decisions:",e),{added:0,updated:0}}},async upsertCertificate(e){if(this.isInitialized)try{const t={...e.decisionRecord||{},certificate_no:e.certificateNo,revision:e.revision,site_scopes:e.siteScopes,initial_date:e.initialDate,current_issue:e.currentIssue},i={id:e.id,client:e.client,standard:e.standard,issue_date:e.issueDate,expiry_date:e.expiryDate,status:e.status,scope:e.scope,history:e.history,decision_record:t,date:e.history?.[0]?.date||(new Date).toISOString().split("T")[0],decision:"Certified",updated_at:(new Date).toISOString()},{error:a}=await this.client.from("certification_decisions").upsert(i,{onConflict:"id"}).select();if(a)throw Logger.error("Supabase UPSERT Error:",a),a;Logger.info("Certificate synced to certification_decisions (JSONB):",e.id)}catch(e){throw Logger.error("Failed to sync certificate:",e),e}},async deleteCertificate(e){if(this.isInitialized)try{const{error:t}=await this.client.from("certification_decisions").delete().eq("id",e);if(t)throw t;Logger.info("Certificate deleted from certification_decisions:",e)}catch(e){throw Logger.error("Failed to delete certificate:",e),e}},async uploadFile(e,t="documents"){if(!this.isInitialized)throw new Error("Supabase not initialized");try{const i=Date.now(),a=`${t}/${i}_${e.name.replace(/[^a-zA-Z0-9.-]/g,"_")}`,{data:n,error:s}=await this.client.storage.from("documents").upload(a,e,{cacheControl:"3600",upsert:!1});if(s)throw s;const{data:r}=this.client.storage.from("documents").getPublicUrl(a);return Logger.info("File uploaded successfully:",a),{path:n.path,url:r.publicUrl,name:e.name,size:e.size,type:e.type}}catch(e){Logger.error("Failed to upload file:",e);const t=e.message||JSON.stringify(e);throw window.alert(`FILE UPLOAD FAILED:\n${t}`),e}},async downloadFile(e){if(!this.isInitialized)throw new Error("Supabase not initialized");try{const{data:t,error:i}=await this.client.storage.from("documents").download(e);if(i)throw i;return Logger.info("File downloaded successfully:",e),t}catch(e){throw Logger.error("Failed to download file:",e),e}},async deleteFile(e){if(!this.isInitialized)throw new Error("Supabase not initialized");try{const{error:t}=await this.client.storage.from("documents").remove([e]);if(t)throw t;return Logger.info("File deleted successfully:",e),!0}catch(e){throw Logger.error("Failed to delete file:",e),e}},async listFiles(e=""){if(!this.isInitialized)throw new Error("Supabase not initialized");try{const{data:t,error:i}=await this.client.storage.from("documents").list(e,{limit:100,offset:0,sortBy:{column:"created_at",order:"desc"}});if(i)throw i;return Logger.info(`Listed ${t.length} files in folder: ${e}`),t}catch(e){throw Logger.error("Failed to list files:",e),e}},async uploadDocument(e,t={}){if(!this.isInitialized)throw new Error("Supabase not initialized");try{const i=await this.uploadFile(e,t.folder||"documents"),a={id:Date.now(),name:t.name||e.name,type:e.type,url:i.url,storage_path:i.path,file_size:e.size,uploaded_by:t.uploadedBy||window.state?.currentUser?.email||"Unknown",uploaded_at:(new Date).toISOString(),folder:t.folder||"documents",description:t.description||null},{data:n,error:s}=await this.client.from("documents").insert(a).select().single();if(s)throw s;return window.state.documents||(window.state.documents=[]),window.state.documents.push({id:n.id,name:n.name,type:n.type,url:n.url,storagePath:n.storage_path,fileSize:n.file_size,uploadedBy:n.uploaded_by,uploadedAt:n.uploaded_at,folder:n.folder,description:n.description}),window.saveState(),Logger.info("Document uploaded and saved:",n.name),n}catch(e){throw Logger.error("Failed to upload document:",e),e}},async deleteDocument(e){if(!this.isInitialized)throw new Error("Supabase not initialized");try{const{data:t,error:i}=await this.client.from("documents").select("storage_path").eq("id",e).single();if(i)throw i;t.storage_path&&await this.deleteFile(t.storage_path);const{error:a}=await this.client.from("documents").delete().eq("id",e);if(a)throw a;return window.state.documents&&(window.state.documents=window.state.documents.filter(t=>t.id!==e),window.saveState()),Logger.info("Document deleted:",e),!0}catch(e){throw Logger.error("Failed to delete document:",e),e}}};window.SupabaseClient=SupabaseClient,"undefined"!=typeof supabase?"loading"===document.readyState?document.addEventListener("DOMContentLoaded",()=>SupabaseClient.init()):SupabaseClient.init():Logger.warn("Supabase library not loaded. Using localStorage fallback."),Logger.info("SupabaseClient module loaded"),"undefined"!=typeof module&&module.exports&&(module.exports=SupabaseClient);
+// ============================================
+// SUPABASE INTEGRATION MODULE (ESM-ready)
+// ============================================
+// Handles Supabase authentication and database operations
+
+const SupabaseClient = {
+    client: null,
+    isInitialized: false,
+
+    /**
+     * Initialize Supabase client
+     * NOTE: Add your Supabase credentials to .env or settings
+     */
+    init: function () {
+        try {
+            // Get Supabase credentials from SupabaseConfig module
+            const supabaseUrl = window.SupabaseConfig?.getUrl();
+            const supabaseKey = window.SupabaseConfig?.getAnonKey();
+
+            if (!supabaseUrl || !supabaseKey) {
+                Logger.warn('Supabase credentials not configured. Using localStorage fallback.');
+                this.isInitialized = false;
+                return false;
+            }
+
+            // Initialize Supabase client
+            this.client = supabase.createClient(supabaseUrl, supabaseKey);
+            this.isInitialized = true;
+
+            Logger.info('Supabase client initialized successfully');
+
+            // Setup auth state listener
+            this.setupAuthListener();
+
+            return true;
+        } catch (error) {
+            Logger.error('Failed to initialize Supabase:', error);
+            this.isInitialized = false;
+            return false;
+        }
+    },
+
+    /**
+     * Setup authentication state listener
+     */
+    setupAuthListener: function () {
+        if (!this.client) return;
+
+        this.client.auth.onAuthStateChange((event, session) => {
+            Logger.info('Auth state changed:', event);
+
+            if (event === 'SIGNED_IN' && session) {
+                this.handleSignIn(session);
+            } else if (event === 'SIGNED_OUT') {
+                this.handleSignOut();
+            } else if (event === 'TOKEN_REFRESHED') {
+                Logger.info('Token refreshed');
+            }
+        });
+    },
+
+    /**
+     * Handle sign in
+     */
+    handleSignIn: async function (session) {
+        const user = session.user;
+
+        // Determine role based on email if not set in metadata
+        let userRole = user.user_metadata?.role;
+        let userPermissions = user.user_metadata?.permissions;
+
+        // Check if admin email (configured in settings or user management)
+        const cbEmail = window.state?.cbSettings?.cbEmail?.toLowerCase() || '';
+        const adminUsers = (window.state?.users || [])
+            .filter(u => u.role === 'Admin')
+            .map(u => u.email?.toLowerCase());
+
+        // Include CB email as admin if configured
+        if (cbEmail) adminUsers.push(cbEmail);
+
+        if (adminUsers.includes(user.email.toLowerCase())) {
+            userRole = 'Admin';
+            userPermissions = ['all'];
+        } else if (!userRole) {
+            // Default to Auditor if no role set
+            userRole = 'Auditor';
+            userPermissions = ['view_assigned'];
+        }
+
+        // Update app state with user info
+        window.state.currentUser = {
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || user.email,
+            role: userRole,
+            permissions: userPermissions
+        };
+
+        Logger.info('User signed in:', window.state.currentUser.email, 'Initial Role:', userRole);
+
+        // 🆕 Load user's data from Supabase (always, for cross-window sync)
+        try {
+            Logger.info('Loading user data from Supabase...');
+            await this.loadUserDataFromCloud();
+            Logger.info('User data loaded successfully from cloud');
+
+            // Now update role from user management system
+            const managedUser = window.state?.users?.find(u =>
+                u.email?.toLowerCase() === window.state.currentUser.email.toLowerCase()
+            );
+
+            if (managedUser && managedUser.role) {
+                window.state.currentUser.role = managedUser.role;
+                window.state.currentUser.name = managedUser.name || window.state.currentUser.name;
+
+                // Update permissions based on role
+                const rolePermissions = {
+                    'Admin': ['all'],
+                    'Certification Manager': ['view_all', 'edit_clients', 'approve_reports', 'manage_auditors'],
+                    'Lead Auditor': ['view_assigned', 'edit_reports', 'create_ncr'],
+                    'Auditor': ['view_assigned']
+                };
+                window.state.currentUser.permissions = rolePermissions[managedUser.role] || ['view_assigned'];
+                Logger.info('Role updated from user management:', managedUser.role);
+            }
+        } catch (error) {
+            Logger.warn('Failed to load cloud data, using local data:', error.message);
+        }
+
+        // Refresh the client sidebar after sign-in completes
+        if (typeof window.populateClientSidebar === 'function') {
+            window.populateClientSidebar();
+            Logger.info('Client sidebar refreshed after sign-in');
+        }
+
+        // Show app chrome now that data is loaded
+        const sidebar = document.getElementById('sidebar');
+        const header = document.querySelector('.main-header');
+        if (sidebar) sidebar.style.display = '';
+        if (header) header.style.display = '';
+
+        const appContainer = document.getElementById('app-container');
+        if (appContainer) {
+            appContainer.classList.remove('auth-pending');
+            appContainer.classList.add('auth-ready');
+        }
+
+        // Redirect to dashboard if on login page — hashchange listener will render
+        if (window.location.hash === '' || window.location.hash === '#login') {
+            window.location.hash = 'dashboard';
+        } else if (window.location.hash === '#dashboard' && window.renderModule) {
+            // Already on dashboard — re-render with fresh cloud data
+            Logger.info('Re-rendering dashboard with fresh cloud data...');
+            window.renderModule('dashboard');
+        }
+    },
+
+    /**
+     * Handle sign out
+     */
+    handleSignOut: function () {
+        window.state.currentUser = null;
+        Logger.info('User signed out');
+
+        // Redirect to login
+        window.location.hash = 'login';
+        if (window.AuthManager) {
+            window.AuthManager.showLoginScreen();
+        }
+    },
+
+    /**
+     * Sign in with email and password
+     */
+    async signIn(email, password) {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized, using demo auth');
+            return null;
+        }
+
+        try {
+            const { data, error } = await this.client.auth.signInWithPassword({
+                email,
+                password
+            });
+
+            if (error) throw error;
+
+            Logger.info('Sign in successful');
+            return data;
+        } catch (error) {
+            Logger.error('Sign in failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sign up new user
+     * @param {string} email - User email
+     * @param {string} password - User password
+     * @param {object} metadata - User metadata (full_name, role, etc.)
+     * @param {object} options - Additional signup options (emailRedirectTo, etc.)
+     */
+    async signUp(email, password, metadata = {}, options = {}) {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return null;
+        }
+
+        try {
+            const { data, error } = await this.client.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: metadata, // user_metadata
+                    ...options // Spread additional options (emailRedirectTo, etc.)
+                }
+            });
+
+            if (error) throw error;
+
+            Logger.info('Sign up successful');
+            return data;
+        } catch (error) {
+            Logger.error('Sign up failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sign out
+     */
+    async signOut() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return;
+        }
+
+        try {
+            const { error } = await this.client.auth.signOut();
+            if (error) throw error;
+
+            Logger.info('Sign out successful');
+        } catch (error) {
+            Logger.error('Sign out failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get current session
+     */
+    async getSession() {
+        if (!this.isInitialized) return null;
+
+        try {
+            const { data, error } = await this.client.auth.getSession();
+            if (error) throw error;
+            return data.session;
+        } catch (error) {
+            Logger.error('Get session failed:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Get current user
+     */
+    async getUser() {
+        if (!this.isInitialized) return null;
+
+        try {
+            const { data, error } = await this.client.auth.getUser();
+            if (error) throw error;
+            return data.user;
+        } catch (error) {
+            Logger.error('Get user failed:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Fluent API Proxy for Database
+     * Allows: window.SupabaseClient.from('table').select()...
+     */
+    from(table) {
+        if (!this.client) {
+            Logger.error('Supabase client not initialized');
+            throw new Error('Supabase not initialized');
+        }
+        return this.client.from(table);
+    },
+
+    /**
+     * Direct Database Proxies
+     * Compatibility for window.SupabaseClient.update('table', id, data)
+     */
+    async insert(table, data) {
+        return this.db.insert(table, data);
+    },
+
+    async update(table, idOrData, data) {
+        // Support both (table, id, data) and (table, {id, ...data})
+        if (data === undefined && typeof idOrData === 'object') {
+            const id = idOrData.id;
+            return this.db.update(table, id, idOrData);
+        }
+        return this.db.update(table, idOrData, data);
+    },
+
+    async delete(table, id) {
+        return this.db.delete(table, id);
+    },
+
+    async select(table, filters) {
+        return this.db.select(table, filters);
+    },
+
+    /**
+     * INCREMENTAL SYNC HELPERS
+     * Track last sync timestamp per table to only fetch changed rows.
+     * Uses sessionStorage so each tab/session starts fresh but benefits
+     * from delta sync on subsequent navigations within the same session.
+     */
+    _getSyncTimestamp(table) {
+        try {
+            return sessionStorage.getItem(`sync_ts_${table}`) || null;
+        } catch (e) { Logger.debug('sessionStorage read failed (private mode?)', e.message); return null; }
+    },
+
+    _setSyncTimestamp(table) {
+        try {
+            sessionStorage.setItem(`sync_ts_${table}`, new Date().toISOString());
+        } catch (e) { Logger.debug('sessionStorage write failed (private mode?)', e.message); }
+    },
+
+    _clearSyncTimestamps() {
+        try {
+            const keys = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const k = sessionStorage.key(i);
+                if (k.startsWith('sync_ts_')) keys.push(k);
+            }
+            keys.forEach(k => sessionStorage.removeItem(k));
+            Logger.info('Sync timestamps cleared — next sync will be full');
+        } catch (e) { Logger.debug('sessionStorage clear failed (private mode?)', e.message); }
+    },
+
+    /**
+     * Build a Supabase query with optional incremental filter.
+     * If a previous sync timestamp exists for this table, adds .gte('updated_at', ts).
+     * @param {string} table - Table name
+     * @returns {{ query: object, isIncremental: boolean, lastSync: string|null }}
+     */
+    _buildSyncQuery(table) {
+        const lastSync = this._getSyncTimestamp(table);
+        let query = this.client.from(table).select('*').limit(5000);
+        if (lastSync) {
+            query = query.gte('updated_at', lastSync);
+        }
+        return { query, isIncremental: !!lastSync, lastSync };
+    },
+
+    /**
+     * Load all user data from Supabase cloud
+     * Called automatically on sign-in to sync data across devices
+     */
+    async loadUserDataFromCloud() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized, skipping cloud data load');
+            return;
+        }
+
+        try {
+            //  CRITICAL: Disable sync during initial data load
+            // This prevents saveData() calls within sync methods from uploading to cloud
+            window._dataFullyLoaded = false;
+
+            const syncStart = performance.now();
+            Logger.info('Loading user data from Supabase cloud (parallel)...');
+
+            // Sync all data entities from Supabase
+            const results = {
+                clients: { added: 0, updated: 0 },
+                auditors: { added: 0, updated: 0 },
+                users: { added: 0, updated: 0 },
+                settings: false,
+                documents: { added: 0, updated: 0 },
+                auditorAssignments: { added: 0, updated: 0 }
+            };
+
+            // PERFORMANCE: Run ALL independent syncs in parallel using Promise.allSettled
+            // This reduces login time from ~8s (sequential) to ~2s (parallel)
+            const [
+                clientsResult,
+                auditorsResult,
+                usersResult,
+                settingsResult,
+                documentsResult,
+                assignmentsResult,
+                plansResult,
+                reportsResult,
+                checklistsResult,
+                certsResult
+            ] = await Promise.allSettled([
+                this.syncClientsFromSupabase(),
+                this.syncAuditorsFromSupabase(),
+                this.syncUsersFromSupabase(),
+                this.syncSettingsFromSupabase(),
+                this.syncDocumentsFromSupabase(),
+                this.syncAuditorAssignmentsFromSupabase(),
+                this.syncAuditPlansFromSupabase(),
+                this.syncAuditReportsFromSupabase(),
+                this.syncChecklistsFromSupabase(),
+                this.syncCertificationDecisionsFromSupabase()
+            ]);
+
+            // Process results — log failures but don't crash
+            if (clientsResult.status === 'fulfilled') results.clients = clientsResult.value;
+            else { Logger.warn('Clients sync failed:', clientsResult.reason); window.showNotification('Failed to sync clients from cloud. Using local data.', 'warning'); }
+
+            if (auditorsResult.status === 'fulfilled') results.auditors = auditorsResult.value;
+            else { Logger.warn('Auditors sync failed:', auditorsResult.reason); window.showNotification('Failed to sync auditors from cloud. Using local data.', 'warning'); }
+
+            if (usersResult.status === 'fulfilled') results.users = usersResult.value;
+            else Logger.warn('Users sync failed:', usersResult.reason);
+
+            if (settingsResult.status === 'fulfilled') results.settings = settingsResult.value?.updated || false;
+            else Logger.warn('Settings sync failed:', settingsResult.reason);
+
+            if (documentsResult.status === 'fulfilled') results.documents = documentsResult.value;
+            else Logger.warn('Documents sync failed:', documentsResult.reason);
+
+            if (assignmentsResult.status === 'fulfilled') { results.auditorAssignments = assignmentsResult.value; Logger.info('Auditor assignments synced:', results.auditorAssignments); }
+            else Logger.warn('Auditor assignments sync failed:', assignmentsResult.reason);
+
+            if (plansResult.status === 'rejected') { Logger.warn('Audit Plans sync failed:', plansResult.reason); window.showNotification('Failed to sync audit plans. Working offline.', 'warning'); }
+            if (reportsResult.status === 'rejected') { Logger.warn('Audit Reports sync failed:', reportsResult.reason); window.showNotification('Failed to sync audit reports. Working offline.', 'warning'); }
+            if (checklistsResult.status === 'rejected') Logger.warn('Checklists sync failed:', checklistsResult.reason);
+            if (certsResult.status === 'rejected') Logger.warn('Certification Decisions sync failed:', certsResult.reason);
+
+            // HYDRATION: Link Certifications to Clients (optimized with Map for O(N+M) instead of O(N×M))
+            if (window.state.clients && window.state.certifications) {
+                // Pre-build lookup maps keyed by client name and ID
+                const certsByKey = new Map();
+                window.state.certifications.forEach(c => {
+                    const key = String(c.client);
+                    if (!certsByKey.has(key)) certsByKey.set(key, []);
+                    certsByKey.get(key).push(c);
+                });
+
+                let hydrationCount = 0;
+                window.state.clients.forEach(client => {
+                    const byName = certsByKey.get(client.name) || [];
+                    const byId = certsByKey.get(String(client.id)) || [];
+                    const merged = [...byName, ...byId.filter(c => !byName.includes(c))];
+                    if (merged.length > 0) {
+                        client.certificates = merged;
+                        hydrationCount++;
+                    }
+                });
+                Logger.info(`Hydrated certificates for ${hydrationCount} clients`);
+            }
+
+            // CRITICAL: Save to IndexedDB (don't call saveData - it triggers upload!)
+            try {
+                await window.StateStore.save(window.state);
+            } catch (_saveErr) {
+                Logger.warn('IndexedDB save failed during cloud sync. State kept in memory only.');
+            }
+
+            const elapsed = ((performance.now() - syncStart) / 1000).toFixed(1);
+            Logger.info(`Cloud data load complete in ${elapsed}s:`, results);
+            return results;
+        } catch (error) {
+            Logger.error('Failed to load user data from cloud:', error);
+            window.showNotification('Failed to connect to cloud database. Working offline.', 'error');
+            throw error;
+        } finally {
+            // Mark that data loading attempted (success or fail) to unblock UI
+            window._dataFullyLoaded = true;
+        }
+    },
+
+    /**
+     * Database operations
+     */
+    db: {
+        /**
+         * Insert data
+         */
+        insert: async function (table, data) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                const { data: result, error } = await SupabaseClient.client
+                    .from(table)
+                    .insert(data)
+                    .select();
+
+                if (error) throw error;
+                return result;
+            } catch (error) {
+                Logger.error(`Insert to ${table} failed:`, error);
+                throw error;
+            }
+        },
+
+        /**
+         * Upsert data
+         */
+        upsert: async function (table, data) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                const { data: result, error } = await SupabaseClient.client
+                    .from(table)
+                    .upsert(data)
+                    .select();
+
+                if (error) throw error;
+                return result;
+            } catch (error) {
+                Logger.error(`Upsert to ${table} failed:`, error);
+                throw error;
+            }
+        },
+
+        update: async function (table, id, data) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                const { data: result, error } = await SupabaseClient.client
+                    .from(table)
+                    .update(data)
+                    .eq('id', id)
+                    .select();
+
+                if (error) throw error;
+                return result;
+            } catch (error) {
+                Logger.error(`Update ${table} failed:`, error);
+                throw error;
+            }
+        },
+
+        /**
+         * Delete data
+         */
+        delete: async function (table, id) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                const { error } = await SupabaseClient.client
+                    .from(table)
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                return true;
+            } catch (error) {
+                Logger.error(`Delete from ${table} failed:`, error);
+                throw error;
+            }
+        },
+
+        /**
+         * Select data
+         */
+        select: async function (table, filters = {}) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                let query = SupabaseClient.client.from(table).select('*').limit(5000);
+
+                // Apply filters
+                for (const [key, value] of Object.entries(filters)) {
+                    query = query.eq(key, value);
+                }
+
+                const { data, error } = await query;
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                Logger.error(`Select from ${table} failed:`, error);
+                throw error;
+            }
+        },
+
+        /**
+         * Get single record by ID
+         */
+        getById: async function (table, id) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, using localStorage');
+                return null;
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client
+                    .from(table)
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                Logger.error(`Get from ${table} failed:`, error);
+                throw error;
+            }
+        }
+    },
+
+    /**
+     * Storage operations
+     */
+    storage: {
+        /**
+         * Upload file
+         */
+        upload: async function (bucket, path, file) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return null;
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+                Logger.info('File uploaded:', path);
+                return data;
+            } catch (error) {
+                Logger.error('File upload failed:', error);
+                throw error;
+            }
+        },
+
+        /**
+         * Upload generic file (PDF, Doc, Image)
+         * @param {File|Blob} file - The file to upload
+         * @param {string} bucket - Target bucket name
+         * @param {string} folder - Target folder/prefix
+         * @param {string} entityId - Related entity ID (optional)
+         * @returns {object} { url, path, fileName } or null
+         */
+        uploadGenericFile: async function (file, bucket, folder, entityId = '') {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return null;
+            }
+
+            try {
+                // Generate unique filename
+                const timestamp = Date.now();
+                const cleanFileName = file.name ? file.name.replace(/[^a-zA-Z0-9.-]/g, '_') : 'unnamed_file';
+                const prefix = entityId ? `${entityId}_` : '';
+                const filename = `${prefix}${timestamp}_${cleanFileName}`;
+                const path = folder ? `${folder}/${filename}` : filename;
+
+                // Upload
+                const { data: _data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Get URL - prefer public URL (permanent) for public buckets like audit-images
+                let url;
+                const { data: publicUrlData } = SupabaseClient.client.storage
+                    .from(bucket)
+                    .getPublicUrl(path);
+                if (publicUrlData && publicUrlData.publicUrl) {
+                    url = publicUrlData.publicUrl;
+                } else {
+                    // Fallback to signed URL for private buckets
+                    url = await this.getSignedUrl(bucket, path);
+                }
+
+                Logger.info(`File uploaded to ${bucket}:`, path);
+                return { url, path, fileName: file.name || filename };
+            } catch (error) {
+                Logger.error('File upload failed:', error);
+                return null;
+            }
+        },
+
+        /**
+         * Upload audit image
+         * @param {File} file - The image file
+         * @param {string} context - Context (e.g., 'client-logo', 'ncr-evidence', 'checklist')
+         * @param {string} entityId - Related entity ID
+         * @returns {object} { url, path } or null
+         */
+        /**
+         * Upload client logo
+         * @param {File} file - The image file
+         * @param {string} clientId - Client ID
+         * @returns {object} { url, path } or null
+         */
+        uploadClientLogo: async function (file, clientId) {
+            if (!SupabaseClient.isInitialized) return null;
+
+            // Use 'audit-logos' bucket (matches user's existing bucket)
+            const bucket = 'audit-logos';
+            const timestamp = Date.now();
+            const cleanFileName = file.name ? file.name.replace(/[^a-zA-Z0-9.-]/g, '_') : 'logo';
+            const path = `client-logos/${clientId}_${timestamp}_${cleanFileName}`;
+
+            try {
+                const { data: _data2, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .upload(path, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) {
+                    console.error('[SupabaseStorage] Upload Action Error:', error);
+                    throw error;
+                }
+
+                // Try to get Public URL first (preferred for logos)
+                const { data: publicUrlData } = SupabaseClient.client.storage
+                    .from(bucket)
+                    .getPublicUrl(path);
+
+                if (publicUrlData && publicUrlData.publicUrl) {
+                    Logger.info('Client logo uploaded (public):', publicUrlData.publicUrl);
+                    return { url: publicUrlData.publicUrl, path };
+                }
+
+                // Fallback to signed URL if public fails
+                const signedUrl = await this.getSignedUrl(bucket, path, 86400 * 365); // 1 year
+                return { url: signedUrl, path };
+            } catch (error) {
+                Logger.error('Client logo upload failed:', error);
+
+                // DEBUG: Show explicit alert for the user
+                const msg = error.message || (error.error_description) || JSON.stringify(error);
+                let hint = '';
+                if (msg.includes('policies')) hint = '\nHINT: Storage bucket policies may be blocking writes. Check "audit-logos" bucket permissions.';
+                if (msg.includes('403')) hint = '\nHINT: 403 Forbidden - Permission denied. Check role permissions on storage objects.';
+                if (msg.includes('bucket')) hint = '\nHINT: Bucket might not exist or is not public.';
+                if (msg.includes('Payload Too Large')) hint = '\nHINT: File size too large.';
+
+                window.alert(`LOGO UPLOAD FAILED:\n${msg}${hint}\n\nCheck console for details.`);
+                console.error('[SupabaseStorage] Full Error Metadata:', {
+                    error,
+                    bucket,
+                    path,
+                    fileType: file.type,
+                    fileSize: file.size
+                });
+
+                return null;
+            }
+        },
+
+        uploadAuditImage: async function (file, context, entityId) {
+            return this.uploadGenericFile(file, 'audit-images', context, entityId);
+        },
+
+        /**
+         * Upload audit report (PDF)
+         * @param {Blob|File} pdfBlob - The PDF file/blob
+         * @param {string} reportType - Type of report (e.g., 'audit-report', 'ncr-report', 'certificate')
+         * @param {string} clientName - Client name for filename
+         * @param {string} reportId - Report ID
+         * @returns {object} { url, path } or null
+         */
+        uploadAuditReport: async function (pdfBlob, reportType, clientName, reportId) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized, report saved locally only');
+                return null;
+            }
+
+            try {
+                // Generate unique filename
+                const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+                const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+                const filename = `${reportType}_${sanitizedClientName}_${reportId}_${timestamp}.pdf`;
+                const path = `${reportType}/${filename}`;
+
+                // Upload to audit-reports bucket
+                const { data: _data3, error } = await SupabaseClient.client.storage
+                    .from('audit-reports')
+                    .upload(path, pdfBlob, {
+                        contentType: 'application/pdf',
+                        cacheControl: '31536000', // 1 year cache for reports
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                // Get signed URL for the report (long expiry for reports)
+                const url = await this.getSignedUrl('audit-reports', path, 86400 * 30); // 30 days
+
+                Logger.info('Audit report uploaded:', path);
+
+                // Log to audit trail
+                if (window.AuditLogger) {
+                    AuditLogger.log('upload', 'report', reportId, {}, {
+                        summary: `Uploaded ${reportType} for ${clientName}`,
+                        path,
+                        size: pdfBlob.size
+                    });
+                }
+
+                return { url, path, filename };
+            } catch (error) {
+                Logger.error('Audit report upload failed:', error);
+                return null;
+            }
+        },
+
+        /**
+         * Download file
+         */
+        download: async function (bucket, path) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return null;
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .download(path);
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                Logger.error('File download failed:', error);
+                throw error;
+            }
+        },
+
+        /**
+         * Get public URL
+         */
+        getPublicUrl: function (bucket, path) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return null;
+            }
+
+            const { data } = SupabaseClient.client.storage
+                .from(bucket)
+                .getPublicUrl(path);
+
+            return data.publicUrl;
+        },
+
+        /**
+         * Get signed URL (for private buckets)
+         */
+        getSignedUrl: async function (bucket, path, expiresIn = 3600) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return null;
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .createSignedUrl(path, expiresIn);
+
+                if (error) throw error;
+                return data.signedUrl;
+            } catch (error) {
+                Logger.error('Get signed URL failed:', error);
+                return null;
+            }
+        },
+
+        /**
+         * Delete file
+         */
+        deleteFile: async function (bucket, path) {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return false;
+            }
+
+            try {
+                const { error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .remove([path]);
+
+                if (error) throw error;
+                Logger.info('File deleted:', path);
+                return true;
+            } catch (error) {
+                Logger.error('File delete failed:', error);
+                return false;
+            }
+        },
+
+        /**
+         * List files in a bucket path
+         */
+        listFiles: async function (bucket, folder = '') {
+            if (!SupabaseClient.isInitialized) {
+                Logger.warn('Supabase not initialized');
+                return [];
+            }
+
+            try {
+                const { data, error } = await SupabaseClient.client.storage
+                    .from(bucket)
+                    .list(folder);
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                Logger.error('List files failed:', error);
+                return [];
+            }
+        }
+    },
+
+    // ============================================
+    // USER PROFILE SYNC METHODS
+    // ============================================
+
+    /**
+     * Upsert a user profile to Supabase
+     */
+    async upsertUserProfile(user) {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized for user sync');
+            return null;
+        }
+
+        try {
+            // Generate UUID from user ID or create new one
+            let userId;
+            if (user.id && typeof user.id === 'string' && user.id.includes('-')) {
+                // Already a UUID
+                userId = user.id;
+            } else {
+                // Generate deterministic UUID from email
+                userId = crypto.randomUUID();
+            }
+
+            const profileData = {
+                id: userId,
+                email: user.email,
+                full_name: user.name,
+                role: user.role,
+                avatar_url: user.avatar || null,
+                updated_at: new Date().toISOString()
+            };
+
+            const { data, error } = await this.client
+                .from('profiles')
+                .upsert(profileData, { onConflict: 'email' })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            Logger.info('User profile synced:', user.email);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to upsert user profile:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch all user profiles from Supabase
+     */
+    async fetchUserProfiles() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return [];
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('profiles');
+            const { data, error } = await query.order('full_name', { ascending: true });
+
+            if (error) throw error;
+
+            this._setSyncTimestamp('profiles');
+            Logger.info(`Fetched user profiles (${isIncremental ? 'incremental' : 'full'}): ${data?.length || 0}`);
+            return data || [];
+        } catch (error) {
+            Logger.error('Failed to fetch user profiles:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Sync all local users to Supabase
+     */
+    async syncUsersToSupabase(users) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        const results = { success: 0, failed: 0, errors: [] };
+
+        for (const user of users) {
+            try {
+                await this.upsertUserProfile(user);
+                results.success++;
+            } catch (error) {
+                results.failed++;
+                results.errors.push({ email: user.email, error: error.message });
+            }
+        }
+
+        Logger.info(`User sync complete: ${results.success} synced, ${results.failed} failed`);
+        return results;
+    },
+
+    /**
+     * Pull users from Supabase and merge with local
+     */
+    async syncUsersFromSupabase() {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        const profiles = await this.fetchUserProfiles();
+
+        if (!profiles.length) {
+            return { added: 0, updated: 0 };
+        }
+
+        const localUsers = window.state.users || [];
+        let added = 0, updated = 0;
+
+        profiles.forEach(profile => {
+            const existing = localUsers.find(u => u.email === profile.email);
+            if (existing) {
+                // Update existing
+                existing.name = profile.full_name;
+                existing.role = profile.role;
+                existing.avatar = profile.avatar_url;
+                updated++;
+            } else {
+                // Add new
+                localUsers.push({
+                    id: profile.id,
+                    email: profile.email,
+                    name: profile.full_name,
+                    role: profile.role,
+                    status: 'Active',
+                    avatar: profile.avatar_url
+                });
+                added++;
+            }
+        });
+
+        window.state.users = localUsers;
+        window.saveData();
+
+        Logger.info(`Synced from Supabase: ${added} added, ${updated} updated`);
+        return { added, updated };
+    },
+
+    /**
+     // Send password reset email via Supabase Auth
+    sendPasswordResetEmail: async function (email) {
+        try {
+            if (!this.client) {
+                throw new Error('Supabase client not initialized');
+            }
+
+            const { error } = await this.client.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/#password-reset`
+            });
+
+            if (error) throw error;
+
+            Logger.info('Password reset email sent to:', email);
+            return { success: true };
+        } catch (error) {
+            Logger.error('Failed to send password reset email:', error);
+            throw error;
+        }
+    },
+
+    // Update user password (Admin function - requires Supabase Admin API or Service Role)
+    // This is a workaround using password reset for now
+    updateUserPassword: async function (email, newPassword) {
+        try {
+            if (!this.client) {
+                throw new Error('Supabase client not initialized');
+            }
+
+            // Note: Updating another user's password requires Supabase Admin API
+            // This implementation uses the current session to update password
+            // For a production app, you'd need a backend endpoint with service role key
+            
+            Logger.warn('Password update for users other than current user requires backend implementation');
+            
+            // Check if we're updating the current user
+            const { data: { user } } = await this.client.auth.getUser();
+            
+            if (user && user.email === email) {
+                // Updating current user - this works
+                const { error } = await this.client.auth.updateUser({
+                    password: newPassword
+                });
+
+                if (error) throw error;
+
+                Logger.info('Password updated successfully for:', email);
+                return { success: true };
+            } else {
+                // Updating another user - send password reset instead
+                Logger.info('Sending password reset email to:', email);
+                return await this.sendPasswordResetEmail(email);
+            }
+        } catch (error) {
+            Logger.error('Failed to update password:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upsert a single client to Supabase
+     * Handles both Insert (New) and Update (Edit/Add Site/etc)
+     */
+    async upsertClient(client) {
+        if (!this.isInitialized) return;
+
+        try {
+            const clientData = {
+                id: String(client.id), // Ensure id is a string for TEXT column
+                name: client.name,
+                standard: client.standard,
+                status: client.status,
+                type: client.type,
+                website: client.website || null,
+                employees: client.employees || 0,
+                shifts: client.shifts || 'No',
+                industry: client.industry || null,
+                contacts: client.contacts || [],
+                sites: client.sites || [],
+                departments: client.departments || [],
+                designations: client.designations || [],
+                goods_services: client.goodsServices || [],
+                key_processes: client.keyProcesses || [],
+                // Derived fields if not present
+                contact_person: client.contactPerson || (client.contacts?.[0]?.name) || null,
+                logo_url: client.logoUrl || null,
+                // Use current user ID from app state
+                created_by: client.createdBy || window.state?.currentUser?.id || null,
+                updated_at: new Date().toISOString(),
+                // Store extended data in JSONB column
+                data: {
+                    profile: client.profile || null,
+                    profileUpdated: client.profileUpdated || null,
+                    profileHistory: client.profileHistory || [],
+                    certificates: client.certificates || [],
+                    nextAudit: client.nextAudit || null
+                }
+            };
+
+
+            const { data, error } = await this.client
+                .from('clients')
+                .upsert(clientData, { onConflict: 'id' })
+                .select();
+
+            if (error) {
+                console.error('[upsertClient] Supabase Error:', error);
+                throw error;
+            }
+            Logger.info('Client saved to Supabase:', client.name);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to save client:', error);
+            throw error; // Re-throw to let caller handle it
+        }
+    },
+
+    /**
+     * Sync clients to Supabase
+     */
+    async syncClientsToSupabase(clients) {
+        if (!this.isInitialized) return;
+
+        try {
+            // CRITICAL: Delete ALL clients first, then insert current list
+            // Upsert won't remove deleted clients from database
+            Logger.info('Replacing all clients in database...');
+
+            // DELETED 2026-01-27: This was causing mass data loss when local state was empty or stale.
+            // Using a safe upsert-only approach instead.
+            // await this.client
+            //     .from('clients')
+            //     .delete()
+            //     .gte('id', 0); // Delete all (id >= 0 matches everything)
+
+            // Insert current clients if any
+            if (clients?.length > 0) {
+                const clientsData = clients.map(client => ({
+                    id: String(client.id),
+                    name: client.name,
+                    standard: client.standard,
+                    status: client.status,
+                    type: client.type,
+                    website: client.website || null,
+                    employees: client.employees || 0,
+                    shifts: client.shifts || 'No',
+                    industry: client.industry || null,
+                    contacts: client.contacts || [],
+                    sites: client.sites || [],
+                    departments: client.departments || [],
+                    designations: client.designations || [],
+                    goods_services: client.goodsServices || [],
+                    key_processes: client.keyProcesses || [],
+                    contact_person: client.contactPerson || null,
+                    logo_url: client.logoUrl || null,
+                    updated_at: new Date().toISOString(),
+                    data: {
+                        profile: client.profile || null,
+                        profileUpdated: client.profileUpdated || null,
+                        profileHistory: client.profileHistory || [],
+                        certificates: client.certificates || [],
+                        nextAudit: client.nextAudit || null
+                    }
+                }));
+
+                const { error } = await this.client
+                    .from('clients')
+                    .upsert(clientsData);
+
+                if (error) throw error;
+            }
+
+            Logger.info(`✅ Database updated: ${clients?.length || 0} clients`);
+        } catch (error) {
+            Logger.error('Failed to sync clients:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sync auditors to Supabase
+     */
+    async syncAuditorsToSupabase(auditors) {
+        if (!this.isInitialized || !auditors?.length) return;
+
+        try {
+            const batch = auditors.map(auditor => ({
+                id: auditor.id,
+                name: auditor.name,
+                role: auditor.role,
+                email: auditor.email || null,
+                phone: auditor.phone || null,
+                location: auditor.location || null,
+                experience: auditor.experience || 0,
+                standards: auditor.standards || [],
+                expertise: auditor.domainExpertise || auditor.expertise || [],
+                industries: auditor.industries || [],
+                man_day_rate: auditor.manDayRate || 0,
+                education: auditor.education || null,
+                rating: auditor.customerRating || 0,
+                status: auditor.status || 'Active',
+                updated_at: new Date().toISOString()
+            }));
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('auditors')
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert auditors failed:', error); throw error; }
+            }
+            Logger.info(`Synced ${auditors.length} auditors to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync auditors:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch clients from Supabase and merge with local state
+     */
+    async syncClientsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('clients');
+            const { data, error } = await query.order('name', { ascending: true });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localClients = window.state.clients || [];
+            let added = 0, updated = 0;
+
+            data.forEach(client => {
+                const mappedClient = {
+                    id: client.id,
+                    name: client.name,
+                    standard: client.standard,
+                    status: client.status,
+                    type: client.type,
+                    website: client.website,
+                    employees: client.employees,
+                    shifts: client.shifts,
+                    industry: client.industry,
+                    contacts: client.contacts || [],
+                    sites: client.sites || [],
+                    departments: client.departments || [],
+                    designations: client.designations || [],
+                    goodsServices: client.goods_services || [],
+                    keyProcesses: client.key_processes || [],
+                    contactPerson: client.contact_person,
+                    updatedAt: client.updated_at,
+                    logoUrl: client.logo_url,
+                    // Restore extended data from JSONB
+                    profile: (client.data && client.data.profile) || null,
+                    profileUpdated: (client.data && client.data.profileUpdated) || null,
+                    profileHistory: (client.data && client.data.profileHistory) || [],
+                    certificates: (client.data && client.data.certificates) || [],
+                    nextAudit: (client.data && client.data.nextAudit) || null
+                };
+
+                const existing = localClients.find(c => String(c.id) === String(client.id));
+                if (existing) {
+                    // Update existing
+                    Object.assign(existing, mappedClient);
+                    updated++;
+                } else {
+                    // Add new
+                    localClients.push(mappedClient);
+                    added++;
+                }
+            });
+
+            window.state.clients = localClients;
+            this._setSyncTimestamp('clients');
+            Logger.info(`Synced clients (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
+
+            // CRITICAL: Refresh the client sidebar after syncing
+            if (typeof window.populateClientSidebar === 'function') {
+                window.populateClientSidebar();
+                Logger.info('Client sidebar refreshed after sync');
+            }
+
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch clients from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Fetch auditors from Supabase and merge with local state
+     */
+    async syncAuditorsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('auditors');
+            const { data, error } = await query.order('name', { ascending: true });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localAuditors = window.state.auditors || [];
+            let added = 0, updated = 0;
+
+            data.forEach(auditor => {
+                const existing = localAuditors.find(a => String(a.id) === String(auditor.id));
+                if (existing) {
+                    // Update existing
+                    Object.assign(existing, auditor);
+                    updated++;
+                } else {
+                    // Add new
+                    const newAuditor = {
+                        id: auditor.id,
+                        name: auditor.name,
+                        role: auditor.role,
+                        email: auditor.email,
+                        phone: auditor.phone,
+                        location: auditor.location,
+                        experience: auditor.experience,
+                        standards: auditor.standards || [],
+                        domainExpertise: auditor.expertise || [],
+                        industries: auditor.industries || [],
+                        manDayRate: auditor.man_day_rate,
+                        education: auditor.education,
+                        customerRating: auditor.rating,
+                        status: auditor.status
+                    };
+                    localAuditors.push(newAuditor);
+                    added++;
+                }
+            });
+
+            // Link auditors to users (to get UUID)
+            const users = window.state.users || [];
+            localAuditors.forEach(auditor => {
+                if (auditor.email) {
+                    const user = users.find(u => u.email?.toLowerCase() === auditor.email.toLowerCase());
+                    if (user) {
+                        auditor.userId = user.id || user.supabaseId;
+                    }
+                }
+            });
+
+            window.state.auditors = localAuditors;
+            // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
+            this._setSyncTimestamp('auditors');
+            Logger.info(`Synced auditors (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch auditors from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Sync auditor assignments to Supabase
+     */
+    async syncAuditorAssignmentsToSupabase(assignments) {
+        if (!this.isInitialized || !assignments?.length) {
+            Logger.warn('Supabase not initialized or no assignments to sync');
+            return;
+        }
+
+        try {
+            Logger.info(`[syncAuditorAssignmentsToSupabase] Syncing ${assignments.length} assignments...`);
+
+            const batch = assignments.map(assignment => ({
+                id: assignment.id || Date.now(),
+                auditor_id: String(assignment.auditorId),
+                user_id: assignment.userId || null,
+                client_id: String(assignment.clientId),
+                role: assignment.role || 'Auditor',
+                assigned_by: assignment.assignedBy || 'System',
+                assigned_at: assignment.assignedAt || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }));
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('auditor_assignments')
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) {
+                    Logger.error('[syncAuditorAssignmentsToSupabase] Batch upsert failed:', error);
+                    throw error;
+                }
+            }
+            Logger.info(`✓ Synced ${assignments.length} assignments to Supabase`);
+        } catch (error) {
+            Logger.error('[syncAuditorAssignmentsToSupabase] Failed to sync assignments:', error);
+            console.error('Full error details:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch auditor assignments from Supabase
+     */
+    async syncAuditorAssignmentsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('auditor_assignments');
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localAssignments = window.state.auditorAssignments || [];
+            let added = 0, updated = 0;
+
+            data.forEach(remote => {
+                const existing = localAssignments.find(l =>
+                    String(l.auditorId) === String(remote.auditor_id) && String(l.clientId) === String(remote.client_id)
+                );
+
+                const mapped = {
+                    id: remote.id, // Include the ID field
+                    auditorId: String(remote.auditor_id),
+                    userId: remote.user_id, // Read user_id (UUID)
+                    clientId: String(remote.client_id),
+                    role: remote.role || 'Auditor',
+                    assignedBy: remote.assigned_by,
+                    assignedAt: remote.assigned_at
+                };
+
+                if (existing) {
+                    Object.assign(existing, mapped);
+                    updated++;
+                } else {
+                    localAssignments.push(mapped);
+                    added++;
+                }
+            });
+
+            window.state.auditorAssignments = localAssignments;
+            window.saveData();
+            this._setSyncTimestamp('auditor_assignments');
+            Logger.info(`Synced assignments (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch assignments from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Delete auditor assignment
+     */
+    async deleteAuditorAssignment(auditorId, clientId) {
+        if (!this.isInitialized) return null;
+
+        try {
+            const { error } = await this.client
+                .from('auditor_assignments')
+                .delete()
+                .match({ auditor_id: auditorId, client_id: clientId });
+
+            if (error) throw error;
+            Logger.info(`Deleted assignment for auditor ${auditorId} and client ${clientId}`);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to delete assignment:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sync audit plans to Supabase
+     */
+    async syncAuditPlansToSupabase(auditPlans) {
+        if (!this.isInitialized || !auditPlans?.length) return;
+
+        try {
+            const batch = auditPlans.map(plan => {
+                const auditorIds = Array.isArray(plan.auditors)
+                    ? plan.auditors.map(a => String(a))
+                    : [];
+                const auditTeam = Array.isArray(plan.auditTeam)
+                    ? plan.auditTeam.map(t => typeof t === 'object' ? String(t.id || t.name || t) : String(t))
+                    : [];
+                const selectedChecklists = Array.isArray(plan.selectedChecklists) && plan.selectedChecklists.length > 0
+                    ? plan.selectedChecklists
+                    : (Array.isArray(plan.checklistIds) ? plan.checklistIds : []);
+
+                return {
+                    id: String(plan.id),
+                    client_name: plan.client || plan.clientName || null,
+                    client_id: plan.clientId ? String(plan.clientId) : null,
+                    standard: plan.standard || null,
+                    date: plan.date || null,
+                    auditor_ids: auditorIds,
+                    status: plan.status || 'Planned',
+                    objectives: plan.objectives || null,
+                    scope: plan.scope || null,
+                    man_days: Number(plan.manDays) || 0,
+                    selected_checklists: selectedChecklists,
+                    start_date: plan.date || plan.startDate || null,
+                    end_date: plan.endDate || plan.date || null,
+                    lead_auditor: plan.leadAuditor || null,
+                    audit_team: auditTeam,
+                    pre_audit: plan.preAudit || null,
+                    updated_at: new Date().toISOString()
+                };
+            });
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('audit_plans')
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert audit plans failed:', error); throw error; }
+            }
+            Logger.info(`Synced ${auditPlans.length} audit plans to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync audit plans:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sync audit reports to Supabase
+     */
+    async syncAuditReportsToSupabase(auditReports) {
+        if (!this.isInitialized || !auditReports?.length) return;
+
+        try {
+            const batch = auditReports.map(report => {
+                const ncrs = Array.isArray(report.ncrs) ? report.ncrs : [];
+                return {
+                    id: String(report.id),
+                    client_id: report.clientId ? String(report.clientId) : null,
+                    date: report.date || null,
+                    status: report.status || 'Draft',
+                    findings: Number(report.findings) || 0,
+                    conclusion: report.conclusion || null,
+                    recommendation: report.recommendation || null,
+                    ncrs: ncrs,
+                    audit_type: report.auditType || null,
+                    lead_auditor: report.leadAuditor || null,
+                    audit_plan_id: report.auditPlanId ? String(report.auditPlanId) : null,
+                    opening_meeting: report.openingMeeting || {},
+                    closing_meeting: report.closingMeeting || {},
+                    checklist_progress: report.checklistProgress || [],
+                    custom_items: report.customItems || [],
+                    updated_at: new Date().toISOString()
+                };
+            });
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('audit_reports')
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert audit reports failed:', error); throw error; }
+            }
+            Logger.info(`Synced ${auditReports.length} audit reports to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync audit reports:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upsert a single audit report with partial data (used by OfflineManager)
+     * Maps camelCase keys to snake_case DB columns automatically
+     */
+    async upsertAuditReport(reportId, updateFields) {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized for upsertAuditReport');
+            return false;
+        }
+
+        try {
+            // Map camelCase to snake_case for known fields
+            const dbData = { updated_at: new Date().toISOString() };
+            if (updateFields.openingMeeting !== undefined) dbData.opening_meeting = updateFields.openingMeeting;
+            if (updateFields.closingMeeting !== undefined) dbData.closing_meeting = updateFields.closingMeeting;
+            if (updateFields.checklistProgress !== undefined) dbData.checklist_progress = updateFields.checklistProgress;
+            if (updateFields.customItems !== undefined) dbData.custom_items = updateFields.customItems;
+            if (updateFields.ncrs !== undefined) dbData.ncrs = updateFields.ncrs;
+            if (updateFields.status !== undefined) dbData.status = updateFields.status;
+            if (updateFields.conclusion !== undefined) dbData.conclusion = updateFields.conclusion;
+            if (updateFields.recommendation !== undefined) dbData.recommendation = updateFields.recommendation;
+
+            const { error } = await this.client
+                .from('audit_reports')
+                .update(dbData)
+                .eq('id', String(reportId));
+
+            if (error) throw error;
+            Logger.info(`upsertAuditReport: updated report ${reportId}`, Object.keys(dbData));
+            return true;
+        } catch (error) {
+            Logger.error('upsertAuditReport failed:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Fetch audit plans from Supabase
+     */
+    async syncAuditPlansFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('audit_plans');
+            const { data, error } = await query.order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localPlans = window.state.auditPlans || [];
+            let added = 0, updated = 0;
+
+            data.forEach(plan => {
+                // Map snake_case DB fields to camelCase app fields
+                const fullData = plan.data || {};
+
+                const mappedPlan = {
+                    // Spread data column FIRST so computed fields below override
+                    ...fullData,
+                    // Then set all properly mapped fields (these take precedence)
+                    id: plan.id,
+                    client: plan.client_name || plan.client || fullData.client,
+                    clientName: plan.client_name || fullData.clientName,
+                    clientId: plan.client_id || fullData.clientId,
+                    date: plan.date || fullData.date,
+                    status: plan.status || fullData.status,
+                    auditType: plan.audit_type || fullData.auditType,
+                    standard: plan.standard || fullData.standard,
+                    scope: plan.scope || fullData.scope,
+                    objectives: plan.objectives || fullData.objectives,
+                    manDays: plan.man_days || fullData.manDays,
+                    auditors: plan.auditor_ids || fullData.auditors || [],
+                    // CRITICAL: Load checklist configuration (fallback to data column)
+                    checklistIds: (plan.selected_checklists?.length ? plan.selected_checklists : null) || fullData.selectedChecklists || fullData.checklistIds || [],
+                    selectedChecklists: (plan.selected_checklists?.length ? plan.selected_checklists : null) || fullData.selectedChecklists || [],
+                    selectedChecklistItems: fullData.selectedChecklistItems || {},
+                    selectedChecklistOverrides: fullData.selectedChecklistOverrides || {},
+                    checklistConfig: plan.checklist_config || fullData.checklistConfig || [],
+                    startDate: plan.start_date || fullData.startDate,
+                    endDate: plan.end_date || fullData.endDate,
+                    leadAuditor: plan.lead_auditor || fullData.leadAuditor,
+                    auditTeam: plan.audit_team || fullData.auditTeam || [],
+                    preAudit: plan.pre_audit || fullData.preAudit || null,
+                };
+
+                const existing = localPlans.find(p => String(p.id) === String(plan.id));
+                if (existing) {
+                    Object.assign(existing, mappedPlan);
+                    updated++;
+                } else {
+                    localPlans.push(mappedPlan);
+                    added++;
+                }
+            });
+
+            window.state.auditPlans = localPlans;
+            // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
+            this._setSyncTimestamp('audit_plans');
+            Logger.info(`Synced audit plans (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch audit plans from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Fetch audit reports from Supabase
+     */
+    async syncAuditReportsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('audit_reports');
+            const { data, error } = await query.order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localReports = window.state.auditReports || [];
+            let added = 0, updated = 0;
+
+            data.forEach(report => {
+                // Map snake_case DB fields to camelCase app fields
+                // Use 'data' field as base if available (contains full report object)
+                const fullData = report.data || {};
+
+                const mappedReport = {
+                    // Spread data column FIRST so computed fields below can override
+                    ...fullData,
+                    // Then set all properly mapped fields (these take precedence)
+                    id: report.id,
+                    planId: report.plan_id || report.audit_plan_id || fullData.planId,
+                    clientId: report.client_id || fullData.clientId,
+                    client: report.client_name || fullData.client,
+                    date: report.date || report.audit_date || fullData.date,
+                    status: report.status || fullData.status,
+                    auditType: report.audit_type || report.auditType || fullData.auditType,
+                    leadAuditor: report.lead_auditor || report.leadAuditor || fullData.leadAuditor,
+                    findings: report.findings || report.findings_count || fullData.findings || 0,
+                    conformities: report.conformities || fullData.conformities || 0,
+                    conclusion: report.conclusion || fullData.conclusion,
+                    recommendation: report.recommendation || fullData.recommendation,
+                    // Load execution data - preserve all evidence URLs (idb://, https://, data:)
+                    // Do NOT strip any image references to prevent data loss
+                    checklistProgress: (report.checklist_progress || report.checklist_data || fullData.checklistProgress || []),
+                    customItems: report.custom_items || fullData.customItems || [],
+                    openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
+                    closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
+                    ncrs: report.ncrs || fullData.ncrs || [],
+                };
+
+                const existing = localReports.find(r => String(r.id) === String(report.id));
+                if (existing) {
+                    Object.assign(existing, mappedReport);
+                    updated++;
+                } else {
+                    localReports.push(mappedReport);
+                    added++;
+                }
+            });
+
+            window.state.auditReports = localReports;
+            this._setSyncTimestamp('audit_reports');
+            Logger.info(`Synced audit reports (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch audit reports from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Sync checklists to Supabase
+     */
+    async syncChecklistsToSupabase(checklists) {
+        if (!this.isInitialized || !checklists?.length) return;
+
+        try {
+            const batch = checklists.map(checklist => ({
+                id: checklist.id,
+                name: checklist.name,
+                standard: checklist.standard,
+                type: checklist.type || 'global',
+                audit_type: checklist.auditType || null,
+                audit_scope: checklist.auditScope || null,
+                created_by: checklist.createdBy || null,
+                clauses: checklist.clauses || [],
+                updated_at: new Date().toISOString()
+            }));
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('checklists')
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert checklists failed:', error); throw error; }
+            }
+            Logger.info(`Synced ${checklists.length} checklists to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync checklists:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch checklists from Supabase
+     */
+    async syncChecklistsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('checklists');
+            const { data, error } = await query.order('name', { ascending: true });
+
+            if (error) throw error;
+
+            // CRITICAL FIX: If incremental sync returns 0 but local state is empty,
+            // force a full sync by clearing timestamp and retrying
+            const localEmpty = !window.state.checklists || window.state.checklists.length === 0;
+            if (isIncremental && (!data || data.length === 0) && localEmpty) {
+                Logger.warn('Incremental checklist sync returned 0 but local state is empty — forcing full sync');
+                try { sessionStorage.removeItem('sync_ts_checklists'); } catch(_e) {}
+                return this.syncChecklistsFromSupabase(); // Retry as full sync
+            }
+
+            const cloudChecklists = (data || []).map(checklist => ({
+                id: checklist.id,
+                name: checklist.name,
+                standard: checklist.standard,
+                type: checklist.type,
+                auditType: checklist.audit_type,
+                auditScope: checklist.audit_scope,
+                createdBy: checklist.created_by,
+                clientName: checklist.client_name || null,
+                clientId: checklist.client_id || null,
+                clauses: checklist.clauses,
+                createdAt: checklist.created_at,
+                updatedAt: checklist.updated_at
+            }));
+
+            const localCount = (window.state.checklists || []).length;
+            const cloudCount = cloudChecklists.length;
+            let added = 0, updated = 0;
+
+            if (isIncremental && cloudCount > 0) {
+                // INCREMENTAL: merge changed checklists into existing array
+                const local = window.state.checklists || [];
+                cloudChecklists.forEach(cc => {
+                    const idx = local.findIndex(l => String(l.id) === String(cc.id));
+                    if (idx !== -1) { local[idx] = cc; updated++; }
+                    else { local.push(cc); added++; }
+                });
+                window.state.checklists = local;
+            } else {
+                // FULL: Supabase is source of truth — replace entirely
+                window.state.checklists = cloudChecklists;
+                added = Math.max(0, cloudCount - localCount);
+                updated = Math.min(localCount, cloudCount);
+            }
+
+            this._setSyncTimestamp('checklists');
+            Logger.info(`Synced checklists (${isIncremental ? 'delta' : 'full'}): ${cloudCount} fetched, ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch checklists from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Sync settings to Supabase
+     */
+    /**
+     * Sync settings to Supabase
+     */
+    async syncSettingsToSupabase(settings) {
+        if (!this.isInitialized) return;
+
+        try {
+            // Merge existing state with provided settings
+            const standards = settings?.standards || window.state.settings?.standards || [];
+            const roles = settings?.roles || window.state.settings?.roles || [];
+            const isAdmin = settings?.isAdmin || window.state.settings?.isAdmin || false;
+
+            // PREPARATION: Dynamically find the ID
+            // We cannot hardcode '1' because the DB uses UUIDs.
+            let settingsId = window.state.settingsId; // Cache ID locally
+
+            if (!settingsId) {
+                // Try to find ANY existing row
+                const { data: existing } = await this.client
+                    .from('settings')
+                    .select('id')
+                    .limit(1)
+                    .maybeSingle();
+
+                if (existing) {
+                    settingsId = existing.id;
+                }
+                // If not found, we let the DB generate one on insert
+            }
+
+            const settingsData = {
+                // If we have an ID, update it. If not, don't send ID so DB generates UUID.
+                ...(settingsId ? { id: settingsId } : {}),
+                standards: standards,
+                roles: roles,
+                is_admin: isAdmin,
+                cb_settings: window.state.cbSettings || {},
+                organization: window.state.orgStructure || [],
+                policies: window.state.cbPolicies || {},
+                knowledge_base: window.state.knowledgeBase || {},
+                updated_at: new Date().toISOString()
+            };
+
+            Logger.debug('Sync', 'Syncing Settings to Supabase:', settingsData);
+
+            // Use UPSERT with ID if available, otherwise INSERT
+            const { data, error } = await this.client
+                .from('settings')
+                .upsert(settingsData)
+                .select()
+                .single();
+
+            if (error) {
+                Logger.error('Sync', 'Supabase Settings Sync Error:', error.message);
+                throw error;
+            }
+
+            // Cache the ID for next time
+            if (data && data.id) {
+                window.state.settingsId = data.id;
+            }
+
+            Logger.info('Synced settings to Supabase');
+        } catch (error) {
+            Logger.error('Failed to sync settings:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch settings from Supabase
+     */
+    async syncSettingsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { updated: false };
+        }
+
+        try {
+            // GET SINGLETON ROW (Limit 1) regardless of ID
+            const { data, error } = await this.client
+                .from('settings')
+                .select('*')
+                .limit(1)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (data) {
+                // Store the real ID for updates
+                window.state.settingsId = data.id;
+
+                // Update basic settings
+                window.state.settings = {
+                    standards: data.standards || [],
+                    roles: data.roles || [],
+                    isAdmin: data.is_admin || false
+                };
+
+                // Update CB Configuration
+                if (data.cb_settings) window.state.cbSettings = data.cb_settings;
+                if (data.organization) window.state.orgStructure = data.organization;
+                if (data.policies) window.state.cbPolicies = data.policies;
+                if (data.knowledge_base) window.state.knowledgeBase = data.knowledge_base;
+
+                // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
+                Logger.info('Synced settings from Supabase (Singleton)');
+
+                // Refresh CB logo in sidebar with real name from cloud settings
+                if (typeof window.updateCBLogoDisplay === 'function') {
+                    window.updateCBLogoDisplay();
+                }
+
+                return { updated: true };
+            }
+
+            return { updated: false };
+        } catch (error) {
+            Logger.error('Failed to fetch settings from Supabase:', error);
+            return { updated: false };
+        }
+    },
+
+    /**
+     * Sync documents to Supabase
+     */
+    async syncDocumentsToSupabase(documents) {
+        if (!this.isInitialized || !documents?.length) return;
+
+        try {
+            const batch = documents.map(doc => ({
+                id: doc.id,
+                name: doc.name,
+                type: doc.type || null,
+                url: doc.url || null,
+                uploaded_by: doc.uploadedBy || null,
+                uploaded_at: doc.uploadedAt || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }));
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('documents')
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert documents failed:', error); throw error; }
+            }
+            Logger.info(`Synced ${documents.length} documents to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync documents:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch documents from Supabase
+     */
+    async syncDocumentsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('documents');
+            const { data, error } = await query.order('uploaded_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            const localDocs = window.state.documents || [];
+            let added = 0, updated = 0;
+
+            data.forEach(doc => {
+                const existing = localDocs.find(d => String(d.id) === String(doc.id));
+                const mappedDoc = {
+                    id: doc.id,
+                    name: doc.name,
+                    type: doc.type,
+                    url: doc.url,
+                    storagePath: doc.storage_path,
+                    folder: doc.folder,
+                    fileSize: doc.file_size,
+                    uploadedBy: doc.uploaded_by,
+                    uploadedAt: doc.uploaded_at,
+                    uploadDate: doc.uploaded_at ? new Date(doc.uploaded_at).toISOString().split('T')[0] : null
+                };
+
+                if (existing) {
+                    Object.assign(existing, mappedDoc);
+                    updated++;
+                } else {
+                    localDocs.push(mappedDoc);
+                    added++;
+                }
+
+                // AUTO-POPULATE KNOWLEDGE BASE
+                // If the document is in a KB folder, ensure it's in the KB state
+                const kbFolders = ['standard', 'sop', 'policy', 'marketing'];
+                if (doc.folder && kbFolders.includes(doc.folder)) {
+                    if (!window.state.knowledgeBase) {
+                        window.state.knowledgeBase = { standards: [], sops: [], policies: [], marketing: [] };
+                    }
+
+                    const kb = window.state.knowledgeBase;
+                    let collection;
+                    if (doc.folder === 'standard') collection = kb.standards;
+                    else if (doc.folder === 'sop') collection = kb.sops;
+                    else if (doc.folder === 'policy') collection = kb.policies;
+                    else if (doc.folder === 'marketing') collection = kb.marketing;
+
+                    if (collection) {
+                        const docId = String(doc.id);
+                        const inKB = collection.some(k => String(k.id) === docId || k.cloudPath === doc.storage_path);
+
+                        if (!inKB) {
+                            collection.push({
+                                id: doc.id,
+                                name: doc.name,
+                                fileName: doc.name, // Fallback to name
+                                uploadDate: mappedDoc.uploadDate,
+                                status: 'pending', // Needs analysis
+                                fileSize: doc.file_size,
+                                cloudUrl: doc.url,
+                                cloudPath: doc.storage_path,
+                                clauses: []
+                            });
+                            Logger.info(`Auto-added document to Knowledge Base: ${doc.name}`);
+                        }
+                    }
+                }
+            });
+
+            window.state.documents = localDocs;
+            // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
+            this._setSyncTimestamp('documents');
+            Logger.info(`Synced documents (${isIncremental ? 'delta' : 'full'}): ${added} added, ${updated} updated`);
+            return { added, updated };
+        } catch (error) {
+            Logger.error('Failed to fetch documents from Supabase:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Sync certification decisions to Supabase
+     */
+    async syncCertificationDecisionsToSupabase(decisions) {
+        if (!this.isInitialized || !decisions?.length) return;
+
+        try {
+            const batch = decisions.map(decision => ({
+                client: decision.client,
+                standard: decision.standard,
+                date: decision.date,
+                decision: decision.decision,
+                updated_at: new Date().toISOString()
+            }));
+
+            if (batch.length > 0) {
+                const { error } = await this.client
+                    .from('certification_decisions')
+                    .upsert(batch, { onConflict: 'client,standard,date' });
+                if (error) { Logger.error('Batch upsert certification decisions failed:', error); throw error; }
+            }
+            Logger.info(`Synced ${decisions.length} certification decisions to Supabase`);
+        } catch (error) {
+            Logger.error('Failed to sync certification decisions:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Fetch certification decisions from Supabase and map to Certificates
+     */
+    async syncCertificationDecisionsFromSupabase() {
+        if (!this.isInitialized) {
+            Logger.warn('Supabase not initialized');
+            return { added: 0, updated: 0 };
+        }
+
+        try {
+            const { query, isIncremental } = this._buildSyncQuery('certification_decisions');
+            const { data, error } = await query.order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || !data.length) {
+                return { added: 0, updated: 0 };
+            }
+
+            // ONE SOURCE OF TRUTH: Map these decisions to window.state.certifications
+            // If they have an 'id', 'issue_date', etc, they are treated as Issued Certificates
+            const localCerts = data.filter(d => d.id && d.status).map(c => ({
+                id: c.id,
+                client: c.client,
+                standard: c.standard,
+                issueDate: c.issue_date,
+                expiryDate: c.expiry_date,
+                status: c.status,
+                scope: c.scope,
+                history: c.history || [],
+                decisionRecord: c.decision_record || {},
+                // Unpack Details from JSONB
+                certificateNo: c.decision_record?.certificate_no || '',
+                revision: c.decision_record?.revision || '00',
+                siteScopes: c.decision_record?.site_scopes || {},
+                initialDate: c.decision_record?.initial_date || '',
+                currentIssue: c.decision_record?.current_issue || ''
+            }));
+
+            // Also keep the raw decisions for other uses if needed
+            window.state.certificationDecisions = data;
+
+            // Overwrite local certifications with Cloud Truth
+            if (localCerts.length > 0) {
+                window.state.certifications = localCerts;
+            }
+
+            // PERF: saveState() removed — loadUserDataFromCloud does a single save at the end
+            this._setSyncTimestamp('certification_decisions');
+            Logger.info(`Synced cert decisions (${isIncremental ? 'delta' : 'full'}): ${data.length} rows (${localCerts.length} active certs)`);
+            return { added: 0, updated: data.length };
+        } catch (error) {
+            Logger.error('Failed to fetch certification decisions:', error);
+            return { added: 0, updated: 0 };
+        }
+    },
+
+    /**
+     * Upsert certificate (actually writes to certification_decisions)
+     */
+    async upsertCertificate(cert) {
+        if (!this.isInitialized) return;
+
+        try {
+            // Pack details into decision_record (JSONB) to avoid schema changes
+            const decisionRecord = {
+                ...(cert.decisionRecord || {}),
+                certificate_no: cert.certificateNo,
+                revision: cert.revision,
+                site_scopes: cert.siteScopes,
+                initial_date: cert.initialDate,
+                current_issue: cert.currentIssue
+            };
+
+            const payload = {
+                id: cert.id,
+                client: cert.client,
+                standard: cert.standard,
+                issue_date: cert.issueDate,
+                expiry_date: cert.expiryDate,
+                status: cert.status,
+                scope: cert.scope,
+                history: cert.history,
+                decision_record: decisionRecord, // Stored here
+                // Ensure legacy fields required by constraint are present if needed
+                date: cert.history?.[0]?.date || new Date().toISOString().split('T')[0],
+                decision: 'Certified',
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await this.client
+                .from('certification_decisions')
+                .upsert(payload, { onConflict: 'id' })
+                .select();
+
+            if (error) {
+                Logger.error('Supabase UPSERT Error:', error);
+                throw error;
+            }
+            Logger.info('Certificate synced to certification_decisions (JSONB):', cert.id);
+        } catch (error) {
+            Logger.error('Failed to sync certificate:', error);
+            // alert('Certificate Sync Failed: ' + (error.message || JSON.stringify(error))); 
+            throw error;
+        }
+    },
+
+    /**
+     * Delete certificate
+     */
+    async deleteCertificate(certId) {
+        if (!this.isInitialized) return;
+
+        try {
+            const { error } = await this.client
+                .from('certification_decisions')
+                .delete()
+                .eq('id', certId);
+
+            if (error) throw error;
+            Logger.info('Certificate deleted from certification_decisions:', certId);
+        } catch (error) {
+            Logger.error('Failed to delete certificate:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upload file to Supabase Storage
+     * @param {string} folder - Optional folder path (e.g., 'audit-reports', 'certificates')
+     * @returns {Promise<{url: string, path: string}>}
+     */
+    async uploadFile(file, folder = 'documents') {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            // Generate unique filename
+            const timestamp = Date.now();
+            const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filePath = `${folder}/${timestamp}_${sanitizedName}`;
+
+            // Upload file to storage bucket
+            const { data, error } = await this.client.storage
+                .from('documents') // Using existing bucket (lowercase)
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (error) throw error;
+
+            // Get public URL
+            const { data: urlData } = this.client.storage
+                .from('documents')
+                .getPublicUrl(filePath);
+
+            Logger.info('File uploaded successfully:', filePath);
+
+            return {
+                path: data.path,
+                url: urlData.publicUrl,
+                name: file.name,
+                size: file.size,
+                type: file.type
+            };
+        } catch (error) {
+            Logger.error('Failed to upload file:', error);
+
+            // DEBUG: Show explicit alert
+            const msg = error.message || JSON.stringify(error);
+            window.alert(`FILE UPLOAD FAILED:\n${msg}`);
+
+            throw error;
+        }
+    },
+
+    /**
+     * Download file from Supabase Storage
+     * @param {string} filePath - Path to the file in storage
+     * @returns {Promise<Blob>}
+     */
+    async downloadFile(filePath) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { data, error } = await this.client.storage
+                .from('documents')
+                .download(filePath);
+
+            if (error) throw error;
+
+            Logger.info('File downloaded successfully:', filePath);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to download file:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete file from Supabase Storage
+     * @param {string} filePath - Path to the file in storage
+     */
+    async deleteFile(filePath) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { error } = await this.client.storage
+                .from('documents')
+                .remove([filePath]);
+
+            if (error) throw error;
+
+            Logger.info('File deleted successfully:', filePath);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to delete file:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * List files in a folder
+     * @param {string} folder - Folder path
+     * @returns {Promise<Array>}
+     */
+    async listFiles(folder = '') {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            const { data, error } = await this.client.storage
+                .from('documents')
+                .list(folder, {
+                    limit: 100,
+                    offset: 0,
+                    sortBy: { column: 'created_at', order: 'desc' }
+                });
+
+            if (error) throw error;
+
+            Logger.info(`Listed ${data.length} files in folder: ${folder}`);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to list files:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upload document and save metadata
+     * @param {File} file - The file to upload
+     * @param {Object} metadata - Additional metadata (name, type, etc.)
+     * @returns {Promise<Object>}
+     */
+    async uploadDocument(file, metadata = {}) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            // Upload file to storage
+            const uploadResult = await this.uploadFile(file, metadata.folder || 'documents');
+
+            // Save document metadata to database
+            const docData = {
+                id: Date.now(), // Simple ID generation
+                name: metadata.name || file.name,
+                type: file.type,
+                url: uploadResult.url,
+                storage_path: uploadResult.path,
+                file_size: file.size,
+                uploaded_by: metadata.uploadedBy || window.state?.currentUser?.email || 'Unknown',
+                uploaded_at: new Date().toISOString(),
+                folder: metadata.folder || 'documents',
+                description: metadata.description || null
+            };
+
+            const { data, error } = await this.client
+                .from('documents')
+                .insert(docData)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Add to local state
+            if (!window.state.documents) window.state.documents = [];
+            window.state.documents.push({
+                id: data.id,
+                name: data.name,
+                type: data.type,
+                url: data.url,
+                storagePath: data.storage_path,
+                fileSize: data.file_size,
+                uploadedBy: data.uploaded_by,
+                uploadedAt: data.uploaded_at,
+                folder: data.folder,
+                description: data.description
+            });
+            window.saveState();
+
+            Logger.info('Document uploaded and saved:', data.name);
+            return data;
+        } catch (error) {
+            Logger.error('Failed to upload document:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete document and its file
+     * @param {number} documentId - Document ID
+     */
+    async deleteDocument(documentId) {
+        if (!this.isInitialized) {
+            throw new Error('Supabase not initialized');
+        }
+
+        try {
+            // Get document metadata
+            const { data: doc, error: fetchError } = await this.client
+                .from('documents')
+                .select('storage_path')
+                .eq('id', documentId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            // Delete file from storage
+            if (doc.storage_path) {
+                await this.deleteFile(doc.storage_path);
+            }
+
+            // Delete document metadata
+            const { error: deleteError } = await this.client
+                .from('documents')
+                .delete()
+                .eq('id', documentId);
+
+            if (deleteError) throw deleteError;
+
+            // Remove from local state
+            if (window.state.documents) {
+                window.state.documents = window.state.documents.filter(d => d.id !== documentId);
+                window.saveState();
+            }
+
+            Logger.info('Document deleted:', documentId);
+            return true;
+        } catch (error) {
+            Logger.error('Failed to delete document:', error);
+            throw error;
+        }
+    }
+
+};
+
+// Window export (used by all existing code)
+window.SupabaseClient = SupabaseClient;
+
+// Auto-initialize if Supabase is available
+if (typeof supabase !== 'undefined') {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => SupabaseClient.init());
+    } else {
+        SupabaseClient.init();
+    }
+} else {
+    Logger.warn('Supabase library not loaded. Using localStorage fallback.');
+}
+
+Logger.info('SupabaseClient module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SupabaseClient;
+}

@@ -1,1 +1,165 @@
-window.EmailService={sendUserInvitation:async function(e,i,n,t){try{if(!window.SupabaseClient?.isInitialized)return Logger.warn("Supabase not initialized, cannot send email"),{success:!1,error:"Supabase not configured"};const{data:a,error:r}=await window.SupabaseClient.client.functions.invoke("send-email",{body:{type:"user_invitation",to:e,data:{full_name:i,role:n,confirmation_url:t,organization:window.state.settings?.cbName||"Company Certification",user_id:window.state.currentUser?.id}}});if(r)throw r;return Logger.info("User invitation email sent:",e),{...a,success:!0}}catch(e){return Logger.error("Failed to send invitation email:",e),{success:!1,error:e.message}}},sendAuditAssignment:async function(e,i,n,t){try{if(!window.SupabaseClient?.isInitialized)return Logger.warn("Supabase not initialized, cannot send email"),{success:!1,error:"Supabase not configured"};const{data:a,error:r}=await window.SupabaseClient.client.functions.invoke("send-email",{body:{type:"audit_assignment",to:e,data:{auditor_name:i,client_name:n,standard:t.standard,scheduled_date:t.scheduledDate,role:t.role||"Auditor",audit_url:`${window.location.origin}/#audit-execution?id=${t.auditId}`,user_id:window.state.currentUser?.id}}});if(r)throw r;return Logger.info("Audit assignment email sent:",e),{...a,success:!0}}catch(e){return Logger.error("Failed to send audit assignment email:",e),{success:!1,error:e.message}}},sendReportApproval:async function(e,i,n,t,a,r){try{if(!window.SupabaseClient?.isInitialized)return Logger.warn("Supabase not initialized, cannot send email"),{success:!1,error:"Supabase not configured"};const{data:o,error:s}=await window.SupabaseClient.client.functions.invoke("send-email",{body:{type:"report_approval",to:e,data:{auditor_name:i,client_name:n,status:t,comments:a,report_url:`${window.location.origin}/#reporting-detail?id=${r}`,user_id:window.state.currentUser?.id}}});if(s)throw s;return Logger.info("Report approval email sent:",e),{...o,success:!0}}catch(e){return Logger.error("Failed to send report approval email:",e),{success:!1,error:e.message}}},sendCertificateIssued:async function(e,i,n){try{if(!window.SupabaseClient?.isInitialized)return Logger.warn("Supabase not initialized, cannot send email"),{success:!1,error:"Supabase not configured"};const{data:t,error:a}=await window.SupabaseClient.client.functions.invoke("send-email",{body:{type:"certificate_issued",to:e,data:{client_name:i,certificate_number:n.number,issue_date:n.issueDate,expiry_date:n.expiryDate,standard:n.standard,certificate_url:n.downloadUrl||`${window.location.origin}/#certificates`,user_id:window.state.currentUser?.id}}});if(a)throw a;return Logger.info("Certificate issuance email sent:",e),{...t,success:!0}}catch(e){return Logger.error("Failed to send certificate email:",e),{success:!1,error:e.message}}},isAvailable:function(){return!0===window.SupabaseClient?.isInitialized}},Logger.info("Email Service loaded"),"undefined"!=typeof module&&module.exports&&(module.exports=EmailService);
+// ============================================
+// EMAIL SERVICE - Client-Side Wrapper (ESM-ready)
+// ============================================
+// Provides a simple interface for sending emails via Supabase Edge Function
+
+window.EmailService = {
+    /**
+     * Send user invitation email
+     */
+    sendUserInvitation: async function (email, fullName, role, confirmationUrl) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
+
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'user_invitation',
+                    to: email,
+                    data: {
+                        full_name: fullName,
+                        role: role,
+                        confirmation_url: confirmationUrl,
+                        organization: window.state.settings?.cbName || 'Company Certification',
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            Logger.info('User invitation email sent:', email);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send invitation email:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Send audit assignment notification
+     */
+    sendAuditAssignment: async function (auditorEmail, auditorName, clientName, auditDetails) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
+
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'audit_assignment',
+                    to: auditorEmail,
+                    data: {
+                        auditor_name: auditorName,
+                        client_name: clientName,
+                        standard: auditDetails.standard,
+                        scheduled_date: auditDetails.scheduledDate,
+                        role: auditDetails.role || 'Auditor',
+                        audit_url: `${window.location.origin}/#audit-execution?id=${auditDetails.auditId}`,
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            Logger.info('Audit assignment email sent:', auditorEmail);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send audit assignment email:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Send report approval/rejection notification
+     */
+    sendReportApproval: async function (auditorEmail, auditorName, clientName, status, comments, reportId) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
+
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'report_approval',
+                    to: auditorEmail,
+                    data: {
+                        auditor_name: auditorName,
+                        client_name: clientName,
+                        status: status, // 'Approved' or 'Rejected'
+                        comments: comments,
+                        report_url: `${window.location.origin}/#reporting-detail?id=${reportId}`,
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            Logger.info('Report approval email sent:', auditorEmail);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send report approval email:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Send certificate issuance notification
+     */
+    sendCertificateIssued: async function (clientEmail, clientName, certificateDetails) {
+        try {
+            if (!window.SupabaseClient?.isInitialized) {
+                Logger.warn('Supabase not initialized, cannot send email');
+                return { success: false, error: 'Supabase not configured' };
+            }
+
+            const { data, error } = await window.SupabaseClient.client.functions.invoke('send-email', {
+                body: {
+                    type: 'certificate_issued',
+                    to: clientEmail,
+                    data: {
+                        client_name: clientName,
+                        certificate_number: certificateDetails.number,
+                        issue_date: certificateDetails.issueDate,
+                        expiry_date: certificateDetails.expiryDate,
+                        standard: certificateDetails.standard,
+                        certificate_url: certificateDetails.downloadUrl || `${window.location.origin}/#certificates`,
+                        user_id: window.state.currentUser?.id
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            Logger.info('Certificate issuance email sent:', clientEmail);
+            return { ...data, success: true };
+
+        } catch (error) {
+            Logger.error('Failed to send certificate email:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Check if email service is available
+     */
+    isAvailable: function () {
+        return window.SupabaseClient?.isInitialized === true;
+    }
+};
+
+Logger.info('Email Service loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = EmailService;
+}

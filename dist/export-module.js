@@ -1,1 +1,421 @@
-function exportToCSV(t,n,e){const o=e.map(t=>t.label).join(","),r=t.map(t=>e.map(n=>{let e=n.field.split(".").reduce((t,n)=>t?.[n],t)||"";return"string"==typeof e&&(e.includes(",")||e.includes('"')||e.includes("\n"))&&(e=`"${e.replace(/"/g,'""')}"`),e}).join(",")).join("\n"),d=new Blob([`${o}\n${r}`],{type:"text/csv;charset=utf-8;"}),a=document.createElement("a"),i=URL.createObjectURL(d);a.setAttribute("href",i),a.setAttribute("download",`${n}.csv`),a.style.visibility="hidden",document.body.appendChild(a),a.click(),document.body.removeChild(a),showNotification(`Exported ${t.length} records to ${n}.csv`)}function exportToPDF(t,n){const e=window.open("","_blank"),o=`\n        <!DOCTYPE html>\n        <html>\n        <head>\n            <title>${t}</title>\n            <style>\n                @page {\n                    margin: 2cm;\n                    size: A4;\n                }\n                \n                body {\n                    font-family: 'Inter', Arial, sans-serif;\n                    font-size: 11pt;\n                    line-height: 1.5;\n                    color: #000;\n                }\n                \n                h1 {\n                    font-size: 18pt;\n                    margin-bottom: 1rem;\n                    color: #1e293b;\n                    border-bottom: 2px solid #2563eb;\n                    padding-bottom: 0.5rem;\n                }\n                \n                h2 {\n                    font-size: 14pt;\n                    margin-top: 1.5rem;\n                    margin-bottom: 0.75rem;\n                    color: #334155;\n                }\n                \n                h3 {\n                    font-size: 12pt;\n                    margin-top: 1rem;\n                    margin-bottom: 0.5rem;\n                    color: #475569;\n                }\n                \n                table {\n                    width: 100%;\n                    border-collapse: collapse;\n                    margin: 1rem 0;\n                    page-break-inside: auto;\n                }\n                \n                tr {\n                    page-break-inside: avoid;\n                    page-break-after: auto;\n                }\n                \n                thead {\n                    display: table-header-group;\n                }\n                \n                th, td {\n                    padding: 0.5rem;\n                    text-align: left;\n                    border: 1px solid #cbd5e1;\n                }\n                \n                th {\n                    background-color: #f1f5f9;\n                    font-weight: 600;\n                    color: #475569;\n                }\n                \n                .header {\n                    margin-bottom: 2rem;\n                }\n                \n                .meta-info {\n                    color: #64748b;\n                    font-size: 10pt;\n                    margin-bottom: 1rem;\n                }\n                \n                .status-badge {\n                    display: inline-block;\n                    padding: 2px 8px;\n                    border-radius: 4px;\n                    font-size: 9pt;\n                    font-weight: 500;\n                    border: 1px solid #cbd5e1;\n                }\n                \n                .footer {\n                    margin-top: 2rem;\n                    padding-top: 1rem;\n                    border-top: 1px solid #e2e8f0;\n                    font-size: 9pt;\n                    color: #64748b;\n                }\n                \n                @media print {\n                    body {\n                        print-color-adjust: exact;\n                        -webkit-print-color-adjust: exact;\n                    }\n                }\n            </style>\n        </head>\n        <body>\n            <div class="header">\n                <h1>${t}</h1>\n                <div class="meta-info">\n                    Generated on: ${(new Date).toLocaleString()}<br>\n                    AuditCB360 - ISO CB Auditor & Audit Management\n                </div>\n            </div>\n            ${n}\n            <div class="footer">\n                <p>This is a computer-generated report from AuditCB360.</p>\n            </div>\n        </body>\n        </html>\n    `;e.document.write(o),e.document.close(),e.onload=function(){e.focus(),setTimeout(()=>{e.print()},250)}}function exportClientsToCSV(){exportToCSV(state.clients,"clients_export",[{label:"ID",field:"id"},{label:"Client Name",field:"name"},{label:"Standard",field:"standard"},{label:"Status",field:"status"},{label:"Next Audit",field:"nextAudit"}])}function exportAuditorsToCSV(){exportToCSV(state.auditors.map(t=>({...t,standards:t.standards.join("; ")})),"auditors_export",[{label:"ID",field:"id"},{label:"Name",field:"name"},{label:"Role",field:"role"},{label:"Standards",field:"standards"}])}function exportAuditProgramsToCSV(){exportToCSV(state.auditPrograms,"audit_programs_export",[{label:"ID",field:"id"},{label:"Client",field:"client"},{label:"Standard",field:"standard"},{label:"Cycle Start",field:"cycleStart"},{label:"Cycle End",field:"cycleEnd"},{label:"Status",field:"status"}])}function exportClientsToPDF(){const t=state.clients.map(t=>`\n        <tr>\n            <td>${t.id}</td>\n            <td>${t.name}</td>\n            <td>${t.standard}</td>\n            <td><span class="status-badge">${t.status}</span></td>\n            <td>${t.nextAudit}</td>\n        </tr>\n    `).join("");exportToPDF("Clients Report",`\n        <h2>Client List</h2>\n        <p>Total Clients: ${state.clients.length}</p>\n        <table>\n            <thead>\n                <tr>\n                    <th>ID</th>\n                    <th>Client Name</th>\n                    <th>Standard</th>\n                    <th>Status</th>\n                    <th>Next Audit</th>\n                </tr>\n            </thead>\n            <tbody>\n                ${t}\n            </tbody>\n        </table>\n    `)}function exportAuditProgramToPDF(t){const n=state.auditPrograms.find(n=>n.id===t);if(!n)return void showNotification("Program not found","error");const e=`\n        <h2>Audit Program Details</h2>\n        <table>\n            <tr>\n                <th>Client</th>\n                <td>${n.client}</td>\n            </tr>\n            <tr>\n                <th>Standard</th>\n                <td>${n.standard}</td>\n            </tr>\n            <tr>\n                <th>Cycle Period</th>\n                <td>${n.cycleStart} to ${n.cycleEnd}</td>\n            </tr>\n            <tr>\n                <th>Status</th>\n                <td><span class="status-badge">${n.status}</span></td>\n            </tr>\n        </table>\n        \n        <h3>Scheduled Audits</h3>\n        <table>\n            <thead>\n                <tr>\n                    <th>Audit Type</th>\n                    <th>Planned Date</th>\n                    <th>Auditor</th>\n                    <th>Status</th>\n                </tr>\n            </thead>\n            <tbody>\n                <tr>\n                    <td>Stage 1</td>\n                    <td>2023-01-15</td>\n                    <td>John Doe</td>\n                    <td>Completed</td>\n                </tr>\n                <tr>\n                    <td>Stage 2</td>\n                    <td>2023-02-20</td>\n                    <td>John Doe</td>\n                    <td>Completed</td>\n                </tr>\n                <tr>\n                    <td>Surveillance 1</td>\n                    <td>2024-02-20</td>\n                    <td>Jane Smith</td>\n                    <td>Scheduled</td>\n                </tr>\n            </tbody>\n        </table>\n    `;exportToPDF(`Audit Program - ${n.client}`,e)}function exportDashboardToPDF(){exportToPDF("Dashboard Summary Report",`\n        <h2>Dashboard Summary</h2>\n        \n        <h3>Key Performance Indicators</h3>\n        <table>\n            <tr>\n                <th>Metric</th>\n                <th>Value</th>\n            </tr>\n            <tr>\n                <td>Total Clients</td>\n                <td>${state.clients.length}</td>\n            </tr>\n            <tr>\n                <td>Active Auditors</td>\n                <td>${state.auditors.length}</td>\n            </tr>\n            <tr>\n                <td>Audit Programs</td>\n                <td>${state.auditPrograms.length}</td>\n            </tr>\n            <tr>\n                <td>Certification Decisions</td>\n                <td>${state.certificationDecisions.length}</td>\n            </tr>\n        </table>\n        \n        <h3>Recent Clients</h3>\n        <table>\n            <thead>\n                <tr>\n                    <th>Client Name</th>\n                    <th>Standard</th>\n                    <th>Status</th>\n                    <th>Next Audit</th>\n                </tr>\n            </thead>\n            <tbody>\n                ${state.clients.slice(0,10).map(t=>`\n                    <tr>\n                        <td>${t.name}</td>\n                        <td>${t.standard}</td>\n                        <td>${t.status}</td>\n                        <td>${t.nextAudit}</td>\n                    </tr>\n                `).join("")}\n            </tbody>\n        </table>\n    `)}function addExportButtons(t){return{clients:'\n            <div style="display: flex; gap: 0.5rem;">\n                <button class="btn btn-secondary" data-action="exportClientsToCSV" aria-label="Export Excel">\n                    <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel\n                </button>\n                <button class="btn btn-secondary" data-action="exportClientsToPDF" aria-label="Export PDF">\n                    <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export to PDF\n                </button>\n            </div>\n        ',auditors:'\n            <button class="btn btn-secondary" data-action="exportAuditorsToCSV" aria-label="Export Excel">\n                <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel\n            </button>\n        ',"audit-programs":'\n            <button class="btn btn-secondary" data-action="exportAuditProgramsToCSV" aria-label="Export Excel">\n                <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel\n            </button>\n        ',dashboard:'\n            <button class="btn btn-secondary" data-action="exportDashboardToPDF" aria-label="Export PDF">\n                <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Summary\n            </button>\n        '}[t]||""}window.exportToCSV=exportToCSV,window.exportToPDF=exportToPDF,window.exportClientsToCSV=exportClientsToCSV,window.exportAuditorsToCSV=exportAuditorsToCSV,window.exportAuditProgramsToCSV=exportAuditProgramsToCSV,window.exportClientsToPDF=exportClientsToPDF,window.exportAuditProgramToPDF=exportAuditProgramToPDF,window.exportDashboardToPDF=exportDashboardToPDF,window.addExportButtons=addExportButtons,"undefined"!=typeof module&&module.exports&&(module.exports={exportToCSV:exportToCSV,exportToPDF:exportToPDF,exportClientsToCSV:exportClientsToCSV,exportAuditorsToCSV:exportAuditorsToCSV,exportAuditProgramsToCSV:exportAuditProgramsToCSV,exportClientsToPDF:exportClientsToPDF,exportAuditProgramToPDF:exportAuditProgramToPDF,exportDashboardToPDF:exportDashboardToPDF,addExportButtons:addExportButtons});
+// ============================================
+// EXPORT MODULE - PDF & Excel Export (ESM-ready)
+// ============================================
+
+// Export to CSV (Excel-compatible)
+function exportToCSV(data, filename, columns) {
+    // Create CSV header
+    const headers = columns.map(col => col.label).join(',');
+
+    // Create CSV rows
+    const rows = data.map(item => {
+        return columns.map(col => {
+            let value = col.field.split('.').reduce((obj, key) => obj?.[key], item) || '';
+            // Escape quotes and wrap in quotes if contains comma
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                value = `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+        }).join(',');
+    }).join('\n');
+
+    const csv = `${headers}\n${rows}`;
+
+    // Create download link
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showNotification(`Exported ${data.length} records to ${filename}.csv`);
+}
+
+// Export to PDF (using browser print with custom styles)
+function exportToPDF(title, content) {
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${title}</title>
+            <style>
+                @page {
+                    margin: 2cm;
+                    size: A4;
+                }
+                
+                body {
+                    font-family: 'Inter', Arial, sans-serif;
+                    font-size: 11pt;
+                    line-height: 1.5;
+                    color: #000;
+                }
+                
+                h1 {
+                    font-size: 18pt;
+                    margin-bottom: 1rem;
+                    color: #1e293b;
+                    border-bottom: 2px solid #2563eb;
+                    padding-bottom: 0.5rem;
+                }
+                
+                h2 {
+                    font-size: 14pt;
+                    margin-top: 1.5rem;
+                    margin-bottom: 0.75rem;
+                    color: #334155;
+                }
+                
+                h3 {
+                    font-size: 12pt;
+                    margin-top: 1rem;
+                    margin-bottom: 0.5rem;
+                    color: #475569;
+                }
+                
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 1rem 0;
+                    page-break-inside: auto;
+                }
+                
+                tr {
+                    page-break-inside: avoid;
+                    page-break-after: auto;
+                }
+                
+                thead {
+                    display: table-header-group;
+                }
+                
+                th, td {
+                    padding: 0.5rem;
+                    text-align: left;
+                    border: 1px solid #cbd5e1;
+                }
+                
+                th {
+                    background-color: #f1f5f9;
+                    font-weight: 600;
+                    color: #475569;
+                }
+                
+                .header {
+                    margin-bottom: 2rem;
+                }
+                
+                .meta-info {
+                    color: #64748b;
+                    font-size: 10pt;
+                    margin-bottom: 1rem;
+                }
+                
+                .status-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 9pt;
+                    font-weight: 500;
+                    border: 1px solid #cbd5e1;
+                }
+                
+                .footer {
+                    margin-top: 2rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid #e2e8f0;
+                    font-size: 9pt;
+                    color: #64748b;
+                }
+                
+                @media print {
+                    body {
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>${title}</h1>
+                <div class="meta-info">
+                    Generated on: ${new Date().toLocaleString()}<br>
+                    AuditCB360 - ISO CB Auditor & Audit Management
+                </div>
+            </div>
+            ${content}
+            <div class="footer">
+                <p>This is a computer-generated report from AuditCB360.</p>
+            </div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+
+    // Wait for content to load, then print
+    printWindow.onload = function () {
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 250);
+    };
+}
+
+// Export Clients to CSV
+function exportClientsToCSV() {
+    const columns = [
+        { label: 'ID', field: 'id' },
+        { label: 'Client Name', field: 'name' },
+        { label: 'Standard', field: 'standard' },
+        { label: 'Status', field: 'status' },
+        { label: 'Next Audit', field: 'nextAudit' }
+    ];
+
+    exportToCSV(state.clients, 'clients_export', columns);
+}
+
+// Export Auditors to CSV
+function exportAuditorsToCSV() {
+    const columns = [
+        { label: 'ID', field: 'id' },
+        { label: 'Name', field: 'name' },
+        { label: 'Role', field: 'role' },
+        { label: 'Standards', field: 'standards' }
+    ];
+
+    // Transform standards array to string
+    const data = state.auditors.map(auditor => ({
+        ...auditor,
+        standards: auditor.standards.join('; ')
+    }));
+
+    exportToCSV(data, 'auditors_export', columns);
+}
+
+// Export Audit Programs to CSV
+function exportAuditProgramsToCSV() {
+    const columns = [
+        { label: 'ID', field: 'id' },
+        { label: 'Client', field: 'client' },
+        { label: 'Standard', field: 'standard' },
+        { label: 'Cycle Start', field: 'cycleStart' },
+        { label: 'Cycle End', field: 'cycleEnd' },
+        { label: 'Status', field: 'status' }
+    ];
+
+    exportToCSV(state.auditPrograms, 'audit_programs_export', columns);
+}
+
+// Export Clients Report to PDF
+function exportClientsToPDF() {
+    const tableRows = state.clients.map(client => `
+        <tr>
+            <td>${client.id}</td>
+            <td>${client.name}</td>
+            <td>${client.standard}</td>
+            <td><span class="status-badge">${client.status}</span></td>
+            <td>${client.nextAudit}</td>
+        </tr>
+    `).join('');
+
+    const content = `
+        <h2>Client List</h2>
+        <p>Total Clients: ${state.clients.length}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Client Name</th>
+                    <th>Standard</th>
+                    <th>Status</th>
+                    <th>Next Audit</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
+
+    exportToPDF('Clients Report', content);
+}
+
+// Export Audit Program Report to PDF
+function exportAuditProgramToPDF(programId) {
+    const program = state.auditPrograms.find(p => p.id === programId);
+    if (!program) {
+        showNotification('Program not found', 'error');
+        return;
+    }
+
+    const content = `
+        <h2>Audit Program Details</h2>
+        <table>
+            <tr>
+                <th>Client</th>
+                <td>${program.client}</td>
+            </tr>
+            <tr>
+                <th>Standard</th>
+                <td>${program.standard}</td>
+            </tr>
+            <tr>
+                <th>Cycle Period</th>
+                <td>${program.cycleStart} to ${program.cycleEnd}</td>
+            </tr>
+            <tr>
+                <th>Status</th>
+                <td><span class="status-badge">${program.status}</span></td>
+            </tr>
+        </table>
+        
+        <h3>Scheduled Audits</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Audit Type</th>
+                    <th>Planned Date</th>
+                    <th>Auditor</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Stage 1</td>
+                    <td>2023-01-15</td>
+                    <td>John Doe</td>
+                    <td>Completed</td>
+                </tr>
+                <tr>
+                    <td>Stage 2</td>
+                    <td>2023-02-20</td>
+                    <td>John Doe</td>
+                    <td>Completed</td>
+                </tr>
+                <tr>
+                    <td>Surveillance 1</td>
+                    <td>2024-02-20</td>
+                    <td>Jane Smith</td>
+                    <td>Scheduled</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
+    exportToPDF(`Audit Program - ${program.client}`, content);
+}
+
+// Export Dashboard Summary to PDF
+function exportDashboardToPDF() {
+    const content = `
+        <h2>Dashboard Summary</h2>
+        
+        <h3>Key Performance Indicators</h3>
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Total Clients</td>
+                <td>${state.clients.length}</td>
+            </tr>
+            <tr>
+                <td>Active Auditors</td>
+                <td>${state.auditors.length}</td>
+            </tr>
+            <tr>
+                <td>Audit Programs</td>
+                <td>${state.auditPrograms.length}</td>
+            </tr>
+            <tr>
+                <td>Certification Decisions</td>
+                <td>${state.certificationDecisions.length}</td>
+            </tr>
+        </table>
+        
+        <h3>Recent Clients</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Client Name</th>
+                    <th>Standard</th>
+                    <th>Status</th>
+                    <th>Next Audit</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${state.clients.slice(0, 10).map(client => `
+                    <tr>
+                        <td>${client.name}</td>
+                        <td>${client.standard}</td>
+                        <td>${client.status}</td>
+                        <td>${client.nextAudit}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    exportToPDF('Dashboard Summary Report', content);
+}
+
+// Add export buttons to modules
+function addExportButtons(moduleName) {
+    const exportButtons = {
+        'clients': `
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary" data-action="exportClientsToCSV" aria-label="Export Excel">
+                    <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
+                </button>
+                <button class="btn btn-secondary" data-action="exportClientsToPDF" aria-label="Export PDF">
+                    <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export to PDF
+                </button>
+            </div>
+        `,
+        'auditors': `
+            <button class="btn btn-secondary" data-action="exportAuditorsToCSV" aria-label="Export Excel">
+                <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
+            </button>
+        `,
+        'audit-programs': `
+            <button class="btn btn-secondary" data-action="exportAuditProgramsToCSV" aria-label="Export Excel">
+                <i class="fa-solid fa-file-excel" style="margin-right: 0.5rem;"></i>Export to Excel
+            </button>
+        `,
+        'dashboard': `
+            <button class="btn btn-secondary" data-action="exportDashboardToPDF" aria-label="Export PDF">
+                <i class="fa-solid fa-file-pdf" style="margin-right: 0.5rem;"></i>Export Summary
+            </button>
+        `
+    };
+
+    return exportButtons[moduleName] || '';
+}
+
+// Export functions to global scope
+window.exportToCSV = exportToCSV;
+window.exportToPDF = exportToPDF;
+window.exportClientsToCSV = exportClientsToCSV;
+window.exportAuditorsToCSV = exportAuditorsToCSV;
+window.exportAuditProgramsToCSV = exportAuditProgramsToCSV;
+window.exportClientsToPDF = exportClientsToPDF;
+window.exportAuditProgramToPDF = exportAuditProgramToPDF;
+window.exportDashboardToPDF = exportDashboardToPDF;
+window.addExportButtons = addExportButtons;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { exportToCSV, exportToPDF, exportClientsToCSV, exportAuditorsToCSV, exportAuditProgramsToCSV, exportClientsToPDF, exportAuditProgramToPDF, exportDashboardToPDF, addExportButtons };
+}

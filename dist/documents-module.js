@@ -1,1 +1,876 @@
-function renderDocuments(){const e=state.documentSearchTerm||"",t=state.documentFilterType||"All",n=state.documentActiveTab||"library";let o=state.documents.filter(n=>{const o=n.title.toLowerCase().includes(e.toLowerCase())||n.client.toLowerCase().includes(e.toLowerCase())||(n.documentNumber||"").toLowerCase().includes(e.toLowerCase()),a="All"===t||n.type===t;return o&&a});const a=state.documents.length,i=state.documents.filter(e=>"Controlled"===e.controlStatus).length,r=state.documents.filter(e=>"Draft"===e.status).length,d=new Date,s=state.documents.filter(e=>{if(!e.nextReviewDate)return!1;const t=new Date(e.nextReviewDate),n=Math.ceil((t-d)/864e5);return n<=30&&n>-365}).length,l=e=>{if(!e)return{status:"none",label:"Not Set",color:"#6b7280"};const t=new Date(e),n=Math.ceil((t-d)/864e5);return n<0?{status:"overdue",label:`${Math.abs(n)} days overdue`,color:"#dc2626"}:n<=30?{status:"due",label:`Due in ${n} days`,color:"#f59e0b"}:{status:"ok",label:e,color:"#10b981"}},c=o.map(e=>{l(e.nextReviewDate);return`\n        <tr class="document-row" style="cursor: pointer;">\n            <td>\n                <div style="display: flex; align-items: center; gap: 0.75rem;">\n                    <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); font-size: 1.2rem;">\n                        <i class="fa-solid ${getDocumentIcon(e.type)}"></i>\n                    </div>\n                    <div>\n                        <div style="font-weight: 500;">${window.UTILS.escapeHtml(e.title)}</div>\n                        <div style="font-size: 0.75rem; color: var(--text-secondary);">\n                            ${window.UTILS.escapeHtml(e.documentNumber||"No Doc #")} • ${window.UTILS.escapeHtml(e.size)}\n                        </div>\n                    </div>\n                </div>\n            </td>\n            <td>${window.UTILS.escapeHtml(e.type)}</td>\n            <td><span class="badge bg-blue">${window.UTILS.escapeHtml(e.version||"1.0")}</span></td>\n            <td>\n                <span class="badge" style="background: ${"Controlled"===e.controlStatus?"#dcfce7":"Draft"===e.controlStatus?"#fef3c7":"#f3f4f6"}; color: ${"Controlled"===e.controlStatus?"#166534":"Draft"===e.controlStatus?"#92400e":"#374151"};">\n                    ${window.UTILS.escapeHtml(e.controlStatus||"Uncontrolled")}\n                </span>\n            </td>\n            <td><span class="status-badge status-${(e.status||"").toLowerCase()}">${window.UTILS.escapeHtml(e.status)}</span></td>\n            <td>\n                <button class="btn btn-sm btn-icon" data-action="viewDocumentHistory" data-id="${e.id}" title="Revision History">\n                    <i class="fa-solid fa-clock-rotate-left" style="color: #7c3aed;"></i>\n                </button>\n                <button class="btn btn-sm btn-icon" data-action="viewDocumentDetails" data-id="${e.id}" title="Document Details" aria-label="View">\n                    <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>\n                </button>\n                ${"Draft"===e.status?`\n                    <button class="btn btn-sm btn-success" data-action="approveDocument" data-id="${e.id}" title="Approve" aria-label="Confirm">\n                        <i class="fa-solid fa-check"></i>\n                    </button>\n                `:""}\n                <button class="btn btn-sm btn-icon" data-action="createNewRevision" data-id="${e.id}" title="New Revision">\n                    <i class="fa-solid fa-code-branch" style="color: #0284c7;"></i>\n                </button>\n                <button class="btn btn-sm btn-icon" data-action="downloadDocument" data-id="${e.id}" title="Download" aria-label="Download">\n                    <i class="fa-solid fa-download" style="color: var(--primary-color);"></i>\n                </button>\n                <button class="btn btn-sm btn-icon" data-action="deleteDocument" data-id="${e.id}" title="Delete" aria-label="Delete">\n                    <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>\n                </button>\n            </td>\n        </tr>\n    `}).join(""),u=o.map(e=>{const t=l(e.nextReviewDate);return`\n        <tr>\n            <td><strong>${window.UTILS.escapeHtml(e.documentNumber||"-")}</strong></td>\n            <td>${window.UTILS.escapeHtml(e.title)}</td>\n            <td>${window.UTILS.escapeHtml(e.type)}</td>\n            <td><span class="badge bg-blue">${window.UTILS.escapeHtml(e.version||"1.0")}</span></td>\n            <td>${window.UTILS.escapeHtml(e.owner||"-")}</td>\n            <td>\n                <span style="color: ${t.color}; font-weight: ${"overdue"===t.status?"bold":"normal"};">\n                    ${"overdue"===t.status?'<i class="fa-solid fa-exclamation-triangle" style="margin-right: 4px;"></i>':""}\n                    ${"due"===t.status?'<i class="fa-solid fa-clock" style="margin-right: 4px;"></i>':""}\n                    ${window.UTILS.escapeHtml(t.label)}\n                </span>\n            </td>\n            <td>\n                <span class="badge" style="background: ${"Controlled"===e.controlStatus?"#dcfce7":"#f3f4f6"}; color: ${"Controlled"===e.controlStatus?"#166534":"#374151"};">\n                    ${window.UTILS.escapeHtml(e.controlStatus||"Uncontrolled")}\n                </span>\n            </td>\n            <td>${(e.distributionList||[]).map(e=>`<span class="badge" style="background: #e0f2fe; color: #0369a1; margin: 2px;">${window.UTILS.escapeHtml(e)}</span>`).join(" ")||"-"}</td>\n        </tr>\n    `}).join(""),m=`\n        <div class="fade-in">\n            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">\n                <div>\n                    <h2 style="margin: 0;">Document Control</h2>\n                    <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">ISO 17021-1 Clause 8.3 - Control of Documents</p>\n                </div>\n                <button class="btn btn-primary" data-action="openUploadModal">\n                    <i class="fa-solid fa-cloud-upload-alt" style="margin-right: 0.5rem;"></i> Upload Document\n                </button>\n            </div>\n\n            \x3c!-- Stats Cards --\x3e\n            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">\n                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">\n                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">\n                        <i class="fa-solid fa-file-alt"></i>\n                    </div>\n                    <div>\n                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Documents</div>\n                        <div style="font-size: 1.5rem; font-weight: bold;">${a}</div>\n                    </div>\n                </div>\n                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">\n                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">\n                        <i class="fa-solid fa-lock"></i>\n                    </div>\n                    <div>\n                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Controlled</div>\n                        <div style="font-size: 1.5rem; font-weight: bold; color: #16a34a;">${i}</div>\n                    </div>\n                </div>\n                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">\n                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">\n                        <i class="fa-solid fa-edit"></i>\n                    </div>\n                    <div>\n                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Drafts</div>\n                        <div style="font-size: 1.5rem; font-weight: bold; color: #d97706;">${r}</div>\n                    </div>\n                </div>\n                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">\n                    <div style="width: 48px; height: 48px; border-radius: 50%; background: ${s>0?"#fee2e2":"#f3f4f6"}; color: ${s>0?"#dc2626":"#6b7280"}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">\n                        <i class="fa-solid fa-calendar-check"></i>\n                    </div>\n                    <div>\n                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Review Due</div>\n                        <div style="font-size: 1.5rem; font-weight: bold; color: ${s>0?"#dc2626":"#16a34a"};">${s}</div>\n                    </div>\n                </div>\n            </div>\n\n            \x3c!-- Tab Buttons --\x3e\n            <div class="card">\n                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 1rem;">\n                    <button class="btn ${"library"===n?"btn-primary":"btn-secondary"}" data-action="switchDocumentTab" data-id="library">\n                        <i class="fa-solid fa-folder-open" style="margin-right: 0.5rem;"></i>Document Library\n                    </button>\n                    <button class="btn ${"masterlist"===n?"btn-primary":"btn-secondary"}" data-action="switchDocumentTab" data-id="masterlist" aria-label="Checklist">\n                        <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Master Document List\n                    </button>\n                    <div style="flex: 1;"></div>\n                    <button class="btn btn-sm btn-outline-secondary" data-action="printMasterDocumentList" aria-label="Print">\n                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Print MDL\n                    </button>\n                    <button class="btn btn-sm btn-outline-secondary" data-action="exportMasterDocumentList">\n                        <i class="fa-solid fa-file-csv" style="margin-right: 0.5rem;"></i>Export CSV\n                    </button>\n                </div>\n\n                \x3c!-- Filters --\x3e\n                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">\n                    <input type="text" id="doc-search" placeholder="Search documents..." value="${e}" style="max-width: 300px; margin-bottom: 0;">\n                    <select id="doc-filter" style="max-width: 150px; margin-bottom: 0;">\n                        <option value="All" ${"All"===t?"selected":""}>All Types</option>\n                        <option value="Manual" ${"Manual"===t?"selected":""}>Manuals</option>\n                        <option value="Procedure" ${"Procedure"===t?"selected":""}>Procedures</option>\n                        <option value="Template" ${"Template"===t?"selected":""}>Templates</option>\n                        <option value="Record" ${"Record"===t?"selected":""}>Records</option>\n                        <option value="Certificate" ${"Certificate"===t?"selected":""}>Certificates</option>\n                    </select>\n                </div>\n\n                ${"library"===n?`\n                    \x3c!-- Drag & Drop Zone --\x3e\n                    <div id="drop-zone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 2rem; text-align: center; background: #f8fafc; margin-bottom: 1.5rem; transition: all 0.3s ease;">\n                        <i class="fa-solid fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 0.5rem;"></i>\n                        <h3 style="font-size: 1rem; margin-bottom: 0.25rem;">Drag and drop files here</h3>\n                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Supported formats: PDF, DOCX, XLSX, JPG (Max 10MB)</p>\n                        <button class="btn btn-sm btn-secondary" data-action="openUploadModal">Browse Files</button>\n                    </div>\n\n                    <div class="table-container">\n                        <table>\n                            <thead>\n                                <tr>\n                                    <th>Document Name</th>\n                                    <th>Type</th>\n                                    <th>Version</th>\n                                    <th>Control Status</th>\n                                    <th>Status</th>\n                                    <th>Actions</th>\n                                </tr>\n                            </thead>\n                            <tbody>\n                                ${c||'<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No documents found</td></tr>'}\n                            </tbody>\n                        </table>\n                    </div>\n                `:`\n                    \x3c!-- Master Document List View --\x3e\n                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">\n                        <strong>Master Document List (MDL)</strong> - ISO 17021-1 Clause 8.3 requires maintaining a list of all controlled documents with current versions, owners, and review schedules.\n                    </div>\n                    <div class="table-container">\n                        <table>\n                            <thead>\n                                <tr>\n                                    <th>Doc #</th>\n                                    <th>Title</th>\n                                    <th>Type</th>\n                                    <th>Version</th>\n                                    <th>Owner</th>\n                                    <th>Next Review</th>\n                                    <th>Control Status</th>\n                                    <th>Distribution</th>\n                                </tr>\n                            </thead>\n                            <tbody>\n                                ${u||'<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No documents found</td></tr>'}\n                            </tbody>\n                        </table>\n                    </div>\n                `}\n            </div>\n        </div>\n    `;window.contentArea.innerHTML=m,document.getElementById("doc-search")?.addEventListener("input",e=>{state.documentSearchTerm=e.target.value,renderDocuments()}),document.getElementById("doc-filter")?.addEventListener("change",e=>{state.documentFilterType=e.target.value,renderDocuments()});const p=document.getElementById("drop-zone");p&&(p.addEventListener("dragover",e=>{e.preventDefault(),p.style.borderColor="var(--primary-color)",p.style.background="#eef2ff"}),p.addEventListener("dragleave",e=>{e.preventDefault(),p.style.borderColor="var(--border-color)",p.style.background="#f8fafc"}),p.addEventListener("drop",e=>{e.preventDefault(),p.style.borderColor="var(--border-color)",p.style.background="#f8fafc",alert("File upload simulation: Files dropped successfully!")}))}function getDocumentIcon(e){switch(e){case"Manual":return"fa-book";case"Procedure":return"fa-file-alt";case"Record":return"fa-clipboard-check";case"Certificate":return"fa-certificate";default:return"fa-file"}}function openUploadModal(){window.DataService.openFormModal("Upload Document",`\n        <form id="upload-form">\n            <div class="form-group">\n                <label>Document Title</label>\n                <input type="text" class="form-control" id="doc-title" required placeholder="e.g., Quality Manual v1.0">\n            </div>\n            <div class="form-group">\n                <label>Document Type</label>\n                <select class="form-control" id="doc-type">\n                    <option value="Manual">Manual</option>\n                    <option value="Procedure">Procedure</option>\n                    <option value="Record">Record</option>\n                    <option value="Certificate">Certificate</option>\n                    <option value="Other">Other</option>\n                </select>\n            </div>\n            <div class="form-group">\n                <label>Related Client</label>\n                <select class="form-control" id="doc-client" ${window.state.activeClientId?"disabled":""}>\n                    <option value="">-- Select Client --</option>\n                    ${state.clients.map(e=>`<option value="${window.UTILS.escapeHtml(e.name)}" ${String(window.state.activeClientId)===String(e.id)?"selected":""}>${window.UTILS.escapeHtml(e.name)}</option>`).join("")}\n                </select>\n            </div>\n            <div class="form-group">\n                <label>File Select</label>\n                <input type="file" class="form-control" id="doc-file" required>\n            </div>\n            <div class="form-group">\n                <label>Status</label>\n                <select class="form-control" id="doc-status">\n                    <option value="Draft">Draft</option>\n                    <option value="Review">In Review</option>\n                    <option value="Approved">Approved</option>\n                </select>\n            </div>\n        </form>\n    `,()=>{const e=document.getElementById("doc-title").value,t=document.getElementById("doc-type").value,n=document.getElementById("doc-client").value,o=document.getElementById("doc-status").value;if(e){const a={id:Date.now(),title:e,type:t,client:n||"Internal",date:(new Date).toISOString().split("T")[0],size:(5*Math.random()).toFixed(1)+" MB",status:o};state.documents.unshift(a),saveData(),closeModal(),renderDocuments(),showNotification("Document uploaded successfully")}})}function downloadDocument(e){showNotification("Downloading document...")}function deleteDocument(e){confirm("Are you sure you want to delete this document?")&&(state.documents=state.documents.filter(t=>String(t.id)!==String(e)),saveData(),renderDocuments(),showNotification("Document deleted"))}state.documents||(state.documents=[{id:1,title:"Quality Manual",type:"Manual",client:"CB Internal",date:"2023-11-15",size:"2.4 MB",status:"Approved",version:"4.0",documentNumber:"QM-001",controlStatus:"Controlled",owner:"Quality Manager",nextReviewDate:"2024-11-15",reviewFrequency:"Annual",distributionList:["All Staff","Auditors","Management"],confidentiality:"Internal",revisionHistory:[{version:"4.0",date:"2023-11-15",author:"Quality Manager",changes:"Updated for ISO 17021-1:2015",approvedBy:"CEO",approvedDate:"2023-11-18"},{version:"3.0",date:"2022-06-10",author:"Quality Manager",changes:"Annual review - minor updates",approvedBy:"CEO",approvedDate:"2022-06-15"},{version:"2.0",date:"2021-03-05",author:"Quality Manager",changes:"Added impartiality committee procedures",approvedBy:"CEO",approvedDate:"2021-03-10"}]},{id:2,title:"Certification Decision Procedure",type:"Procedure",client:"CB Internal",date:"2023-12-10",size:"1.1 MB",status:"Approved",version:"2.1",documentNumber:"PR-001",controlStatus:"Controlled",owner:"Certification Manager",nextReviewDate:"2024-12-10",reviewFrequency:"Annual",distributionList:["Certification Managers","Lead Auditors"],confidentiality:"Internal",revisionHistory:[{version:"2.1",date:"2023-12-10",author:"Certification Manager",changes:"Added independence checklist",approvedBy:"Quality Manager",approvedDate:"2023-12-12"},{version:"2.0",date:"2023-01-15",author:"Certification Manager",changes:"Revised decision workflow",approvedBy:"Quality Manager",approvedDate:"2023-01-18"}]},{id:3,title:"Auditor Competence Procedure",type:"Procedure",client:"CB Internal",date:"2023-10-05",size:"0.8 MB",status:"Approved",version:"3.0",documentNumber:"PR-002",controlStatus:"Controlled",owner:"HR Manager",nextReviewDate:"2024-10-05",reviewFrequency:"Annual",distributionList:["HR","Lead Auditors","Management"],confidentiality:"Internal",revisionHistory:[{version:"3.0",date:"2023-10-05",author:"HR Manager",changes:"Updated competence criteria per IRCA requirements",approvedBy:"Quality Manager",approvedDate:"2023-10-08"}]},{id:4,title:"Internal Audit Procedure",type:"Procedure",client:"CB Internal",date:"2024-01-20",size:"1.2 MB",status:"Draft",version:"1.1-DRAFT",documentNumber:"PR-003",controlStatus:"Draft",owner:"Quality Manager",nextReviewDate:null,reviewFrequency:"Annual",distributionList:["Quality Team"],confidentiality:"Internal",revisionHistory:[{version:"1.1-DRAFT",date:"2024-01-20",author:"Quality Manager",changes:"Adding annual schedule requirements",approvedBy:null,approvedDate:null},{version:"1.0",date:"2023-06-15",author:"Quality Manager",changes:"Initial release",approvedBy:"CEO",approvedDate:"2023-06-18"}]},{id:5,title:"Audit Report Template",type:"Template",client:"CB Internal",date:"2023-11-28",size:"0.3 MB",status:"Approved",version:"5.0",documentNumber:"TM-001",controlStatus:"Controlled",owner:"Operations Manager",nextReviewDate:"2024-11-28",reviewFrequency:"Annual",distributionList:["Auditors","Lead Auditors"],confidentiality:"Internal",revisionHistory:[{version:"5.0",date:"2023-11-28",author:"Operations",changes:"Added NCR severity classification",approvedBy:"Quality Manager",approvedDate:"2023-11-30"}]}]),window.viewDocumentHistory=function(e){const t=state.documents.find(t=>String(t.id)===String(e));if(!t)return;const n=t.revisionHistory||[];document.getElementById("modal-title").textContent=`Revision History - ${t.title}`,document.getElementById("modal-body").innerHTML=`\n        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px;">\n            <strong>Current Version:</strong> ${window.UTILS.escapeHtml(t.version||"1.0")}<br>\n            <strong>Status:</strong> <span class="badge ${"Approved"===t.status?"bg-green":"bg-orange"}">${window.UTILS.escapeHtml(t.status)}</span>\n        </div>\n        \n        <h4 style="margin-bottom: 1rem; color: #0369a1;">\n            <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem;"></i>\n            Version History\n        </h4>\n        \n        <div class="table-container">\n            <table>\n                <thead>\n                    <tr>\n                        <th>Version</th>\n                        <th>Date</th>\n                        <th>Author</th>\n                        <th>Changes</th>\n                        <th>Approved By</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    ${n.length>0?n.map(e=>`\n                        <tr>\n                            <td><span class="badge bg-blue">${window.UTILS.escapeHtml(e.version)}</span></td>\n                            <td>${window.UTILS.escapeHtml(e.date)}</td>\n                            <td>${window.UTILS.escapeHtml(e.author)}</td>\n                            <td style="max-width: 200px;">${window.UTILS.escapeHtml(e.changes)}</td>\n                            <td>\n                                ${e.approvedBy?`\n                                    <span style="color: green;">\n                                        <i class="fa-solid fa-check-circle"></i>\n                                        ${window.UTILS.escapeHtml(e.approvedBy)}<br>\n                                        <small>${window.UTILS.escapeHtml(e.approvedDate)}</small>\n                                    </span>\n                                `:'<span style="color: orange;">Pending</span>'}\n                            </td>\n                        </tr>\n                    `).join(""):'<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No revision history</td></tr>'}\n                </tbody>\n            </table>\n        </div>\n        \n        <div style="margin-top: 1rem; padding: 0.75rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">\n            <small style="color: #065f46;">\n                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>\n                ISO 17021-1 Clause 8.3 requires controlled documents with version tracking and approval records.\n            </small>\n        </div>\n    `,document.getElementById("modal-save").style.display="none",window.openModal()},window.approveDocument=function(e){const t=state.documents.find(t=>String(t.id)===String(e));t&&(document.getElementById("modal-title").textContent="Approve Document",document.getElementById("modal-body").innerHTML=`\n        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border-radius: 8px;">\n            <strong>Document:</strong> ${window.UTILS.escapeHtml(t.title)}<br>\n            <strong>Version:</strong> ${window.UTILS.escapeHtml(t.version||"1.0")}\n        </div>\n        <form id="approve-form">\n            <div class="form-group">\n                <label>Approved By <span style="color: var(--danger-color);">*</span></label>\n                <input type="text" class="form-control" id="approved-by" placeholder="e.g., Quality Manager" required>\n            </div>\n            <div class="form-group">\n                <label>Approval Date</label>\n                <input type="date" class="form-control" id="approval-date" value="${(new Date).toISOString().split("T")[0]}">\n            </div>\n            <div class="form-group">\n                <label>Comments</label>\n                <textarea class="form-control" id="approval-comments" rows="2" placeholder="Optional approval comments..."></textarea>\n            </div>\n        </form>\n    `,document.getElementById("modal-save").style.display="",document.getElementById("modal-save").onclick=()=>{const e=document.getElementById("approved-by").value.trim(),n=document.getElementById("approval-date").value;e?(t.status="Approved",t.revisionHistory&&t.revisionHistory.length>0&&(t.revisionHistory[0].approvedBy=e,t.revisionHistory[0].approvedDate=n),t.version&&t.version.includes("DRAFT")&&(t.version=t.version.replace("-DRAFT","")),saveData(),closeModal(),renderDocuments(),showNotification("Document approved successfully","success")):showNotification("Please enter approver name","error")},window.openModal())},window.createNewRevision=function(e){const t=state.documents.find(t=>String(t.id)===String(e));t&&(document.getElementById("modal-title").textContent="Create New Revision",document.getElementById("modal-body").innerHTML=`\n        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px;">\n            <strong>Document:</strong> ${window.UTILS.escapeHtml(t.title)}<br>\n            <strong>Current Version:</strong> ${window.UTILS.escapeHtml(t.version||"1.0")}\n        </div>\n        <form id="revision-form">\n            <div class="form-group">\n                <label>New Version Number <span style="color: var(--danger-color);">*</span></label>\n                <input type="text" class="form-control" id="new-version" placeholder="e.g., 4.1" required>\n            </div>\n            <div class="form-group">\n                <label>Author <span style="color: var(--danger-color);">*</span></label>\n                <input type="text" class="form-control" id="revision-author" placeholder="e.g., Quality Manager" required>\n            </div>\n            <div class="form-group">\n                <label>Changes Made <span style="color: var(--danger-color);">*</span></label>\n                <textarea class="form-control" id="revision-changes" rows="3" placeholder="Describe the changes in this revision..." required></textarea>\n            </div>\n            <div class="form-group">\n                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">\n                    <input type="checkbox" id="submit-as-draft" checked style="width: 18px; height: 18px;">\n                    <span>Submit as Draft (requires approval)</span>\n                </label>\n            </div>\n        </form>\n    `,document.getElementById("modal-save").style.display="",document.getElementById("modal-save").onclick=()=>{const e=document.getElementById("new-version").value.trim(),n=document.getElementById("revision-author").value.trim(),o=document.getElementById("revision-changes").value.trim(),a=document.getElementById("submit-as-draft").checked;e&&n&&o?(t.revisionHistory||(t.revisionHistory=[]),t.revisionHistory.unshift({version:a?e+"-DRAFT":e,date:(new Date).toISOString().split("T")[0],author:n,changes:o,approvedBy:a?null:n,approvedDate:a?null:(new Date).toISOString().split("T")[0]}),t.version=a?e+"-DRAFT":e,t.status=a?"Draft":"Approved",t.date=(new Date).toISOString().split("T")[0],saveData(),closeModal(),renderDocuments(),showNotification("New revision created successfully","success")):showNotification("Please fill in all required fields","error")},window.openModal())},window.switchDocumentTab=function(e){state.documentActiveTab=e,renderDocuments()},window.viewDocumentDetails=function(e){const t=state.documents.find(t=>String(t.id)===String(e));t&&(document.getElementById("modal-title").textContent=`Document Details - ${t.title}`,document.getElementById("modal-body").innerHTML=`\n        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">\n            <div>\n                <h4 style="margin: 0 0 1rem 0; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">\n                    <i class="fa-solid fa-file-alt" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Document Information\n                </h4>\n                <table style="width: 100%; font-size: 0.9rem;">\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280; width: 40%;">Document #:</td><td style="font-weight: 500;">${window.UTILS.escapeHtml(t.documentNumber||"Not Assigned")}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Title:</td><td style="font-weight: 500;">${window.UTILS.escapeHtml(t.title)}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Type:</td><td>${window.UTILS.escapeHtml(t.type)}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Version:</td><td><span class="badge bg-blue">${window.UTILS.escapeHtml(t.version||"1.0")}</span></td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Status:</td><td><span class="status-badge status-${(t.status||"").toLowerCase()}">${window.UTILS.escapeHtml(t.status)}</span></td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Last Modified:</td><td>${window.UTILS.escapeHtml(t.date)}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">File Size:</td><td>${window.UTILS.escapeHtml(t.size)}</td></tr>\n                </table>\n            </div>\n            <div>\n                <h4 style="margin: 0 0 1rem 0; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">\n                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem; color: #16a34a;"></i>Control Information\n                </h4>\n                <table style="width: 100%; font-size: 0.9rem;">\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280; width: 40%;">Control Status:</td><td>\n                        <span class="badge" style="background: ${"Controlled"===t.controlStatus?"#dcfce7":"#fef3c7"}; color: ${"Controlled"===t.controlStatus?"#166534":"#92400e"};">\n                            ${window.UTILS.escapeHtml(t.controlStatus||"Uncontrolled")}\n                        </span>\n                    </td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Owner:</td><td style="font-weight: 500;">${window.UTILS.escapeHtml(t.owner||"Not Assigned")}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Review Frequency:</td><td>${window.UTILS.escapeHtml(t.reviewFrequency||"Not Set")}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Next Review:</td><td>${window.UTILS.escapeHtml(t.nextReviewDate||"Not Scheduled")}</td></tr>\n                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Confidentiality:</td><td>${window.UTILS.escapeHtml(t.confidentiality||"Internal")}</td></tr>\n                </table>\n            </div>\n        </div>\n        <div style="margin-top: 1.5rem;">\n            <h4 style="margin: 0 0 1rem 0; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">\n                <i class="fa-solid fa-users" style="margin-right: 0.5rem; color: #0284c7;"></i>Distribution List\n            </h4>\n            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">\n                ${(t.distributionList||[]).length>0?t.distributionList.map(e=>`<span class="badge" style="background: #e0f2fe; color: #0369a1;">${window.UTILS.escapeHtml(e)}</span>`).join(""):'<span style="color: #6b7280;">No distribution list defined</span>'}\n            </div>\n        </div>\n        <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">\n            <small style="color: #166534;">\n                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>\n                ISO 17021-1 Clause 8.3 requires controlled documents with version tracking, approval records, and distribution control.\n            </small>\n        </div>\n    `,document.getElementById("modal-save").style.display="none",window.openModal())},window.printMasterDocumentList=function(){const e=window.open("","PrintMDL","width=1200,height=800");if(!e)return void alert("Pop-up blocked. Please allow pop-ups for this site.");const t=state.documents||[],n=t.map(e=>`\n        <tr>\n            <td>${window.UTILS.escapeHtml(e.documentNumber||"-")}</td>\n            <td>${window.UTILS.escapeHtml(e.title)}</td>\n            <td>${window.UTILS.escapeHtml(e.type)}</td>\n            <td>${window.UTILS.escapeHtml(e.version||"1.0")}</td>\n            <td>${window.UTILS.escapeHtml(e.status)}</td>\n            <td>${window.UTILS.escapeHtml(e.owner||"-")}</td>\n            <td>${window.UTILS.escapeHtml(e.nextReviewDate||"-")}</td>\n            <td>${window.UTILS.escapeHtml(e.controlStatus||"Uncontrolled")}</td>\n            <td>${(e.distributionList||[]).join(", ")||"-"}</td>\n        </tr>\n    `).join("");e.document.write(`\n        <!DOCTYPE html>\n        <html>\n        <head>\n            <title>Master Document List - AuditCB360</title>\n            <style>\n                body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }\n                h1 { color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; font-size: 18px; }\n                table { width: 100%; border-collapse: collapse; margin-top: 15px; }\n                th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }\n                th { background: #1e3a5f; color: white; font-size: 10px; }\n                tr:nth-child(even) { background: #f8f9fa; }\n                .header-info { display: flex; justify-content: space-between; margin-bottom: 15px; }\n                .footer { margin-top: 20px; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px; }\n            </style>\n        </head>\n        <body>\n            <h1>Master Document List (MDL)</h1>\n            <div class="header-info">\n                <div><strong>Generated:</strong> ${(new Date).toLocaleString()}</div>\n                <div><strong>Total Documents:</strong> ${t.length}</div>\n                <div><strong>Controlled:</strong> ${t.filter(e=>"Controlled"===e.controlStatus).length}</div>\n            </div>\n            \n            <table>\n                <thead>\n                    <tr>\n                        <th>Doc #</th>\n                        <th>Title</th>\n                        <th>Type</th>\n                        <th>Version</th>\n                        <th>Status</th>\n                        <th>Owner</th>\n                        <th>Next Review</th>\n                        <th>Control</th>\n                        <th>Distribution</th>\n                    </tr>\n                </thead>\n                <tbody>\n                    ${n||'<tr><td colspan="9" style="text-align: center;">No documents</td></tr>'}\n                </tbody>\n            </table>\n            \n            <div class="footer">\n                <p><strong>ISO 17021-1 Clause 8.3</strong> - Control of Documents</p>\n                <p>This Master Document List is maintained as evidence of document control per accreditation requirements.</p>\n                <p>AuditCB360 Certification Body Management System</p>\n            </div>\n        </body>\n        </html>\n    `),e.document.close(),setTimeout(()=>e.print(),500)},window.exportMasterDocumentList=function(){const e=state.documents||[];let t="Document Number,Title,Type,Version,Status,Owner,Next Review Date,Control Status,Review Frequency,Confidentiality,Distribution List\n";e.forEach(e=>{const n=[e.documentNumber||"",`"${(e.title||"").replace(/"/g,'""')}"`,e.type||"",e.version||"1.0",e.status||"",e.owner||"",e.nextReviewDate||"",e.controlStatus||"Uncontrolled",e.reviewFrequency||"",e.confidentiality||"",`"${(e.distributionList||[]).join(", ")}"`];t+=n.join(",")+"\n"});const n=new Blob([t],{type:"text/csv;charset=utf-8;"}),o=document.createElement("a");o.href=URL.createObjectURL(n),o.download=`Master_Document_List_${(new Date).toISOString().split("T")[0]}.csv`,o.click(),showNotification("Master Document List exported successfully","success")},window.renderDocuments=renderDocuments,window.openUploadModal=openUploadModal,window.downloadDocument=downloadDocument,window.deleteDocument=deleteDocument,"undefined"!=typeof module&&module.exports&&(module.exports={viewDocumentHistory:viewDocumentHistory,approveDocument:approveDocument,createNewRevision:createNewRevision,switchDocumentTab:switchDocumentTab,viewDocumentDetails:viewDocumentDetails,printMasterDocumentList:printMasterDocumentList,exportMasterDocumentList:exportMasterDocumentList,renderDocuments:renderDocuments,openUploadModal:openUploadModal,downloadDocument:downloadDocument,deleteDocument:deleteDocument});
+// ============================================
+// DOCUMENT MANAGEMENT MODULE (ESM-ready)
+// ============================================
+
+// Initial mock data for documents if not present
+if (!state.documents) {
+    state.documents = [
+        {
+            id: 1,
+            title: 'Quality Manual',
+            type: 'Manual',
+            client: 'CB Internal',
+            date: '2023-11-15',
+            size: '2.4 MB',
+            status: 'Approved',
+            version: '4.0',
+            // ISO 17021 Clause 8.3 - Document Control Fields
+            documentNumber: 'QM-001',
+            controlStatus: 'Controlled',
+            owner: 'Quality Manager',
+            nextReviewDate: '2024-11-15',
+            reviewFrequency: 'Annual',
+            distributionList: ['All Staff', 'Auditors', 'Management'],
+            confidentiality: 'Internal',
+            revisionHistory: [
+                { version: '4.0', date: '2023-11-15', author: 'Quality Manager', changes: 'Updated for ISO 17021-1:2015', approvedBy: 'CEO', approvedDate: '2023-11-18' },
+                { version: '3.0', date: '2022-06-10', author: 'Quality Manager', changes: 'Annual review - minor updates', approvedBy: 'CEO', approvedDate: '2022-06-15' },
+                { version: '2.0', date: '2021-03-05', author: 'Quality Manager', changes: 'Added impartiality committee procedures', approvedBy: 'CEO', approvedDate: '2021-03-10' }
+            ]
+        },
+        {
+            id: 2,
+            title: 'Certification Decision Procedure',
+            type: 'Procedure',
+            client: 'CB Internal',
+            date: '2023-12-10',
+            size: '1.1 MB',
+            status: 'Approved',
+            version: '2.1',
+            documentNumber: 'PR-001',
+            controlStatus: 'Controlled',
+            owner: 'Certification Manager',
+            nextReviewDate: '2024-12-10',
+            reviewFrequency: 'Annual',
+            distributionList: ['Certification Managers', 'Lead Auditors'],
+            confidentiality: 'Internal',
+            revisionHistory: [
+                { version: '2.1', date: '2023-12-10', author: 'Certification Manager', changes: 'Added independence checklist', approvedBy: 'Quality Manager', approvedDate: '2023-12-12' },
+                { version: '2.0', date: '2023-01-15', author: 'Certification Manager', changes: 'Revised decision workflow', approvedBy: 'Quality Manager', approvedDate: '2023-01-18' }
+            ]
+        },
+        {
+            id: 3,
+            title: 'Auditor Competence Procedure',
+            type: 'Procedure',
+            client: 'CB Internal',
+            date: '2023-10-05',
+            size: '0.8 MB',
+            status: 'Approved',
+            version: '3.0',
+            documentNumber: 'PR-002',
+            controlStatus: 'Controlled',
+            owner: 'HR Manager',
+            nextReviewDate: '2024-10-05',
+            reviewFrequency: 'Annual',
+            distributionList: ['HR', 'Lead Auditors', 'Management'],
+            confidentiality: 'Internal',
+            revisionHistory: [
+                { version: '3.0', date: '2023-10-05', author: 'HR Manager', changes: 'Updated competence criteria per IRCA requirements', approvedBy: 'Quality Manager', approvedDate: '2023-10-08' }
+            ]
+        },
+        {
+            id: 4,
+            title: 'Internal Audit Procedure',
+            type: 'Procedure',
+            client: 'CB Internal',
+            date: '2024-01-20',
+            size: '1.2 MB',
+            status: 'Draft',
+            version: '1.1-DRAFT',
+            documentNumber: 'PR-003',
+            controlStatus: 'Draft',
+            owner: 'Quality Manager',
+            nextReviewDate: null,
+            reviewFrequency: 'Annual',
+            distributionList: ['Quality Team'],
+            confidentiality: 'Internal',
+            revisionHistory: [
+                { version: '1.1-DRAFT', date: '2024-01-20', author: 'Quality Manager', changes: 'Adding annual schedule requirements', approvedBy: null, approvedDate: null },
+                { version: '1.0', date: '2023-06-15', author: 'Quality Manager', changes: 'Initial release', approvedBy: 'CEO', approvedDate: '2023-06-18' }
+            ]
+        },
+        {
+            id: 5,
+            title: 'Audit Report Template',
+            type: 'Template',
+            client: 'CB Internal',
+            date: '2023-11-28',
+            size: '0.3 MB',
+            status: 'Approved',
+            version: '5.0',
+            documentNumber: 'TM-001',
+            controlStatus: 'Controlled',
+            owner: 'Operations Manager',
+            nextReviewDate: '2024-11-28',
+            reviewFrequency: 'Annual',
+            distributionList: ['Auditors', 'Lead Auditors'],
+            confidentiality: 'Internal',
+            revisionHistory: [
+                { version: '5.0', date: '2023-11-28', author: 'Operations', changes: 'Added NCR severity classification', approvedBy: 'Quality Manager', approvedDate: '2023-11-30' }
+            ]
+        }
+    ];
+}
+
+function renderDocuments() {
+    const searchTerm = state.documentSearchTerm || '';
+    const filterType = state.documentFilterType || 'All';
+    const activeTab = state.documentActiveTab || 'library';
+
+    // Filter documents
+    let filteredDocs = state.documents.filter(doc => {
+        const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doc.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (doc.documentNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesType = filterType === 'All' || doc.type === filterType;
+        return matchesSearch && matchesType;
+    });
+
+    // Calculate stats for dashboard
+    const totalDocs = state.documents.length;
+    const controlledDocs = state.documents.filter(d => d.controlStatus === 'Controlled').length;
+    const draftDocs = state.documents.filter(d => d.status === 'Draft').length;
+    const today = new Date();
+    const reviewDueDocs = state.documents.filter(d => {
+        if (!d.nextReviewDate) return false;
+        const reviewDate = new Date(d.nextReviewDate);
+        const daysUntil = Math.ceil((reviewDate - today) / (1000 * 60 * 60 * 24));
+        return daysUntil <= 30 && daysUntil > -365;
+    }).length;
+
+    // Check if review is due/overdue
+    const getReviewStatus = (nextReviewDate) => {
+        if (!nextReviewDate) return { status: 'none', label: 'Not Set', color: '#6b7280' };
+        const reviewDate = new Date(nextReviewDate);
+        const daysUntil = Math.ceil((reviewDate - today) / (1000 * 60 * 60 * 24));
+        if (daysUntil < 0) return { status: 'overdue', label: `${Math.abs(daysUntil)} days overdue`, color: '#dc2626' };
+        if (daysUntil <= 30) return { status: 'due', label: `Due in ${daysUntil} days`, color: '#f59e0b' };
+        return { status: 'ok', label: nextReviewDate, color: '#10b981' };
+    };
+
+    const rows = filteredDocs.map(doc => {
+        const _reviewStatus = getReviewStatus(doc.nextReviewDate);
+        return `
+        <tr class="document-row" style="cursor: pointer;">
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); font-size: 1.2rem;">
+                        <i class="fa-solid ${getDocumentIcon(doc.type)}"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight: 500;">${window.UTILS.escapeHtml(doc.title)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                            ${window.UTILS.escapeHtml(doc.documentNumber || 'No Doc #')} • ${window.UTILS.escapeHtml(doc.size)}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>${window.UTILS.escapeHtml(doc.type)}</td>
+            <td><span class="badge bg-blue">${window.UTILS.escapeHtml(doc.version || '1.0')}</span></td>
+            <td>
+                <span class="badge" style="background: ${doc.controlStatus === 'Controlled' ? '#dcfce7' : doc.controlStatus === 'Draft' ? '#fef3c7' : '#f3f4f6'}; color: ${doc.controlStatus === 'Controlled' ? '#166534' : doc.controlStatus === 'Draft' ? '#92400e' : '#374151'};">
+                    ${window.UTILS.escapeHtml(doc.controlStatus || 'Uncontrolled')}
+                </span>
+            </td>
+            <td><span class="status-badge status-${(doc.status || '').toLowerCase()}">${window.UTILS.escapeHtml(doc.status)}</span></td>
+            <td>
+                <button class="btn btn-sm btn-icon" data-action="viewDocumentHistory" data-id="${doc.id}" title="Revision History">
+                    <i class="fa-solid fa-clock-rotate-left" style="color: #7c3aed;"></i>
+                </button>
+                <button class="btn btn-sm btn-icon" data-action="viewDocumentDetails" data-id="${doc.id}" title="Document Details" aria-label="View">
+                    <i class="fa-solid fa-eye" style="color: #0ea5e9;"></i>
+                </button>
+                ${doc.status === 'Draft' ? `
+                    <button class="btn btn-sm btn-success" data-action="approveDocument" data-id="${doc.id}" title="Approve" aria-label="Confirm">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                ` : ''}
+                <button class="btn btn-sm btn-icon" data-action="createNewRevision" data-id="${doc.id}" title="New Revision">
+                    <i class="fa-solid fa-code-branch" style="color: #0284c7;"></i>
+                </button>
+                <button class="btn btn-sm btn-icon" data-action="downloadDocument" data-id="${doc.id}" title="Download" aria-label="Download">
+                    <i class="fa-solid fa-download" style="color: var(--primary-color);"></i>
+                </button>
+                <button class="btn btn-sm btn-icon" data-action="deleteDocument" data-id="${doc.id}" title="Delete" aria-label="Delete">
+                    <i class="fa-solid fa-trash" style="color: var(--danger-color);"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+    }).join('');
+
+    // Master Document List rows
+    const mdlRows = filteredDocs.map(doc => {
+        const reviewStatus = getReviewStatus(doc.nextReviewDate);
+        return `
+        <tr>
+            <td><strong>${window.UTILS.escapeHtml(doc.documentNumber || '-')}</strong></td>
+            <td>${window.UTILS.escapeHtml(doc.title)}</td>
+            <td>${window.UTILS.escapeHtml(doc.type)}</td>
+            <td><span class="badge bg-blue">${window.UTILS.escapeHtml(doc.version || '1.0')}</span></td>
+            <td>${window.UTILS.escapeHtml(doc.owner || '-')}</td>
+            <td>
+                <span style="color: ${reviewStatus.color}; font-weight: ${reviewStatus.status === 'overdue' ? 'bold' : 'normal'};">
+                    ${reviewStatus.status === 'overdue' ? '<i class="fa-solid fa-exclamation-triangle" style="margin-right: 4px;"></i>' : ''}
+                    ${reviewStatus.status === 'due' ? '<i class="fa-solid fa-clock" style="margin-right: 4px;"></i>' : ''}
+                    ${window.UTILS.escapeHtml(reviewStatus.label)}
+                </span>
+            </td>
+            <td>
+                <span class="badge" style="background: ${doc.controlStatus === 'Controlled' ? '#dcfce7' : '#f3f4f6'}; color: ${doc.controlStatus === 'Controlled' ? '#166534' : '#374151'};">
+                    ${window.UTILS.escapeHtml(doc.controlStatus || 'Uncontrolled')}
+                </span>
+            </td>
+            <td>${(doc.distributionList || []).map(d => `<span class="badge" style="background: #e0f2fe; color: #0369a1; margin: 2px;">${window.UTILS.escapeHtml(d)}</span>`).join(' ') || '-'}</td>
+        </tr>
+    `;
+    }).join('');
+
+    const html = `
+        <div class="fade-in">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h2 style="margin: 0;">Document Control</h2>
+                    <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">ISO 17021-1 Clause 8.3 - Control of Documents</p>
+                </div>
+                <button class="btn btn-primary" data-action="openUploadModal">
+                    <i class="fa-solid fa-cloud-upload-alt" style="margin-right: 0.5rem;"></i> Upload Document
+                </button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-file-alt"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Total Documents</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${totalDocs}</div>
+                    </div>
+                </div>
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Controlled</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #16a34a;">${controlledDocs}</div>
+                    </div>
+                </div>
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-edit"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Drafts</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #d97706;">${draftDocs}</div>
+                    </div>
+                </div>
+                <div class="card" style="margin: 0; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: ${reviewDueDocs > 0 ? '#fee2e2' : '#f3f4f6'}; color: ${reviewDueDocs > 0 ? '#dc2626' : '#6b7280'}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Review Due</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: ${reviewDueDocs > 0 ? '#dc2626' : '#16a34a'};">${reviewDueDocs}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="card">
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 1rem;">
+                    <button class="btn ${activeTab === 'library' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="library">
+                        <i class="fa-solid fa-folder-open" style="margin-right: 0.5rem;"></i>Document Library
+                    </button>
+                    <button class="btn ${activeTab === 'masterlist' ? 'btn-primary' : 'btn-secondary'}" data-action="switchDocumentTab" data-id="masterlist" aria-label="Checklist">
+                        <i class="fa-solid fa-list-check" style="margin-right: 0.5rem;"></i>Master Document List
+                    </button>
+                    <div style="flex: 1;"></div>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="printMasterDocumentList" aria-label="Print">
+                        <i class="fa-solid fa-print" style="margin-right: 0.5rem;"></i>Print MDL
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" data-action="exportMasterDocumentList">
+                        <i class="fa-solid fa-file-csv" style="margin-right: 0.5rem;"></i>Export CSV
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                    <input type="text" id="doc-search" placeholder="Search documents..." value="${searchTerm}" style="max-width: 300px; margin-bottom: 0;">
+                    <select id="doc-filter" style="max-width: 150px; margin-bottom: 0;">
+                        <option value="All" ${filterType === 'All' ? 'selected' : ''}>All Types</option>
+                        <option value="Manual" ${filterType === 'Manual' ? 'selected' : ''}>Manuals</option>
+                        <option value="Procedure" ${filterType === 'Procedure' ? 'selected' : ''}>Procedures</option>
+                        <option value="Template" ${filterType === 'Template' ? 'selected' : ''}>Templates</option>
+                        <option value="Record" ${filterType === 'Record' ? 'selected' : ''}>Records</option>
+                        <option value="Certificate" ${filterType === 'Certificate' ? 'selected' : ''}>Certificates</option>
+                    </select>
+                </div>
+
+                ${activeTab === 'library' ? `
+                    <!-- Drag & Drop Zone -->
+                    <div id="drop-zone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 2rem; text-align: center; background: #f8fafc; margin-bottom: 1.5rem; transition: all 0.3s ease;">
+                        <i class="fa-solid fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 0.5rem;"></i>
+                        <h3 style="font-size: 1rem; margin-bottom: 0.25rem;">Drag and drop files here</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Supported formats: PDF, DOCX, XLSX, JPG (Max 10MB)</p>
+                        <button class="btn btn-sm btn-secondary" data-action="openUploadModal">Browse Files</button>
+                    </div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Document Name</th>
+                                    <th>Type</th>
+                                    <th>Version</th>
+                                    <th>Control Status</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows || '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No documents found</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : `
+                    <!-- Master Document List View -->
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px;">
+                        <strong>Master Document List (MDL)</strong> - ISO 17021-1 Clause 8.3 requires maintaining a list of all controlled documents with current versions, owners, and review schedules.
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Doc #</th>
+                                    <th>Title</th>
+                                    <th>Type</th>
+                                    <th>Version</th>
+                                    <th>Owner</th>
+                                    <th>Next Review</th>
+                                    <th>Control Status</th>
+                                    <th>Distribution</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${mdlRows || '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No documents found</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+
+    window.contentArea.innerHTML = html;
+
+    // Event listeners
+    document.getElementById('doc-search')?.addEventListener('input', (e) => {
+        state.documentSearchTerm = e.target.value;
+        renderDocuments();
+    });
+
+    document.getElementById('doc-filter')?.addEventListener('change', (e) => {
+        state.documentFilterType = e.target.value;
+        renderDocuments();
+    });
+
+    // Drag and drop functionality
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'var(--primary-color)';
+            dropZone.style.background = '#eef2ff';
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'var(--border-color)';
+            dropZone.style.background = '#f8fafc';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'var(--border-color)';
+            dropZone.style.background = '#f8fafc';
+            alert('File upload simulation: Files dropped successfully!');
+        });
+    }
+}
+
+function getDocumentIcon(type) {
+    switch (type) {
+        case 'Manual': return 'fa-book';
+        case 'Procedure': return 'fa-file-alt';
+        case 'Record': return 'fa-clipboard-check';
+        case 'Certificate': return 'fa-certificate';
+        default: return 'fa-file';
+    }
+}
+
+function openUploadModal() {
+    window.DataService.openFormModal('Upload Document', `
+        <form id="upload-form">
+            <div class="form-group">
+                <label>Document Title</label>
+                <input type="text" class="form-control" id="doc-title" required placeholder="e.g., Quality Manual v1.0">
+            </div>
+            <div class="form-group">
+                <label>Document Type</label>
+                <select class="form-control" id="doc-type">
+                    <option value="Manual">Manual</option>
+                    <option value="Procedure">Procedure</option>
+                    <option value="Record">Record</option>
+                    <option value="Certificate">Certificate</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Related Client</label>
+                <select class="form-control" id="doc-client" ${window.state.activeClientId ? 'disabled' : ''}>
+                    <option value="">-- Select Client --</option>
+                    ${state.clients.map(c => `<option value="${window.UTILS.escapeHtml(c.name)}" ${String(window.state.activeClientId) === String(c.id) ? 'selected' : ''}>${window.UTILS.escapeHtml(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>File Select</label>
+                <input type="file" class="form-control" id="doc-file" required>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select class="form-control" id="doc-status">
+                    <option value="Draft">Draft</option>
+                    <option value="Review">In Review</option>
+                    <option value="Approved">Approved</option>
+                </select>
+            </div>
+        </form>
+    `, () => {
+        const title = document.getElementById('doc-title').value;
+        const type = document.getElementById('doc-type').value;
+        const client = document.getElementById('doc-client').value;
+        const status = document.getElementById('doc-status').value;
+
+        if (title) {
+            const newDoc = {
+                id: Date.now(),
+                title: title,
+                type: type,
+                client: client || 'Internal',
+                date: new Date().toISOString().split('T')[0],
+                size: (Math.random() * 5).toFixed(1) + ' MB', // Mock size
+                status: status
+            };
+
+            state.documents.unshift(newDoc);
+            saveData();
+            closeModal();
+            renderDocuments();
+            showNotification('Document uploaded successfully');
+        }
+    });
+}
+
+function downloadDocument(_id) {
+    showNotification('Downloading document...');
+    // Simulation
+}
+
+function deleteDocument(id) {
+    if (confirm('Are you sure you want to delete this document?')) {
+        state.documents = state.documents.filter(d => String(d.id) !== String(id));
+        saveData();
+        renderDocuments();
+        showNotification('Document deleted');
+    }
+}
+
+// ============================================
+// VERSION CONTROL FUNCTIONS (ISO 17021 Clause 8.3)
+// ============================================
+
+window.viewDocumentHistory = function (docId) {
+    const doc = state.documents.find(d => String(d.id) === String(docId));
+    if (!doc) return;
+
+    const history = doc.revisionHistory || [];
+
+    document.getElementById('modal-title').textContent = `Revision History - ${doc.title}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px;">
+            <strong>Current Version:</strong> ${window.UTILS.escapeHtml(doc.version || '1.0')}<br>
+            <strong>Status:</strong> <span class="badge ${doc.status === 'Approved' ? 'bg-green' : 'bg-orange'}">${window.UTILS.escapeHtml(doc.status)}</span>
+        </div>
+        
+        <h4 style="margin-bottom: 1rem; color: #0369a1;">
+            <i class="fa-solid fa-clock-rotate-left" style="margin-right: 0.5rem;"></i>
+            Version History
+        </h4>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>Date</th>
+                        <th>Author</th>
+                        <th>Changes</th>
+                        <th>Approved By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${history.length > 0 ? history.map(rev => `
+                        <tr>
+                            <td><span class="badge bg-blue">${window.UTILS.escapeHtml(rev.version)}</span></td>
+                            <td>${window.UTILS.escapeHtml(rev.date)}</td>
+                            <td>${window.UTILS.escapeHtml(rev.author)}</td>
+                            <td style="max-width: 200px;">${window.UTILS.escapeHtml(rev.changes)}</td>
+                            <td>
+                                ${rev.approvedBy ? `
+                                    <span style="color: green;">
+                                        <i class="fa-solid fa-check-circle"></i>
+                                        ${window.UTILS.escapeHtml(rev.approvedBy)}<br>
+                                        <small>${window.UTILS.escapeHtml(rev.approvedDate)}</small>
+                                    </span>
+                                ` : '<span style="color: orange;">Pending</span>'}
+                            </td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No revision history</td></tr>'}
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 1rem; padding: 0.75rem; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">
+            <small style="color: #065f46;">
+                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                ISO 17021-1 Clause 8.3 requires controlled documents with version tracking and approval records.
+            </small>
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
+
+window.approveDocument = function (docId) {
+    const doc = state.documents.find(d => String(d.id) === String(docId));
+    if (!doc) return;
+
+    document.getElementById('modal-title').textContent = 'Approve Document';
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border-radius: 8px;">
+            <strong>Document:</strong> ${window.UTILS.escapeHtml(doc.title)}<br>
+            <strong>Version:</strong> ${window.UTILS.escapeHtml(doc.version || '1.0')}
+        </div>
+        <form id="approve-form">
+            <div class="form-group">
+                <label>Approved By <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="approved-by" placeholder="e.g., Quality Manager" required>
+            </div>
+            <div class="form-group">
+                <label>Approval Date</label>
+                <input type="date" class="form-control" id="approval-date" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="form-group">
+                <label>Comments</label>
+                <textarea class="form-control" id="approval-comments" rows="2" placeholder="Optional approval comments..."></textarea>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const approvedBy = document.getElementById('approved-by').value.trim();
+        const approvalDate = document.getElementById('approval-date').value;
+
+        if (!approvedBy) {
+            showNotification('Please enter approver name', 'error');
+            return;
+        }
+
+        doc.status = 'Approved';
+
+        // Update the latest revision with approval info
+        if (doc.revisionHistory && doc.revisionHistory.length > 0) {
+            doc.revisionHistory[0].approvedBy = approvedBy;
+            doc.revisionHistory[0].approvedDate = approvalDate;
+        }
+
+        // Remove DRAFT from version if present
+        if (doc.version && doc.version.includes('DRAFT')) {
+            doc.version = doc.version.replace('-DRAFT', '');
+        }
+
+        saveData();
+        closeModal();
+        renderDocuments();
+        showNotification('Document approved successfully', 'success');
+    };
+
+    window.openModal();
+};
+
+window.createNewRevision = function (docId) {
+    const doc = state.documents.find(d => String(d.id) === String(docId));
+    if (!doc) return;
+
+    document.getElementById('modal-title').textContent = 'Create New Revision';
+    document.getElementById('modal-body').innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px;">
+            <strong>Document:</strong> ${window.UTILS.escapeHtml(doc.title)}<br>
+            <strong>Current Version:</strong> ${window.UTILS.escapeHtml(doc.version || '1.0')}
+        </div>
+        <form id="revision-form">
+            <div class="form-group">
+                <label>New Version Number <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="new-version" placeholder="e.g., 4.1" required>
+            </div>
+            <div class="form-group">
+                <label>Author <span style="color: var(--danger-color);">*</span></label>
+                <input type="text" class="form-control" id="revision-author" placeholder="e.g., Quality Manager" required>
+            </div>
+            <div class="form-group">
+                <label>Changes Made <span style="color: var(--danger-color);">*</span></label>
+                <textarea class="form-control" id="revision-changes" rows="3" placeholder="Describe the changes in this revision..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" id="submit-as-draft" checked style="width: 18px; height: 18px;">
+                    <span>Submit as Draft (requires approval)</span>
+                </label>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('modal-save').style.display = '';
+    document.getElementById('modal-save').onclick = () => {
+        const newVersion = document.getElementById('new-version').value.trim();
+        const author = document.getElementById('revision-author').value.trim();
+        const changes = document.getElementById('revision-changes').value.trim();
+        const isDraft = document.getElementById('submit-as-draft').checked;
+
+        if (!newVersion || !author || !changes) {
+            showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
+        // Add to revision history
+        if (!doc.revisionHistory) doc.revisionHistory = [];
+        doc.revisionHistory.unshift({
+            version: isDraft ? newVersion + '-DRAFT' : newVersion,
+            date: new Date().toISOString().split('T')[0],
+            author: author,
+            changes: changes,
+            approvedBy: isDraft ? null : author,
+            approvedDate: isDraft ? null : new Date().toISOString().split('T')[0]
+        });
+
+        doc.version = isDraft ? newVersion + '-DRAFT' : newVersion;
+        doc.status = isDraft ? 'Draft' : 'Approved';
+        doc.date = new Date().toISOString().split('T')[0];
+
+        saveData();
+        closeModal();
+        renderDocuments();
+        showNotification('New revision created successfully', 'success');
+    };
+
+    window.openModal();
+};
+
+// ============================================
+// DOCUMENT CONTROL HELPER FUNCTIONS (ISO 17021 Clause 8.3)
+// ============================================
+
+window.switchDocumentTab = function (tabName) {
+    state.documentActiveTab = tabName;
+    renderDocuments();
+};
+
+window.viewDocumentDetails = function (docId) {
+    const doc = state.documents.find(d => String(d.id) === String(docId));
+    if (!doc) return;
+
+    document.getElementById('modal-title').textContent = `Document Details - ${doc.title}`;
+    document.getElementById('modal-body').innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div>
+                <h4 style="margin: 0 0 1rem 0; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">
+                    <i class="fa-solid fa-file-alt" style="margin-right: 0.5rem; color: var(--primary-color);"></i>Document Information
+                </h4>
+                <table style="width: 100%; font-size: 0.9rem;">
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280; width: 40%;">Document #:</td><td style="font-weight: 500;">${window.UTILS.escapeHtml(doc.documentNumber || 'Not Assigned')}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Title:</td><td style="font-weight: 500;">${window.UTILS.escapeHtml(doc.title)}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Type:</td><td>${window.UTILS.escapeHtml(doc.type)}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Version:</td><td><span class="badge bg-blue">${window.UTILS.escapeHtml(doc.version || '1.0')}</span></td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Status:</td><td><span class="status-badge status-${(doc.status || '').toLowerCase()}">${window.UTILS.escapeHtml(doc.status)}</span></td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Last Modified:</td><td>${window.UTILS.escapeHtml(doc.date)}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">File Size:</td><td>${window.UTILS.escapeHtml(doc.size)}</td></tr>
+                </table>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 1rem 0; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">
+                    <i class="fa-solid fa-lock" style="margin-right: 0.5rem; color: #16a34a;"></i>Control Information
+                </h4>
+                <table style="width: 100%; font-size: 0.9rem;">
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280; width: 40%;">Control Status:</td><td>
+                        <span class="badge" style="background: ${doc.controlStatus === 'Controlled' ? '#dcfce7' : '#fef3c7'}; color: ${doc.controlStatus === 'Controlled' ? '#166534' : '#92400e'};">
+                            ${window.UTILS.escapeHtml(doc.controlStatus || 'Uncontrolled')}
+                        </span>
+                    </td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Owner:</td><td style="font-weight: 500;">${window.UTILS.escapeHtml(doc.owner || 'Not Assigned')}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Review Frequency:</td><td>${window.UTILS.escapeHtml(doc.reviewFrequency || 'Not Set')}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Next Review:</td><td>${window.UTILS.escapeHtml(doc.nextReviewDate || 'Not Scheduled')}</td></tr>
+                    <tr><td style="padding: 0.5rem 0; color: #6b7280;">Confidentiality:</td><td>${window.UTILS.escapeHtml(doc.confidentiality || 'Internal')}</td></tr>
+                </table>
+            </div>
+        </div>
+        <div style="margin-top: 1.5rem;">
+            <h4 style="margin: 0 0 1rem 0; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">
+                <i class="fa-solid fa-users" style="margin-right: 0.5rem; color: #0284c7;"></i>Distribution List
+            </h4>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                ${(doc.distributionList || []).length > 0
+            ? doc.distributionList.map(d => `<span class="badge" style="background: #e0f2fe; color: #0369a1;">${window.UTILS.escapeHtml(d)}</span>`).join('')
+            : '<span style="color: #6b7280;">No distribution list defined</span>'
+        }
+            </div>
+        </div>
+        <div style="margin-top: 1.5rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">
+            <small style="color: #166534;">
+                <i class="fa-solid fa-info-circle" style="margin-right: 0.5rem;"></i>
+                ISO 17021-1 Clause 8.3 requires controlled documents with version tracking, approval records, and distribution control.
+            </small>
+        </div>
+    `;
+
+    document.getElementById('modal-save').style.display = 'none';
+    window.openModal();
+};
+
+window.printMasterDocumentList = function () {
+    const printWindow = window.open('', 'PrintMDL', 'width=1200,height=800');
+    if (!printWindow) {
+        alert('Pop-up blocked. Please allow pop-ups for this site.');
+        return;
+    }
+
+    const docs = state.documents || [];
+    const rows = docs.map(doc => `
+        <tr>
+            <td>${window.UTILS.escapeHtml(doc.documentNumber || '-')}</td>
+            <td>${window.UTILS.escapeHtml(doc.title)}</td>
+            <td>${window.UTILS.escapeHtml(doc.type)}</td>
+            <td>${window.UTILS.escapeHtml(doc.version || '1.0')}</td>
+            <td>${window.UTILS.escapeHtml(doc.status)}</td>
+            <td>${window.UTILS.escapeHtml(doc.owner || '-')}</td>
+            <td>${window.UTILS.escapeHtml(doc.nextReviewDate || '-')}</td>
+            <td>${window.UTILS.escapeHtml(doc.controlStatus || 'Uncontrolled')}</td>
+            <td>${(doc.distributionList || []).join(', ') || '-'}</td>
+        </tr>
+    `).join('');
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Master Document List - AuditCB360</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }
+                h1 { color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; font-size: 18px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                th { background: #1e3a5f; color: white; font-size: 10px; }
+                tr:nth-child(even) { background: #f8f9fa; }
+                .header-info { display: flex; justify-content: space-between; margin-bottom: 15px; }
+                .footer { margin-top: 20px; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px; }
+            </style>
+        </head>
+        <body>
+            <h1>Master Document List (MDL)</h1>
+            <div class="header-info">
+                <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+                <div><strong>Total Documents:</strong> ${docs.length}</div>
+                <div><strong>Controlled:</strong> ${docs.filter(d => d.controlStatus === 'Controlled').length}</div>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Doc #</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Owner</th>
+                        <th>Next Review</th>
+                        <th>Control</th>
+                        <th>Distribution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows || '<tr><td colspan="9" style="text-align: center;">No documents</td></tr>'}
+                </tbody>
+            </table>
+            
+            <div class="footer">
+                <p><strong>ISO 17021-1 Clause 8.3</strong> - Control of Documents</p>
+                <p>This Master Document List is maintained as evidence of document control per accreditation requirements.</p>
+                <p>AuditCB360 Certification Body Management System</p>
+            </div>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+};
+
+window.exportMasterDocumentList = function () {
+    const docs = state.documents || [];
+
+    // CSV header
+    let csv = 'Document Number,Title,Type,Version,Status,Owner,Next Review Date,Control Status,Review Frequency,Confidentiality,Distribution List\n';
+
+    // Add rows
+    docs.forEach(doc => {
+        const row = [
+            doc.documentNumber || '',
+            `"${(doc.title || '').replace(/"/g, '""')}"`,
+            doc.type || '',
+            doc.version || '1.0',
+            doc.status || '',
+            doc.owner || '',
+            doc.nextReviewDate || '',
+            doc.controlStatus || 'Uncontrolled',
+            doc.reviewFrequency || '',
+            doc.confidentiality || '',
+            `"${(doc.distributionList || []).join(', ')}"`
+        ];
+        csv += row.join(',') + '\n';
+    });
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Master_Document_List_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    showNotification('Master Document List exported successfully', 'success');
+};
+
+// Export functions
+window.renderDocuments = renderDocuments;
+window.openUploadModal = openUploadModal;
+window.downloadDocument = downloadDocument;
+window.deleteDocument = deleteDocument;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { viewDocumentHistory, approveDocument, createNewRevision, switchDocumentTab, viewDocumentDetails, printMasterDocumentList, exportMasterDocumentList, renderDocuments, openUploadModal, downloadDocument, deleteDocument };
+}

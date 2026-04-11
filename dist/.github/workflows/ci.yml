@@ -18,11 +18,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Lint
         run: npm run lint
@@ -38,4 +38,4 @@ jobs:
           echo "### Build Results" >> $GITHUB_STEP_SUMMARY
           echo "- **JS files**: $(ls dist/*.js 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
           echo "- **Bundle size**: $(du -sh dist/ | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tests**: 87 passing" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: 201 passing" >> $GITHUB_STEP_SUMMARY

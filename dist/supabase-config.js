@@ -1,1 +1,400 @@
-const SupabaseConfig={_defaultUrl:null,_defaultAnonKey:null,getUrl:function(){if(window.__SUPABASE_URL__)return window.__SUPABASE_URL__;const e=localStorage.getItem("supabase_url");return e&&e.includes("supabase.co")?e:window.state?.settings?.supabaseUrl?window.state.settings.supabaseUrl:(this._warnedNoUrl||(Logger.warn("Supabase URL not configured. Set via Settings → Supabase Configuration or build environment."),this._warnedNoUrl=!0),null)},getAnonKey:function(){if(window.__SUPABASE_ANON_KEY__)return window.__SUPABASE_ANON_KEY__;const e=localStorage.getItem("supabase_anon_key");return e||(window.state?.settings?.supabaseAnonKey?window.state.settings.supabaseAnonKey:(this._warnedNoKey||(Logger.warn("Supabase anon key not configured. Set via Settings → Supabase Configuration or build environment."),this._warnedNoKey=!0),null))},isConfigured:function(){const e=this.getUrl(),n=this.getAnonKey();return!(!e||!n)},saveConfig:function(e,n){try{return e&&localStorage.setItem("supabase_url",e),n&&localStorage.setItem("supabase_anon_key",n),window.state.settings||(window.state.settings={}),window.state.settings.supabaseUrl=e,window.state.settings.supabaseAnonKey=n,window.saveData&&window.saveData(),Logger.info("Supabase configuration saved"),!0}catch(e){return Logger.error("Failed to save Supabase configuration:",e),!1}},clearConfig:function(){try{return localStorage.removeItem("supabase_url"),localStorage.removeItem("supabase_anon_key"),window.state?.settings&&(delete window.state.settings.supabaseUrl,delete window.state.settings.supabaseAnonKey),window.saveData&&window.saveData(),Logger.info("Supabase configuration cleared"),!0}catch(e){return Logger.error("Failed to clear Supabase configuration:",e),!1}},testConnection:async function(){const e=this.getUrl(),n=this.getAnonKey();if(!e||!n)return{success:!1,error:"Supabase URL and anon key are required"};try{if("undefined"==typeof supabase||!supabase.createClient)return{success:!1,error:"Supabase library not loaded yet"};const{createClient:t}=supabase,a=t(e,n);if(!a||!a.auth||"function"!=typeof a.auth.getSession)return{success:!1,error:"Supabase client not fully initialized"};const{data:o,error:s}=await a.auth.getSession();return s&&s.message.includes("Invalid")?{success:!1,error:"Invalid Supabase credentials"}:{success:!0,message:"Successfully connected to Supabase"}}catch(e){return{success:!1,error:e.message||"Failed to connect to Supabase"}}},getStatus:function(){const e=this.getUrl(),n=this.getAnonKey();return{configured:this.isConfigured(),url:e?this.maskUrl(e):null,keyConfigured:!!n,source:this.getConfigSource()}},maskUrl:function(e){if(!e)return null;try{const n=new URL(e);return`${n.protocol}//${n.hostname}`}catch{return e.substring(0,20)+"..."}},getConfigSource:function(){return window.__SUPABASE_URL__?"Build Environment":localStorage.getItem("supabase_url")?"localStorage (Manual)":window.state?.settings?.supabaseUrl?"Settings":"Not Configured"},showConfigUI:function(){const e=this.getStatus(),n=`\n            <div class="supabase-config">\n                <h3><i class="fa-solid fa-database"></i> Supabase Configuration</h3>\n\n                <div class="config-status" style="background: ${e.configured?"#d4edda":"#f8d7da"}; \n                     padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px solid ${e.configured?"#c3e6cb":"#f5c6cb"};">\n                    <strong>Status:</strong> ${e.configured?"✅ Configured":"❌ Not Configured"}<br>\n                    ${e.url?`<strong>URL:</strong> ${e.url}<br>`:""}\n                    ${e.keyConfigured?"<strong>Key:</strong> ✅ Configured<br>":""}\n                    <strong>Source:</strong> ${e.source}\n                </div>\n\n                <form id="supabase-config-form">\n                    <div class="form-group">\n                        <label>Supabase URL</label>\n                        <input type="url" id="supabase-url" class="form-control" \n                               placeholder="https://your-project.supabase.co"\n                               value="${e.url||""}" required>\n                        <small>Your Supabase project URL</small>\n                    </div>\n\n                    <div class="form-group">\n                        <label>Supabase Anon Key</label>\n                        <input type="password" id="supabase-anon-key" class="form-control" \n                               placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."\n                               value="${e.keyConfigured?"••••••••••••••••":""}" required>\n                        <small>Your Supabase anon/public key</small>\n                    </div>\n\n                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">\n                        <button type="button" data-action="SupabaseConfig_handleTest" class="btn btn-secondary">\n                            <i class="fa-solid fa-plug"></i> Test Connection\n                        </button>\n                        <button type="submit" class="btn btn-primary" aria-label="Save">\n                            <i class="fa-solid fa-save"></i> Save Configuration\n                        </button>\n                        ${e.configured?'\n                            <button type="button" data-action="SupabaseConfig_handleClear" class="btn btn-danger" aria-label="Delete">\n                                <i class="fa-solid fa-trash"></i> Clear\n                            </button>\n                        ':""}\n                    </div>\n                </form>\n\n                <div style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">\n                    <strong>How to get your credentials:</strong>\n                    <ol style="margin: 0.5rem 0 0 1.5rem;">\n                        <li>Go to <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a></li>\n                        <li>Select your project</li>\n                        <li>Go to Settings → API</li>\n                        <li>Copy "Project URL" and "anon public" key</li>\n                    </ol>\n                </div>\n            </div>\n        `;if(window.openModal)window.openModal("Supabase Configuration",n,null,null);else{const e=document.getElementById("content-area");e&&SafeDOM.setHTML(e,n)}let t=document.getElementById("supabase-config-form");t&&t.addEventListener("submit",function(e){return SupabaseConfig.handleSave(e)})},handleSave:function(e){e.preventDefault();const n=document.getElementById("supabase-url").value.trim(),t=document.getElementById("supabase-anon-key").value.trim();if(!n||!t)return window.showNotification("Please provide both URL and anon key","error"),!1;const a="••••••••••••••••"===t?this.getAnonKey():t;return this.saveConfig(n,a)?(window.showNotification("Supabase configuration saved! Reloading...","success"),setTimeout(()=>{location.reload()},1e3)):window.showNotification("Failed to save configuration","error"),!1},handleTest:async function(){const e=document.getElementById("supabase-url").value.trim(),n=document.getElementById("supabase-anon-key").value.trim();if(!e||!n)return void window.showNotification("Please provide both URL and anon key","error");const t="••••••••••••••••"===n?this.getAnonKey():n;this.saveConfig(e,t),window.showNotification("Testing connection...","info");const a=await this.testConnection();a.success?window.showNotification(a.message,"success"):window.showNotification("Connection failed: "+a.error,"error")},handleClear:function(){confirm("Are you sure you want to clear Supabase configuration? The app will use localStorage instead.")&&this.clearConfig()&&(window.showNotification("Configuration cleared. Reloading...","info"),setTimeout(()=>{location.reload()},1e3))}};window.SupabaseConfig=SupabaseConfig,Logger.info("SupabaseConfig module loaded"),"undefined"!=typeof module&&module.exports&&(module.exports=SupabaseConfig);
+// ============================================
+// SUPABASE CONFIGURATION MODULE (ESM-ready)
+// ============================================
+// Centralized Supabase configuration management
+// Version: 2.0 - Permanent credentials configured
+
+const SupabaseConfig = {
+
+    // Supabase credentials must be provided via environment variables,
+    // localStorage, or settings. Never hardcode credentials in source.
+    _defaultUrl: null,
+    _defaultAnonKey: null,
+
+    /**
+     * Get Supabase URL
+     */
+    getUrl: function () {
+        // Try window environment (set by build process or manually)
+        if (window.__SUPABASE_URL__) {
+            return window.__SUPABASE_URL__;
+        }
+
+        // Try localStorage (manual configuration)
+        const stored = localStorage.getItem('supabase_url');
+        // Only accept valid Supabase Cloud URLs
+        if (stored && stored.includes('supabase.co')) {
+            return stored;
+        }
+
+        // Try state settings
+        if (window.state?.settings?.supabaseUrl) {
+            return window.state.settings.supabaseUrl;
+        }
+
+        // No credentials configured
+        if (!this._warnedNoUrl) {
+            Logger.warn('Supabase URL not configured. Set via Settings → Supabase Configuration or build environment.');
+            this._warnedNoUrl = true;
+        }
+        return null;
+    },
+
+    /**
+     * Get Supabase anon key
+     */
+    getAnonKey: function () {
+
+        // Try window environment (set by build process)
+        if (window.__SUPABASE_ANON_KEY__) {
+            return window.__SUPABASE_ANON_KEY__;
+        }
+
+        // Try localStorage (manual configuration)
+        const stored = localStorage.getItem('supabase_anon_key');
+        if (stored) {
+            return stored;
+        }
+
+        // Try state settings
+        if (window.state?.settings?.supabaseAnonKey) {
+            return window.state.settings.supabaseAnonKey;
+        }
+
+        // No credentials configured
+        if (!this._warnedNoKey) {
+            Logger.warn('Supabase anon key not configured. Set via Settings → Supabase Configuration or build environment.');
+            this._warnedNoKey = true;
+        }
+        return null;
+    },
+
+    /**
+     * Check if Supabase is configured
+     */
+    isConfigured: function () {
+        const url = this.getUrl();
+        const key = this.getAnonKey();
+        return !!(url && key);
+    },
+
+    /**
+     * Save configuration to localStorage
+     */
+    saveConfig: function (url, anonKey) {
+        try {
+            if (url) {
+                localStorage.setItem('supabase_url', url);
+            }
+            if (anonKey) {
+                localStorage.setItem('supabase_anon_key', anonKey);
+            }
+
+            // Also save to state settings
+            if (!window.state.settings) {
+                window.state.settings = {};
+            }
+            window.state.settings.supabaseUrl = url;
+            window.state.settings.supabaseAnonKey = anonKey;
+
+            if (window.saveData) {
+                window.saveData();
+            }
+
+            Logger.info('Supabase configuration saved');
+            return true;
+        } catch (error) {
+            Logger.error('Failed to save Supabase configuration:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Clear configuration
+     */
+    clearConfig: function () {
+        try {
+            localStorage.removeItem('supabase_url');
+            localStorage.removeItem('supabase_anon_key');
+
+            if (window.state?.settings) {
+                delete window.state.settings.supabaseUrl;
+                delete window.state.settings.supabaseAnonKey;
+            }
+
+            if (window.saveData) {
+                window.saveData();
+            }
+
+            Logger.info('Supabase configuration cleared');
+            return true;
+        } catch (error) {
+            Logger.error('Failed to clear Supabase configuration:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Test connection to Supabase
+     */
+    testConnection: async function () {
+        const url = this.getUrl();
+        const key = this.getAnonKey();
+
+        if (!url || !key) {
+            return {
+                success: false,
+                error: 'Supabase URL and anon key are required'
+            };
+        }
+
+        try {
+            // Try to create a client and test connection
+            if (typeof supabase === 'undefined' || !supabase.createClient) {
+                return {
+                    success: false,
+                    error: 'Supabase library not loaded yet'
+                };
+            }
+
+            const { createClient } = supabase;
+            const client = createClient(url, key);
+
+            // Safety check: ensure client and auth are initialized
+            if (!client || !client.auth || typeof client.auth.getSession !== 'function') {
+                return {
+                    success: false,
+                    error: 'Supabase client not fully initialized'
+                };
+            }
+
+            // Test by getting session (doesn't require auth)
+            const { data: _data, error } = await client.auth.getSession();
+
+            if (error && error.message.includes('Invalid')) {
+                return {
+                    success: false,
+                    error: 'Invalid Supabase credentials'
+                };
+            }
+
+            return {
+                success: true,
+                message: 'Successfully connected to Supabase'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message || 'Failed to connect to Supabase'
+            };
+        }
+    },
+
+    /**
+     * Get configuration status
+     */
+    getStatus: function () {
+        const url = this.getUrl();
+        const key = this.getAnonKey();
+
+        return {
+            configured: this.isConfigured(),
+            url: url ? this.maskUrl(url) : null,
+            keyConfigured: !!key,
+            source: this.getConfigSource()
+        };
+    },
+
+    /**
+     * Mask URL for display
+     */
+    maskUrl: function (url) {
+        if (!url) return null;
+        try {
+            const urlObj = new URL(url);
+            return `${urlObj.protocol}//${urlObj.hostname}`;
+        } catch {
+            return url.substring(0, 20) + '...';
+        }
+    },
+
+    /**
+     * Get configuration source
+     */
+    getConfigSource: function () {
+        if (window.__SUPABASE_URL__) {
+            return 'Build Environment';
+        }
+        if (localStorage.getItem('supabase_url')) {
+            return 'localStorage (Manual)';
+        }
+        if (window.state?.settings?.supabaseUrl) {
+            return 'Settings';
+        }
+        return 'Not Configured';
+    },
+
+    /**
+     * Show configuration UI
+     */
+    showConfigUI: function () {
+        const status = this.getStatus();
+
+        const html = `
+            <div class="supabase-config">
+                <h3><i class="fa-solid fa-database"></i> Supabase Configuration</h3>
+
+                <div class="config-status" style="background: ${status.configured ? '#d4edda' : '#f8d7da'}; 
+                     padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px solid ${status.configured ? '#c3e6cb' : '#f5c6cb'};">
+                    <strong>Status:</strong> ${status.configured ? '✅ Configured' : '❌ Not Configured'}<br>
+                    ${status.url ? `<strong>URL:</strong> ${status.url}<br>` : ''}
+                    ${status.keyConfigured ? `<strong>Key:</strong> ✅ Configured<br>` : ''}
+                    <strong>Source:</strong> ${status.source}
+                </div>
+
+                <form id="supabase-config-form">
+                    <div class="form-group">
+                        <label>Supabase URL</label>
+                        <input type="url" id="supabase-url" class="form-control" 
+                               placeholder="https://your-project.supabase.co"
+                               value="${status.url || ''}" required>
+                        <small>Your Supabase project URL</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Supabase Anon Key</label>
+                        <input type="password" id="supabase-anon-key" class="form-control" 
+                               placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                               value="${status.keyConfigured ? '••••••••••••••••' : ''}" required>
+                        <small>Your Supabase anon/public key</small>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button type="button" data-action="SupabaseConfig_handleTest" class="btn btn-secondary">
+                            <i class="fa-solid fa-plug"></i> Test Connection
+                        </button>
+                        <button type="submit" class="btn btn-primary" aria-label="Save">
+                            <i class="fa-solid fa-save"></i> Save Configuration
+                        </button>
+                        ${status.configured ? `
+                            <button type="button" data-action="SupabaseConfig_handleClear" class="btn btn-danger" aria-label="Delete">
+                                <i class="fa-solid fa-trash"></i> Clear
+                            </button>
+                        ` : ''}
+                    </div>
+                </form>
+
+                <div style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+                    <strong>How to get your credentials:</strong>
+                    <ol style="margin: 0.5rem 0 0 1.5rem;">
+                        <li>Go to <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a></li>
+                        <li>Select your project</li>
+                        <li>Go to Settings → API</li>
+                        <li>Copy "Project URL" and "anon public" key</li>
+                    </ol>
+                </div>
+            </div>
+        `;
+
+        if (window.openModal) {
+            window.openModal('Supabase Configuration', html, null, null);
+        } else {
+            const contentArea = document.getElementById('content-area');
+            if (contentArea) {
+                SafeDOM.setHTML(contentArea, html);
+            }
+        }
+
+        // Attach submit handler (CSP-safe — no inline onsubmit)
+        let configForm = document.getElementById('supabase-config-form');
+        if (configForm) {
+            configForm.addEventListener('submit', function (e) {
+                return SupabaseConfig.handleSave(e);
+            });
+        }
+    },
+
+    /**
+     * Handle save from UI
+     */
+    handleSave: function (event) {
+        event.preventDefault();
+
+        const url = document.getElementById('supabase-url').value.trim();
+        const key = document.getElementById('supabase-anon-key').value.trim();
+
+        if (!url || !key) {
+            window.showNotification('Please provide both URL and anon key', 'error');
+            return false;
+        }
+
+        // Don't update key if it's the masked value
+        const actualKey = key === '••••••••••••••••' ? this.getAnonKey() : key;
+
+        if (this.saveConfig(url, actualKey)) {
+            window.showNotification('Supabase configuration saved! Reloading...', 'success');
+
+            // Reload to reinitialize Supabase client
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            window.showNotification('Failed to save configuration', 'error');
+        }
+
+        return false;
+    },
+
+    /**
+     * Handle test connection from UI
+     */
+    handleTest: async function () {
+        const url = document.getElementById('supabase-url').value.trim();
+        const key = document.getElementById('supabase-anon-key').value.trim();
+
+        if (!url || !key) {
+            window.showNotification('Please provide both URL and anon key', 'error');
+            return;
+        }
+
+        // Temporarily save for testing
+        const actualKey = key === '••••••••••••••••' ? this.getAnonKey() : key;
+        this.saveConfig(url, actualKey);
+
+        window.showNotification('Testing connection...', 'info');
+
+        const result = await this.testConnection();
+
+        if (result.success) {
+            window.showNotification(result.message, 'success');
+        } else {
+            window.showNotification('Connection failed: ' + result.error, 'error');
+        }
+    },
+
+    /**
+     * Handle clear from UI
+     */
+    handleClear: function () {
+        if (!confirm('Are you sure you want to clear Supabase configuration? The app will use localStorage instead.')) {
+            return;
+        }
+
+        if (this.clearConfig()) {
+            window.showNotification('Configuration cleared. Reloading...', 'info');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    }
+};
+
+// Window export (used by all existing code)
+window.SupabaseConfig = SupabaseConfig;
+
+Logger.info('SupabaseConfig module loaded');
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SupabaseConfig;
+}

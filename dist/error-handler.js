@@ -1,1 +1,291 @@
-const ErrorHandler={handle:function(e,r="Unknown",o=!0){if(Logger.error(`[${r}]`,e),o&&window.showNotification){const o=this.getUserMessage(e,r);window.showNotification(o,"error")}return this.attemptRecovery(e,r),this.reportError(e,r),!1},getUserMessage:function(e,r){if(!e)return`An error occurred in ${r}. Please try again.`;const o={QuotaExceededError:"Storage is full. Please export and clear old data to continue.",NetworkError:"Connection lost. Please check your internet connection.",TypeError:"An unexpected error occurred. Please refresh the page.",ValidationError:"Please check your input and try again.",AuthenticationError:"Please log in again to continue.",PermissionError:"You do not have permission to perform this action.",NotFoundError:"The requested item was not found.",DuplicateError:"This item already exists."};if(e?.name&&o[e.name])return o[e.name];if("QuotaExceededError"===e.name||e.message?.includes("quota")||e.message?.includes("storage"))return o.QuotaExceededError;const t={save:"Failed to save changes. Please try again.",load:"Failed to load data. Please refresh the page.",delete:"Failed to delete item. Please try again.",export:"Failed to export data. Please try again.",import:"Failed to import data. Please check the file format.",validation:"Please check your input and try again."};return t[r.toLowerCase()]?t[r.toLowerCase()]:`An error occurred in ${r}. Please try again or contact support.`},attemptRecovery:function(e,r){try{if("QuotaExceededError"===e.name)return Logger.warn("Attempting storage cleanup..."),void this.cleanupStorage();if("NetworkError"===e.name)return Logger.warn("Network error detected, will retry when online"),void this.setupRetryOnOnline(r);if("load"===r&&"SyntaxError"===e.name)return Logger.warn("State corruption detected, attempting recovery from backup"),void this.recoverFromBackup()}catch(e){Logger.error("Recovery failed:",e)}},cleanupStorage:function(){try{window.state?.auditLog?.length>100&&(window.state.auditLog=window.state.auditLog.slice(-100),Logger.info("Cleaned up old audit logs")),window.showNotification&&window.showNotification("Storage is nearly full. Please export old audit reports and clear them.","warning")}catch(e){Logger.error("Cleanup failed:",e)}},setupRetryOnOnline:function(e){const r=()=>{Logger.info("Connection restored, retrying operation"),window.showNotification("Connection restored!","success"),window.removeEventListener("online",r)};window.addEventListener("online",r)},recoverFromBackup:function(){try{const e=Object.keys(localStorage).filter(e=>e.startsWith("auditCB360State_backup_"));if(e.length>0){const r=e.sort().pop(),o=localStorage.getItem(r);if(o)return localStorage.setItem("auditCB360State",o),Logger.info("Recovered from backup:",r),window.showNotification("Data recovered from backup. Please refresh the page.","success"),!0}return Logger.warn("No backup found for recovery"),!1}catch(e){return Logger.error("Backup recovery failed:",e),!1}},reportError:function(e,r){window.Sentry&&"function"==typeof window.Sentry.captureException&&(window.Sentry.setContext("error_context",{module:r,url:window.location.href,timestamp:(new Date).toISOString(),user:window.state?.currentUser?.email||"anonymous"}),window.Sentry.captureException(e,{tags:{context:r}})),Logger.debug("Error reported to monitoring:",r,e.message)},validateOperation:function(e,r={}){const o=[];if(r.requireAuth&&!window.state?.currentUser&&o.push("User must be authenticated"),r.requiredRole){const e=window.state?.currentUser?.role,t=Array.isArray(r.requiredRole)?r.requiredRole:[r.requiredRole];t.includes(e)||o.push(`Operation requires one of: ${t.join(", ")}`)}if(r.requireData)for(const e of r.requireData)window.state?.[e]||o.push(`Required data missing: ${e}`);if(o.length>0){const e=new Error(o.join("; "));throw e.name="ValidationError",e}return!0},safeAsync:async function(e,r,o=null){try{return await e()}catch(e){return this.handle(e,r),o}},safeSync:function(e,r,o=null){try{return e()}catch(e){return this.handle(e,r),o}}};window.ErrorHandler=ErrorHandler,"undefined"!=typeof module&&module.exports&&(module.exports=ErrorHandler),window.addEventListener("error",e=>{if(e.error||e.message){const r=e.error||new Error(e.message||"Unknown error");ErrorHandler.handle(r,"Global Error",!0)}else Logger.warn("Global Error event with no error object:",e)}),window.addEventListener("unhandledrejection",e=>{const r=e.reason instanceof Error?e.reason:new Error(String(e.reason||"Unhandled Promise Rejection"));ErrorHandler.handle(r,"Unhandled Promise",!0)}),Logger.info("ErrorHandler initialized with global error catching");
+// ============================================
+// ERROR HANDLER UTILITY MODULE (ESM-ready)
+// ============================================
+// Centralized error handling with user-friendly messages
+
+const ErrorHandler = {
+
+    /**
+     * Handle errors with context and user-friendly messages
+     * @param {Error} error - The error object
+     * @param {string} context - Context where error occurred
+     * @param {boolean} showToUser - Whether to show notification to user
+     */
+    handle: function (error, context = 'Unknown', showToUser = true) {
+        // Log for debugging
+        Logger.error(`[${context}]`, error);
+
+        // Show user-friendly message
+        if (showToUser && window.showNotification) {
+            const userMessage = this.getUserMessage(error, context);
+            window.showNotification(userMessage, 'error');
+        }
+
+        // Attempt recovery if possible
+        this.attemptRecovery(error, context);
+
+        // Report to monitoring (in production)
+        this.reportError(error, context);
+
+        return false; // Indicate error was handled
+    },
+
+    /**
+     * Get user-friendly error message
+     */
+    getUserMessage: function (error, context) {
+        // Handle null/undefined error
+        if (!error) {
+            return `An error occurred in ${context}. Please try again.`;
+        }
+
+        const errorMessages = {
+            'QuotaExceededError': 'Storage is full. Please export and clear old data to continue.',
+            'NetworkError': 'Connection lost. Please check your internet connection.',
+            'TypeError': 'An unexpected error occurred. Please refresh the page.',
+            'ValidationError': 'Please check your input and try again.',
+            'AuthenticationError': 'Please log in again to continue.',
+            'PermissionError': 'You do not have permission to perform this action.',
+            'NotFoundError': 'The requested item was not found.',
+            'DuplicateError': 'This item already exists.',
+        };
+
+        // Check for specific error types
+        if (error?.name && errorMessages[error.name]) {
+            return errorMessages[error.name];
+        }
+
+        // Check for quota exceeded
+        if (error.name === 'QuotaExceededError' ||
+            error.message?.includes('quota') ||
+            error.message?.includes('storage')) {
+            return errorMessages['QuotaExceededError'];
+        }
+
+        // Context-specific messages
+        const contextMessages = {
+            'save': 'Failed to save changes. Please try again.',
+            'load': 'Failed to load data. Please refresh the page.',
+            'delete': 'Failed to delete item. Please try again.',
+            'export': 'Failed to export data. Please try again.',
+            'import': 'Failed to import data. Please check the file format.',
+            'validation': 'Please check your input and try again.',
+        };
+
+        if (contextMessages[context.toLowerCase()]) {
+            return contextMessages[context.toLowerCase()];
+        }
+
+        // Default message
+        return `An error occurred in ${context}. Please try again or contact support.`;
+    },
+
+    /**
+     * Attempt to recover from error
+     */
+    attemptRecovery: function (error, context) {
+        try {
+            // Handle quota exceeded
+            if (error.name === 'QuotaExceededError') {
+                Logger.warn('Attempting storage cleanup...');
+                this.cleanupStorage();
+                return;
+            }
+
+            // Handle network errors
+            if (error.name === 'NetworkError') {
+                Logger.warn('Network error detected, will retry when online');
+                this.setupRetryOnOnline(context);
+                return;
+            }
+
+            // Handle state corruption
+            if (context === 'load' && error.name === 'SyntaxError') {
+                Logger.warn('State corruption detected, attempting recovery from backup');
+                this.recoverFromBackup();
+                return;
+            }
+        } catch (recoveryError) {
+            Logger.error('Recovery failed:', recoveryError);
+        }
+    },
+
+    /**
+     * Cleanup storage to free space
+     */
+    cleanupStorage: function () {
+        try {
+            // Remove old audit logs (keep last 100)
+            if (window.state?.auditLog?.length > 100) {
+                window.state.auditLog = window.state.auditLog.slice(-100);
+                Logger.info('Cleaned up old audit logs');
+            }
+
+            // Prompt user to export old data
+            if (window.showNotification) {
+                window.showNotification(
+                    'Storage is nearly full. Please export old audit reports and clear them.',
+                    'warning'
+                );
+            }
+        } catch (e) {
+            Logger.error('Cleanup failed:', e);
+        }
+    },
+
+    /**
+     * Setup retry when connection is restored
+     */
+    setupRetryOnOnline: function (_context) {
+        const retryHandler = () => {
+            Logger.info('Connection restored, retrying operation');
+            window.showNotification('Connection restored!', 'success');
+            window.removeEventListener('online', retryHandler);
+        };
+
+        window.addEventListener('online', retryHandler);
+    },
+
+    /**
+     * Recover from backup
+     */
+    recoverFromBackup: function () {
+        try {
+            // Check for backup in localStorage
+            const backupKeys = Object.keys(localStorage).filter(k => k.startsWith('auditCB360State_backup_'));
+
+            if (backupKeys.length > 0) {
+                // Get most recent backup
+                const latestBackup = backupKeys.sort().pop();
+                const backupData = localStorage.getItem(latestBackup);
+
+                if (backupData) {
+                    localStorage.setItem('auditCB360State', backupData);
+                    Logger.info('Recovered from backup:', latestBackup);
+                    window.showNotification('Data recovered from backup. Please refresh the page.', 'success');
+                    return true;
+                }
+            }
+
+            Logger.warn('No backup found for recovery');
+            return false;
+        } catch (e) {
+            Logger.error('Backup recovery failed:', e);
+            return false;
+        }
+    },
+
+    /**
+     * Report error to Sentry monitoring service
+     * @param {Error} error - The error to report
+     * @param {string} context - Context string describing where the error occurred
+     */
+    reportError: function (error, context) {
+        // Report to Sentry if available (initialized in sentry-init.js)
+        if (window.Sentry && typeof window.Sentry.captureException === 'function') {
+            window.Sentry.setContext('error_context', {
+                module: context,
+                url: window.location.href,
+                timestamp: new Date().toISOString(),
+                user: window.state?.currentUser?.email || 'anonymous'
+            });
+            window.Sentry.captureException(error, {
+                tags: { context: context }
+            });
+        }
+        Logger.debug('Error reported to monitoring:', context, error.message);
+    },
+
+    /**
+     * Validate operation before execution
+     */
+    validateOperation: function (operation, requirements = {}) {
+        const errors = [];
+
+        // Check authentication
+        if (requirements.requireAuth && !window.state?.currentUser) {
+            errors.push('User must be authenticated');
+        }
+
+        // Check permissions
+        if (requirements.requiredRole) {
+            const userRole = window.state?.currentUser?.role;
+            const allowedRoles = Array.isArray(requirements.requiredRole)
+                ? requirements.requiredRole
+                : [requirements.requiredRole];
+
+            if (!allowedRoles.includes(userRole)) {
+                errors.push(`Operation requires one of: ${allowedRoles.join(', ')}`);
+            }
+        }
+
+        // Check data availability
+        if (requirements.requireData) {
+            for (const dataKey of requirements.requireData) {
+                if (!window.state?.[dataKey]) {
+                    errors.push(`Required data missing: ${dataKey}`);
+                }
+            }
+        }
+
+        if (errors.length > 0) {
+            const error = new Error(errors.join('; '));
+            error.name = 'ValidationError';
+            throw error;
+        }
+
+        return true;
+    },
+
+    /**
+     * Safe async operation wrapper
+     */
+    safeAsync: async function (asyncFn, context, fallbackValue = null) {
+        try {
+            return await asyncFn();
+        } catch (error) {
+            this.handle(error, context);
+            return fallbackValue;
+        }
+    },
+
+    /**
+     * Safe sync operation wrapper
+     */
+    safeSync: function (syncFn, context, fallbackValue = null) {
+        try {
+            return syncFn();
+        } catch (error) {
+            this.handle(error, context);
+            return fallbackValue;
+        }
+    }
+};
+
+// Window export (used by all existing code)
+window.ErrorHandler = ErrorHandler;
+
+// Support CommonJS/test environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ErrorHandler;
+}
+
+// Setup global error handlers
+window.addEventListener('error', (event) => {
+    // Prevent null/undefined errors from crashing handler
+    if (event.error || event.message) {
+        const error = event.error || new Error(event.message || 'Unknown error');
+        ErrorHandler.handle(error, 'Global Error', true);
+    } else {
+        Logger.warn('Global Error event with no error object:', event);
+    }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    const error = event.reason instanceof Error
+        ? event.reason
+        : new Error(String(event.reason || 'Unhandled Promise Rejection'));
+    ErrorHandler.handle(error, 'Unhandled Promise', true);
+});
+
+Logger.info('ErrorHandler initialized with global error catching');

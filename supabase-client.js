@@ -354,7 +354,7 @@ const SupabaseClient = {
      */
     _buildSyncQuery(table) {
         const lastSync = this._getSyncTimestamp(table);
-        let query = this.client.from(table).select('*');
+        let query = this.client.from(table).select('*').limit(5000);
         if (lastSync) {
             query = query.gte('updated_at', lastSync);
         }
@@ -586,7 +586,7 @@ const SupabaseClient = {
             }
 
             try {
-                let query = SupabaseClient.client.from(table).select('*');
+                let query = SupabaseClient.client.from(table).select('*').limit(5000);
 
                 // Apply filters
                 for (const [key, value] of Object.entries(filters)) {
@@ -1274,28 +1274,29 @@ const SupabaseClient = {
         if (!this.isInitialized || !auditors?.length) return;
 
         try {
-            for (const auditor of auditors) {
-                const auditorData = {
-                    id: auditor.id,
-                    name: auditor.name,
-                    role: auditor.role,
-                    email: auditor.email || null,
-                    phone: auditor.phone || null,
-                    location: auditor.location || null,
-                    experience: auditor.experience || 0,
-                    standards: auditor.standards || [],
-                    expertise: auditor.domainExpertise || auditor.expertise || [],
-                    industries: auditor.industries || [],
-                    man_day_rate: auditor.manDayRate || 0,
-                    education: auditor.education || null,
-                    rating: auditor.customerRating || 0,
-                    status: auditor.status || 'Active',
-                    updated_at: new Date().toISOString()
-                };
+            const batch = auditors.map(auditor => ({
+                id: auditor.id,
+                name: auditor.name,
+                role: auditor.role,
+                email: auditor.email || null,
+                phone: auditor.phone || null,
+                location: auditor.location || null,
+                experience: auditor.experience || 0,
+                standards: auditor.standards || [],
+                expertise: auditor.domainExpertise || auditor.expertise || [],
+                industries: auditor.industries || [],
+                man_day_rate: auditor.manDayRate || 0,
+                education: auditor.education || null,
+                rating: auditor.customerRating || 0,
+                status: auditor.status || 'Active',
+                updated_at: new Date().toISOString()
+            }));
 
-                await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('auditors')
-                    .upsert(auditorData, { onConflict: 'id' });
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert auditors failed:', error); throw error; }
             }
             Logger.info(`Synced ${auditors.length} auditors to Supabase`);
         } catch (error) {
@@ -1468,30 +1469,25 @@ const SupabaseClient = {
         try {
             Logger.info(`[syncAuditorAssignmentsToSupabase] Syncing ${assignments.length} assignments...`);
 
-            for (const assignment of assignments) {
-                const data = {
-                    id: assignment.id || Date.now(), // Include the ID field
-                    auditor_id: String(assignment.auditorId),
-                    user_id: assignment.userId || null, // Sync user_id (UUID)
-                    client_id: String(assignment.clientId),
-                    role: assignment.role || 'Auditor',
-                    assigned_by: assignment.assignedBy || 'System',
-                    assigned_at: assignment.assignedAt || new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                };
+            const batch = assignments.map(assignment => ({
+                id: assignment.id || Date.now(),
+                auditor_id: String(assignment.auditorId),
+                user_id: assignment.userId || null,
+                client_id: String(assignment.clientId),
+                role: assignment.role || 'Auditor',
+                assigned_by: assignment.assignedBy || 'System',
+                assigned_at: assignment.assignedAt || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }));
 
-                Logger.info('[syncAuditorAssignmentsToSupabase] Upserting assignment:', data);
-
-                const { data: result, error } = await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('auditor_assignments')
-                    .upsert(data, { onConflict: 'id' }); // Use id as conflict resolution
-
+                    .upsert(batch, { onConflict: 'id' });
                 if (error) {
-                    Logger.error('[syncAuditorAssignmentsToSupabase] Upsert failed:', error);
+                    Logger.error('[syncAuditorAssignmentsToSupabase] Batch upsert failed:', error);
                     throw error;
                 }
-
-                Logger.info('[syncAuditorAssignmentsToSupabase] Assignment synced successfully:', result);
             }
             Logger.info(`✓ Synced ${assignments.length} assignments to Supabase`);
         } catch (error) {
@@ -1586,8 +1582,7 @@ const SupabaseClient = {
         if (!this.isInitialized || !auditPlans?.length) return;
 
         try {
-            for (const plan of auditPlans) {
-                // Ensure proper types for all fields
+            const batch = auditPlans.map(plan => {
                 const auditorIds = Array.isArray(plan.auditors)
                     ? plan.auditors.map(a => String(a))
                     : [];
@@ -1598,7 +1593,7 @@ const SupabaseClient = {
                     ? plan.selectedChecklists
                     : (Array.isArray(plan.checklistIds) ? plan.checklistIds : []);
 
-                const planData = {
+                return {
                     id: String(plan.id),
                     client_name: plan.client || plan.clientName || null,
                     client_id: plan.clientId ? String(plan.clientId) : null,
@@ -1614,13 +1609,16 @@ const SupabaseClient = {
                     end_date: plan.endDate || plan.date || null,
                     lead_auditor: plan.leadAuditor || null,
                     audit_team: auditTeam,
-                    pre_audit: plan.preAudit || null,  // Pre-Audit (Stage 1) data
+                    pre_audit: plan.preAudit || null,
                     updated_at: new Date().toISOString()
                 };
+            });
 
-                await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('audit_plans')
-                    .upsert(planData, { onConflict: 'id' });
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert audit plans failed:', error); throw error; }
             }
             Logger.info(`Synced ${auditPlans.length} audit plans to Supabase`);
         } catch (error) {
@@ -1636,11 +1634,9 @@ const SupabaseClient = {
         if (!this.isInitialized || !auditReports?.length) return;
 
         try {
-            for (const report of auditReports) {
-                // Ensure proper types for all fields
+            const batch = auditReports.map(report => {
                 const ncrs = Array.isArray(report.ncrs) ? report.ncrs : [];
-
-                const reportData = {
+                return {
                     id: String(report.id),
                     client_id: report.clientId ? String(report.clientId) : null,
                     date: report.date || null,
@@ -1658,10 +1654,13 @@ const SupabaseClient = {
                     custom_items: report.customItems || [],
                     updated_at: new Date().toISOString()
                 };
+            });
 
-                await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('audit_reports')
-                    .upsert(reportData, { onConflict: 'id' });
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert audit reports failed:', error); throw error; }
             }
             Logger.info(`Synced ${auditReports.length} audit reports to Supabase`);
         } catch (error) {
@@ -1861,22 +1860,23 @@ const SupabaseClient = {
         if (!this.isInitialized || !checklists?.length) return;
 
         try {
-            for (const checklist of checklists) {
-                const checklistData = {
-                    id: checklist.id,
-                    name: checklist.name,
-                    standard: checklist.standard,
-                    type: checklist.type || 'global',
-                    audit_type: checklist.auditType || null,
-                    audit_scope: checklist.auditScope || null,
-                    created_by: checklist.createdBy || null,
-                    clauses: checklist.clauses || [],
-                    updated_at: new Date().toISOString()
-                };
+            const batch = checklists.map(checklist => ({
+                id: checklist.id,
+                name: checklist.name,
+                standard: checklist.standard,
+                type: checklist.type || 'global',
+                audit_type: checklist.auditType || null,
+                audit_scope: checklist.auditScope || null,
+                created_by: checklist.createdBy || null,
+                clauses: checklist.clauses || [],
+                updated_at: new Date().toISOString()
+            }));
 
-                await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('checklists')
-                    .upsert(checklistData, { onConflict: 'id' });
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert checklists failed:', error); throw error; }
             }
             Logger.info(`Synced ${checklists.length} checklists to Supabase`);
         } catch (error) {
@@ -2086,20 +2086,21 @@ const SupabaseClient = {
         if (!this.isInitialized || !documents?.length) return;
 
         try {
-            for (const doc of documents) {
-                const docData = {
-                    id: doc.id,
-                    name: doc.name,
-                    type: doc.type || null,
-                    url: doc.url || null,
-                    uploaded_by: doc.uploadedBy || null,
-                    uploaded_at: doc.uploadedAt || new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                };
+            const batch = documents.map(doc => ({
+                id: doc.id,
+                name: doc.name,
+                type: doc.type || null,
+                url: doc.url || null,
+                uploaded_by: doc.uploadedBy || null,
+                uploaded_at: doc.uploadedAt || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }));
 
-                await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('documents')
-                    .upsert(docData, { onConflict: 'id' });
+                    .upsert(batch, { onConflict: 'id' });
+                if (error) { Logger.error('Batch upsert documents failed:', error); throw error; }
             }
             Logger.info(`Synced ${documents.length} documents to Supabase`);
         } catch (error) {
@@ -2208,18 +2209,19 @@ const SupabaseClient = {
         if (!this.isInitialized || !decisions?.length) return;
 
         try {
-            for (const decision of decisions) {
-                const decisionData = {
-                    client: decision.client,
-                    standard: decision.standard,
-                    date: decision.date,
-                    decision: decision.decision,
-                    updated_at: new Date().toISOString()
-                };
+            const batch = decisions.map(decision => ({
+                client: decision.client,
+                standard: decision.standard,
+                date: decision.date,
+                decision: decision.decision,
+                updated_at: new Date().toISOString()
+            }));
 
-                await this.client
+            if (batch.length > 0) {
+                const { error } = await this.client
                     .from('certification_decisions')
-                    .upsert(decisionData, { onConflict: 'client,standard,date' });
+                    .upsert(batch, { onConflict: 'client,standard,date' });
+                if (error) { Logger.error('Batch upsert certification decisions failed:', error); throw error; }
             }
             Logger.info(`Synced ${decisions.length} certification decisions to Supabase`);
         } catch (error) {
