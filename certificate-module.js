@@ -487,19 +487,19 @@ window.suspendCertificate = function (certId) {
     if (!cert) return;
 
     if (cert.status === 'Suspended') {
-        if (confirm('Reinstate this certificate?')) {
+        window.DataService.confirmAction('Reinstate this certificate?', () => {
             cert.status = 'Valid';
             window.saveState();
             window.showNotification('Certificate reinstated', 'success');
             window.renderCertificates();
-        }
+        });
     } else {
-        if (confirm('Suspend this certificate? It can be reinstated later.')) {
+        window.DataService.confirmAction('Suspend this certificate? It can be reinstated later.', () => {
             cert.status = 'Suspended';
             window.saveState();
             window.showNotification('Certificate suspended', 'success');
             window.renderCertificates();
-        }
+        });
     }
 };
 
@@ -511,12 +511,12 @@ window.revokeCertificate = function (certId) {
     const cert = window.state.certificates?.find(c => String(c.id) === String(certId));
     if (!cert) return;
 
-    if (confirm('Revoke this certificate? This action cannot be undone.')) {
+    window.DataService.confirmAction('Revoke this certificate? This action cannot be undone.', () => {
         cert.status = 'Revoked';
         window.saveState();
         window.showNotification('Certificate revoked', 'success');
         window.renderCertificates();
-    }
+    });
 };
 
 // Initialize certificates array in state if not exists

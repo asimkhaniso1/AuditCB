@@ -782,7 +782,7 @@ window.addStandardToMasterlist = function () {
 };
 
 window.deleteStandardFromMasterlist = function (std) {
-    if (confirm(`Are you sure you want to remove ${std} from the masterlist?`)) {
+    window.DataService.confirmAction(`Are you sure you want to remove ${std} from the masterlist?`, () => {
         const settings = window.state.cbSettings;
         settings.availableStandards = settings.availableStandards.filter(s => s !== std);
         settings.standardsOffered = settings.standardsOffered.filter(s => s !== std);
@@ -790,7 +790,7 @@ window.deleteStandardFromMasterlist = function (std) {
         window.saveData();
         switchSettingsTab('accreditation', document.querySelectorAll('.tab-btn')[3]);
         window.showNotification('Standard removed', 'success');
-    }
+    });
 };
 
 // ============================================
@@ -934,7 +934,7 @@ window.editGlobalDesignation = function (id) {
 };
 
 window.deleteGlobalDesignation = async function (id) {
-    if (confirm('Delete this designation?')) {
+    window.DataService.confirmAction('Delete this designation?', async () => {
         window.state.orgStructure = window.state.orgStructure.filter(p => p.id !== id);
         window.saveData();
 
@@ -944,7 +944,7 @@ window.deleteGlobalDesignation = async function (id) {
 
         switchSettingsTab('organization', document.querySelector('.tab-btn:nth-child(3)'));
         window.showNotification('Designation deleted', 'success');
-    }
+    });
 };
 
 // ============================================
@@ -1086,18 +1086,18 @@ function getPermissionsHTML() {
 }
 
 window.resetPermissions = function () {
-    if (!confirm('Are you sure you want to reset all role permissions to their system defaults? This cannot be undone.')) return;
-
-    window.state.rolePermissions = {
-        'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
-        'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
-        'Lead Auditor': { dashboard: 'view', clients: 'partial', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
-        'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
-        'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }
-    };
-    window.saveData();
-    switchSettingsTab('permissions', document.querySelectorAll('.tab-btn')[3]);
-    window.showNotification('Role permissions reset to defaults', 'success');
+    window.DataService.confirmAction('Are you sure you want to reset all role permissions to their system defaults? This cannot be undone.', () => {
+        window.state.rolePermissions = {
+            'Admin': { dashboard: 'full', clients: 'full', auditors: 'full', audits: 'full', certs: 'full', reports: 'full', settings: 'full' },
+            'Cert Manager': { dashboard: 'view', clients: 'full', auditors: 'view', audits: 'full', certs: 'full', reports: 'full', settings: 'none' },
+            'Lead Auditor': { dashboard: 'view', clients: 'partial', auditors: 'view', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+            'Auditor': { dashboard: 'view', clients: 'none', auditors: 'none', audits: 'assigned', certs: 'none', reports: 'own', settings: 'none' },
+            'Client': { dashboard: 'none', clients: 'own', auditors: 'none', audits: 'own', certs: 'own', reports: 'own', settings: 'none' }
+        };
+        window.saveData();
+        switchSettingsTab('permissions', document.querySelectorAll('.tab-btn')[3]);
+        window.showNotification('Role permissions reset to defaults', 'success');
+    });
 };
 
 
@@ -1607,12 +1607,12 @@ function restoreData(input) {
             if (!data.clients || !data.auditors) {
                 throw new Error('Invalid backup file format');
             }
-            if (confirm('Are you sure you want to restore this data? Current data will be lost.')) {
+            window.DataService.confirmAction('Are you sure you want to restore this data? Current data will be lost.', () => {
                 Object.assign(window.state, data);
                 window.saveData();
                 window.showNotification('Data restored successfully. Reloading...', 'success');
                 setTimeout(() => location.reload(), 1500);
-            }
+            });
         } catch (_error) {
             window.showNotification('Failed to restore data: Invalid file', 'error');
         }
@@ -1763,7 +1763,7 @@ window.editCBSite = function (idx) {
 };
 
 window.deleteCBSite = async function (idx) {
-    if (confirm('Delete this office location?')) {
+    window.DataService.confirmAction('Delete this office location?', async () => {
         window.state.cbSettings.cbSites.splice(idx, 1);
         window.saveData();
 
@@ -1773,7 +1773,7 @@ window.deleteCBSite = async function (idx) {
 
         switchSettingsTab('profile', document.querySelector('.tab-btn:first-child'));
         window.showNotification('Office location deleted', 'success');
-    }
+    });
 };
 
 // ============================================
@@ -1942,12 +1942,12 @@ window.editRetentionPolicy = function (policyId) {
 };
 
 window.deleteRetentionPolicy = function (policyId) {
-    if (confirm('Delete this retention policy?')) {
+    window.DataService.confirmAction('Delete this retention policy?', () => {
         window.state.retentionPolicies = window.state.retentionPolicies.filter(p => p.id !== policyId);
         window.saveData();
         switchSettingsTab('retention', document.querySelectorAll('.tab-btn')[4]);
         window.showNotification('Retention policy deleted', 'success');
-    }
+    });
 };
 
 // ============================================
@@ -2336,7 +2336,7 @@ window.removeAssignment = async function (auditorId, clientId) {
 
 This only removes future access to new client data.`;
 
-    if (confirm(confirmMsg)) {
+    window.DataService.confirmAction(confirmMsg, async () => {
         // Use loose equality (===) to handle type mismatches (string vs number)
         window.state.auditorAssignments = window.state.auditorAssignments.filter(
             a => !(a.auditorId === auditorId && a.clientId === clientId)
@@ -2346,7 +2346,7 @@ This only removes future access to new client data.`;
 
         switchSettingsTab('assignments', document.querySelector('.tab-btn[onclick*="assignments"]'));
         window.showNotification('Assignment removed. Historical audit records retained.', 'success');
-    }
+    });
 };
 
 // ============================================
@@ -2781,14 +2781,14 @@ window.loadSupabaseStats = async function () {
 
 // Reset usage data with confirmation
 window.resetUsageData = function () {
-    if (confirm('Are you sure you want to reset all API usage data? This action cannot be undone.')) {
+    window.DataService.confirmAction('Are you sure you want to reset all API usage data? This action cannot be undone.', () => {
         if (window.APIUsageTracker) {
             window.APIUsageTracker.resetUsageData();
             window.showNotification('Usage data reset successfully', 'success');
             // Refresh the tab
             switchSettingsSubTab('system', 'usage');
         }
-    }
+    });
 };
 
 // Re-sync Knowledge Base from Cloud

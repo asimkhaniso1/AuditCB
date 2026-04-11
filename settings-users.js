@@ -64,32 +64,30 @@ window.cleanupDemoUsers = async function () {
             `  • ${u.name} (${u.email || 'no email'})`
         ).join('\n');
 
-        const confirmed = confirm(
+        window.DataService.confirmAction(
             `Remove ${demoUsers.length} demo user(s)?\n\n` +
             `Demo users to remove:\n${userList}\n\n` +
-            `Keeping ${realUsers.length} real Supabase users`
+            `Keeping ${realUsers.length} real Supabase users`,
+            () => {
+                // Update state
+                window.state.users = realUsers;
+                window.saveData();
+
+                // Refresh UI
+                document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+
+                window.showNotification(
+                    `Removed ${demoUsers.length} demo users. ${realUsers.length} real users remaining.`,
+                    'success'
+                );
+
+                Logger.info('Demo users cleaned up:', {
+                    removed: demoUsers.length,
+                    remaining: realUsers.length
+                });
+            }
         );
-
-        if (!confirmed) {
-            return;
-        }
-
-        // Update state
-        window.state.users = realUsers;
-        window.saveData();
-
-        // Refresh UI
-        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
-
-        window.showNotification(
-            `Removed ${demoUsers.length} demo users. ${realUsers.length} real users remaining.`,
-            'success'
-        );
-
-        Logger.info('Demo users cleaned up:', {
-            removed: demoUsers.length,
-            remaining: realUsers.length
-        });
+        return;
 
     } catch (error) {
         Logger.error('Failed to cleanup demo users:', error);
@@ -477,52 +475,50 @@ window.deleteUser = async function (userId) {
         return;
     }
 
-    if (!confirm(`Are you sure you want to permanently delete user "${user.name}" (${user.email})?\n\nThis action cannot be undone.`)) {
-        return;
-    }
+    window.DataService.confirmAction(`Are you sure you want to permanently delete user "${user.name}" (${user.email})?\n\nThis action cannot be undone.`, async () => {
+        try {
+            // Delete from Supabase if available
+            if (window.SupabaseClient?.isInitialized) {
+                // Delete from profiles table
+                const { error: profileError } = await window.SupabaseClient.client
+                    .from('profiles')
+                    .delete()
+                    .eq('email', user.email);
 
-    try {
-        // Delete from Supabase if available
-        if (window.SupabaseClient?.isInitialized) {
-            // Delete from profiles table
-            const { error: profileError } = await window.SupabaseClient.client
-                .from('profiles')
-                .delete()
-                .eq('email', user.email);
+                if (profileError) {
+                    console.warn('Profile deletion warning:', profileError);
+                }
 
-            if (profileError) {
-                console.warn('Profile deletion warning:', profileError);
+                // Note: Deleting from auth.users requires admin API
+                // For now, we'll just delete from profiles and local state
+                // The auth user can be deleted manually from Supabase Dashboard → Authentication → Users
+
+                Logger.info('User deleted from profiles table:', user.email);
             }
 
-            // Note: Deleting from auth.users requires admin API
-            // For now, we'll just delete from profiles and local state
-            // The auth user can be deleted manually from Supabase Dashboard → Authentication → Users
+            // Remove from local state
+            window.state.users = window.state.users.filter(u => String(u.id) !== String(userId));
+            window.saveData();
 
-            Logger.info('User deleted from profiles table:', user.email);
+            // Refresh UI
+            document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
+
+            window.showNotification(`User "${user.name}" deleted successfully`, 'success');
+
+            // Show additional info if Supabase auth user still exists
+            if (window.SupabaseClient?.isInitialized) {
+                setTimeout(() => {
+                    window.showNotification(
+                        'Note: To fully remove the user, also delete from Supabase Dashboard → Authentication → Users',
+                        'info'
+                    );
+                }, 2000);
+            }
+        } catch (error) {
+            Logger.error('User deletion failed:', error);
+            window.showNotification('Failed to delete user: ' + error.message, 'error');
         }
-
-        // Remove from local state
-        window.state.users = window.state.users.filter(u => String(u.id) !== String(userId));
-        window.saveData();
-
-        // Refresh UI
-        document.getElementById('users-list-container').innerHTML = renderUsersList(window.state.users);
-
-        window.showNotification(`User "${user.name}" deleted successfully`, 'success');
-
-        // Show additional info if Supabase auth user still exists
-        if (window.SupabaseClient?.isInitialized) {
-            setTimeout(() => {
-                window.showNotification(
-                    'Note: To fully remove the user, also delete from Supabase Dashboard → Authentication → Users',
-                    'info'
-                );
-            }, 2000);
-        }
-    } catch (error) {
-        Logger.error('User deletion failed:', error);
-        window.showNotification('Failed to delete user: ' + error.message, 'error');
-    }
+    });
 };
 
 
@@ -581,32 +577,33 @@ window.syncUsersToCloud = async function () {
 
 // Send password reset email
 window.sendPasswordReset = async function (email) {
-    if (!confirm(`Send password reset email to ${email}?`)) return;
+    window.DataService.confirmAction(`Send password reset email to ${email}?`, async () => {
+        try {
+            // Check if Supabase is initialized
+            if (!window.SupabaseClient?.isInitialized) {
+                window.showNotification('Supabase is not configured. Please configure in System Settings.', 'error');
+                return;
+            }
 
-    try {
-        // Check if Supabase is initialized
-        if (!window.SupabaseClient?.isInitialized) {
-            window.showNotification('Supabase is not configured. Please configure in System Settings.', 'error');
-            return;
+            // Check if the method exists
+            if (typeof window.SupabaseClient.sendPasswordResetEmail !== 'function') {
+                window.showNotification('Password reset feature is not available. Please update the application.', 'error');
+                Logger.error('sendPasswordResetEmail method not found on SupabaseClient');
+                return;
+            }
+
+            window.showNotification('Sending password reset email...', 'info');
+
+            await window.SupabaseClient.sendPasswordResetEmail(email);
+
+            window.showNotification(`Password reset email sent to ${email}`, 'success');
+            Logger.info('Password reset email sent to:', email);
+        } catch (error) {
+            Logger.error('Password reset failed:', error);
+            window.showNotification('Failed to send reset email: ' + error.message, 'error');
         }
-
-        // Check if the method exists
-        if (typeof window.SupabaseClient.sendPasswordResetEmail !== 'function') {
-            window.showNotification('Password reset feature is not available. Please update the application.', 'error');
-            Logger.error('sendPasswordResetEmail method not found on SupabaseClient');
-            return;
-        }
-
-        window.showNotification('Sending password reset email...', 'info');
-
-        await window.SupabaseClient.sendPasswordResetEmail(email);
-
-        window.showNotification(`Password reset email sent to ${email}`, 'success');
-        Logger.info('Password reset email sent to:', email);
-    } catch (error) {
-        Logger.error('Password reset failed:', error);
-        window.showNotification('Failed to send reset email: ' + error.message, 'error');
-    }
+    });
+    return;
 };
 
 

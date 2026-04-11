@@ -946,93 +946,87 @@ window.deleteThreat = async function (id) {
     const threat = window.state.impartialityCommittee.threats.find(t => String(t.id) === String(id));
     if (!threat) return;
 
-    if (!confirm(`Are you sure you want to delete this threat?\n\nType: ${threat.type}\nDescription: ${threat.description}`)) {
-        return;
-    }
+    window.DataService.confirmAction(`Are you sure you want to delete this threat?\n\nType: ${threat.type}\nDescription: ${threat.description}`, async () => {
+        try {
+            // Remove from state
+            const index = window.state.impartialityCommittee.threats.findIndex(t => String(t.id) === String(id));
+            if (index > -1) {
+                window.state.impartialityCommittee.threats.splice(index, 1);
+            }
 
-    try {
-        // Remove from state
-        const index = window.state.impartialityCommittee.threats.findIndex(t => String(t.id) === String(id));
-        if (index > -1) {
-            window.state.impartialityCommittee.threats.splice(index, 1);
+            window.saveData();
+
+            // Delete from Supabase
+            if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+                const { error } = await window.SupabaseClient.from('audit_impartiality_threats').delete().eq('id', id);
+                if (error) throw error;
+            }
+
+            window.showNotification('Threat deleted successfully', 'success');
+            renderImpartialityModule();
+        } catch (e) {
+            console.error('Failed to delete threat:', e);
+            window.showNotification('Failed to delete threat: ' + e.message, 'error');
         }
-
-        window.saveData();
-
-        // Delete from Supabase
-        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
-            const { error } = await window.SupabaseClient.from('audit_impartiality_threats').delete().eq('id', id);
-            if (error) throw error;
-        }
-
-        window.showNotification('Threat deleted successfully', 'success');
-        renderImpartialityModule();
-    } catch (e) {
-        console.error('Failed to delete threat:', e);
-        window.showNotification('Failed to delete threat: ' + e.message, 'error');
-    }
+    });
 };
 
 window.deleteMeeting = async function (id) {
     const meeting = window.state.impartialityCommittee.meetings.find(m => String(m.id) === String(id));
     if (!meeting) return;
 
-    if (!confirm(`Are you sure you want to delete this meeting record?\n\nDate: ${meeting.date}\nAttendees: ${meeting.attendees.length} members`)) {
-        return;
-    }
+    window.DataService.confirmAction(`Are you sure you want to delete this meeting record?\n\nDate: ${meeting.date}\nAttendees: ${meeting.attendees.length} members`, async () => {
+        try {
+            // Remove from state
+            const index = window.state.impartialityCommittee.meetings.findIndex(m => String(m.id) === String(id));
+            if (index > -1) {
+                window.state.impartialityCommittee.meetings.splice(index, 1);
+            }
 
-    try {
-        // Remove from state
-        const index = window.state.impartialityCommittee.meetings.findIndex(m => String(m.id) === String(id));
-        if (index > -1) {
-            window.state.impartialityCommittee.meetings.splice(index, 1);
+            window.saveData();
+
+            // Delete from Supabase
+            if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+                const { error } = await window.SupabaseClient.from('audit_impartiality_meetings').delete().eq('id', id);
+                if (error) throw error;
+            }
+
+            window.showNotification('Meeting deleted successfully', 'success');
+            renderImpartialityModule();
+        } catch (e) {
+            console.error('Failed to delete meeting:', e);
+            window.showNotification('Failed to delete meeting: ' + e.message, 'error');
         }
-
-        window.saveData();
-
-        // Delete from Supabase
-        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
-            const { error } = await window.SupabaseClient.from('audit_impartiality_meetings').delete().eq('id', id);
-            if (error) throw error;
-        }
-
-        window.showNotification('Meeting deleted successfully', 'success');
-        renderImpartialityModule();
-    } catch (e) {
-        console.error('Failed to delete meeting:', e);
-        window.showNotification('Failed to delete meeting: ' + e.message, 'error');
-    }
+    });
 };
 
 window.deleteCommitteeMember = async function (id) {
     const member = window.state.impartialityCommittee.members.find(m => String(m.id) === String(id));
     if (!member) return;
 
-    if (!confirm(`Are you sure you want to delete this committee member?\n\nName: ${member.name}\nOrganization: ${member.organization}`)) {
-        return;
-    }
+    window.DataService.confirmAction(`Are you sure you want to delete this committee member?\n\nName: ${member.name}\nOrganization: ${member.organization}`, async () => {
+        try {
+            // Remove from state
+            const index = window.state.impartialityCommittee.members.findIndex(m => String(m.id) === String(id));
+            if (index > -1) {
+                window.state.impartialityCommittee.members.splice(index, 1);
+            }
 
-    try {
-        // Remove from state
-        const index = window.state.impartialityCommittee.members.findIndex(m => String(m.id) === String(id));
-        if (index > -1) {
-            window.state.impartialityCommittee.members.splice(index, 1);
+            window.saveData();
+
+            // Delete from Supabase
+            if (window.SupabaseClient && !String(id).startsWith('demo-')) {
+                const { error } = await window.SupabaseClient.from('audit_impartiality_members').delete().eq('id', id);
+                if (error) throw error;
+            }
+
+            window.showNotification('Committee member deleted successfully', 'success');
+            renderImpartialityModule();
+        } catch (e) {
+            console.error('Failed to delete member:', e);
+            window.showNotification('Failed to delete member: ' + e.message, 'error');
         }
-
-        window.saveData();
-
-        // Delete from Supabase
-        if (window.SupabaseClient && !String(id).startsWith('demo-')) {
-            const { error } = await window.SupabaseClient.from('audit_impartiality_members').delete().eq('id', id);
-            if (error) throw error;
-        }
-
-        window.showNotification('Committee member deleted successfully', 'success');
-        renderImpartialityModule();
-    } catch (e) {
-        console.error('Failed to delete member:', e);
-        window.showNotification('Failed to delete member: ' + e.message, 'error');
-    }
+    });
 };
 
 // Support CommonJS/test environments

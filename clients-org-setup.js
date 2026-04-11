@@ -689,9 +689,11 @@ window.bulkUploadSites = function (clientId) {
 };
 
 window.deleteSite = function (clientId, index) {
-    if (!confirm('Delete?')) return;
-    const client = window.DataService.findClient(clientId);
-    if (client && client.sites) { client.sites.splice(index, 1); window.saveData(); window.DataService.syncClient(client, { saveLocal: false }); renderClientDetail(clientId); window.showNotification('Deleted'); }
+    window.DataService.confirmAction('Delete?', () => {
+        const client = window.DataService.findClient(clientId);
+        if (client && client.sites) { client.sites.splice(index, 1); window.saveData(); window.DataService.syncClient(client, { saveLocal: false }); renderClientDetail(clientId); window.showNotification('Deleted'); }
+    });
+    return;
 };
 
 // ============================================
@@ -721,12 +723,14 @@ window.addDepartment = function (clientId) {
 
 window.deleteDepartment = function (clientId, index) {
     const client = window.DataService.findClient(clientId);
-    if (client && client.departments && confirm('Delete?')) {
-        client.departments.splice(index, 1);
-        window.saveData();
-        window.DataService.syncClient(client, { saveLocal: false });
-        renderClientDetail(clientId);
-        window.showNotification('Department deleted');
+    if (client && client.departments) {
+        window.DataService.confirmAction('Delete?', () => {
+            client.departments.splice(index, 1);
+            window.saveData();
+            window.DataService.syncClient(client, { saveLocal: false });
+            renderClientDetail(clientId);
+            window.showNotification('Department deleted');
+        });
     }
 };
 window.editDepartment = function (clientId, index) {
@@ -801,11 +805,13 @@ window.addContactPerson = function (clientId) {
 };
 window.deleteContact = function (clientId, index) {
     const client = window.DataService.findClient(clientId);
-    if (client && client.contacts && confirm('Delete?')) {
-        client.contacts.splice(index, 1);
-        window.saveData();
-        window.DataService.syncClient(client, { saveLocal: false });
-        renderClientDetail(clientId);
+    if (client && client.contacts) {
+        window.DataService.confirmAction('Delete?', () => {
+            client.contacts.splice(index, 1);
+            window.saveData();
+            window.DataService.syncClient(client, { saveLocal: false });
+            renderClientDetail(clientId);
+        });
     }
 };
 window.editContact = function (clientId, index) {
@@ -894,11 +900,13 @@ window.addClientDesignation = function (clientId) {
 };
 window.deleteClientDesignation = function (clientId, index) {
     const client = window.DataService.findClient(clientId);
-    if (client && client.designations && confirm('Delete?')) {
-        client.designations.splice(index, 1);
-        window.saveData();
-        window.DataService.syncClient(client, { saveLocal: false });
-        window.setSetupWizardStep(clientId, 4);
+    if (client && client.designations) {
+        window.DataService.confirmAction('Delete?', () => {
+            client.designations.splice(index, 1);
+            window.saveData();
+            window.DataService.syncClient(client, { saveLocal: false });
+            window.setSetupWizardStep(clientId, 4);
+        });
     }
 };
 window.editClientDesignation = function (clientId, index) {
@@ -1080,12 +1088,14 @@ window.openClientAuditorAssignmentModal = function (clientId, clientName) {
 };
 
 window.removeClientAuditorAssignment = function (clientId, auditorId) {
-    if (!confirm('Remove assignment?')) return;
-    window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => !(String(a.clientId) === String(clientId) && String(a.auditorId) === String(auditorId)));
-    window.saveData();
-    window.DataService.deleteAuditorAssignment(auditorId, clientId);
-    if (window.renderClientDetail) renderClientDetail(clientId);
-    window.showNotification('Removed');
+    window.DataService.confirmAction('Remove assignment?', () => {
+        window.state.auditorAssignments = (window.state.auditorAssignments || []).filter(a => !(String(a.clientId) === String(clientId) && String(a.auditorId) === String(auditorId)));
+        window.saveData();
+        window.DataService.deleteAuditorAssignment(auditorId, clientId);
+        if (window.renderClientDetail) renderClientDetail(clientId);
+        window.showNotification('Removed');
+    });
+    return;
 };
 
 // ============================================
