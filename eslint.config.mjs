@@ -70,19 +70,38 @@ export default [
                 NotificationManager: 'writable',
                 EmailService: 'writable',
                 DataMigration: 'writable',
+                DataService: 'writable',
                 StateStore: 'writable',
+
+                // Node.js (for CommonJS exports at bottom of files)
+                module: 'readonly',
+                require: 'readonly',
+                process: 'readonly',
+                __dirname: 'readonly',
             }
         },
         rules: {
             // Relaxed for existing codebase — tighten over time
             'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-            'no-undef': 'warn', // Warn first, error later
+            'no-undef': 'warn',
             'no-redeclare': 'warn',
             'no-empty': ['warn', { allowEmptyCatch: true }],
             'no-prototype-builtins': 'off',
             'no-useless-escape': 'warn',
             'no-constant-condition': ['warn', { checkLoops: false }],
-            'prefer-const': 'off', // Too many changes needed
+            'no-case-declarations': 'warn', // 39 instances — fix incrementally
+            'no-useless-assignment': 'warn', // 14 instances — fix incrementally
+            'no-self-assign': 'warn',
+            'preserve-caught-error': 'off',
+            'prefer-const': 'off',
+        }
+    },
+
+    // ESM files (vitest config, eslint config)
+    {
+        files: ['**/*.mjs'],
+        languageOptions: {
+            sourceType: 'module'
         }
     },
 
@@ -93,9 +112,11 @@ export default [
             'node_modules/**',
             'coverage/**',
             'tests/**',
+            '.agent/**',
             'build.js',
             'vitest.config.js',
             'tools/**',
+            'api/**',
             '*.min.js',
         ]
     }

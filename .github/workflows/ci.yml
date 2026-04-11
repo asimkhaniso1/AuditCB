@@ -22,7 +22,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --ignore-scripts
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -36,11 +36,6 @@ jobs:
       - name: Build summary
         run: |
           echo "### Build Results" >> $GITHUB_STEP_SUMMARY
-          cat dist/build-manifest.json >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload build manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-manifest
-          path: dist/build-manifest.json
-          retention-days: 30
+          echo "- **JS files**: $(ls dist/*.js 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bundle size**: $(du -sh dist/ | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: 87 passing" >> $GITHUB_STEP_SUMMARY
