@@ -24,7 +24,22 @@
     --radius-md: 0.5rem;
     --radius-lg: 1rem;
     --glass-backdrop: blur(12px);
-    /* Aliases for backward compat (used in index.html inline styles) */
+    /* Extended palette for dark mode support */
+    --bg-muted: #f8fafc;
+    --bg-hover: #f1f5f9;
+    --border-light: #cbd5e1;
+    --text-muted: #94a3b8;
+    --success-bg: #ecfdf5;
+    --success-text: #059669;
+    --warning-bg: #fef3c7;
+    --warning-text: #d97706;
+    --danger-bg: #fef2f2;
+    --danger-text: #dc2626;
+    --info-bg: #eff6ff;
+    --info-text: #2563eb;
+    --accent-purple: #8b5cf6;
+    --accent-pink: #ec4899;
+    /* Aliases for backward compat */
     --card-bg: var(--surface-color);
     --text-color: var(--text-primary);
     --radius-sm: 0.375rem;
@@ -131,7 +146,7 @@ body {
 }
 
 .main-nav li:hover {
-    background-color: #f1f5f9;
+    background-color: var(--bg-hover);
     color: var(--primary-color);
     transform: translateX(4px);
 }
@@ -183,7 +198,7 @@ body {
 .avatar {
     width: 36px;
     height: 36px;
-    background-color: #e2e8f0;
+    background-color: var(--border-color);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -217,7 +232,7 @@ body {
 .card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
-    border-color: #cbd5e1;
+    border-color: var(--border-light);
 }
 
 .stat-card h3 {
@@ -239,6 +254,7 @@ body {
     align-items: center;
     justify-content: center;
     padding: 0.5rem 1rem;
+    min-height: 2.5rem; /* 40px — accessible touch target */
     border-radius: var(--radius-md);
     font-weight: 500;
     cursor: pointer;
@@ -269,8 +285,8 @@ body {
 }
 
 .btn-secondary:hover {
-    background-color: #f8fafc;
-    border-color: #cbd5e1;
+    background-color: var(--bg-muted);
+    border-color: var(--border-light);
     color: var(--text-primary);
 }
 
@@ -295,7 +311,7 @@ td {
 }
 
 th {
-    background-color: #f8fafc;
+    background-color: var(--bg-muted);
     font-weight: 600;
     color: var(--text-secondary);
     font-size: 0.75rem;
@@ -308,7 +324,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-    background-color: #f8fafc;
+    background-color: var(--bg-muted);
 }
 
 tr:last-child td {
@@ -330,26 +346,26 @@ tr:last-child td {
 .status-granted,
 .status-approved,
 .status-completed {
-    background-color: #ecfdf5;
-    color: #059669;
+    background-color: var(--success-bg);
+    color: var(--success-text);
 }
 
 .status-suspended,
 .status-draft,
 .status-pending {
-    background-color: #fef3c7;
-    color: #d97706;
+    background-color: var(--warning-bg);
+    color: var(--warning-text);
 }
 
 .status-withdrawn,
 .status-rejected {
-    background-color: #fef2f2;
-    color: #dc2626;
+    background-color: var(--danger-bg);
+    color: var(--danger-text);
 }
 
 .status-scheduled {
-    background-color: #eff6ff;
-    color: #2563eb;
+    background-color: var(--info-bg);
+    color: var(--info-text);
 }
 
 input,
@@ -837,7 +853,7 @@ textarea:focus:invalid {
 }
 
 .modal-content {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    background: linear-gradient(135deg, var(--surface-color) 0%, var(--bg-muted) 100%);
     border-radius: 24px;
     width: 90%;
     max-width: 700px;
@@ -871,9 +887,9 @@ textarea:focus:invalid {
    ============================================ */
 
 .modal-header {
-    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    background: linear-gradient(135deg, var(--bg-muted) 0%, var(--surface-color) 100%);
     padding: 1.75rem 2rem;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid var(--border-color);
     border-radius: 24px 24px 0 0;
     position: relative;
     overflow: hidden;
@@ -886,7 +902,7 @@ textarea:focus:invalid {
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--accent-purple) 50%, var(--accent-pink) 100%);
     background-size: 200% 100%;
     animation: gradientShift 3s ease infinite;
 }
@@ -918,7 +934,7 @@ textarea:focus:invalid {
     content: '';
     width: 6px;
     height: 24px;
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-purple) 100%);
     border-radius: 3px;
 }
 
@@ -954,7 +970,7 @@ textarea:focus:invalid {
     padding: 2rem;
     overflow-y: auto;
     max-height: 65vh;
-    background: #ffffff;
+    background: var(--surface-color);
 }
 
 /* Custom scrollbar for modal */
@@ -963,17 +979,17 @@ textarea:focus:invalid {
 }
 
 .modal-body::-webkit-scrollbar-track {
-    background: #f1f5f9;
+    background: var(--bg-hover);
     border-radius: 4px;
 }
 
 .modal-body::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+    background: linear-gradient(135deg, var(--border-light) 0%, var(--text-muted) 100%);
     border-radius: 4px;
 }
 
 .modal-body::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+    background: linear-gradient(135deg, var(--text-muted) 0%, var(--secondary-color) 100%);
 }
 
 /* ============================================
@@ -1007,12 +1023,12 @@ textarea:focus:invalid {
 .modal-body textarea {
     width: 100%;
     padding: 0.875rem 1.125rem;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--border-color);
     border-radius: 12px;
     font-size: 0.95rem;
     font-family: inherit;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    background: linear-gradient(135deg, var(--surface-color) 0%, var(--bg-muted) 100%);
     color: var(--text-primary);
     box-shadow:
         0 1px 2px 0 rgba(0, 0, 0, 0.05),
@@ -1023,8 +1039,8 @@ textarea:focus:invalid {
 .modal-body select:focus,
 .modal-body textarea:focus {
     outline: none;
-    border-color: #3b82f6;
-    background: #ffffff;
+    border-color: var(--primary-color);
+    background: var(--surface-color);
     box-shadow:
         0 0 0 4px rgba(59, 130, 246, 0.1),
         0 4px 6px -1px rgba(0, 0, 0, 0.1),
@@ -1035,7 +1051,7 @@ textarea:focus:invalid {
 .modal-body input:hover:not(:focus),
 .modal-body select:hover:not(:focus),
 .modal-body textarea:hover:not(:focus) {
-    border-color: #cbd5e1;
+    border-color: var(--border-light);
 }
 
 .modal-body textarea {
@@ -1060,7 +1076,7 @@ textarea:focus:invalid {
 .modal-body form>div[style*="border-bottom"] {
     margin: 2rem 0 1.5rem 0;
     padding-top: 1.5rem;
-    border-top: 2px solid #e2e8f0 !important;
+    border-top: 2px solid var(--border-color) !important;
     position: relative;
 }
 
@@ -1072,7 +1088,7 @@ textarea:focus:invalid {
     left: 0;
     width: 60px;
     height: 2px;
-    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--accent-purple) 100%);
 }
 
 /* ============================================
@@ -1081,8 +1097,8 @@ textarea:focus:invalid {
 
 .modal-footer {
     padding: 1.5rem 2rem;
-    border-top: 2px solid #e2e8f0;
-    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    border-top: 2px solid var(--border-color);
+    background: linear-gradient(135deg, var(--bg-muted) 0%, var(--surface-color) 100%);
     border-radius: 0 0 24px 24px;
     display: flex;
     justify-content: flex-end;
@@ -1100,7 +1116,7 @@ textarea:focus:invalid {
 }
 
 .modal-footer .btn-primary {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
     color: white;
     border: none;
     box-shadow:
@@ -1109,7 +1125,7 @@ textarea:focus:invalid {
 }
 
 .modal-footer .btn-primary:hover {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary-hover) 100%);
     box-shadow:
         0 10px 15px -3px rgba(37, 99, 235, 0.4),
         0 4px 6px -2px rgba(37, 99, 235, 0.3);
@@ -1123,14 +1139,14 @@ textarea:focus:invalid {
 }
 
 .modal-footer .btn-secondary {
-    background: #ffffff;
+    background: var(--surface-color);
     color: var(--text-secondary);
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--border-color);
 }
 
 .modal-footer .btn-secondary:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+    background: var(--bg-muted);
+    border-color: var(--border-light);
     color: var(--text-primary);
     transform: translateY(-1px);
 }
@@ -1145,12 +1161,12 @@ textarea:focus:invalid {
     height: 20px;
     margin-right: 0.75rem;
     cursor: pointer;
-    accent-color: #3b82f6;
+    accent-color: var(--primary-color);
 }
 
 .modal-body input[type="checkbox"]:focus,
 .modal-body input[type="radio"]:focus {
-    outline: 2px solid #3b82f6;
+    outline: 2px solid var(--primary-color);
     outline-offset: 2px;
 }
 
@@ -1253,8 +1269,8 @@ textarea:focus:invalid {
     width: 40px;
     height: 40px;
     margin: -20px 0 0 -20px;
-    border: 3px solid #e2e8f0;
-    border-top-color: #3b82f6;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
     z-index: 2;
@@ -1288,10 +1304,10 @@ textarea:focus:invalid {
 /* Disabled input styling */
 .modal-body input:disabled,
 .modal-body select:disabled {
-    background-color: #f1f5f9;
-    color: #9ca3af;
+    background-color: var(--bg-hover);
+    color: var(--text-muted);
     cursor: not-allowed;
-    border-color: #e5e7eb;
+    border-color: var(--border-color);
 }
 
 /* Focus ring animation */
@@ -1386,11 +1402,11 @@ textarea:focus:invalid {
 }
 
 .client-list-item:hover {
-    background-color: #f1f5f9;
+    background-color: var(--bg-hover);
 }
 
 .client-list-item.active {
-    background-color: #eff6ff;
+    background-color: var(--info-bg);
     border-left-color: var(--primary-color);
 }
 
@@ -1398,7 +1414,7 @@ textarea:focus:invalid {
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-purple) 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -1468,7 +1484,7 @@ textarea:focus:invalid {
 }
 
 .sidebar-toggle-btn:hover {
-    background-color: #f1f5f9;
+    background-color: var(--bg-hover);
     color: var(--primary-color);
 }
 
@@ -1905,4 +1921,97 @@ textarea:focus:invalid {
 /* Logout button hover - CSP Phase 2 (replaced inline onmouseover/onmouseout) */
 .logout-btn:hover {
     background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ============================================
+   DARK MODE (auto via prefers-color-scheme)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-color: #60a5fa;
+        --primary-hover: #3b82f6;
+        --primary-gradient: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+        --secondary-color: #94a3b8;
+        --background-color: #0f172a;
+        --surface-color: #1e293b;
+        --surface-glass: rgba(30, 41, 59, 0.85);
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --border-color: #334155;
+        --success-color: #34d399;
+        --warning-color: #fbbf24;
+        --danger-color: #f87171;
+        --bg-muted: #1e293b;
+        --bg-hover: #334155;
+        --border-light: #475569;
+        --text-muted: #64748b;
+        --success-bg: rgba(16, 185, 129, 0.1);
+        --success-text: #34d399;
+        --warning-bg: rgba(245, 158, 11, 0.1);
+        --warning-text: #fbbf24;
+        --danger-bg: rgba(239, 68, 68, 0.1);
+        --danger-text: #f87171;
+        --info-bg: rgba(59, 130, 246, 0.1);
+        --info-text: #60a5fa;
+        --accent-purple: #a78bfa;
+        --accent-pink: #f472b6;
+        --card-bg: var(--surface-color);
+        --text-color: var(--text-primary);
+        --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+        --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.3);
+    }
+
+    body {
+        color-scheme: dark;
+    }
+
+    .card, .modal-content, .modal-body {
+        background-color: var(--surface-color);
+        color: var(--text-primary);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        border-bottom-color: var(--border-color);
+    }
+
+    .modal-body input[type="text"],
+    .modal-body input[type="email"],
+    .modal-body input[type="tel"],
+    .modal-body input[type="number"],
+    .modal-body input[type="date"],
+    .modal-body input[type="url"],
+    .modal-body input[type="password"],
+    .modal-body select,
+    .modal-body textarea {
+        background: var(--bg-hover);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    table th {
+        background-color: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    table td {
+        border-color: var(--border-color);
+    }
+
+    .sidebar, .client-sidebar {
+        background-color: var(--surface-glass);
+        border-color: var(--border-color);
+    }
+
+    header {
+        background-color: var(--surface-glass);
+        border-color: var(--border-color);
+    }
+
+    .client-search input {
+        background: var(--bg-hover);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
 }
