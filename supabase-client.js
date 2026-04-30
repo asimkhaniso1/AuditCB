@@ -24,7 +24,15 @@ const SupabaseClient = {
             }
 
             // Initialize Supabase client
-            this.client = supabase.createClient(supabaseUrl, supabaseKey);
+            // Explicit auth options so session survives page reloads.
+            this.client = supabase.createClient(supabaseUrl, supabaseKey, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true,
+                    storage: window.localStorage
+                }
+            });
             this.isInitialized = true;
 
             Logger.info('Supabase client initialized successfully');

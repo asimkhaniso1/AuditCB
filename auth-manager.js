@@ -314,10 +314,15 @@ const AuthManager = {
 
     /**
      * Save session to storage
+     *
+     * Uses localStorage so the SESSION_TIMEOUT (8h) actually applies across
+     * page reloads and tab closes. sessionStorage was wiped on every reload,
+     * which silently logged users out before the timeout was reached.
+     * Migrate any leftover sessionStorage entry on first read.
      */
     saveSession: function (session) {
         try {
-            sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+            localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
         } catch (error) {
             Logger.error('Failed to save session:', error);
         }
@@ -328,7 +333,15 @@ const AuthManager = {
      */
     getSession: function () {
         try {
-            const sessionData = sessionStorage.getItem(this.SESSION_KEY);
+            let sessionData = localStorage.getItem(this.SESSION_KEY);
+            if (!sessionData) {
+                const legacy = sessionStorage.getItem(this.SESSION_KEY);
+                if (legacy) {
+                    localStorage.setItem(this.SESSION_KEY, legacy);
+                    sessionStorage.removeItem(this.SESSION_KEY);
+                    sessionData = legacy;
+                }
+            }
             return sessionData ? JSON.parse(sessionData) : null;
         } catch (error) {
             Logger.error('Failed to get session:', error);
@@ -340,6 +353,7 @@ const AuthManager = {
      * Clear session
      */
     clearSession: function () {
+        localStorage.removeItem(this.SESSION_KEY);
         sessionStorage.removeItem(this.SESSION_KEY);
     },
 

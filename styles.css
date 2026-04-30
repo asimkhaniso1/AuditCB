@@ -68,6 +68,7 @@ body {
     font-family: 'Inter', sans-serif;
     background-color: var(--background-color);
     color: var(--text-primary);
+    color-scheme: light; /* Force light UA controls regardless of OS preference */
     line-height: 1.5;
     height: 100vh;
     overflow: hidden;
@@ -279,7 +280,7 @@ body {
 }
 
 .btn-secondary {
-    background-color: white;
+    background-color: var(--surface-color);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
 }
@@ -378,6 +379,8 @@ textarea {
     margin-bottom: 1rem;
     font-family: inherit;
     font-size: 0.95rem;
+    background-color: var(--surface-color);
+    color: var(--text-primary);
 }
 
 input:focus,
@@ -1923,95 +1926,6 @@ textarea:focus:invalid {
     background: rgba(239, 68, 68, 0.1) !important;
 }
 
-/* ============================================
-   DARK MODE (auto via prefers-color-scheme)
-   ============================================ */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --primary-color: #60a5fa;
-        --primary-hover: #3b82f6;
-        --primary-gradient: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-        --secondary-color: #94a3b8;
-        --background-color: #0f172a;
-        --surface-color: #1e293b;
-        --surface-glass: rgba(30, 41, 59, 0.85);
-        --text-primary: #f1f5f9;
-        --text-secondary: #94a3b8;
-        --border-color: #334155;
-        --success-color: #34d399;
-        --warning-color: #fbbf24;
-        --danger-color: #f87171;
-        --bg-muted: #1e293b;
-        --bg-hover: #334155;
-        --border-light: #475569;
-        --text-muted: #64748b;
-        --success-bg: rgba(16, 185, 129, 0.1);
-        --success-text: #34d399;
-        --warning-bg: rgba(245, 158, 11, 0.1);
-        --warning-text: #fbbf24;
-        --danger-bg: rgba(239, 68, 68, 0.1);
-        --danger-text: #f87171;
-        --info-bg: rgba(59, 130, 246, 0.1);
-        --info-text: #60a5fa;
-        --accent-purple: #a78bfa;
-        --accent-pink: #f472b6;
-        --card-bg: var(--surface-color);
-        --text-color: var(--text-primary);
-        --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
-        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
-        --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.3);
-    }
-
-    body {
-        color-scheme: dark;
-    }
-
-    .card, .modal-content, .modal-body {
-        background-color: var(--surface-color);
-        color: var(--text-primary);
-    }
-
-    .modal-header {
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        border-bottom-color: var(--border-color);
-    }
-
-    .modal-body input[type="text"],
-    .modal-body input[type="email"],
-    .modal-body input[type="tel"],
-    .modal-body input[type="number"],
-    .modal-body input[type="date"],
-    .modal-body input[type="url"],
-    .modal-body input[type="password"],
-    .modal-body select,
-    .modal-body textarea {
-        background: var(--bg-hover);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-    }
-
-    table th {
-        background-color: var(--bg-hover);
-        color: var(--text-primary);
-    }
-
-    table td {
-        border-color: var(--border-color);
-    }
-
-    .sidebar, .client-sidebar {
-        background-color: var(--surface-glass);
-        border-color: var(--border-color);
-    }
-
-    header {
-        background-color: var(--surface-glass);
-        border-color: var(--border-color);
-    }
-
-    .client-search input {
-        background: var(--bg-hover);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-    }
-}
+/* Dark mode removed — was incomplete (only modals/some elements styled)
+   and produced inconsistent appearance (dark inputs/headers on light cards).
+   Reintroduce later as an explicit user toggle, not OS-driven. */
