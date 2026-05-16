@@ -1951,8 +1951,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="min-width:28px;height:28px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;flex-shrink:0;">' + (idx + 1) + '</div>'
                 + '<div style="flex:1;padding-top:3px;">' + obs + '</div></div>').join('');
         };
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) { window.showNotification('Pop-up blocked. Please allow pop-ups.', 'warning'); return; }
+        // Note: printWindow opened later via Blob URL (after reportHtml is built)
+        // to bypass parent page CSP that blocks inline scripts.
         const clauseLabels = Object.keys(d.stats.ncByClause).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
         const clauseValues = clauseLabels.map(k => d.stats.ncByClause[k]);
         const standard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
@@ -2035,7 +2035,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const reportHtml = '<!DOCTYPE html><html><head>'
             + '<title>Audit Report — ' + d.report.client + '</title>'
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
-            + '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>'
+            + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'
             + '<style>'
             + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'
@@ -2299,7 +2299,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'if(c7){var rd=' + JSON.stringify((function () { var rData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.department) return; if (!rData[item.department]) rData[item.department] = { total: 0, conform: 0 }; rData[item.department].total++; if (item.status === 'conform') rData[item.department].conform++; }); var labels = Object.keys(rData).sort(); return { labels: labels, data: labels.map(function (l) { return rData[l].total > 0 ? Math.round((rData[l].conform / rData[l].total) * 100) : 0; }) }; })()) + ';'
             + 'if(rd.labels.length>=3)new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Compliance %",data:rd.data,borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,0.15)",borderWidth:2,pointBackgroundColor:"#6366f1"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});else c7.parentElement.innerHTML="<div style=\\"text-align:center;padding:20px;color:#94a3b8;font-size:0.82rem;\\">Need 3+ departments</div>";}'
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});},2000);'
-            + '}rc();'
+            + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
             + 'setTimeout(function(){try{'
             + 'var pageH=1123;'
             + 'var tocItems=document.querySelectorAll(".toc-item[data-toc-target]");'
@@ -2316,10 +2316,21 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '},1200);'
             + '</script></body></html>';
 
-        printWindow.document.write(reportHtml);
-        printWindow.document.close();
-        setTimeout(function () { printWindow.print(); }, 1800);
-        let overlay = document.getElementById('report-preview-overlay');
+        // Open via Blob URL — bypasses parent CSP, allows inline scripts in the document.
+        const blob = new Blob([reportHtml], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
+        const printWindow = window.open(blobUrl, '_blank');
+        if (!printWindow) {
+            URL.revokeObjectURL(blobUrl);
+            window.showNotification('Pop-up blocked. Please allow pop-ups for this site.', 'warning');
+            return;
+        }
+        // Trigger print once charts render, then release Blob memory
+        setTimeout(function () {
+            try { printWindow.print(); } catch (e) { console.warn('Print failed:', e); }
+        }, 2000);
+        setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
+        const overlay = document.getElementById('report-preview-overlay');
         if (overlay) overlay.remove();
     };
 
