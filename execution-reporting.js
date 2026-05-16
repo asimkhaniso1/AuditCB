@@ -2311,9 +2311,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // FOOTER
             + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
             + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;font-style:italic;max-width:340px;">This report has been prepared in accordance with ' + standard + ' requirements. Distribution is limited to authorized personnel only.</div>'
-            + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>'
-            // CHARTS SCRIPT
-            + '<script>'
+            + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>';
+
+        // Build chart init script SEPARATELY (will become its own Blob URL to bypass inline-script CSP)
+        const chartScriptCode = ''
             + 'function rc(){'
             + 'var c1=document.getElementById("chart-doughnut");'
             + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#22c55e","#f59e0b","#ef4444","#3b82f6"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
@@ -2351,12 +2352,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'if(pgEl)pgEl.textContent=pg;'
             + '});'
             + '}catch(e){console.warn("TOC page calc:",e);}'
-            + '},1200);'
-            + '</script></body></html>';
+            + '},1200);';
 
-        // Open via Blob URL — bypasses parent CSP, allows inline scripts in the document.
-        // BOM ensures browsers interpret as UTF-8 even if charset header missing
-        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), reportHtml], { type: 'text/html;charset=utf-8' });
+        // Append script via external Blob URL (not inline) to comply with parent CSP
+        const chartScriptBlob = new Blob([chartScriptCode], { type: 'application/javascript' });
+        const chartScriptUrl = URL.createObjectURL(chartScriptBlob);
+        const reportHtmlFinal = reportHtml + '<script src="' + chartScriptUrl + '"></script></body></html>';
+
+        // Open via Blob URL. Chart script is also a Blob URL (loaded via <script src>)
+        // so it works even when parent page CSP disallows inline scripts.
+        // BOM ensures browsers interpret as UTF-8 even if charset header missing.
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), reportHtmlFinal], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
         const printWindow = window.open(blobUrl, '_blank');
         if (!printWindow) {
@@ -2378,7 +2384,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             } catch (e) { console.warn('Print failed:', e); }
         }
         setTimeout(function () { _attemptPrint(0); }, 1000);
-        setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
+        setTimeout(function () {
+            URL.revokeObjectURL(blobUrl);
+            URL.revokeObjectURL(chartScriptUrl);
+        }, 60000);
         const overlay = document.getElementById('report-preview-overlay');
         if (overlay) overlay.remove();
     };
