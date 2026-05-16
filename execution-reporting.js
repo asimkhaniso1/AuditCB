@@ -1094,7 +1094,7 @@
                 <div class="rp-sec" id="sec-changes">
                     <div class="rp-sec-hdr" style="border-left-color:#78716c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">11</span>CHANGES SINCE LAST AUDIT<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div id="rp-changes" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">${d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit. Click to edit if changes occurred.'}</div>
+                        <div id="rp-changes" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">${d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.'}</div>
                     </div>
                 </div>
                 <!-- 7: Conclusion -->
@@ -1129,7 +1129,7 @@
                             </div>
                             <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                                 <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Technical Reviewer / Certification Manager</div>
-                                <div id="rp-reviewer-name" class="rp-edit" contenteditable="true" style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;min-height:22px;">${d.report.technicalReviewer || 'Click to enter reviewer name'}</div>
+                                <div id="rp-reviewer-name" class="rp-edit" contenteditable="true" data-placeholder="Click to enter reviewer name" style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;min-height:22px;">${d.report.technicalReviewer || ''}</div>
                                 <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
                                 <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <span id="rp-reviewer-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
@@ -2205,8 +2205,29 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="chart-box"><div class="chart-title">Personnel Workload</div><canvas id="chart-workload"></canvas></div></div>'
                 + '<div class="chart-grid" style="margin-top:16px;"><div class="chart-box"><div class="chart-title">Compliance by Department</div><canvas id="chart-radar"></canvas></div>'
                 + '<div class="chart-box"></div></div>'
-                + '<div style="margin-top:18px;"><div style="font-weight:700;font-size:0.9rem;color:#1e293b;margin-bottom:10px;"><i class="fa-solid fa-building" style="margin-right:6px;color:#6366f1;"></i>Department Summary</div><table class="f-tbl"><thead><tr style="background:#f8fafc;"><th style="width:25%;">Department</th><th style="width:15%;text-align:center;">Personnel</th><th style="width:15%;text-align:center;">Items</th><th style="width:15%;text-align:center;">Conform</th><th style="width:15%;text-align:center;">NC</th><th style="width:15%;text-align:center;">Compliance</th></tr></thead><tbody>'
-                + (function () { var deptMap = {}; (d.hydratedProgress || []).forEach(function (i) { var dept = i.department || 'Unassigned'; if (!deptMap[dept]) deptMap[dept] = { pers: {}, items: 0, conform: 0, nc: 0 }; if (i.personnel) deptMap[dept].pers[i.personnel] = 1; deptMap[dept].items++; if (i.status === 'conform') deptMap[dept].conform++; else if (i.status === 'nc') deptMap[dept].nc++; }); return Object.keys(deptMap).sort().map(function (dept) { var d2 = deptMap[dept]; var pct = d2.items > 0 ? Math.round((d2.conform / d2.items) * 100) : 0; var clr = pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626'; return '<tr><td style="padding:8px 10px;font-weight:500;">' + dept + '</td><td style="padding:8px 10px;text-align:center;">' + Object.keys(d2.pers).length + '</td><td style="padding:8px 10px;text-align:center;">' + d2.items + '</td><td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:600;">' + d2.conform + '</td><td style="padding:8px 10px;text-align:center;color:#dc2626;font-weight:600;">' + d2.nc + '</td><td style="padding:8px 10px;text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-weight:700;font-size:0.78rem;background:' + clr + '15;color:' + clr + ';">' + pct + '%</span></td></tr>'; }).join(''); })()
+                + '<div style="margin-top:18px;"><div style="font-weight:700;font-size:0.9rem;color:#1e293b;margin-bottom:10px;"><i class="fa-solid fa-building" style="margin-right:6px;color:#6366f1;"></i>Department Summary</div><table class="f-tbl"><thead><tr style="background:#f8fafc;"><th style="width:30%;">Department</th><th style="width:14%;text-align:center;">Personnel</th><th style="width:14%;text-align:center;">Items</th><th style="width:14%;text-align:center;">Conform</th><th style="width:14%;text-align:center;">NC</th><th style="width:14%;text-align:center;">Status</th></tr></thead><tbody>'
+                + (function () {
+                    var deptMap = {};
+                    (d.hydratedProgress || []).forEach(function (i) {
+                        var dept = i.department || 'Unassigned';
+                        if (!deptMap[dept]) deptMap[dept] = { pers: {}, items: 0, conform: 0, nc: 0 };
+                        if (i.personnel) deptMap[dept].pers[i.personnel] = 1;
+                        deptMap[dept].items++;
+                        if (i.status === 'conform') deptMap[dept].conform++;
+                        else if (i.status === 'nc') {
+                            // Only Major/Minor count as NC; observations/OFI are separate
+                            var t = (i.ncrType || '').toLowerCase();
+                            if (t === 'major' || t === 'minor') deptMap[dept].nc++;
+                        }
+                    });
+                    if (deptMap['Unassigned'] && deptMap['Unassigned'].items === 0) delete deptMap['Unassigned'];
+                    return Object.keys(deptMap).sort().map(function (dept) {
+                        var d2 = deptMap[dept];
+                        var statusTxt = d2.nc === 0 ? 'Satisfactory' : 'Minor Issues';
+                        var clr = d2.nc === 0 ? '#16a34a' : '#d97706';
+                        return '<tr><td style="padding:8px 10px;font-weight:500;">' + dept + '</td><td style="padding:8px 10px;text-align:center;">' + Object.keys(d2.pers).length + '</td><td style="padding:8px 10px;text-align:center;">' + d2.items + '</td><td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:600;">' + d2.conform + '</td><td style="padding:8px 10px;text-align:center;color:#dc2626;font-weight:600;">' + d2.nc + '</td><td style="padding:8px 10px;text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-weight:700;font-size:0.78rem;background:' + clr + '15;color:' + clr + ';">' + statusTxt + '</span></td></tr>';
+                    }).join('');
+                })()
                 + '</tbody></table></div></div>' : '')
             // SECTION 4 - CONFORMANCE VERIFICATION
             + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;"><span class="sn" style="background:#10b981;">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
@@ -2314,7 +2335,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'var c7=document.getElementById("chart-radar");'
             + 'if(c7){var rd=' + JSON.stringify((function () { var rData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.department) return; if (!rData[item.department]) rData[item.department] = { total: 0, conform: 0 }; rData[item.department].total++; if (item.status === 'conform') rData[item.department].conform++; }); var labels = Object.keys(rData).sort(); return { labels: labels, data: labels.map(function (l) { return rData[l].total > 0 ? Math.round((rData[l].conform / rData[l].total) * 100) : 0; }) }; })()) + ';'
             + 'if(rd.labels.length>=3)new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Compliance %",data:rd.data,borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,0.15)",borderWidth:2,pointBackgroundColor:"#6366f1"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});else c7.parentElement.innerHTML="<div style=\\"text-align:center;padding:20px;color:#94a3b8;font-size:0.82rem;\\">Need 3+ departments</div>";}'
-            + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});},2000);'
+            + 'window._chartsReady=false;'
+            + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});window._chartsReady=true;},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
             + 'setTimeout(function(){try{'
             + 'var pageH=1123;'
@@ -2342,10 +2364,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             window.showNotification('Pop-up blocked. Please allow pop-ups for this site.', 'warning');
             return;
         }
-        // Trigger print once charts render, then release Blob memory
-        setTimeout(function () {
-            try { printWindow.print(); } catch (e) { console.warn('Print failed:', e); }
-        }, 2000);
+        // Trigger print once charts render and convert to images
+        function _attemptPrint(attempts) {
+            try {
+                if (printWindow.window && printWindow.window._chartsReady) {
+                    printWindow.print();
+                } else if (attempts < 20) {
+                    setTimeout(function () { _attemptPrint(attempts + 1); }, 500);
+                } else {
+                    // Timeout fallback — print anyway
+                    printWindow.print();
+                }
+            } catch (e) { console.warn('Print failed:', e); }
+        }
+        setTimeout(function () { _attemptPrint(0); }, 1000);
         setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
         const overlay = document.getElementById('report-preview-overlay');
         if (overlay) overlay.remove();
