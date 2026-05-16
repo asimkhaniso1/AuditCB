@@ -63,7 +63,8 @@
 
         // Attempt to get client details for address/logo if available
         const client = window.state.clients.find(c => c.name === report.client) || {};
-        const _clientLogo = client.logoUrl || 'https://via.placeholder.com/150?text=Client+Logo';
+        // Use empty string for missing logo (rendered as blank instead of placeholder image)
+        const _clientLogo = client.logoUrl || '';
 
         // Get audit plan reference
         const auditPlan = report.planId ? window.DataService.findAuditPlan(report.planId) : null;
@@ -135,8 +136,12 @@
             clientLogo: client.logoUrl || '',
             cbLogo: cbSettings.logoUrl || '',
             qrCodeUrl,
-            stats: { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause },
-            today: new Date().toLocaleDateString()
+            stats: (() => {
+                const applicableCount = totalItems - naItems.length;
+                const complianceScore = applicableCount > 0 ? Math.round((conformityItems.length / applicableCount) * 100) : 0;
+                return { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, complianceScore };
+            })(),
+            today: new Date().toLocaleDateString('en-GB')
         };
 
         // Show Report Preview & Edit modal
@@ -303,11 +308,11 @@
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Date</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.date || 'N/A'}${d.report.endDate ? ' — ' + d.report.endDate : ''}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.date || '—'}${d.report.endDate ? ' — ' + d.report.endDate : ''}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Lead Auditor</div>
-                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.leadAuditor || 'N/A'}</div>
+                                <div style="font-size:1rem;color:#1e293b;font-weight:600;">${d.report.leadAuditor || '—'}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Report ID</div>
@@ -363,13 +368,13 @@
                     <div class="rp-sec-body">
                         <table style="width:100%;font-size:0.86rem;border-collapse:collapse;">
                             <tr><td style="padding:7px 12px;width:35%;color:#64748b;font-weight:600;">Client</td><td style="padding:7px 12px;">${d.report.client}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Industry</td><td style="padding:7px 12px;">${d.client.industry || 'N/A'}</td></tr>
-                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Certification Scope</td><td style="padding:7px 12px;">${d.client.certificationScope || 'N/A'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Standard</td><td style="padding:7px 12px;">${d.report.standard || d.auditPlan?.standard || 'N/A'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Industry</td><td style="padding:7px 12px;">${d.client.industry || '—'}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Certification Scope</td><td style="padding:7px 12px;">${d.client.certificationScope || '—'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Standard</td><td style="padding:7px 12px;">${d.report.standard || d.auditPlan?.standard || '—'}</td></tr>
                             <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Audit Type</td><td style="padding:7px 12px;">${d.auditPlan?.auditType || 'Initial'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || 'N/A'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
-                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || 'N/A'}</td></tr>
-                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${[d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || 'N/A'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Dates</td><td style="padding:7px 12px;">${d.report.date || '—'} ${d.report.endDate ? '→ ' + d.report.endDate : ''}</td></tr>
+                            <tr><td style="padding:7px 12px;color:#64748b;font-weight:600;">Lead Auditor</td><td style="padding:7px 12px;">${d.report.leadAuditor || '—'}</td></tr>
+                            <tr style="background:#f8fafc;"><td style="padding:7px 12px;color:#64748b;font-weight:600;">Location</td><td style="padding:7px 12px;">${[d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ') || '—'}</td></tr>
                 ${(() => {
                 const locAddr = [d.client.address, d.client.city, d.client.province, d.client.country].filter(Boolean).join(', ');
                 const addrFallback = locAddr ? `<div style="padding:16px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;text-align:center;"><i class="fa-solid fa-map-location-dot" style="font-size:1.5rem;color:#64748b;margin-bottom:6px;display:block;"></i><div style="color:#334155;font-size:0.9rem;font-weight:600;">${locAddr}</div></div>` : '';
@@ -438,10 +443,10 @@
                                 <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #3b82f6;">
                                     <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Compliance</div>
                                     <div style="font-size:1.8rem;font-weight:800;color:#3b82f6;">
-                                        ${Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100)}%
+                                        ${d.stats.complianceScore}%
                                     </div>
                                     <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;margin-top:0.5rem;overflow:hidden;">
-                                        <div style="width:${Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100)}%;height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:3px;"></div>
+                                        <div style="width:${d.stats.complianceScore}%;height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:3px;"></div>
                                     </div>
                                 </div>
                                 
@@ -542,7 +547,7 @@
                         <!-- KPI Metrics Dashboard -->
                         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:2rem;">
                             <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;color:white;">
-                                <div style="font-size:2rem;font-weight:800;">${Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100)}%</div>
+                                <div style="font-size:2rem;font-weight:800;">${d.stats.complianceScore}%</div>
                                 <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">COMPLIANCE RATE</div>
                             </div>
                             <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;color:white;">
@@ -711,7 +716,7 @@
                                     // Group findings by main clause (e.g., 4.x -> 4, 5.x -> 5)
                                     const clauseData = {};
                                     const allItems = ${JSON.stringify(d.hydratedProgress.map(i => ({
-                clause: i.kbMatch?.clause || i.clause || 'N/A',
+                clause: i.kbMatch?.clause || i.clause || '—',
                 status: i.status,
                 ncrType: (i.ncrType || '').toLowerCase()
             })))};
@@ -985,7 +990,7 @@
                                 .filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi');
                             const prevNCRs = prevReport.ncrs || [];
                             if (prevNCs.length === 0 && prevNCRs.length === 0) {
-                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || 'N/A') + '):</strong> No non-conformities were raised. Certification was recommended.</div>';
+                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No non-conformities were raised. Certification was recommended.</div>';
                             }
                             let rows = '';
                             prevNCs.forEach(function (nc, i) {
@@ -994,7 +999,7 @@
                             prevNCRs.forEach(function (ncr, i) {
                                 rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (ncr.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
                             });
-                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || 'N/A') + ' | ' + (prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
+                            return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + (prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
                                 + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + rows + '</tbody></table>';
                         })()}
                     </div>
@@ -1071,7 +1076,7 @@
                 <div class="rp-sec" id="sec-meetings">
                     <div class="rp-sec-hdr" style="border-left-color:#0891b2;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CLOSING MEETING<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || 'N/A'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || 'N/A'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
+                        <div style="padding:12px;background:#eff6ff;border-radius:8px;"><strong style="color:#1e40af;"><i class="fa-solid fa-pen" style="font-size:0.6rem;margin-right:4px;opacity:0.5;"></i>Closing Meeting</strong><div style="font-size:0.85rem;color:#334155;margin-top:6px;">Date: ${d.report.closingMeeting?.date || '—'}</div><div style="font-size:0.85rem;color:#334155;">Attendees: ${(() => { const att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(a => typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a).filter(Boolean).join(', ') || '—'; return String(att); })()}</div><div id="rp-closing-summary" class="rp-edit" contenteditable="true" style="margin-top:6px;font-size:0.85rem;min-height:30px;">${d.report.closingMeeting?.summary || '<em style="color:#94a3b8;">Click to add closing meeting summary...</em>'}</div></div>
                     </div>
                 </div>
                 <!-- Changes Since Last Audit -->
@@ -1203,7 +1208,7 @@
                 if (clauseCtx) {
                     const clauseData = {};
                     d.hydratedProgress.forEach(item => {
-                        const clause = item.kbMatch?.clause || item.clause || 'N/A';
+                        const clause = item.kbMatch?.clause || item.clause || '—';
                         const mainClause = clause.split('.')[0];
                         if (!clauseData[mainClause]) clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ok: 0 };
                         if (item.status === 'nc') {
@@ -1649,7 +1654,7 @@
             try {
                 const ncTotal = d.stats.majorNC + d.stats.minorNC;
                 const obsTotal = d.stats.observationCount + d.stats.ofiCount;
-                const _conformRate = d.stats.totalItems > 0 ? Math.round((d.stats.conformCount / d.stats.totalItems) * 100) : 0;
+                const _conformRate = d.stats.complianceScore;
                 const conclusionPrompt = `You are a Senior Lead Auditor at a top-tier Certification Body. Write a formal audit conclusion (150-200 words) for the following audit:
 
 Client: ${d.report.client}
@@ -2093,9 +2098,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div style="font-size:2rem;font-weight:700;color:#2563eb;">' + d.report.client + '</div>'
             + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || 'N/A') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || 'N/A') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || '—') + '</div></div>'
             + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
@@ -2136,15 +2141,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION 1
             + (en['audit-info'] !== false ? '<div id="sec-audit-info" class="sh page-break" style="background:#eff6ff;border-left-color:#2563eb;"><span class="sn" style="background:#2563eb;">1</span>AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
-                + '<tr><td>Industry</td><td>' + (d.client.industry || 'N/A') + '</td></tr>'
-                + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || 'N/A') + '</td></tr>'
-                + '<tr><td>Number of Employees</td><td>' + (d.client.employees || d.client.numberOfEmployees || 'N/A') + '</td></tr>'
+                + '<tr><td>Industry</td><td>' + (d.client.industry || '—') + '</td></tr>'
+                + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || '—') + '</td></tr>'
+                + '<tr><td>Number of Employees</td><td>' + (d.client.employees || d.client.numberOfEmployees || '—') + '</td></tr>'
                 + '<tr><td>Audit Standard</td><td>' + standard + '</td></tr>'
                 + '<tr><td>Audit Type</td><td>' + (d.auditPlan?.auditType || 'Initial') + '</td></tr>'
-                + '<tr><td>Audit Dates</td><td>' + (d.report.date || 'N/A') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
-                + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || 'N/A') + '</td></tr>'
+                + '<tr><td>Audit Dates</td><td>' + (d.report.date || '—') + (d.report.endDate ? ' → ' + d.report.endDate : '') + '</td></tr>'
+                + '<tr><td>Lead Auditor</td><td>' + (d.report.leadAuditor || '—') + '</td></tr>'
                 + '<tr><td>Audit Method</td><td>' + (d.auditPlan?.auditMethod || 'On-site') + '</td></tr>'
-                + (function () { var s = (d.client.sites && d.client.sites[0]) || {}; var addr = [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || 'N/A'; return '<tr><td>Audit Location</td><td>' + addr + '</td></tr>'; })()
+                + (function () { var s = (d.client.sites && d.client.sites[0]) || {}; var addr = [d.client.address || s.address, d.client.city || s.city, d.client.province, d.client.country || s.country].filter(Boolean).join(', ') || '—'; return '<tr><td>Audit Location</td><td>' + addr + '</td></tr>'; })()
                 + '<tr><td>Plan Reference</td><td>' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'Not Linked') + '</td></tr>'
                 + '</table>'
                 + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:10px;font-size:0.85rem;color:#334155;"><strong>Goods & Services:</strong> ' + d.client.goodsServices.map(g => g.name + (g.category ? ' (' + g.category + ')' : '')).join(', ') + '</div>' : '')
@@ -2161,18 +2166,18 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;"><span class="sn" style="background:#059669;">3</span>EXECUTIVE SUMMARY</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || 'N/A') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.manDays || d.auditPlan?.man_days || 'N/A') + ' Man-Days' + (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.manDays || d.auditPlan?.man_days || '—') + ' Man-Days' + (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
-                + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
+                + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div class="sh page-break" style="background:#f0fdf4;border-left-color:#22c55e;"><span class="sn" style="background:#16a34a;"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
                 + '<div class="stat-grid">'
-                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + Math.round((d.stats.conformCount / ((d.stats.totalItems - d.stats.naCount) || 1)) * 100) + '%</div><div class="stat-lbl">Compliance Score</div></div>'
+                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + d.stats.complianceScore + '%</div><div class="stat-lbl">Compliance Score</div></div>'
                 + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.actualNCCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
                 + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.obsOfiCount + '</div><div class="stat-lbl">Observations / OFI</div></div>'
                 + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
@@ -2233,7 +2238,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;"><span class="sn" style="background:#4338ca;">12</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedConclusion) + '</div>'
-                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || 'N/A') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || 'N/A'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || 'N/A') + '</td></tr></table></div>'
+                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || '—') + '</td></tr></table></div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
@@ -2278,7 +2283,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'var c2=document.getElementById("chart-clause");'
             + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#2563eb",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
             + 'var c3=document.getElementById("chart-findings");'
-            + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.ncCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","Observations/OFI","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.actualNCCount + ',' + d.stats.obsOfiCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#3b82f6","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
             + 'var c4=document.getElementById("chart-area");'
             + 'if(c4){var ad=' + areaChartData + ';new Chart(c4,{type:"bar",data:{labels:ad.names,datasets:[{label:"Conform",data:ad.conform,backgroundColor:"#22c55e",borderRadius:3},{label:"NC",data:ad.nc,backgroundColor:"#ef4444",borderRadius:3},{label:"OBS",data:ad.obs,backgroundColor:"#3b82f6",borderRadius:3},{label:"OFI",data:ad.ofi,backgroundColor:"#f59e0b",borderRadius:3}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}'
             // Chart 5: Department Findings

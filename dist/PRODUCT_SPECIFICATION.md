@@ -1,7 +1,7 @@
 # AuditCB-360 — Product Specification
 
-**Document Version:** 1.0  
-**Date:** 2026-04-11  
+**Document Version:** 1.1  
+**Date:** 2026-05-01  
 **Status:** Current  
 
 ---
@@ -281,6 +281,7 @@ Permission enforcement occurs at two layers:
 
 ### 7.1 Authentication
 - Supabase Auth with email/password
+- Persistent sessions across page reloads (auto-recovery via Supabase session restore)
 - Login rate limiting: 5 attempts, 15-minute lockout
 - Session timeout: 8 hours
 - Password policy: 8+ characters, uppercase, number, special character
@@ -296,6 +297,13 @@ Permission enforcement occurs at two layers:
 - **SQL Injection Prevention**: Parameterized queries via Supabase client
 - **No Inline Scripts**: All JavaScript via external files (CSP-compliant)
 - **X-Frame-Options**: Clickjacking protection
+
+### 7.5 Accessibility (a11y)
+- Modal focus trap (keyboard focus contained within open dialogs)
+- `:focus-visible` styling on all interactive buttons
+- Search inputs have associated labels
+- Touch-target sizing on buttons (minimum 44×44px)
+- CSS variable system for consistent theming and contrast
 
 ### 7.4 Data Security
 - Row-Level Security (RLS) policies on all database tables
@@ -384,6 +392,8 @@ vercel deploy    # Deploy to Vercel
 - Modular architecture enabling selective module loading
 - CDN delivery for third-party libraries
 - Terser minification for production builds
+- Set-based KB document lookup cache (O(n²) → O(n) optimization)
+- String coercion for KB ID lookups to prevent type-mismatch lookup misses
 
 ---
 
@@ -438,7 +448,7 @@ vercel deploy    # Deploy to Vercel
 | Custom Report Templates | User-configurable report layouts |
 | Mobile Application | Native mobile app for on-site audit execution |
 | Internationalization (i18n) | Multi-language support |
-| Dark Mode | Theme toggle (CSS variable infrastructure in place) |
+| Theming | Light theme stable; dark mode deferred pending design rework |
 | Third-Party API | RESTful API for integration with external CB systems |
 | Batch Processing | Bulk certificate renewal and report generation |
 | Audit Trail Export | Exportable audit log reports for accreditation reviews |
