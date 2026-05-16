@@ -138,8 +138,15 @@
             qrCodeUrl,
             stats: (() => {
                 const applicableCount = totalItems - naItems.length;
-                const complianceScore = applicableCount > 0 ? Math.round((conformityItems.length / applicableCount) * 100) : 0;
-                return { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, complianceScore };
+                // ISO 17021-1 style status (not percentage-based)
+                let auditStatus, statusColor;
+                if (majorNC > 0) { auditStatus = 'Action Required'; statusColor = '#dc2626'; }
+                else if (minorNC > 0) { auditStatus = 'Satisfactory with Minor Issues'; statusColor = '#d97706'; }
+                else { auditStatus = 'Satisfactory'; statusColor = '#16a34a'; }
+                let recommendation, recColor;
+                if (majorNC > 0) { recommendation = 'Conditional Recommendation'; recColor = '#d97706'; }
+                else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
+                return { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, auditStatus, statusColor, recommendation, recColor };
             })(),
             today: new Date().toLocaleDateString('en-GB')
         };
@@ -439,15 +446,13 @@
                                     <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${d.stats.ncCount} NC Found</div>
                                 </div>
                                 
-                                <!-- Compliance Score -->
-                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #3b82f6;">
-                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Compliance</div>
-                                    <div style="font-size:1.8rem;font-weight:800;color:#3b82f6;">
-                                        ${d.stats.complianceScore}%
+                                <!-- Audit Status -->
+                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid ${d.stats.statusColor};">
+                                    <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Audit Status</div>
+                                    <div style="font-size:1rem;font-weight:700;color:${d.stats.statusColor};line-height:1.3;padding:0.25rem 0;">
+                                        ${d.stats.auditStatus}
                                     </div>
-                                    <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;margin-top:0.5rem;overflow:hidden;">
-                                        <div style="width:${d.stats.complianceScore}%;height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:3px;"></div>
-                                    </div>
+                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">per ISO 17021-1</div>
                                 </div>
                                 
                                 <!-- Client Maturity -->
@@ -546,9 +551,9 @@
                     <div class="rp-sec-body">
                         <!-- KPI Metrics Dashboard -->
                         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:2rem;">
-                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#10b981,#059669);border-radius:10px;color:white;">
-                                <div style="font-size:2rem;font-weight:800;">${d.stats.complianceScore}%</div>
-                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">COMPLIANCE RATE</div>
+                            <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,${d.stats.statusColor},${d.stats.statusColor});border-radius:10px;color:white;">
+                                <div style="font-size:0.95rem;font-weight:700;line-height:1.25;padding:4px 0;">${d.stats.auditStatus}</div>
+                                <div style="font-size:0.72rem;font-weight:600;opacity:0.9;">AUDIT STATUS</div>
                             </div>
                             <div style="text-align:center;padding:16px 8px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;color:white;">
                                 <div style="font-size:2rem;font-weight:800;">${d.stats.majorNC}</div>
@@ -612,7 +617,7 @@
                         <div style="background:white;padding:16px;border-radius:10px;border:1px solid #e2e8f0;margin-top:1.5rem;">
                             <h4 style="margin:0 0 1rem 0;color:#1e293b;font-size:0.95rem;"><i class="fa-solid fa-table-cells" style="margin-right:0.5rem;color:#7c3aed;"></i>Department Summary</h4>
                             <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
-                                <thead><tr style="background:#f8fafc;"><th style="padding:8px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Department</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Personnel</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Items</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Conform</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">NC</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Compliance %</th></tr></thead>
+                                <thead><tr style="background:#f8fafc;"><th style="padding:8px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Department</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Personnel</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Items</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Conform</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">NC</th><th style="padding:8px 12px;text-align:center;border-bottom:2px solid #e2e8f0;">Status</th></tr></thead>
                                 <tbody>${(() => {
                 const deptMap = {};
                 d.hydratedProgress.forEach(i => {
@@ -621,12 +626,18 @@
                     if (i.personnel) deptMap[dept].personnel.add(i.personnel);
                     deptMap[dept].items++;
                     if (i.status === 'conform') deptMap[dept].conform++;
-                    else if (i.status === 'nc') deptMap[dept].nc++;
+                    else if (i.status === 'nc') {
+                        // Only count Major/Minor as NCs; observations/OFI are separate
+                        const t = (i.ncrType || '').toLowerCase();
+                        if (t === 'major' || t === 'minor') deptMap[dept].nc++;
+                    }
                 });
+                // Filter out Unassigned if it has no items, otherwise relabel
+                if (deptMap['Unassigned'] && deptMap['Unassigned'].items === 0) delete deptMap['Unassigned'];
                 return Object.entries(deptMap).sort((a, b) => a[0].localeCompare(b[0])).map(([dept, data]) => {
-                    const compPct = data.items > 0 ? Math.round((data.conform / data.items) * 100) : 0;
-                    const pctColor = compPct >= 80 ? '#16a34a' : compPct >= 50 ? '#d97706' : '#dc2626';
-                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + dept + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:' + pctColor + '15;color:' + pctColor + ';">' + compPct + '%</span></td></tr>';
+                    const statusTxt = data.nc === 0 ? 'Satisfactory' : 'Minor Issues';
+                    const statusColor = data.nc === 0 ? '#16a34a' : '#d97706';
+                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + dept + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:' + statusColor + '15;color:' + statusColor + ';">' + statusTxt + '</span></td></tr>';
                 }).join('');
             })()}</tbody>
                             </table>
@@ -927,7 +938,7 @@
                                             data: {
                                                 labels: rLabels,
                                                 datasets: [{
-                                                    label: 'Compliance %',
+                                                    label: 'Conformance %',
                                                     data: rLabels.map(d => rDeptData[d].total > 0 ? Math.round((rDeptData[d].conform / rDeptData[d].total) * 100) : 0),
                                                     borderColor: '#6366f1',
                                                     backgroundColor: 'rgba(99, 102, 241, 0.15)',
@@ -1322,7 +1333,7 @@
                             data: {
                                 labels: rLabels,
                                 datasets: [{
-                                    label: 'Compliance %',
+                                    label: 'Conformance %',
                                     data: rLabels.map(rl => rDeptData[rl].total > 0 ? Math.round((rDeptData[rl].conform / rDeptData[rl].total) * 100) : 0),
                                     borderColor: '#6366f1',
                                     backgroundColor: 'rgba(99, 102, 241, 0.15)',
@@ -2032,7 +2043,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Serialize area stats for chart script
         let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
 
-        const reportHtml = '<!DOCTYPE html><html><head>'
+        const reportHtml = '<!DOCTYPE html><html lang="en"><head>'
+            + '<meta charset="UTF-8">'
+            + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
             + '<title>Audit Report — ' + d.report.client + '</title>'
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
             + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'
@@ -2076,7 +2089,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
             + '.ev-inline{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}.ev-inline img{height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;}'
-            + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none;justify-content:center;align-items:center;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:900;color:rgba(148,163,184,0.06);letter-spacing:8px;white-space:nowrap;font-family:Outfit,sans-serif;text-align:center;}'
+            + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;justify-content:center;align-items:center;overflow:hidden;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:900;color:rgba(148,163,184,0.05);letter-spacing:8px;white-space:nowrap;font-family:Outfit,sans-serif;text-align:center;user-select:none;}body{position:relative;z-index:1;}'
             + '</style></head><body>'
             + '<div class="watermark"><span>CONFIDENTIAL</span></div>'
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
@@ -2175,13 +2188,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + (editedPositiveObs ? '<div class="sh page-break" style="background:#f0fdf4;border-left-color:#22c55e;"><span class="sn" style="background:#16a34a;"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
-            + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">3</span>COMPLIANCE OVERVIEW</div><div class="sb">'
+            + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">3</span>AUDIT SUMMARY</div><div class="sb">'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">'
+                + '<div style="padding:14px 18px;background:' + d.stats.statusColor + '14;border-left:4px solid ' + d.stats.statusColor + ';border-radius:8px;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Overall Audit Status</div><div style="font-size:1.1rem;font-weight:700;color:' + d.stats.statusColor + ';margin-top:4px;">' + d.stats.auditStatus + '</div></div>'
+                + '<div style="padding:14px 18px;background:' + d.stats.recColor + '14;border-left:4px solid ' + d.stats.recColor + ';border-radius:8px;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Certification Recommendation</div><div style="font-size:1.1rem;font-weight:700;color:' + d.stats.recColor + ';margin-top:4px;">' + d.stats.recommendation + '</div></div></div>'
                 + '<div class="stat-grid">'
-                + '<div class="stat-box" style="background:#f0fdf4;border-color:#22c55e;"><div class="stat-val" style="color:#16a34a;">' + d.stats.complianceScore + '%</div><div class="stat-lbl">Compliance Score</div></div>'
-                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.actualNCCount + '</div><div class="stat-lbl">Non-Conformities</div></div>'
-                + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.obsOfiCount + '</div><div class="stat-lbl">Observations / OFI</div></div>'
-                + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + d.stats.totalItems + '</div><div class="stat-lbl">Total Checks</div></div></div>'
-                + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Compliance Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
+                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.majorNC + '</div><div class="stat-lbl">Major NC</div></div>'
+                + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.minorNC + '</div><div class="stat-lbl">Minor NC</div></div>'
+                + '<div class="stat-box" style="background:#faf5ff;border-color:#8b5cf6;"><div class="stat-val" style="color:#7c3aed;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
+                + '<div class="stat-box" style="background:#ecfeff;border-color:#06b6d4;"><div class="stat-val" style="color:#0891b2;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div></div>'
+                + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
@@ -2317,7 +2333,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '</script></body></html>';
 
         // Open via Blob URL — bypasses parent CSP, allows inline scripts in the document.
-        const blob = new Blob([reportHtml], { type: 'text/html' });
+        // BOM ensures browsers interpret as UTF-8 even if charset header missing
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), reportHtml], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
         const printWindow = window.open(blobUrl, '_blank');
         if (!printWindow) {
