@@ -8,6 +8,28 @@
 (function () {
     'use strict';
 
+    // Render-time editorial polish for auditor free-text remarks. Does not mutate stored data.
+    // Safe transforms only: whitespace, punctuation, capitalization, common typos, brand casing.
+    const fmtRemark = (t) => {
+        if (t == null) return '';
+        let s = String(t);
+        if (!s.trim()) return '';
+        s = s.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ');
+        s = s.replace(/\bscreen[\s-]?short(s?)\b/gi, (_m, p) => 'screenshot' + (p || ''));
+        s = s.replace(/\bscreen[\s-]?shot(s?)\b/gi, (_m, p) => 'screenshot' + (p || ''));
+        s = s.replace(/\bservice[\s-]?now\b/gi, 'ServiceNow');
+        s = s.replace(/\brecomend(ed|ation|ations|s)?\b/gi, (_m, suf) => 'Recommend' + (suf || ''));
+        s = s.replace(/\s+([.,;:!?])/g, '$1');
+        s = s.replace(/\.{2,}/g, '.');
+        s = s.replace(/([.!?])\s+([a-z])/g, (_m, p, c) => p + ' ' + c.toUpperCase());
+        s = s.trim();
+        if (!s) return '';
+        s = s.charAt(0).toUpperCase() + s.slice(1);
+        if (!/[.!?]$/.test(s)) s += '.';
+        return s;
+    };
+    window._fmtRemark = fmtRemark;
+
     window.generateAuditReport = async function (reportId) {
         const report = window.DataService.findAuditReport(reportId);
         if (!report) {
@@ -138,23 +160,42 @@
         else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
         const stats = { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, auditStatus, statusColor, recommendation, recColor };
 
-        // QR Code: short, non-confidential audit status summary (no scope, findings, or personal data)
-        const cbName = (cbSettings.cbSites || [])[0]?.name || cbSettings.name || '';
+        // QR Code: links to a self-contained, non-confidential Report Card page (#verify hash route).
+        // Scanning opens the app at that hash, which renders the card without exposing scope, findings, or personal data.
+        const cbName = cbSettings.cbName || (cbSettings.cbSites || [])[0]?.name || cbSettings.name || '';
+        // Logo: only include if it's a public http(s) URL — skip data: URIs (too large for QR payload).
+        const cbLogo = (typeof cbSettings.logoUrl === 'string' && /^https?:\/\//i.test(cbSettings.logoUrl))
+            ? cbSettings.logoUrl : '';
+        const accBody = cbSettings.accreditationBody || '';
+        const accNum = cbSettings.accreditationNumber || '';
         const datesText = (report.date || '') + (report.endDate ? ' to ' + report.endDate : '');
-        const qrLines = [
-            'AUDIT STATUS',
-            cbName ? 'CB: ' + cbName : null,
-            'Client: ' + (report.client || ''),
-            'Standard: ' + (report.standard || ''),
-            'Type: ' + (report.auditType || auditPlan?.auditType || 'Initial'),
-            datesText ? 'Dates: ' + datesText : null,
-            'Ref: RPT-' + String(report.id || '').substring(0, 8),
-            'Status: ' + auditStatus,
-            'Findings: ' + majorNC + ' Major, ' + minorNC + ' Minor',
-            'OBS: ' + observationCount + ' | OFI: ' + ofiCount,
-            'Outcome: ' + recommendation
-        ].filter(Boolean);
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=4&data=${encodeURIComponent(qrLines.join('\n'))}`;
+        const cardPayload = {
+            v: 1,
+            cb: cbName,
+            logo: cbLogo,
+            accBody,
+            accNum,
+            email: cbSettings.cbEmail || '',
+            client: report.client || '',
+            standard: report.standard || '',
+            type: report.auditType || auditPlan?.auditType || 'Initial',
+            dates: datesText,
+            ref: 'RPT-' + String(report.id || '').substring(0, 8),
+            status: auditStatus,
+            statusColor,
+            major: majorNC,
+            minor: minorNC,
+            obs: observationCount,
+            ofi: ofiCount,
+            outcome: recommendation,
+            outcomeColor: recColor
+        };
+        const cardHash = '#verify=' + window.btoa(unescape(encodeURIComponent(JSON.stringify(cardPayload))));
+        const baseUrl = (cbSettings.publicReportUrl && /^https?:\/\//.test(cbSettings.publicReportUrl))
+            ? cbSettings.publicReportUrl.replace(/[#?].*$/, '').replace(/\/+$/, '/')
+            : (window.location.origin + window.location.pathname);
+        const cardUrl = baseUrl + cardHash;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(cardUrl)}`;
 
         // Store data for preview & export
         window._reportPreviewData = {
@@ -220,7 +261,7 @@
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
             const sev = item.ncrType || 'NC';
             const sevStyle = sev === 'Major' ? 'background:#fee2e2;color:#991b1b' : 'background:#fef3c7;color:#92400e';
-            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // OBS rows (Observations only)
@@ -228,7 +269,7 @@
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f5f3ff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#ede9fe;color:#6d28d9;">OBS</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // OFI rows (Opportunities for Improvement only)
@@ -236,7 +277,7 @@
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f0fbff' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#e0f7fa;color:#0891b2;">OFI</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         // Conformance rows (items with comments or evidence)
@@ -244,7 +285,7 @@
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${item.comment || '<span style="color:#94a3b8;">No remarks</span>'}${renderEvThumbs(item)}</td></tr>`;
+            return `<tr style="background:${idx % 2 ? '#f0fdf4' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dcfce7;color:#166534;"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Conform</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
 
         const overlay = document.createElement('div');
@@ -1726,7 +1767,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
                     const sev = item.status === 'nc' ? (item.ncrType || 'NC') : item.status === 'observation' ? 'OBS' : 'OK';
                     const sevColor = sev === 'Major' ? '#dc2626' : sev === 'Minor' ? '#f59e0b' : sev === 'OBS' ? '#3b82f6' : '#10b981';
-                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:8px 12px;font-weight:600;">' + clause + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;color:' + sevColor + ';">' + sev + '</span></td><td style="padding:8px 12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (item.comment || '-') + '</td></tr>';
+                    return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:8px 12px;font-weight:600;">' + clause + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;color:' + sevColor + ';">' + sev + '</span></td><td style="padding:8px 12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (fmtRemark(item.comment) || '-') + '</td></tr>';
                 }).join('');
             }
 
@@ -1951,7 +1992,6 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             }
             return '<span style="color:' + clr + ';">' + t + '</span>';
         };
-        const fmtRemark = (t) => { if (!t) return ''; let s = t.trim(); if (!s) return ''; s = s.charAt(0).toUpperCase() + s.slice(1); if (!/[.!?]$/.test(s)) s += '.'; return s; };
         const formatPositiveObs = (text) => {
             if (!text) return '';
             // Normalize HTML: convert block-level tags and <br> to newlines, strip remaining tags
@@ -1984,6 +2024,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const standard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
         const cbName = d.cbSettings.cbName || '';
         const cbEmail = d.cbSettings.cbEmail || '';
+        // CSS-string-safe values for the @page margin-box headers/footers (printed on every page).
+        const cssEscape = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\s+/g, ' ').trim();
+        const planRefForFooter = d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : (d.report.id || '');
+        const pgHdrLeft = '"' + cssEscape('AUDIT REPORT  ·  ' + (d.report.client || '')) + '"';
+        const pgHdrRight = '"' + cssEscape('Ref: ' + (d.report.id || '') + '  ·  ' + standard) + '"';
+        const pgFtrLeft = '"' + cssEscape('Doc Ref: ' + planRefForFooter + '  ·  ' + (cbName || 'Certification Body')) + '"';
+        const pgFtrRight = '"' + cssEscape(d.today || '') + '"';
         const _cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
         // Helper: render all evidence images for PDF (string concat)
         let renderEvThumbsPdf = function (item) {
@@ -2068,8 +2115,26 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'
             + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
-            + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:20mm;padding-bottom:14mm;font-size:10pt;}.page-break{page-break-before:always;}.no-print{display:none !important;}.section-card,tr{break-inside:avoid;}.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;break-after:avoid;margin-top:12px;}.sb{break-before:avoid;}.watermark{display:flex !important;}}'
-            + '@media print{@page{size:A4;margin:14mm 12mm 22mm 12mm;@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:Outfit,sans-serif;font-size:8pt;color:#64748b;}}.rpt-hdr{display:flex !important;}.rpt-ftr{display:flex !important;}.cover .rpt-hdr{display:none !important;}.cover .rpt-ftr{display:none !important;}}'
+            + '@media print{'
+            +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;}'
+            +   '.rpt-hdr,.rpt-ftr{display:none !important;}'
+            +   '.page-break{page-break-before:always;}'
+            +   '.no-print{display:none !important;}'
+            +   '.section-card,tr,thead{break-inside:avoid;}'
+            +   'thead{display:table-header-group;}'
+            +   '.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}'
+            +   '.sb{page-break-before:avoid;break-before:avoid;}'
+            +   '.watermark{display:flex !important;}'
+            +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
+            +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;'
+            +     '@top-left{content:' + pgHdrLeft + ';font-family:"Outfit",sans-serif;font-size:8pt;font-weight:600;color:#475569;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
+            +     '@top-right{content:' + pgHdrRight + ';font-family:"Outfit",sans-serif;font-size:8pt;color:#64748b;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
+            +     '@bottom-left{content:' + pgFtrLeft + ';font-family:"Outfit",sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
+            +     '@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:"Outfit",sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;}'
+            +     '@bottom-right{content:' + pgFtrRight + ';font-family:"Outfit",sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
+            +   '}'
+            +   '@page :first{@top-left{content:none;}@top-right{content:none;}@bottom-left{content:none;}@bottom-center{content:none;}@bottom-right{content:none;}}'
+            + '}'
             + 'body{counter-reset:page;}'
             + '.page-break{counter-increment:page;}'
             + '.rpt-hdr{display:none;position:fixed;top:0;left:0;right:0;height:18mm;background:white;color:#1e293b;padding:3mm 12mm;align-items:center;justify-content:space-between;font-size:0.72rem;z-index:100;border-bottom:1px solid #e2e8f0;}'
@@ -2199,51 +2264,20 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
-                + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + editedOpeningNotes + '</td></tr>' : '') + '</table></div>'
+                + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
                 + (editedPositiveObs ? '<div class="sh page-break" style="background:#f0fdf4;border-left-color:#22c55e;"><span class="sn" style="background:#16a34a;"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">3</span>AUDIT SUMMARY</div><div class="sb">'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">'
-                + '<div style="padding:14px 18px;background:' + d.stats.statusColor + '14;border-left:4px solid ' + d.stats.statusColor + ';border-radius:8px;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Overall Audit Status</div><div style="font-size:1.1rem;font-weight:700;color:' + d.stats.statusColor + ';margin-top:4px;">' + d.stats.auditStatus + '</div></div>'
-                + '<div style="padding:14px 18px;background:' + d.stats.recColor + '14;border-left:4px solid ' + d.stats.recColor + ';border-radius:8px;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Certification Recommendation</div><div style="font-size:1.1rem;font-weight:700;color:' + d.stats.recColor + ';margin-top:4px;">' + d.stats.recommendation + '</div></div></div>'
                 + '<div class="stat-grid">'
-                + '<div class="stat-box" style="background:#fef2f2;border-color:#ef4444;"><div class="stat-val" style="color:#dc2626;">' + d.stats.majorNC + '</div><div class="stat-lbl">Major NC</div></div>'
+                + '<div class="stat-box" style="background:' + d.stats.statusColor + '14;border-color:' + d.stats.statusColor + ';"><div class="stat-val" style="font-size:0.95rem;line-height:1.25;color:' + d.stats.statusColor + ';">' + d.stats.auditStatus + '</div><div class="stat-lbl">Certification Status</div></div>'
                 + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.minorNC + '</div><div class="stat-lbl">Minor NC</div></div>'
                 + '<div class="stat-box" style="background:#faf5ff;border-color:#8b5cf6;"><div class="stat-val" style="color:#7c3aed;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
                 + '<div class="stat-box" style="background:#ecfeff;border-color:#06b6d4;"><div class="stat-val" style="color:#0891b2;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div></div>'
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">Findings Distribution</div><canvas id="chart-findings"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
-                + '<div class="chart-grid" style="margin-top:16px;"><div class="chart-box"><div class="chart-title">Department Findings</div><canvas id="chart-dept"></canvas></div>'
-                + '<div class="chart-box"><div class="chart-title">Personnel Workload</div><canvas id="chart-workload"></canvas></div></div>'
-                + '<div class="chart-grid" style="margin-top:16px;"><div class="chart-box"><div class="chart-title">Compliance by Department</div><canvas id="chart-radar"></canvas></div>'
-                + '<div class="chart-box"></div></div>'
-                + '<div style="margin-top:18px;"><div style="font-weight:700;font-size:0.9rem;color:#1e293b;margin-bottom:10px;"><i class="fa-solid fa-building" style="margin-right:6px;color:#6366f1;"></i>Department Summary</div><table class="f-tbl"><thead><tr style="background:#f8fafc;"><th style="width:26%;">Department</th><th style="width:12%;text-align:center;">Personnel</th><th style="width:10%;text-align:center;">Items</th><th style="width:12%;text-align:center;">Conform</th><th style="width:10%;text-align:center;">NC</th><th style="width:22%;text-align:center;white-space:nowrap;">Status</th></tr></thead><tbody>'
-                + (function () {
-                    var deptMap = {};
-                    (d.hydratedProgress || []).forEach(function (i) {
-                        var dept = i.department || 'Unassigned';
-                        if (!deptMap[dept]) deptMap[dept] = { pers: {}, items: 0, conform: 0, nc: 0 };
-                        if (i.personnel) deptMap[dept].pers[i.personnel] = 1;
-                        deptMap[dept].items++;
-                        if (i.status === 'conform') deptMap[dept].conform++;
-                        else if (i.status === 'nc') {
-                            // Only Major/Minor count as NC; observations/OFI are separate
-                            var t = (i.ncrType || '').toLowerCase();
-                            if (t === 'major' || t === 'minor') deptMap[dept].nc++;
-                        }
-                    });
-                    if (deptMap['Unassigned'] && deptMap['Unassigned'].items === 0) delete deptMap['Unassigned'];
-                    return Object.keys(deptMap).sort().map(function (dept) {
-                        var d2 = deptMap[dept];
-                        var statusTxt = d2.nc === 0 ? 'Satisfactory' : 'Minor Issues';
-                        var clr = d2.nc === 0 ? '#16a34a' : '#d97706';
-                        return '<tr><td style="padding:8px 10px;font-weight:500;">' + dept + '</td><td style="padding:8px 10px;text-align:center;">' + Object.keys(d2.pers).length + '</td><td style="padding:8px 10px;text-align:center;">' + d2.items + '</td><td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:600;">' + d2.conform + '</td><td style="padding:8px 10px;text-align:center;color:#dc2626;font-weight:600;">' + d2.nc + '</td><td style="padding:8px 10px;text-align:center;"><span style="display:inline-block;padding:3px 10px;border-radius:12px;font-weight:700;font-size:0.75rem;background:' + clr + '15;color:' + clr + ';white-space:nowrap;">' + statusTxt + '</span></td></tr>';
-                    }).join('');
-                })()
-                + '</tbody></table></div></div>' : '')
+                + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
+                + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
+                + '</div>' : '')
             // SECTION 4 - CONFORMANCE VERIFICATION
             + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;"><span class="sn" style="background:#10b981;">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION 5 - OBSERVATIONS
@@ -2290,7 +2324,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;"><span class="sn" style="background:#4338ca;">12</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedConclusion) + '</div>'
-                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (editedClosingSummary || '—') + '</td></tr></table></div>'
+                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr></table></div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
