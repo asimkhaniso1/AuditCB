@@ -102,9 +102,6 @@
             }
         }
 
-        // QR Code for Report Verification
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://audit.companycertification.com/#/verify/' + report.id)}`;
-
         // CB Settings (real data, no fake info)
         const cbSettings = window.state.cbSettings || {};
         const cbSite = (cbSettings.cbSites || [])[0] || {};
@@ -130,24 +127,42 @@
             ncByClause[g] = (ncByClause[g] || 0) + 1;
         });
 
+        const applicableCount = totalItems - naItems.length;
+        // ISO 17021-1 style status (not percentage-based)
+        let auditStatus, statusColor;
+        if (majorNC > 0) { auditStatus = 'Action Required'; statusColor = '#dc2626'; }
+        else if (minorNC > 0) { auditStatus = 'Satisfactory with Minor Issues'; statusColor = '#d97706'; }
+        else { auditStatus = 'Satisfactory'; statusColor = '#16a34a'; }
+        let recommendation, recColor;
+        if (majorNC > 0) { recommendation = 'Conditional Recommendation'; recColor = '#d97706'; }
+        else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
+        const stats = { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, auditStatus, statusColor, recommendation, recColor };
+
+        // QR Code: short, non-confidential audit status summary (no scope, findings, or personal data)
+        const cbName = (cbSettings.cbSites || [])[0]?.name || cbSettings.name || '';
+        const datesText = (report.date || '') + (report.endDate ? ' to ' + report.endDate : '');
+        const qrLines = [
+            'AUDIT STATUS',
+            cbName ? 'CB: ' + cbName : null,
+            'Client: ' + (report.client || ''),
+            'Standard: ' + (report.standard || ''),
+            'Type: ' + (report.auditType || auditPlan?.auditType || 'Initial'),
+            datesText ? 'Dates: ' + datesText : null,
+            'Ref: RPT-' + String(report.id || '').substring(0, 8),
+            'Status: ' + auditStatus,
+            'Findings: ' + majorNC + ' Major, ' + minorNC + ' Minor',
+            'OBS: ' + observationCount + ' | OFI: ' + ofiCount,
+            'Outcome: ' + recommendation
+        ].filter(Boolean);
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=4&data=${encodeURIComponent(qrLines.join('\n'))}`;
+
         // Store data for preview & export
         window._reportPreviewData = {
             report, hydratedProgress, client, auditPlan, cbSettings, cbSite,
             clientLogo: client.logoUrl || '',
             cbLogo: cbSettings.logoUrl || '',
             qrCodeUrl,
-            stats: (() => {
-                const applicableCount = totalItems - naItems.length;
-                // ISO 17021-1 style status (not percentage-based)
-                let auditStatus, statusColor;
-                if (majorNC > 0) { auditStatus = 'Action Required'; statusColor = '#dc2626'; }
-                else if (minorNC > 0) { auditStatus = 'Satisfactory with Minor Issues'; statusColor = '#d97706'; }
-                else { auditStatus = 'Satisfactory'; statusColor = '#16a34a'; }
-                let recommendation, recColor;
-                if (majorNC > 0) { recommendation = 'Conditional Recommendation'; recColor = '#d97706'; }
-                else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
-                return { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, auditStatus, statusColor, recommendation, recColor };
-            })(),
+            stats,
             today: new Date().toLocaleDateString('en-GB')
         };
 
@@ -637,7 +652,7 @@
                 return Object.entries(deptMap).sort((a, b) => a[0].localeCompare(b[0])).map(([dept, data]) => {
                     const statusTxt = data.nc === 0 ? 'Satisfactory' : 'Minor Issues';
                     const statusColor = data.nc === 0 ? '#16a34a' : '#d97706';
-                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + dept + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:' + statusColor + '15;color:' + statusColor + ';">' + statusTxt + '</span></td></tr>';
+                    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 12px;font-weight:500;">' + dept + '</td><td style="padding:8px 12px;text-align:center;">' + data.personnel.size + '</td><td style="padding:8px 12px;text-align:center;">' + data.items + '</td><td style="padding:8px 12px;text-align:center;color:#16a34a;font-weight:600;">' + data.conform + '</td><td style="padding:8px 12px;text-align:center;color:#dc2626;font-weight:600;">' + data.nc + '</td><td style="padding:8px 12px;text-align:center;white-space:nowrap;"><span style="display:inline-block;padding:3px 12px;border-radius:20px;font-weight:700;font-size:0.75rem;background:' + statusColor + '15;color:' + statusColor + ';white-space:nowrap;">' + statusTxt + '</span></td></tr>';
                 }).join('');
             })()}</tbody>
                             </table>
@@ -2180,7 +2195,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.manDays || d.auditPlan?.man_days || '—') + ' Man-Days' + (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
                 + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
@@ -2205,7 +2220,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="chart-box"><div class="chart-title">Personnel Workload</div><canvas id="chart-workload"></canvas></div></div>'
                 + '<div class="chart-grid" style="margin-top:16px;"><div class="chart-box"><div class="chart-title">Compliance by Department</div><canvas id="chart-radar"></canvas></div>'
                 + '<div class="chart-box"></div></div>'
-                + '<div style="margin-top:18px;"><div style="font-weight:700;font-size:0.9rem;color:#1e293b;margin-bottom:10px;"><i class="fa-solid fa-building" style="margin-right:6px;color:#6366f1;"></i>Department Summary</div><table class="f-tbl"><thead><tr style="background:#f8fafc;"><th style="width:30%;">Department</th><th style="width:14%;text-align:center;">Personnel</th><th style="width:14%;text-align:center;">Items</th><th style="width:14%;text-align:center;">Conform</th><th style="width:14%;text-align:center;">NC</th><th style="width:14%;text-align:center;">Status</th></tr></thead><tbody>'
+                + '<div style="margin-top:18px;"><div style="font-weight:700;font-size:0.9rem;color:#1e293b;margin-bottom:10px;"><i class="fa-solid fa-building" style="margin-right:6px;color:#6366f1;"></i>Department Summary</div><table class="f-tbl"><thead><tr style="background:#f8fafc;"><th style="width:26%;">Department</th><th style="width:12%;text-align:center;">Personnel</th><th style="width:10%;text-align:center;">Items</th><th style="width:12%;text-align:center;">Conform</th><th style="width:10%;text-align:center;">NC</th><th style="width:22%;text-align:center;white-space:nowrap;">Status</th></tr></thead><tbody>'
                 + (function () {
                     var deptMap = {};
                     (d.hydratedProgress || []).forEach(function (i) {
@@ -2225,7 +2240,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                         var d2 = deptMap[dept];
                         var statusTxt = d2.nc === 0 ? 'Satisfactory' : 'Minor Issues';
                         var clr = d2.nc === 0 ? '#16a34a' : '#d97706';
-                        return '<tr><td style="padding:8px 10px;font-weight:500;">' + dept + '</td><td style="padding:8px 10px;text-align:center;">' + Object.keys(d2.pers).length + '</td><td style="padding:8px 10px;text-align:center;">' + d2.items + '</td><td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:600;">' + d2.conform + '</td><td style="padding:8px 10px;text-align:center;color:#dc2626;font-weight:600;">' + d2.nc + '</td><td style="padding:8px 10px;text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-weight:700;font-size:0.78rem;background:' + clr + '15;color:' + clr + ';">' + statusTxt + '</span></td></tr>';
+                        return '<tr><td style="padding:8px 10px;font-weight:500;">' + dept + '</td><td style="padding:8px 10px;text-align:center;">' + Object.keys(d2.pers).length + '</td><td style="padding:8px 10px;text-align:center;">' + d2.items + '</td><td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:600;">' + d2.conform + '</td><td style="padding:8px 10px;text-align:center;color:#dc2626;font-weight:600;">' + d2.nc + '</td><td style="padding:8px 10px;text-align:center;"><span style="display:inline-block;padding:3px 10px;border-radius:12px;font-weight:700;font-size:0.75rem;background:' + clr + '15;color:' + clr + ';white-space:nowrap;">' + statusTxt + '</span></td></tr>';
                     }).join('');
                 })()
                 + '</tbody></table></div></div>' : '')
@@ -2327,15 +2342,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // Chart 5: Department Findings
             + 'var c5=document.getElementById("chart-dept");'
             + 'if(c5){var dd=' + JSON.stringify((function () { var deptData = {}; (d.hydratedProgress || []).forEach(function (item) { var dept = item.department || ''; if (!dept) return; if (!deptData[dept]) deptData[dept] = { major: 0, minor: 0, obs: 0, conform: 0 }; if (item.status === 'nc') { var t = (item.ncrType || '').toLowerCase(); if (t === 'major') deptData[dept].major++; else if (t === 'minor') deptData[dept].minor++; else deptData[dept].obs++; } else if (item.status === 'conform') deptData[dept].conform++; }); var labels = Object.keys(deptData).sort(); return { labels: labels, major: labels.map(function (l) { return deptData[l].major; }), minor: labels.map(function (l) { return deptData[l].minor; }), obs: labels.map(function (l) { return deptData[l].obs; }), conform: labels.map(function (l) { return deptData[l].conform; }) }; })()) + ';'
-            + 'if(dd.labels.length>0)new Chart(c5,{type:"bar",data:{labels:dd.labels,datasets:[{label:"Major NC",data:dd.major,backgroundColor:"#dc2626",stack:"d"},{label:"Minor NC",data:dd.minor,backgroundColor:"#f59e0b",stack:"d"},{label:"OBS",data:dd.obs,backgroundColor:"#fbbf24",stack:"d"},{label:"Conform",data:dd.conform,backgroundColor:"#22c55e",stack:"d"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});else c5.parentElement.innerHTML="<div style=\\"text-align:center;padding:20px;color:#94a3b8;font-size:0.82rem;\\">No department data</div>";}'
+            + 'if(dd.labels.length>0){new Chart(c5,{type:"bar",data:{labels:dd.labels,datasets:[{label:"Major NC",data:dd.major,backgroundColor:"#dc2626",stack:"d"},{label:"Minor NC",data:dd.minor,backgroundColor:"#f59e0b",stack:"d"},{label:"OBS",data:dd.obs,backgroundColor:"#fbbf24",stack:"d"},{label:"Conform",data:dd.conform,backgroundColor:"#22c55e",stack:"d"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}else{var pB5=c5.closest(".chart-box");if(pB5)pB5.style.display="none";}}'
             // Chart 6: Personnel Workload
             + 'var c6=document.getElementById("chart-workload");'
             + 'if(c6){var pd=' + JSON.stringify((function () { var persData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.personnel) return; if (!persData[item.personnel]) persData[item.personnel] = { conform: 0, nc: 0, na: 0 }; if (item.status === 'conform') persData[item.personnel].conform++; else if (item.status === 'nc') persData[item.personnel].nc++; else if (item.status === 'na') persData[item.personnel].na++; }); var labels = Object.keys(persData).sort(function (a, b) { return (persData[b].conform + persData[b].nc + persData[b].na) - (persData[a].conform + persData[a].nc + persData[a].na); }).slice(0, 10); return { labels: labels, conform: labels.map(function (p) { return persData[p].conform; }), nc: labels.map(function (p) { return persData[p].nc; }), na: labels.map(function (p) { return persData[p].na; }) }; })()) + ';'
-            + 'if(pd.labels.length>0)new Chart(c6,{type:"bar",data:{labels:pd.labels,datasets:[{label:"Conform",data:pd.conform,backgroundColor:"#22c55e",stack:"p"},{label:"NC",data:pd.nc,backgroundColor:"#ef4444",stack:"p"},{label:"N/A",data:pd.na,backgroundColor:"#94a3b8",stack:"p"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});else c6.parentElement.innerHTML="<div style=\\"text-align:center;padding:20px;color:#94a3b8;font-size:0.82rem;\\">No personnel data</div>";}'
+            + 'if(pd.labels.length>0){new Chart(c6,{type:"bar",data:{labels:pd.labels,datasets:[{label:"Conform",data:pd.conform,backgroundColor:"#22c55e",stack:"p"},{label:"NC",data:pd.nc,backgroundColor:"#ef4444",stack:"p"},{label:"N/A",data:pd.na,backgroundColor:"#94a3b8",stack:"p"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}else{var pB6=c6.closest(".chart-box");if(pB6)pB6.style.display="none";}}'
             // Chart 7: Compliance Radar
             + 'var c7=document.getElementById("chart-radar");'
             + 'if(c7){var rd=' + JSON.stringify((function () { var rData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.department) return; if (!rData[item.department]) rData[item.department] = { total: 0, conform: 0 }; rData[item.department].total++; if (item.status === 'conform') rData[item.department].conform++; }); var labels = Object.keys(rData).sort(); return { labels: labels, data: labels.map(function (l) { return rData[l].total > 0 ? Math.round((rData[l].conform / rData[l].total) * 100) : 0; }) }; })()) + ';'
-            + 'if(rd.labels.length>=3)new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Compliance %",data:rd.data,borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,0.15)",borderWidth:2,pointBackgroundColor:"#6366f1"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});else c7.parentElement.innerHTML="<div style=\\"text-align:center;padding:20px;color:#94a3b8;font-size:0.82rem;\\">Need 3+ departments</div>";}'
+            + 'if(rd.labels.length>=3){new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Conformance %",data:rd.data,borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,0.15)",borderWidth:2,pointBackgroundColor:"#6366f1"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});}else{var pBox=c7.closest(".chart-box");if(pBox)pBox.style.display="none";var pGrid=c7.closest(".chart-grid");if(pGrid)pGrid.style.display="none";}}'
             + 'window._chartsReady=false;'
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});window._chartsReady=true;},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
