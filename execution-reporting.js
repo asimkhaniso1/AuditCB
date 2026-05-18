@@ -190,7 +190,10 @@
             outcome: recommendation,
             outcomeColor: recColor
         };
-        const cardHash = '#verify=' + window.btoa(unescape(encodeURIComponent(JSON.stringify(cardPayload))));
+        // URL-safe base64: +/= → -_<stripped>. Some scanners and routers mishandle raw '+' in URL hashes.
+        const cardB64 = window.btoa(unescape(encodeURIComponent(JSON.stringify(cardPayload))))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const cardHash = '#verify=' + cardB64;
         const baseUrl = (cbSettings.publicReportUrl && /^https?:\/\//.test(cbSettings.publicReportUrl))
             ? cbSettings.publicReportUrl.replace(/[#?].*$/, '').replace(/\/+$/, '/')
             : (window.location.origin + window.location.pathname);
@@ -2013,9 +2016,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 items = t.split(/\n+/).map(s => s.replace(/^\s*[-\u2022\u2023\u25E6]\s*/, '').trim()).filter(s => s.length > 3);
             }
             if (items.length === 0) items = [t.replace(/\n/g, ' ').trim()];
-            return items.map((obs, idx) => '<div style="display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;">'
-                + '<div style="min-width:28px;height:28px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;flex-shrink:0;">' + (idx + 1) + '</div>'
-                + '<div style="flex:1;padding-top:3px;">' + obs + '</div></div>').join('');
+            return items.map((obs, idx) => '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">'
+                + '<div style="min-width:24px;height:24px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.72rem;flex-shrink:0;margin-top:1px;">' + (idx + 1) + '</div>'
+                + '<div style="flex:1;line-height:1.55;">' + obs + '</div></div>').join('');
         };
         // Note: printWindow opened later via Blob URL (after reportHtml is built)
         // to bypass parent page CSP that blocks inline scripts.
@@ -2028,9 +2031,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const cssEscape = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\s+/g, ' ').trim();
         const planRefForFooter = d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : (d.report.id || '');
         const pgHdrLeft = '"' + cssEscape('AUDIT REPORT  ·  ' + (d.report.client || '')) + '"';
-        const pgHdrRight = '"' + cssEscape('Ref: ' + (d.report.id || '') + '  ·  ' + standard) + '"';
+        const pgHdrRight = '"' + cssEscape(standard) + '"';
         const pgFtrLeft = '"' + cssEscape('Doc Ref: ' + planRefForFooter + '  ·  ' + (cbName || 'Certification Body')) + '"';
-        const pgFtrRight = '"' + cssEscape(d.today || '') + '"';
+        const pgFtrRight = '"' + cssEscape('Ref: ' + (d.report.id || '')) + '"';
         const _cbSiteAddr = d.cbSite.address ? (d.cbSite.address + ', ' + (d.cbSite.city || '') + ' ' + (d.cbSite.country || '')).trim() : '';
         // Helper: render all evidence images for PDF (string concat)
         let renderEvThumbsPdf = function (item) {
@@ -2262,10 +2265,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
                 + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
-                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
+                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
-                + (editedPositiveObs ? '<div class="sh page-break" style="background:#f0fdf4;border-left-color:#22c55e;"><span class="sn" style="background:#16a34a;"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.95rem;line-height:1.8;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
+                + (editedPositiveObs ? '<div class="sh page-break" style="background:#f0fdf4;border-left-color:#22c55e;"><span class="sn" style="background:#16a34a;"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.92rem;line-height:1.55;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION 3
             + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">3</span>AUDIT SUMMARY</div><div class="sb">'
@@ -2318,12 +2321,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</div>' : '')
             // SECTION: CHANGES SINCE LAST AUDIT
             + (en['changes'] !== false ? '<div id="sec-changes" class="sh page-break" style="background:#f5f5f4;border-left-color:#78716c;"><span class="sn" style="background:#78716c;">11</span>CHANGES SINCE LAST AUDIT</div><div class="sb">'
-                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + (editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
+                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
                 + '</div>' : '')
             // SECTION 7
             + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;"><span class="sn" style="background:#4338ca;">12</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
-                + '<div style="color:#334155;font-size:0.95rem;line-height:1.8;">' + formatRichText(editedConclusion) + '</div>'
+                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr></table></div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
@@ -2347,7 +2350,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</tbody></table></div>' : '')
             // SECTION: ANNEXURES
             + (en['annexures'] !== false ? '<div id="sec-annexures" class="sh page-break" style="background:#faf5ff;border-left-color:#9333ea;"><span class="sn" style="background:#9333ea;">15</span>ANNEXURES / APPENDICES</div><div class="sb">'
-                + '<div style="line-height:1.8;color:#334155;">'
+                + '<div style="line-height:1.55;color:#334155;">'
                 + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
                 + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
                 + '<div style="margin-bottom:12px;">• Standard: ' + standard + '</div>'

@@ -16,6 +16,11 @@
         var idx = h.indexOf('verify=');
         if (idx < 0) return null;
         var raw = h.slice(idx + 'verify='.length);
+        // Some scanners URL-decode the hash, turning '+' into ' '. Reverse that.
+        raw = raw.replace(/ /g, '+');
+        // Translate URL-safe base64 (- _) back to standard (+ /) and re-pad.
+        raw = raw.replace(/-/g, '+').replace(/_/g, '/');
+        while (raw.length % 4) raw += '=';
         try {
             var json = decodeURIComponent(escape(window.atob(raw)));
             var data = JSON.parse(json);
