@@ -2468,7 +2468,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'if(pgEl)pgEl.textContent=pg;'
             + '});'
             + '}catch(e){console.warn("TOC page calc:",e);}'
-            + '},1200);';
+            + '},1200);'
+            // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window
+            + 'document.addEventListener("click",function(ev){'
+            + 'var t=ev.target.closest("[data-action]");if(!t)return;'
+            + 'var a=t.getAttribute("data-action");'
+            + 'if(a==="print"){ev.preventDefault();window.print();}'
+            + 'else if(a==="close"){ev.preventDefault();window.close();}'
+            + '});';
 
         // Append script via external Blob URL (not inline) to comply with parent CSP
         const chartScriptBlob = new Blob([chartScriptCode], { type: 'application/javascript' });
