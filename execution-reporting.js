@@ -194,11 +194,38 @@
         const cardB64 = window.btoa(unescape(encodeURIComponent(JSON.stringify(cardPayload))))
             .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         const cardHash = '#verify=' + cardB64;
-        const baseUrl = (cbSettings.publicReportUrl && /^https?:\/\//.test(cbSettings.publicReportUrl))
-            ? cbSettings.publicReportUrl.replace(/[#?].*$/, '').replace(/\/+$/, '/')
-            : (window.location.origin + window.location.pathname);
-        const cardUrl = baseUrl + cardHash;
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(cardUrl)}`;
+        // Resolve base URL. Scanners only auto-link http(s) URLs that resolve publicly — a QR
+        // pointing at file://, localhost, or 192.168.x.x leads scanners to a dead address.
+        // Fallback chain: explicit publicReportUrl → current origin (if public) → cbWebsite → sentinel.
+        const isPublicOrigin = (function () {
+            const origin = window.location.origin || '';
+            if (!/^https?:\/\//i.test(origin)) return false;
+            try {
+                const host = new URL(origin).hostname;
+                if (!host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return false;
+                if (/^192\.168\./.test(host)) return false;
+                if (/^10\./.test(host)) return false;
+                if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+                return true;
+            } catch (_e) { return false; }
+        })();
+        const normalizeBase = (u) => u.replace(/[#?].*$/, '').replace(/\/+$/, '/');
+        const explicitBase = (cbSettings.publicReportUrl && /^https?:\/\//i.test(cbSettings.publicReportUrl))
+            ? normalizeBase(cbSettings.publicReportUrl) : '';
+        const originBase = isPublicOrigin
+            ? (window.location.origin + window.location.pathname) : '';
+        const cbWebsiteBase = (cbSettings.cbWebsite && /^https?:\/\//i.test(cbSettings.cbWebsite))
+            ? normalizeBase(cbSettings.cbWebsite) + '/' : '';
+        const resolvedBase = explicitBase || originBase || cbWebsiteBase || 'https://audit-cb.example/';
+        const usingFallback = !explicitBase && !originBase && !cbWebsiteBase;
+        const cardUrl = resolvedBase + cardHash;
+        // Use ecc=L (lowest error correction) for higher data density since this URL is dense
+        // and the report is printed/PDF'd at high resolution where errors are unlikely.
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&ecc=L&data=${encodeURIComponent(cardUrl)}`;
+        try { console.info('[Report Card QR] URL:', cardUrl, '(base:', resolvedBase + ')'); } catch (_e) { /* noop */ }
+        if (usingFallback) {
+            try { console.warn('[Report Card QR] Using sentinel fallback URL. Configure cbSettings.cbWebsite or cbSettings.publicReportUrl so scanned QRs resolve to a real address.'); } catch (_e) { /* noop */ }
+        }
 
         // Store data for preview & export
         window._reportPreviewData = {
@@ -206,6 +233,8 @@
             clientLogo: client.logoUrl || '',
             cbLogo: cbSettings.logoUrl || '',
             qrCodeUrl,
+            cardUrl,
+            qrFallback: usingFallback,
             stats,
             today: new Date().toLocaleDateString('en-GB')
         };
@@ -1913,6 +1942,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Strip placeholder text that leaks from contenteditable
         editedConclusion = editedConclusion.replace(/Click to edit this conclusion\.?/gi, '').trim();
         const editedPositiveObs = document.getElementById('rp-positive-obs')?.innerHTML || d.report.positiveObservations || '';
+        const editedOfi = document.getElementById('rp-ofi')?.innerHTML || (Array.isArray(d.report.ofi) ? d.report.ofi.join('\n') : (d.report.ofi || ''));
         const editedOpeningNotes = document.getElementById('rp-opening-notes')?.innerText || d.report.openingMeeting?.notes || '';
         let editedClosingSummary = document.getElementById('rp-closing-summary')?.innerText || d.report.closingMeeting?.summary || '';
         editedClosingSummary = editedClosingSummary.replace(/Click to add closing meeting summary[.]*/gi, '').trim();
@@ -2019,6 +2049,28 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             return items.map((obs, idx) => '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">'
                 + '<div style="min-width:24px;height:24px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.72rem;flex-shrink:0;margin-top:1px;">' + (idx + 1) + '</div>'
                 + '<div style="flex:1;line-height:1.55;">' + obs + '</div></div>').join('');
+        };
+        const formatOfi = (text) => {
+            if (!text) return '';
+            let t = text.replace(/&nbsp;/g, ' ')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/?(div|p|li|ul|ol)[^>]*>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .trim();
+            let items = [];
+            let numbered = t.split(/(?:^|\n)\s*(\d+)[.):-]\s*/);
+            if (numbered.length > 2) {
+                for (let i = 1; i < numbered.length; i += 2) {
+                    let txt = (numbered[i + 1] || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (txt) items.push(txt);
+                }
+            } else {
+                items = t.split(/\n+/).map(s => s.replace(/^\s*[-•‣◦]\s*/, '').trim()).filter(s => s.length > 3);
+            }
+            if (items.length === 0) items = [t.replace(/\n/g, ' ').trim()];
+            return items.map((ofi) => '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">'
+                + '<div style="min-width:24px;height:24px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;margin-top:1px;"><i class="fa-solid fa-arrow-up" style="font-size:0.7rem;"></i></div>'
+                + '<div style="flex:1;line-height:1.6;color:#92400e;">' + ofi + '</div></div>').join('');
         };
         // Note: printWindow opened later via Blob URL (after reportHtml is built)
         // to bypass parent page CSP that blocks inline scripts.
@@ -2184,7 +2236,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div class="cover">'
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
             + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo">' : '<div></div>')
-            + '<img src="' + d.qrCodeUrl + '" style="height:70px;" alt="QR"></div>'
+            + (function () {
+                let qrHost = '';
+                try { qrHost = new URL(d.cardUrl).host; } catch (_e) { qrHost = ''; }
+                return '<div style="text-align:center;max-width:160px;">'
+                    + '<img src="' + d.qrCodeUrl + '" style="height:120px;width:120px;display:block;margin:0 auto;" alt="Scan to verify">'
+                    + '<div style="font-size:0.58rem;color:#64748b;margin-top:4px;letter-spacing:0.2px;font-weight:600;">Scan to view report card</div>'
+                    + (qrHost ? '<div style="font-size:0.52rem;color:#94a3b8;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;">' + window.UTILS.escapeHtml(qrHost) + '</div>' : '')
+                    + (d.qrFallback ? '<div class="no-print" style="font-size:0.52rem;color:#dc2626;margin-top:4px;font-weight:700;">⚠ Set CB website in Settings — QR points to a placeholder URL.</div>' : '')
+                    + '</div></div>';
+            })()
             + '<div style="margin-top:40px;"></div>'
             + '<div class="cover-line"></div>'
             + '<h1 style="font-size:2.8rem;font-weight:800;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
@@ -2220,7 +2281,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     if (k === 'ncrs' && (!(d.report.ncrs || []).length)) continue;
                     if (k === 'corrective' && !(d.stats.majorNC + d.stats.minorNC)) continue;
                     if (k === 'obs' && !obsOnlyRowsHtml) continue;
-                    if (k === 'ofi' && !ofiOnlyRowsHtml) continue;
+                    if (k === 'ofi' && !ofiOnlyRowsHtml && !editedOfi) continue;
                     if (k === 'evidence') {
                         let hasEvidence = (d.hydratedProgress || []).some(function (it) { return it.evidenceImage; }) || (d.report.ncrs || []).some(function (n) { return n.evidenceImage; });
                         if (!hasEvidence) continue;
@@ -2285,8 +2346,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;"><span class="sn" style="background:#10b981;">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION 5 - OBSERVATIONS
             + (obsOnlyRowsHtml ? '<div id="sec-obs" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">5</span>OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
-            // SECTION 6 - OPPORTUNITIES FOR IMPROVEMENT
-            + (ofiOnlyRowsHtml ? '<div id="sec-ofi" class="sh page-break" style="background:#ecfeff;border-left-color:#06b6d4;"><span class="sn" style="background:#06b6d4;">6</span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table></div>' : '')
+            // SECTION 6 - OPPORTUNITIES FOR IMPROVEMENT (narrative + table)
+            + ((editedOfi || ofiOnlyRowsHtml) ? '<div id="sec-ofi" class="sh page-break" style="background:#fffbeb;border-left-color:#f59e0b;"><span class="sn" style="background:#f59e0b;"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb">'
+                + (editedOfi ? '<div style="padding:14px 16px;background:#fffbeb;border-radius:10px;border-left:4px solid #f59e0b;margin-bottom:' + (ofiOnlyRowsHtml ? '14px' : '0') + ';">' + formatOfi(editedOfi) + '</div>' : '')
+                + (ofiOnlyRowsHtml ? '<table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table>' : '')
+                + '</div>' : '')
             + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#dc2626;"><span class="sn" style="background:#dc2626;">7</span>FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION 8 - NCR REGISTER
             + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#ea580c;"><span class="sn" style="background:#ea580c;">8</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
