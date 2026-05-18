@@ -2258,7 +2258,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.chart-title{font-size:0.8rem;font-weight:700;color:#1e293b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px;}'
             + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:160px;object-fit:cover;}.ev-cap{padding:8px 12px;font-size:0.78rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
             + '.toc{padding:30px 40px;}.toc-title{font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:4px;}.toc-sub{font-size:0.88rem;color:#64748b;margin-bottom:20px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin-bottom:25px;}'
-            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}.toc-pg{min-width:40px;text-align:right;font-weight:700;font-size:0.88rem;color:#2563eb;align-self:center;white-space:nowrap;}'
+            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}'
             + 'footer{display:none;}'
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
@@ -2311,11 +2311,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (function () {
                 const tocItems = sectionDefs.filter(function (s) { return s.present; }).map(function (s) {
                     const num = secMap[s.key].num;
-                    return '<a href="#sec-' + s.key + '" class="toc-item" data-toc-target="sec-' + s.key + '">'
+                    return '<a href="#sec-' + s.key + '" class="toc-item">'
                         + '<div class="toc-num" style="background:' + s.color + ';">' + num + '</div>'
                         + '<div class="toc-item-body"><div class="toc-item-title">' + s.name + '</div>'
-                        + '<div class="toc-item-desc">' + s.desc + '</div></div>'
-                        + '<div class="toc-pg" data-pg-for="sec-' + s.key + '"></div></a>';
+                        + '<div class="toc-item-desc">' + s.desc + '</div></div></a>';
                 });
                 if (tocItems.length === 0) return '';
                 return '<div class="toc page-break"><div class="toc-title">Table of Contents</div>'
@@ -2489,20 +2488,6 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'window._chartsReady=false;'
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});window._chartsReady=true;},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
-            + 'setTimeout(function(){try{'
-            + 'var pageH=1123;'
-            + 'var tocItems=document.querySelectorAll(".toc-item[data-toc-target]");'
-            + 'tocItems.forEach(function(item){'
-            + 'var targetId=item.getAttribute("data-toc-target");'
-            + 'var el=document.getElementById(targetId);'
-            + 'if(!el)return;'
-            + 'var top=el.getBoundingClientRect().top+window.scrollY;'
-            + 'var pg=Math.ceil(top/pageH)+1;'
-            + 'var pgEl=item.querySelector(".toc-pg");'
-            + 'if(pgEl)pgEl.textContent=pg;'
-            + '});'
-            + '}catch(e){console.warn("TOC page calc:",e);}'
-            + '},1200);'
             // Wire up data-action buttons (Download PDF, Close) — parent's event delegator does not run in this window
             + 'document.addEventListener("click",function(ev){'
             + 'var t=ev.target.closest("[data-action]");if(!t)return;'
