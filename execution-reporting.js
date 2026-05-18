@@ -2160,6 +2160,45 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Serialize area stats for chart script
         let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
 
+        // ─── Unified section numbering ────────────────────────────────────
+        // Single source of truth for section identity, order, presence, and badge number.
+        // Body and TOC both read from secMap so numbering is always synchronized.
+        const evidenceItemsCount = (d.hydratedProgress || []).reduce(function (acc, it) {
+            return acc + (it.evidenceImages ? it.evidenceImages.length : (it.evidenceImage ? 1 : 0));
+        }, 0) + (d.report.ncrs || []).filter(function (n) { return n.evidenceImage; }).length;
+        const hasEvidence = evidenceItemsCount > 0;
+        const hasNcrs = (d.report.ncrs || []).length > 0;
+        const hasCorrective = (d.stats.majorNC + d.stats.minorNC) > 0;
+        // Previous-findings section currently has no body renderer — keep present:false
+        // until follow-up status data is wired through.
+        const sectionDefs = [
+            { key: 'audit-info',   name: 'AUDIT INFORMATION',                  desc: 'Organization details, scope, audit team and dates',     color: '#2563eb', present: en['audit-info'] !== false },
+            { key: 'objectives',   name: 'OBJECTIVES, CRITERIA &amp; METHODOLOGY', desc: 'Audit objectives, criteria and methodology',         color: '#0891b2', present: en['objectives'] !== false },
+            { key: 'summary',      name: 'EXECUTIVE SUMMARY',                  desc: 'Key findings, opening meeting, positive observations',  color: '#059669', present: en['summary'] !== false },
+            { key: 'charts',       name: 'ANALYTICS DASHBOARD',                desc: 'Compliance charts, KPIs and clause-based breakdown',    color: '#7c3aed', present: en['charts'] !== false },
+            { key: 'conformance',  name: 'CONFORMANCE VERIFICATION',           desc: 'Verified conforming items with supporting evidence',    color: '#10b981', present: en['conformance'] !== false && !!conformRowsHtml },
+            { key: 'prev-findings',name: 'PREVIOUS FINDINGS STATUS',           desc: 'Follow-up status of findings from previous audit',      color: '#6366f1', present: false },
+            { key: 'obs',          name: 'OBSERVATIONS',                       desc: 'Audit observations noted during assessment',            color: '#7c3aed', present: !!obsOnlyRowsHtml },
+            { key: 'ofi',          name: 'OPPORTUNITIES FOR IMPROVEMENT',      desc: 'Opportunities for improvement identified',              color: '#f59e0b', present: !!(ofiOnlyRowsHtml || editedOfi) },
+            { key: 'findings',     name: 'FINDING DETAILS',                    desc: 'Detailed non-conformity findings with evidence',        color: '#dc2626', present: en['findings'] !== false },
+            { key: 'ncrs',         name: 'NCR REGISTER',                       desc: 'Formal NCR register with severity classifications',     color: '#ea580c', present: en['ncrs'] !== false && hasNcrs },
+            { key: 'corrective',   name: 'CORRECTIVE ACTION REQUIREMENTS',     desc: 'Required corrective actions with due dates',            color: '#be185d', present: hasCorrective && en['corrective'] !== false },
+            { key: 'changes',      name: 'CHANGES SINCE LAST AUDIT',           desc: 'Changes to management system since last audit',         color: '#78716c', present: en['changes'] !== false },
+            { key: 'conclusion',   name: 'AUDIT CONCLUSION &amp; RECOMMENDATION', desc: 'Closing meeting, certification recommendation',      color: '#4338ca', present: en['conclusion'] !== false },
+            { key: 'signature',    name: 'SIGNATURE &amp; ATTESTATION',        desc: 'Signatures and attestation',                            color: '#1e293b', present: en['signature'] !== false },
+            { key: 'distribution', name: 'DISTRIBUTION LIST',                  desc: 'Controlled distribution of this report',                color: '#0d9488', present: en['distribution'] !== false },
+            { key: 'annexures',    name: 'ANNEXURES &amp; APPENDICES',         desc: 'Supporting documents and appendices',                   color: '#9333ea', present: en['annexures'] !== false },
+            { key: 'evidence',     name: 'EVIDENCE GALLERY',                   desc: 'Photographic evidence collected during the audit',      color: '#c2410c', present: hasEvidence }
+        ];
+        const secMap = {};
+        let _secCounter = 0;
+        sectionDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color }; } });
+        const sNum = function (key) { return secMap[key] ? secMap[key].num : ''; };
+        const sBadge = function (key) {
+            const m = secMap[key]; if (!m) return '';
+            return '<span class="sn" style="background:' + m.color + ';">' + m.num + '</span>';
+        };
+
         const reportHtml = '<!DOCTYPE html><html lang="en"><head>'
             + '<meta charset="UTF-8">'
             + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
@@ -2268,35 +2307,28 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">1.0</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + (d.report.date || d.today) + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">Initial issue</td></tr>'
             + '</tbody></table></div>'
             + '</div>'
-            // TABLE OF CONTENTS
+            // TABLE OF CONTENTS — driven by unified sectionDefs / secMap
             + (function () {
-                let tocSections = [];
-                let colors = ['#2563eb', '#0891b2', '#059669', '#7c3aed', '#059669', '#6366f1', '#8b5cf6', '#06b6d4', '#dc2626', '#ea580c', '#be185d', '#78716c', '#4338ca', '#1e293b', '#0d9488', '#9333ea', '#c2410c'];
-                let descs = ['Organization details, scope, audit team and dates', 'Audit objectives, criteria and methodology', 'Key findings, opening meeting, positive observations & OFIs', 'Compliance charts, KPIs and clause-based breakdown', 'Verified conforming items with supporting evidence', 'Follow-up status of findings from previous audit', 'Audit observations noted during assessment', 'Opportunities for improvement identified', 'Detailed non-conformity findings with evidence', 'Formal NCR register with severity classifications', 'Required corrective actions with due dates', 'Changes to management system since last audit', 'Closing meeting, certification recommendation', 'Signatures and attestation', 'Controlled distribution of this report', 'Supporting documents and appendices', 'Photographic evidence from the audit'];
-                let names = ['AUDIT INFORMATION', 'OBJECTIVES, CRITERIA & METHODOLOGY', 'EXECUTIVE SUMMARY', 'ANALYTICS DASHBOARD', 'CONFORMANCE VERIFICATION', 'PREVIOUS FINDINGS STATUS', 'OBSERVATIONS', 'OPPORTUNITIES FOR IMPROVEMENT', 'FINDING DETAILS', 'NCR REGISTER', 'CORRECTIVE ACTION REQUIREMENTS', 'CHANGES SINCE LAST AUDIT', 'AUDIT CONCLUSION & RECOMMENDATION', 'SIGNATURE & ATTESTATION', 'DISTRIBUTION LIST', 'ANNEXURES', 'EVIDENCE GALLERY'];
-                let keys = ['audit-info', 'objectives', 'summary', 'charts', 'conformance', 'prev-findings', 'obs', 'ofi', 'findings', 'ncrs', 'corrective', 'changes', 'conclusion', 'signature', 'distribution', 'annexures', 'evidence'];
-                let num = 1;
-                for (var i = 0; i < keys.length; i++) {
-                    let k = keys[i];
-                    if (k === 'ncrs' && (!(d.report.ncrs || []).length)) continue;
-                    if (k === 'corrective' && !(d.stats.majorNC + d.stats.minorNC)) continue;
-                    if (k === 'obs' && !obsOnlyRowsHtml) continue;
-                    if (k === 'ofi' && !ofiOnlyRowsHtml && !editedOfi) continue;
-                    if (k === 'evidence') {
-                        let hasEvidence = (d.hydratedProgress || []).some(function (it) { return it.evidenceImage; }) || (d.report.ncrs || []).some(function (n) { return n.evidenceImage; });
-                        if (!hasEvidence) continue;
-                    }
-                    if (en[k] !== false) {
-                        tocSections.push('<a href="#sec-' + k + '" class="toc-item" data-toc-target="sec-' + k + '"><div class="toc-num" style="background:' + colors[i] + ';">' + num + '</div><div class="toc-item-body"><div class="toc-item-title">' + names[i] + '</div><div class="toc-item-desc">' + descs[i] + '</div></div><div class="toc-pg" data-pg-for="sec-' + k + '"></div></a>');
-                        num++;
-                    }
-                }
-                if (tocSections.length === 0) return '';
-                return '<div class="toc page-break"><div class="toc-title">Table of Contents</div><div class="toc-sub">' + d.report.client + ' — ' + standard + '</div><div class="toc-line"></div>' + tocSections.join('') + '<div style="margin-top:30px;text-align:center;font-size:0.78rem;color:#94a3b8;"><i class="fa-solid fa-file-lines" style="margin-right:4px;"></i>' + tocSections.length + ' sections in this report</div></div>';
+                const tocItems = sectionDefs.filter(function (s) { return s.present; }).map(function (s) {
+                    const num = secMap[s.key].num;
+                    return '<a href="#sec-' + s.key + '" class="toc-item" data-toc-target="sec-' + s.key + '">'
+                        + '<div class="toc-num" style="background:' + s.color + ';">' + num + '</div>'
+                        + '<div class="toc-item-body"><div class="toc-item-title">' + s.name + '</div>'
+                        + '<div class="toc-item-desc">' + s.desc + '</div></div>'
+                        + '<div class="toc-pg" data-pg-for="sec-' + s.key + '"></div></a>';
+                });
+                if (tocItems.length === 0) return '';
+                return '<div class="toc page-break"><div class="toc-title">Table of Contents</div>'
+                    + '<div class="toc-sub">' + d.report.client + ' — ' + standard + '</div>'
+                    + '<div class="toc-line"></div>'
+                    + tocItems.join('')
+                    + '<div style="margin-top:30px;text-align:center;font-size:0.78rem;color:#94a3b8;">'
+                    + '<i class="fa-solid fa-file-lines" style="margin-right:4px;"></i>'
+                    + tocItems.length + ' sections in this report</div></div>';
             })()
             + '<div class="content">'
-            // SECTION 1
-            + (en['audit-info'] !== false ? '<div id="sec-audit-info" class="sh page-break" style="background:#eff6ff;border-left-color:#2563eb;"><span class="sn" style="background:#2563eb;">1</span>AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
+            // SECTION: AUDIT INFORMATION
+            + (secMap['audit-info'] ? '<div id="sec-audit-info" class="sh page-break" style="background:#eff6ff;border-left-color:#2563eb;">' + sBadge('audit-info') + 'AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
                 + '<tr><td>Industry</td><td>' + (d.client.industry || '—') + '</td></tr>'
                 + '<tr><td>Certification Scope</td><td>' + (d.client.certificationScope || '—') + '</td></tr>'
@@ -2313,14 +2345,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:6px;font-size:0.85rem;color:#334155;"><strong>Key Processes:</strong> ' + d.client.keyProcesses.map(p => (p.name || p)).join(', ') + '</div>' : '')
                 + '</div>' : '')
             // SECTION: OBJECTIVES, CRITERIA & METHODOLOGY
-            + (en['objectives'] !== false ? '<div id="sec-objectives" class="sh page-break" style="background:#ecfeff;border-left-color:#0891b2;"><span class="sn" style="background:#0891b2;">2</span>AUDIT OBJECTIVES, CRITERIA & METHODOLOGY</div><div class="sb">'
+            + (secMap['objectives'] ? '<div id="sec-objectives" class="sh page-break" style="background:#ecfeff;border-left-color:#0891b2;">' + sBadge('objectives') + 'AUDIT OBJECTIVES, CRITERIA &amp; METHODOLOGY</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0891b2;"><i class="fa-solid fa-bullseye" style="margin-right:4px;"></i>Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#6366f1;"><i class="fa-solid fa-scale-balanced" style="margin-right:4px;"></i>Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:4px;"></i>Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
                 + '</div></div>' : '')
-            // SECTION 2
-            + (en['summary'] !== false ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;"><span class="sn" style="background:#059669;">3</span>EXECUTIVE SUMMARY</div><div class="sb">'
+            // SECTION: EXECUTIVE SUMMARY
+            + (secMap['summary'] ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;">' + sBadge('summary') + 'EXECUTIVE SUMMARY</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
@@ -2329,10 +2361,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
-                + (editedPositiveObs ? '<div class="sh page-break" style="background:#f0fdf4;border-left-color:#22c55e;"><span class="sn" style="background:#16a34a;"><i class="fa-solid fa-thumbs-up"></i></span>POSITIVE OBSERVATIONS</div><div class="sb"><div style="color:#15803d;font-size:0.92rem;line-height:1.55;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
+                + (editedPositiveObs ? '<div style="margin-top:20px;padding:14px 16px;background:#f0fdf4;border-radius:10px;border-left:4px solid #22c55e;break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><i class="fa-solid fa-thumbs-up" style="color:#16a34a;font-size:1rem;"></i><h4 style="margin:0;color:#166534;font-size:0.95rem;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;">Positive Observations</h4></div><div style="color:#15803d;font-size:0.9rem;line-height:1.6;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
-            // SECTION 3
-            + (en['charts'] !== false ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">3</span>AUDIT SUMMARY</div><div class="sb">'
+            // SECTION: ANALYTICS DASHBOARD
+            + (secMap['charts'] ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;">' + sBadge('charts') + 'ANALYTICS DASHBOARD</div><div class="sb">'
                 + '<div class="stat-grid">'
                 + '<div class="stat-box" style="background:' + d.stats.statusColor + '14;border-color:' + d.stats.statusColor + ';"><div class="stat-val" style="font-size:0.95rem;line-height:1.25;color:' + d.stats.statusColor + ';">' + d.stats.auditStatus + '</div><div class="stat-lbl">Certification Status</div></div>'
                 + '<div class="stat-box" style="background:#fffbeb;border-color:#f59e0b;"><div class="stat-val" style="color:#d97706;">' + d.stats.minorNC + '</div><div class="stat-lbl">Minor NC</div></div>'
@@ -2342,21 +2374,70 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
                 + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
                 + '</div>' : '')
-            // SECTION 4 - CONFORMANCE VERIFICATION
-            + (en['conformance'] !== false && conformRowsHtml ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;"><span class="sn" style="background:#10b981;">4</span>CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
-            // SECTION 5 - OBSERVATIONS
-            + (obsOnlyRowsHtml ? '<div id="sec-obs" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;"><span class="sn" style="background:#7c3aed;">5</span>OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
-            // SECTION 6 - OPPORTUNITIES FOR IMPROVEMENT (narrative + table)
-            + ((editedOfi || ofiOnlyRowsHtml) ? '<div id="sec-ofi" class="sh page-break" style="background:#fffbeb;border-left-color:#f59e0b;"><span class="sn" style="background:#f59e0b;"><i class="fa-solid fa-lightbulb"></i></span>OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb">'
+            // SECTION: CONFORMANCE VERIFICATION
+            + (secMap['conformance'] ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            // SECTION: OBSERVATIONS
+            + (secMap['obs'] ? '<div id="sec-obs" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
+            // SECTION: OPPORTUNITIES FOR IMPROVEMENT (narrative + table)
+            + (secMap['ofi'] ? '<div id="sec-ofi" class="sh page-break" style="background:#fffbeb;border-left-color:#f59e0b;">' + sBadge('ofi') + 'OPPORTUNITIES FOR IMPROVEMENT</div><div class="sb">'
                 + (editedOfi ? '<div style="padding:14px 16px;background:#fffbeb;border-radius:10px;border-left:4px solid #f59e0b;margin-bottom:' + (ofiOnlyRowsHtml ? '14px' : '0') + ';">' + formatOfi(editedOfi) + '</div>' : '')
                 + (ofiOnlyRowsHtml ? '<table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Recommendation</th></tr></thead><tbody>' + ofiOnlyRowsHtml + '</tbody></table>' : '')
                 + '</div>' : '')
-            + (en['findings'] !== false ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#dc2626;"><span class="sn" style="background:#dc2626;">7</span>FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence & Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
-            // SECTION 8 - NCR REGISTER
-            + (en['ncrs'] !== false && (d.report.ncrs || []).length > 0 ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#ea580c;"><span class="sn" style="background:#ea580c;">8</span>NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            // SECTION: FINDING DETAILS
+            + (secMap['findings'] ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#dc2626;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:12%;">Clause</th><th style="width:28%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
+            // SECTION: NCR REGISTER
+            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#ea580c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
-            // EVIDENCE GALLERY
+            // SECTION: CORRECTIVE ACTION REQUIREMENTS
+            + (secMap['corrective'] ? '<div id="sec-corrective" class="sh page-break" style="background:#fdf2f8;border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
+                + '<table class="info-tbl"><thead><tr style="background:#fdf2f8;"><th style="width:12%;">NC Ref</th><th style="width:10%;">Clause</th><th style="width:10%;">Type</th><th style="width:35%;">Corrective Action Required</th><th style="width:13%;">Due Date</th><th style="width:20%;">Verification</th></tr></thead><tbody>'
+                + (function () { var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                + '</tbody></table>'
+                + '<div style="margin-top:12px;padding:10px;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
+                + '</div>' : '')
+            // SECTION: CHANGES SINCE LAST AUDIT
+            + (secMap['changes'] ? '<div id="sec-changes" class="sh page-break" style="background:#f5f5f4;border-left-color:#78716c;">' + sBadge('changes') + 'CHANGES SINCE LAST AUDIT</div><div class="sb">'
+                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
+                + '</div>' : '')
+            // SECTION: AUDIT CONCLUSION & RECOMMENDATION
+            + (secMap['conclusion'] ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;">' + sBadge('conclusion') + 'AUDIT CONCLUSION &amp; RECOMMENDATION</div><div class="sb">'
+                + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
+                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
+                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr></table></div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
+            // SECTION: SIGNATURE & ATTESTATION
+            + (secMap['signature'] ? '<div id="sec-signature" class="sh page-break" style="background:#f8fafc;border-left-color:#1e293b;">' + sBadge('signature') + 'SIGNATURE &amp; ATTESTATION</div><div class="sb">'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedSigDate || d.today) + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || '____________________') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
+                + '</div>'
+                + '<div style="margin-top:20px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:4px;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
+                + '</div>' : '')
+            // SECTION: DISTRIBUTION LIST
+            + (secMap['distribution'] ? '<div id="sec-distribution" class="sh page-break" style="background:#f0fdfa;border-left-color:#0d9488;">' + sBadge('distribution') + 'DISTRIBUTION LIST</div><div class="sb">'
+                + '<div style="margin-bottom:10px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>'
+                + '<table class="info-tbl"><thead><tr style="background:#f0fdfa;"><th style="width:5%;">#</th><th style="width:30%;">Recipient</th><th style="width:25%;">Role</th><th style="width:25%;">Organization</th><th style="width:15%;">Format</th></tr></thead><tbody>'
+                + '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (cbName || 'Certification Body') + '</td><td>Original</td></tr>'
+                + '<tr><td>2</td><td style="font-weight:600;">' + (editedReviewerName || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
+                + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
+                + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (cbName || 'Certification Body') + '</td><td>Archive</td></tr>'
+                + '</tbody></table></div>' : '')
+            // SECTION: ANNEXURES
+            + (secMap['annexures'] ? '<div id="sec-annexures" class="sh page-break" style="background:#faf5ff;border-left-color:#9333ea;">' + sBadge('annexures') + 'ANNEXURES &amp; APPENDICES</div><div class="sb">'
+                + '<div style="line-height:1.55;color:#334155;">'
+                + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
+                + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
+                + '<div style="margin-bottom:12px;">• Standard: ' + standard + '</div>'
+                + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
+                + '<div style="margin-bottom:4px;">• Total Items Audited: ' + d.stats.totalItems + '</div>'
+                + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.majorNC + d.stats.minorNC) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
+                + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
+                + '</div></div>' : '')
+            // SECTION: EVIDENCE GALLERY (always last — photographic appendix)
             + (function () {
+                if (!secMap['evidence']) return '';
                 let evidenceItems = [];
                 (d.hydratedProgress || []).forEach(function (item) {
                     let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
@@ -2374,55 +2455,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     let borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
                     return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
                 }).join('');
-                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;"><span class="sn" style="background:#c2410c;"><i class="fa-solid fa-camera"></i></span>EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
+                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
             })()
-            // SECTION: CORRECTIVE ACTION REQUIREMENTS
-            + ((d.stats.majorNC + d.stats.minorNC) > 0 && en['corrective'] !== false ? '<div id="sec-corrective" class="sh page-break" style="background:#fdf2f8;border-left-color:#be185d;"><span class="sn" style="background:#be185d;">10</span>CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
-                + '<table class="info-tbl"><thead><tr style="background:#fdf2f8;"><th style="width:12%;">NC Ref</th><th style="width:10%;">Clause</th><th style="width:10%;">Type</th><th style="width:35%;">Corrective Action Required</th><th style="width:13%;">Due Date</th><th style="width:20%;">Verification</th></tr></thead><tbody>'
-                + (function () { var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
-                + '</tbody></table>'
-                + '<div style="margin-top:12px;padding:10px;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
-                + '</div>' : '')
-            // SECTION: CHANGES SINCE LAST AUDIT
-            + (en['changes'] !== false ? '<div id="sec-changes" class="sh page-break" style="background:#f5f5f4;border-left-color:#78716c;"><span class="sn" style="background:#78716c;">11</span>CHANGES SINCE LAST AUDIT</div><div class="sb">'
-                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
-                + '</div>' : '')
-            // SECTION 7
-            + (en['conclusion'] !== false ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;"><span class="sn" style="background:#4338ca;">12</span>AUDIT CONCLUSION & RECOMMENDATION</div><div class="sb">'
-                + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
-                + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
-                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr></table></div>'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
-                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
-                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
-            // SECTION: SIGNATURE & ATTESTATION
-            + (en['signature'] !== false ? '<div id="sec-signature" class="sh page-break" style="background:#f8fafc;border-left-color:#1e293b;"><span class="sn" style="background:#1e293b;">13</span>SIGNATURE & ATTESTATION</div><div class="sb">'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedSigDate || d.today) + '</div></div>'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || '____________________') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
-                + '</div>'
-                + '<div style="margin-top:20px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:4px;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
-                + '</div>' : '')
-            // SECTION: DISTRIBUTION LIST
-            + (en['distribution'] !== false ? '<div id="sec-distribution" class="sh page-break" style="background:#f0fdfa;border-left-color:#0d9488;"><span class="sn" style="background:#0d9488;">14</span>DISTRIBUTION LIST</div><div class="sb">'
-                + '<div style="margin-bottom:10px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>'
-                + '<table class="info-tbl"><thead><tr style="background:#f0fdfa;"><th style="width:5%;">#</th><th style="width:30%;">Recipient</th><th style="width:25%;">Role</th><th style="width:25%;">Organization</th><th style="width:15%;">Format</th></tr></thead><tbody>'
-                + '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (cbName || 'Certification Body') + '</td><td>Original</td></tr>'
-                + '<tr><td>2</td><td style="font-weight:600;">' + (editedReviewerName || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
-                + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
-                + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (cbName || 'Certification Body') + '</td><td>Archive</td></tr>'
-                + '</tbody></table></div>' : '')
-            // SECTION: ANNEXURES
-            + (en['annexures'] !== false ? '<div id="sec-annexures" class="sh page-break" style="background:#faf5ff;border-left-color:#9333ea;"><span class="sn" style="background:#9333ea;">15</span>ANNEXURES / APPENDICES</div><div class="sb">'
-                + '<div style="line-height:1.55;color:#334155;">'
-                + '<div style="font-weight:700;margin-bottom:6px;">Annexure A — Audit Plan Reference</div>'
-                + '<div style="margin-bottom:4px;">• Plan Reference: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : 'N/A') + '</div>'
-                + '<div style="margin-bottom:12px;">• Standard: ' + standard + '</div>'
-                + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
-                + '<div style="margin-bottom:4px;">• Total Items Audited: ' + d.stats.totalItems + '</div>'
-                + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.majorNC + d.stats.minorNC) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
-                + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
-                + '</div></div>' : '')
             + '</div>'
             // FOOTER
             + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
