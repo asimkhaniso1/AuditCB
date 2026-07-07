@@ -2193,7 +2193,6 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const secMap = {};
         let _secCounter = 0;
         sectionDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color }; } });
-        const sNum = function (key) { return secMap[key] ? secMap[key].num : ''; };
         const sBadge = function (key) {
             const m = secMap[key]; if (!m) return '';
             return '<span class="sn" style="background:' + m.color + ';">' + m.num + '</span>';
@@ -2276,7 +2275,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
             + (d.cbLogo ? '<img src="' + d.cbLogo + '" style="height:60px;object-fit:contain;" alt="CB Logo">' : '<div></div>')
             + (function () {
-                let qrHost = '';
+                let qrHost;
                 try { qrHost = new URL(d.cardUrl).host; } catch (_e) { qrHost = ''; }
                 return '<div style="text-align:center;max-width:160px;">'
                     + '<img src="' + d.qrCodeUrl + '" style="height:120px;width:120px;display:block;margin:0 auto;" alt="Scan to verify">'
