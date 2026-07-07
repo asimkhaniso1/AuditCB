@@ -14,31 +14,35 @@
     // ─── 1. Emergency Fallbacks ────────────────────────────────────
     // Ensure critical security objects exist even if CDNs fail
 
+    // Shared escape used by every emergency fallback below — never pass dirty
+    // HTML through unchanged just because a CDN failed to load.
+    function emergencyEscape(s) {
+        if (!s) return '';
+        return String(s).replace(/[&<>"']/g, function (m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
+
     if (typeof window.DOMPurify === 'undefined') {
         console.warn('⚠️ DOMPurify missing - Initializing EMERGENCY fallbacks');
         window.DOMPurify = {
-            sanitize: function (dirty) { return dirty; },
+            sanitize: function (dirty) { return emergencyEscape(dirty); },
             isEmergency: true
         };
     }
 
     // Initialize Sanitizer shell immediately to prevent ReferenceErrors during early boot
     window.Sanitizer = window.Sanitizer || {
-        sanitizeHTML: function (d) { return window.DOMPurify ? window.DOMPurify.sanitize(d) : d; },
-        sanitizeText: function (d) { return d; },
+        sanitizeHTML: function (d) { return window.DOMPurify ? window.DOMPurify.sanitize(d) : emergencyEscape(d); },
+        sanitizeText: function (d) { return emergencyEscape(d); },
         sanitizeURL: function (d) { return d; },
-        escapeHTML: function (d) { return d; },
+        escapeHTML: function (d) { return emergencyEscape(d); },
         _placeholder: true
     };
 
     // UTILS Fallback: Ensure basic escaping exists if utils.js fails
     window.UTILS = window.UTILS || {
-        escapeHtml: function (s) {
-            if (!s) return '';
-            return String(s).replace(/[&<>"']/g, function (m) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
-            });
-        }
+        escapeHtml: emergencyEscape
     };
 
     // ─── 2. Cache-Busting / Service Worker Purge (v19.0) ───────────
