@@ -14,7 +14,7 @@ const SRC = __dirname;
 const DIST = path.join(__dirname, 'dist');
 
 // Files/dirs to skip when copying to dist
-const SKIP = new Set(['dist', 'node_modules', '.git', '.agent', '.gemini', '.claude', 'migrations', 'docs', 'tools', 'supabase', 'coverage']);
+const SKIP = new Set(['dist', 'node_modules', '.git', '.agent', '.gemini', '.claude', 'migrations', 'docs', 'tools', 'supabase', 'coverage', 'tests']);
 
 // 1. Clean dist
 if (fs.existsSync(DIST)) {
@@ -138,6 +138,11 @@ console.log(`   JS  — Original: ${Math.round(totalOriginal / 1024)}KB, Minifie
 console.log(`   CSS — Original: ${Math.round(cssOriginal / 1024)}KB, Minified: ${Math.round(cssMinified / 1024)}KB, Savings: ${cssOriginal ? Math.round((1 - cssMinified / cssOriginal) * 100) : 0}%`);
 console.log(`   Total Bundle: ${Math.round((totalMinified + cssMinified) / 1024)}KB`);
 if (errors) console.log(`   JS Errors: ${errors}`);
+
+if (errors > 0) {
+    console.error(`\n❌ Build failed: ${errors} file(s) failed minification.`);
+    process.exit(1);
+}
 
 // 4. Add content-hash cache busting to index.html
 const crypto = require('crypto');

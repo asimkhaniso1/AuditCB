@@ -38,4 +38,3 @@ jobs:
           echo "### Build Results" >> $GITHUB_STEP_SUMMARY
           echo "- **JS files**: $(ls dist/*.js 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
           echo "- **Bundle size**: $(du -sh dist/ | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tests**: 201 passing" >> $GITHUB_STEP_SUMMARY
