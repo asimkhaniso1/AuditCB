@@ -1568,6 +1568,35 @@ async function extractDocxText(uint8Array) {
 }
 
 // Helper: Extract text from file (PDF/DOCX/Text)
+// Lazily configure the PDF.js worker from a blob URL (CSP-safe) and cache it.
+// The worker script lives on cdnjs, which the CSP `worker-src 'self' blob:`
+// directive does NOT allow to load directly — but `worker-src` DOES allow
+// blob:, and `connect-src` permits fetching from cdnjs. So we fetch the worker
+// script once and wrap it in a blob URL (the same pattern used for the
+// CSP-compliant chart scripts elsewhere in this app). Without the worker,
+// PDF.js parses on the main thread and hangs on large standards PDFs, tripping
+// the 120s timeout below and silently returning empty text. On any failure we
+// fall back to main-thread parsing so uploads still degrade gracefully.
+window.ensurePdfWorker = async function () {
+    if (typeof pdfjsLib === 'undefined' || !pdfjsLib.GlobalWorkerOptions) return;
+    if (window.__pdfWorkerBlobUrl) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = window.__pdfWorkerBlobUrl;
+        return;
+    }
+    try {
+        // Version MUST match the pdf.min.js loaded in index.html (3.11.174).
+        const WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const resp = await fetch(WORKER_URL);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const code = await resp.text();
+        window.__pdfWorkerBlobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+        pdfjsLib.GlobalWorkerOptions.workerSrc = window.__pdfWorkerBlobUrl;
+    } catch (e) {
+        console.warn('[KB] PDF worker blob setup failed; parsing on main thread:', e);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
+};
+
 window.extractTextFromFile = async function (file) {
     // Check if PDF.js is loaded
     if (file.type === 'application/pdf' && (typeof pdfjsLib === 'undefined')) {
@@ -1575,19 +1604,22 @@ window.extractTextFromFile = async function (file) {
         return null; // Graceful degradation
     }
 
-    // Disable PDF.js worker globally to bypass CSP blob: restrictions
-    if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    // Set up the PDF.js worker (CSP-safe blob URL) before extraction so parsing
+    // runs off the main thread and doesn't hang on large files.
+    if (file.type === 'application/pdf') {
+        await window.ensurePdfWorker();
     }
 
     const extractionPromise = async () => {
         try {
             if (file.type === 'application/pdf') {
                 const arrayBuffer = await file.arrayBuffer();
-                // Use isEvalSupported:false + disableWorker for max CSP compatibility
+                // Use the blob-URL worker when available (fast, off main thread);
+                // fall back to main-thread parsing only if worker setup failed.
+                // isEvalSupported:false keeps this CSP-safe (no unsafe-eval needed).
                 const loadingTask = pdfjsLib.getDocument({
                     data: arrayBuffer,
-                    disableWorker: true,
+                    disableWorker: !window.__pdfWorkerBlobUrl,
                     isEvalSupported: false
                 });
                 const pdf = await loadingTask.promise;
