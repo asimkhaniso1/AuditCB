@@ -1634,11 +1634,16 @@ Answer:`;
   color: #ffffff;
   background: var(--b4-neutral);
 }
-.b4-heat-cell.b4-heat-0 { background: var(--b4-neutral-bg); color: var(--b4-neutral); }
-.b4-heat-cell.b4-heat-low { background: var(--b4-good); }
-.b4-heat-cell.b4-heat-med { background: var(--b4-warn); }
-.b4-heat-cell.b4-heat-high { background: var(--b4-bad); }
-.b4-heat-cell.b4-heat-crit { background: #7f1d1d; }
+/* Tinted cells (background tint + tone border + dark count) read sharper in print
+   than solid saturated blocks, and survive monochrome via border weight. */
+.b4-heat-cell.b4-heat-0 { background: var(--b4-surface); border: 1px solid var(--b4-line); color: var(--b4-line-2); }
+.b4-heat-cell.b4-heat-low { background: var(--b4-good-bg); border: 1px solid var(--b4-good-line); color: var(--b4-good); }
+.b4-heat-cell.b4-heat-med { background: var(--b4-warn-bg); border: 1px solid var(--b4-warn-line); color: var(--b4-warn); }
+.b4-heat-cell.b4-heat-high { background: var(--b4-bad-bg); border: 2px solid var(--b4-bad-line); color: var(--b4-bad); }
+.b4-heat-cell.b4-heat-crit { background: #7f1d1d; border: 2px solid #7f1d1d; color: #ffffff; }
+.b4-tbl--compact th { padding: 7px 8px; font-size: 7pt; }
+.b4-tbl--compact td { padding: 8px 8px; font-size: 8pt; }
+.b4-tbl--compact .b4-badge, .b4-tbl--compact .b4-pill { font-size: 6.5pt; padding: 2px 6px; }
 
 .b4-chart-box {
   border: 1px solid var(--b4-line);

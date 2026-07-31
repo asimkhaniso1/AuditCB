@@ -743,7 +743,7 @@
             charts: [],
             bodyHtml: r.scoredFindings.length
                 ? renderHeatmap(r.heatMatrix)
-                    + '<div class="b4-mt-6" style="overflow-x:auto;"><table class="b4-tbl" style="min-width:680px;"><thead><tr><th style="width:12%;">Ref</th><th style="width:44%;">Finding</th><th style="width:11%;text-align:center;">L</th><th style="width:11%;text-align:center;">I</th><th style="width:11%;text-align:center;">Residual</th><th style="width:11%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table></div>'
+                    + '<div class="b4-mt-6"><table class="b4-tbl"><thead><tr><th style="width:12%;">Ref</th><th style="width:44%;">Finding</th><th style="width:11%;text-align:center;">L</th><th style="width:11%;text-align:center;">I</th><th style="width:11%;text-align:center;">Residual</th><th style="width:11%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table></div>'
                 : emptyState('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.')
         });
 
@@ -777,7 +777,7 @@
             color: '#4338ca',
             charts: [],
             bodyHtml: r.scoredFindings.length
-                ? impactSummary + '<div style="overflow-x:auto;"><table class="b4-tbl" style="min-width:760px;"><thead><tr><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Categories</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table></div>'
+                ? impactSummary + '<div><table class="b4-tbl"><thead><tr><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Categories</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table></div>'
                 : emptyState('No findings from this audit are assessed as carrying a material business impact at this time.')
         });
 
@@ -864,7 +864,7 @@
             color: '#be185d',
             charts: [],
             bodyHtml: r.riskRegister.length
-                ? '<div style="overflow-x:auto;"><table class="b4-tbl" style="min-width:1050px;"><thead><tr><th style="width:8%;">Ref</th><th style="width:26%;">Risk</th><th style="width:8%;text-align:center;">Likelihood</th><th style="width:8%;text-align:center;">Impact</th><th style="width:8%;text-align:center;">Risk Score</th><th style="width:12%;">Owner</th><th style="width:9%;">Target Date</th><th style="width:9%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
+                ? '<div><table class="b4-tbl b4-tbl--compact"><thead><tr><th style="width:7%;">Ref</th><th style="width:25%;">Risk</th><th style="width:8%;text-align:center;">Likelihood</th><th style="width:8%;text-align:center;">Impact</th><th style="width:8%;text-align:center;">Risk Score</th><th style="width:12%;">Owner</th><th style="width:9%;">Target Date</th><th style="width:9%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
                 : emptyState('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.')
         });
 
@@ -908,7 +908,7 @@
             color: '#dc2626',
             charts: [],
             bodyHtml: r.actionPlan.length
-                ? actionNotes + '<div style="overflow-x:auto;"><table class="b4-tbl" style="min-width:820px;"><thead><tr>' + actionHead + '</tr></thead><tbody>' + actionRows + '</tbody></table></div>'
+                ? actionNotes + '<div><table class="b4-tbl b4-tbl--compact"><thead><tr>' + actionHead + '</tr></thead><tbody>' + actionRows + '</tbody></table></div>'
                 : emptyState('No corrective actions are required based on this audit\'s results.')
         });
 
@@ -990,7 +990,7 @@
             }] : [],
             bodyHtml: hasCapaData
                 ? capaKpis + '<div style="max-width:280px;margin:16px auto;"><canvas id="' + chartId + '"></canvas></div>'
-                    + '<div style="overflow-x:auto;" class="b4-mt-5"><table class="b4-tbl" style="min-width:800px;"><thead><tr>' + capaTableHead + '</tr></thead><tbody>' + capaRows + '</tbody></table></div>'
+                    + '<div class="b4-mt-5"><table class="b4-tbl b4-tbl--compact"><thead><tr>' + capaTableHead + '</tr></thead><tbody>' + capaRows + '</tbody></table></div>'
                 : emptyState('No corrective/preventive actions are open for this audit.')
         });
 

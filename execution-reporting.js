@@ -2701,6 +2701,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   'table{break-inside:auto;}'
             +   '.chart-box,.b4-chart-box,canvas,img{break-inside:avoid;page-break-inside:avoid;max-width:100% !important;}'
             +   '.b4-kpi-card,.b4-card,.b4-callout,.b4-insight-card,.ev-card{break-inside:avoid;page-break-inside:avoid;}'
+            // Paper has no scrollbars: neutralize inline scroll containers so content
+            // reflows instead of clipping (class-based overflow like .watermark and
+            // .b4-bar keep their clipping), and no table may exceed the page width.
+            +   '.sb [style*="overflow-x"],.sb [style*="overflow:auto"],.sb [style*="overflow: auto"]{overflow:visible !important;}'
+            +   '.sb table{max-width:100% !important;min-width:0 !important;width:100% !important;table-layout:fixed;}'
             +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;'
             +     '@top-left{content:' + pgHdrLeft + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:8pt;font-weight:500;color:#475569;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
             +     '@top-right{content:' + pgHdrRight + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:8pt;color:#64748b;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
