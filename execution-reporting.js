@@ -149,6 +149,47 @@
             ncByClause[g] = (ncByClause[g] || 0) + 1;
         });
 
+        // Persist corrective-action due dates ONCE, computed from the audit end date (falling back
+        // to the report date, then today). Previously these were recomputed from `new Date()` at
+        // every export, so regenerating the PDF silently shifted every NC's due date. Now the date
+        // is calculated the first time and stored on the record (checklist item / NCR) so later
+        // exports reuse it.
+        (function persistCorrectiveDueDates() {
+            const baseDateStr = report.endDate || report.date || null;
+            const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
+            const baseValid = !isNaN(baseDate.getTime());
+            const dueFrom = (days) => {
+                const dt = new Date((baseValid ? baseDate : new Date()).getTime());
+                dt.setDate(dt.getDate() + days);
+                return dt.toISOString().split('T')[0];
+            };
+            let changed = false;
+            (report.checklistProgress || []).forEach(item => {
+                if (item.status !== 'nc') return;
+                const typ = (item.ncrType || '').toLowerCase();
+                if (typ !== 'major' && typ !== 'minor') return;
+                if (!item.caDueDate) {
+                    item.caDueDate = dueFrom(typ === 'major' ? 30 : 90);
+                    changed = true;
+                }
+            });
+            (report.ncrs || []).forEach(ncr => {
+                if (!ncr.caDueDate) {
+                    const typ = (ncr.type || 'Minor').toLowerCase();
+                    ncr.caDueDate = dueFrom(typ === 'major' ? 30 : 90);
+                    changed = true;
+                }
+            });
+            if (changed && window.DataService?.syncAuditReport) {
+                try {
+                    window.DataService.syncAuditReport(reportId, {
+                        checklistProgress: report.checklistProgress || [],
+                        ncrs: report.ncrs || []
+                    });
+                } catch (_e) { /* noop */ }
+            }
+        })();
+
         const applicableCount = totalItems - naItems.length;
         // ISO 17021-1 style status (not percentage-based)
         let auditStatus, statusColor;
@@ -261,6 +302,7 @@
             { id: 'summary', label: 'Summary', icon: 'fa-file-lines', color: '#059669' },
             { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
             { id: 'conformance', label: 'Conformance', icon: 'fa-circle-check', color: '#059669' },
+            { id: 'audit-trails', label: 'Audit Trails', icon: 'fa-route', color: '#0ea5e9' },
             { id: 'prev-findings', label: 'Prev Findings', icon: 'fa-history', color: '#6366f1' },
             { id: 'obs', label: 'Observations', icon: 'fa-eye', color: '#8b5cf6' },
             { id: 'ofi', label: 'OFI', icon: 'fa-lightbulb', color: '#06b6d4' },
@@ -2160,6 +2202,58 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Serialize area stats for chart script
         let areaChartData = JSON.stringify({ keys: areaSortedKeys, names: areaSortedKeys.map(function (k) { return clauseAreaNames[k]; }), conform: areaSortedKeys.map(function (k) { return areaStats[k].conform; }), nc: areaSortedKeys.map(function (k) { return areaStats[k].major + areaStats[k].minor; }), obs: areaSortedKeys.map(function (k) { return areaStats[k].obs; }), ofi: areaSortedKeys.map(function (k) { return areaStats[k].ofi; }) });
 
+        // ─── AUDIT TRAILS: checklist items grouped by department/area ────
+        // Shows, per department, which personnel were interviewed, which clauses were
+        // sampled there, how many items were checked, and the worst outcome found.
+        const auditTrailsRowsHtml = (function () {
+            const groups = {};
+            const order = [];
+            (d.hydratedProgress || []).forEach(function (item) {
+                const dept = (item.department && String(item.department).trim()) || 'General';
+                if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, worst: 'conform' }; order.push(dept); }
+                const g = groups[dept];
+                if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
+                const clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || item.clause;
+                if (clause) g.clauses.add(String(clause));
+                g.count++;
+                // Worst-status ranking: major NC > minor NC > observation > conforming
+                const rank = { major: 3, minor: 2, observation: 1, conform: 0 };
+                let itemRank = 0;
+                if (item.status === 'nc') {
+                    const t = (item.ncrType || '').toLowerCase();
+                    if (t === 'major') itemRank = rank.major;
+                    else if (t === 'minor') itemRank = rank.minor;
+                    else if (t === 'observation') itemRank = rank.observation;
+                    else itemRank = rank.minor; // unclassified NC treated as minor for worst-case display
+                }
+                if (itemRank > (rank[g.worst] || 0)) {
+                    g.worst = itemRank === rank.major ? 'major' : itemRank === rank.minor ? 'minor' : itemRank === rank.observation ? 'observation' : 'conform';
+                }
+            });
+            const worstLabel = { major: 'Major NC', minor: 'Minor NC', observation: 'Observation', conform: 'Conforming' };
+            const worstStyle = {
+                major: 'background:#fee2e2;color:#991b1b;',
+                minor: 'background:#fef3c7;color:#92400e;',
+                observation: 'background:#ede9fe;color:#5b21b6;',
+                conform: 'background:#dcfce7;color:#166534;'
+            };
+            return order.map(function (dept, idx) {
+                const g = groups[dept];
+                const clausesSorted = Array.from(g.clauses).sort(function (a, b) {
+                    return parseFloat(a) - parseFloat(b) || a.localeCompare(b);
+                });
+                const personnelTxt = g.personnel.size ? Array.from(g.personnel).join(', ') : '<span style="color:#94a3b8;">Not recorded</span>';
+                const clausesTxt = clausesSorted.length ? clausesSorted.join(', ') : '—';
+                return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';">'
+                    + '<td style="padding:10px 14px;font-weight:700;">' + window.UTILS.escapeHtml(dept) + '</td>'
+                    + '<td style="padding:10px 14px;color:#334155;">' + personnelTxt + '</td>'
+                    + '<td style="padding:10px 14px;color:#334155;">' + clausesTxt + '</td>'
+                    + '<td style="padding:10px 14px;text-align:center;">' + g.count + '</td>'
+                    + '<td style="padding:10px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;' + worstStyle[g.worst] + '">' + worstLabel[g.worst] + '</span></td>'
+                    + '</tr>';
+            }).join('');
+        })();
+
         // ─── Unified section numbering ────────────────────────────────────
         // Single source of truth for section identity, order, presence, and badge number.
         // Body and TOC both read from secMap so numbering is always synchronized.
@@ -2177,6 +2271,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'summary',      name: 'EXECUTIVE SUMMARY',                  desc: 'Key findings, opening meeting, positive observations',  color: '#059669', present: en['summary'] !== false },
             { key: 'charts',       name: 'ANALYTICS DASHBOARD',                desc: 'Compliance charts, KPIs and clause-based breakdown',    color: '#7c3aed', present: en['charts'] !== false },
             { key: 'conformance',  name: 'CONFORMANCE VERIFICATION',           desc: 'Verified conforming items with supporting evidence',    color: '#10b981', present: en['conformance'] !== false && !!conformRowsHtml },
+            { key: 'audit-trails', name: 'AUDIT TRAILS',                       desc: 'Areas sampled, personnel interviewed and clauses covered', color: '#0ea5e9', present: en['audit-trails'] !== false && !!auditTrailsRowsHtml },
             { key: 'prev-findings',name: 'PREVIOUS FINDINGS STATUS',           desc: 'Follow-up status of findings from previous audit',      color: '#6366f1', present: false },
             { key: 'obs',          name: 'OBSERVATIONS',                       desc: 'Audit observations noted during assessment',            color: '#7c3aed', present: !!obsOnlyRowsHtml },
             { key: 'ofi',          name: 'OPPORTUNITIES FOR IMPROVEMENT',      desc: 'Opportunities for improvement identified',              color: '#f59e0b', present: !!(ofiOnlyRowsHtml || editedOfi) },
@@ -2374,6 +2469,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</div>' : '')
             // SECTION: CONFORMANCE VERIFICATION
             + (secMap['conformance'] ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:18%;">Clause</th><th style="width:22%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            // SECTION: AUDIT TRAILS
+            + (secMap['audit-trails'] ? '<div id="sec-audit-trails" class="sh page-break" style="background:#f0f9ff;border-left-color:#0ea5e9;">' + sBadge('audit-trails') + 'AUDIT TRAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0f9ff;"><th style="width:18%;">Area / Process</th><th style="width:27%;">Personnel Interviewed</th><th style="width:22%;">Clauses Covered</th><th style="width:11%;text-align:center;">Items Sampled</th><th style="width:22%;text-align:center;">Result</th></tr></thead><tbody>' + auditTrailsRowsHtml + '</tbody></table></div>' : '')
             // SECTION: OBSERVATIONS
             + (secMap['obs'] ? '<div id="sec-obs" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:18%;">Clause</th><th style="width:22%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
             // SECTION: OPPORTUNITIES FOR IMPROVEMENT (narrative + table)
@@ -2389,7 +2486,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: CORRECTIVE ACTION REQUIREMENTS
             + (secMap['corrective'] ? '<div id="sec-corrective" class="sh page-break" style="background:#fdf2f8;border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
                 + '<table class="info-tbl" style="table-layout:fixed;"><thead><tr style="background:#fdf2f8;"><th style="width:15%;">NC Ref</th><th style="width:9%;">Clause</th><th style="width:9%;">Type</th><th style="width:32%;">Corrective Action Required</th><th style="width:15%;">Due Date</th><th style="width:20%;">Verification</th></tr></thead><tbody>'
-                + (function () { var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;white-space:nowrap;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;white-space:nowrap;">' + due.toISOString().split('T')[0] + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                + (function () {
+                    // Due dates are computed & persisted once in generateAuditReport (from the audit
+                    // end date) and stored as item.caDueDate / ncr.caDueDate. Reuse that stored value
+                    // here so regenerating the PDF does not shift due dates. Fall back to computing
+                    // from today only for legacy records that predate persistence.
+                    var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
+                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var dueStr = item.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var dueStr = ncr.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
                 + '<div style="margin-top:12px;padding:10px;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
                 + '</div>' : '')
