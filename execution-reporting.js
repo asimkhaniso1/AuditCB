@@ -335,6 +335,12 @@
             today: new Date().toLocaleDateString('en-GB')
         };
 
+        // Warm the AI executive-summary/insights cache in the background so export
+        // uses AI content when ready; export never waits on this (fallbacks otherwise).
+        if (window.ReportExecutive?.prepare) {
+            try { window.ReportExecutive.prepare(window._reportPreviewData).catch(function () { }); } catch (_e) { /* noop */ }
+        }
+
         // Show Report Preview & Edit modal
         window.showReportPreviewModal();
 
@@ -373,7 +379,10 @@
             { id: 'signature', label: 'Signature', icon: 'fa-signature', color: '#1e293b' },
             { id: 'distribution', label: 'Distribution', icon: 'fa-share-nodes', color: '#0d9488' },
             { id: 'annexures', label: 'Annexures', icon: 'fa-paperclip', color: '#9333ea' }
-        ];
+        ]
+            .concat((window.ReportExecutive && window.ReportExecutive.sectionsPreviewToggles) ? window.ReportExecutive.sectionsPreviewToggles() : [])
+            .concat((window.ReportScoring && window.ReportScoring.sectionsPreviewToggles) ? window.ReportScoring.sectionsPreviewToggles() : [])
+            .concat((window.ReportRisk && window.ReportRisk.sectionsPreviewToggles) ? window.ReportRisk.sectionsPreviewToggles() : []);
 
         window._reportSectionState = {};
         sections.forEach(s => { window._reportSectionState[s.id] = !s.hide; });
@@ -1447,6 +1456,7 @@
                     </div>
                 </div>
             </div>
+            ${(window.ReportExecutive && window.ReportExecutive.renderAssistantPanel) ? window.ReportExecutive.renderAssistantPanel() : ''}
             <div class="rp-footer">
                 <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
                 <div style="display:flex;gap:10px;align-items:center;">
@@ -2538,6 +2548,23 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'annexures',    name: 'ANNEXURES &amp; APPENDICES',         desc: 'Supporting documents and appendices',                   color: '#9333ea', present: en['annexures'] !== false },
             { key: 'evidence',     name: 'EVIDENCE GALLERY',                   desc: 'Photographic evidence collected during the audit',      color: '#c2410c', present: hasEvidence }
         ];
+        // ─── Executive module sections (report-scoring / report-risk / report-executive) ──
+        // Each module returns [{key,name,desc,color,bodyHtml,charts}]; bodies are inserted
+        // as one block after ANALYTICS DASHBOARD, and defs are spliced in at the same spot
+        // so TOC numbering stays synchronized with body order.
+        const moduleSections = []
+            .concat(
+                (window.ReportExecutive && window.ReportExecutive.sections) ? window.ReportExecutive.sections(d) : [],
+                (window.ReportScoring && window.ReportScoring.sections) ? window.ReportScoring.sections(d) : [],
+                (window.ReportRisk && window.ReportRisk.sections) ? window.ReportRisk.sections(d) : []
+            )
+            .filter(function (s) { return s && s.bodyHtml && en[s.key] !== false; });
+        const modChartEntries = moduleSections.reduce(function (acc, s) { return acc.concat(s.charts || []); }, []);
+        (function () {
+            const idx = sectionDefs.findIndex(function (s) { return s.key === 'conformance'; });
+            const defs = moduleSections.map(function (s) { return { key: s.key, name: s.name, desc: s.desc, color: s.color, present: true }; });
+            sectionDefs.splice.apply(sectionDefs, [idx < 0 ? sectionDefs.length : idx, 0].concat(defs));
+        })();
         const secMap = {};
         let _secCounter = 0;
         sectionDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color }; } });
@@ -2611,6 +2638,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
             + '.ev-inline{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}.ev-inline img{height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;}'
             + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;justify-content:center;align-items:center;overflow:hidden;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:900;color:rgba(148,163,184,0.05);letter-spacing:8px;white-space:nowrap;font-family:Outfit,sans-serif;text-align:center;user-select:none;}body{position:relative;z-index:1;}'
+            + ((window.ReportExecutive && window.ReportExecutive.bigFourCss) ? window.ReportExecutive.bigFourCss() : '')
             + '</style></head><body>'
             + (d.report.reportStatus === 'draft'
                 ? '<div class="watermark"><span style="color:rgba(220,38,38,0.14);">DRAFT</span></div>'
@@ -2746,6 +2774,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
                 + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
                 + '</div>' : '')
+            // SECTIONS: EXECUTIVE MODULES (scoring / risk / AI) — bodies in sectionDefs order
+            + moduleSections.map(function (s) {
+                if (!secMap[s.key]) return '';
+                return '<div id="sec-' + s.key + '" class="sh page-break" style="border-left-color:' + s.color + ';">' + sBadge(s.key) + s.name + '</div><div class="sb">' + s.bodyHtml + '</div>';
+            }).join('')
             // SECTION: CONFORMANCE VERIFICATION
             + (secMap['conformance'] ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:18%;">Clause</th><th style="width:22%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION: AUDIT TRAILS
@@ -2880,6 +2913,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + 'var c7=document.getElementById("chart-radar");'
             + 'if(c7){var rd=' + JSON.stringify((function () { var rData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.department) return; if (!rData[item.department]) rData[item.department] = { total: 0, conform: 0 }; rData[item.department].total++; if (item.status === 'conform') rData[item.department].conform++; }); var labels = Object.keys(rData).sort(); return { labels: labels, data: labels.map(function (l) { return rData[l].total > 0 ? Math.round((rData[l].conform / rData[l].total) * 100) : 0; }) }; })()) + ';'
             + 'if(rd.labels.length>=3){new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Conformance %",data:rd.data,borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,0.15)",borderWidth:2,pointBackgroundColor:"#6366f1"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});}else{var pBox=c7.closest(".chart-box");if(pBox)pBox.style.display="none";var pGrid=c7.closest(".chart-grid");if(pGrid)pGrid.style.display="none";}}'
+            + modChartEntries.map(function (ch, i) {
+                return 'var mc' + i + '=document.getElementById(' + JSON.stringify(ch.canvasId) + ');if(mc' + i + ')try{new Chart(mc' + i + ',' + ch.configJson + ');}catch(e){}';
+            }).join('')
             + 'window._chartsReady=false;'
             + 'setTimeout(function(){document.querySelectorAll("canvas").forEach(function(cv){try{var im=document.createElement("img");im.src=cv.toDataURL("image/png");im.style.maxWidth="100%";im.style.maxHeight=cv.style.maxHeight||"200px";im.style.objectFit="contain";cv.parentNode.replaceChild(im,cv);}catch(e){}});window._chartsReady=true;},2500);'
             + '}function _waitForChart(){if(typeof Chart!=="undefined"){rc();}else{setTimeout(_waitForChart,100);}}_waitForChart();'
