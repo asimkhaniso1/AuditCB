@@ -269,6 +269,7 @@
             { id: 'corrective', label: 'Corrective Actions', icon: 'fa-wrench', color: '#be185d' },
             { id: 'meetings', label: 'Meetings', icon: 'fa-handshake', color: '#0891b2' },
             { id: 'changes', label: 'Changes', icon: 'fa-clock-rotate-left', color: '#78716c' },
+            { id: 'mgmt-effectiveness', label: 'Mgmt Effectiveness', icon: 'fa-gauge-high', color: '#0e7490' },
             { id: 'conclusion', label: 'Conclusion', icon: 'fa-gavel', color: '#4338ca' },
             { id: 'signature', label: 'Signature', icon: 'fa-signature', color: '#1e293b' },
             { id: 'distribution', label: 'Distribution', icon: 'fa-share-nodes', color: '#0d9488' },
@@ -1081,15 +1082,16 @@
                                 .filter(r => r.clientId === d.report.clientId && String(r.id) !== String(d.report.id))
                                 .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
                             const prevReport = prevReports[0];
+                            const prevFindingsNarrative = '<div style="margin-top:12px;"><div style="font-size:0.8rem;font-weight:600;color:#3730a3;margin-bottom:6px;">Previous Findings Status (editable)</div><div id="rp-prev-findings" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">' + (d.report.previousFindingsStatus || 'Nonconformities and observations from the previous audit were reviewed. All corrective actions were verified as effectively implemented unless otherwise stated below.') + '</div></div>';
                             if (!prevReport) {
-                                return '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>No previous audit reports found for this client. This section will auto-populate when prior audit data is available.</div>';
+                                return '<div style="text-align:center;padding:20px;color:#94a3b8;"><i class="fa-solid fa-info-circle" style="margin-right:6px;"></i>No previous audit reports found for this client. Enter the previous findings status manually below.</div>' + prevFindingsNarrative;
                             }
                             // Extract NCs from previous report
                             const prevNCs = (prevReport.checklistProgress || [])
                                 .filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi');
                             const prevNCRs = prevReport.ncrs || [];
                             if (prevNCs.length === 0 && prevNCRs.length === 0) {
-                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No non-conformities were raised. Certification was recommended.</div>';
+                                return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No non-conformities were raised. Certification was recommended.</div>' + prevFindingsNarrative;
                             }
                             let rows = '';
                             prevNCs.forEach(function (nc, i) {
@@ -1185,6 +1187,22 @@
                         <div id="rp-changes" class="rp-edit" contenteditable="true" style="min-height:40px;line-height:1.7;">${d.report.changesSinceLastAudit || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.'}</div>
                     </div>
                 </div>
+                <!-- Management System Effectiveness -->
+                <div class="rp-sec" id="sec-mgmt-effectiveness">
+                    <div class="rp-sec-hdr" style="border-left-color:#0e7490;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-gauge-high"></i></span>MANAGEMENT SYSTEM EFFECTIVENESS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body" style="padding:0;">
+                        <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+                            <thead><tr style="background:#ecfeff;"><th style="padding:10px 14px;text-align:left;width:38%;">Process</th><th style="padding:10px 14px;text-align:left;width:62%;">Effectiveness Status (click to edit)</th></tr></thead>
+                            <tbody>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Internal Audit Programme</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-internal-audit" class="rp-edit" contenteditable="true">${d.report.effInternalAudit || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Management Review</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-mgmt-review" class="rp-edit" contenteditable="true">${d.report.effMgmtReview || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Handling of Complaints</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-complaints" class="rp-edit" contenteditable="true">${d.report.effComplaints || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">Use of Certification Marks / Logo</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" id="rp-eff-marks" class="rp-edit" contenteditable="true">${d.report.effMarks || (/initial|stage/.test(String(d.auditPlan?.auditType || '').toLowerCase()) || !d.auditPlan?.auditType ? 'Not applicable — initial certification audit.' : 'Usage verified as conforming to CB rules.')}</td></tr>
+                                <tr><td style="padding:8px 14px;font-weight:600;">Legal &amp; Regulatory Compliance</td><td style="padding:8px 14px;" id="rp-eff-legal" class="rp-edit" contenteditable="true">${d.report.effLegal || 'Implemented and effective; conforms to the requirements of the standard.'}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 <!-- 7: Conclusion -->
                 <div class="rp-sec" id="sec-conclusion">
                     <div class="rp-sec-hdr" style="border-left-color:#4338ca;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">10</span>AUDIT CONCLUSION<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
@@ -1201,6 +1219,8 @@
                             return '<div style="margin-bottom:14px;padding:14px;background:#fef2f2;border-radius:10px;border-left:4px solid #dc2626;"><div style="font-size:0.82rem;font-weight:700;color:#991b1b;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>RISK AREAS IDENTIFIED</div><div style="font-size:0.85rem;color:#7f1d1d;line-height:1.6;">The following clause areas have been identified as requiring management attention due to non-conformity findings: <strong>' + allRiskClauses.join(', ') + '</strong>. These areas should be prioritized for corrective action and root cause analysis to prevent recurrence.</div></div>';
                         })()}
                         <div id="rp-conclusion" class="rp-edit" contenteditable="true">${d.report.conclusion || 'Based on the audit findings, the audit team concludes that the organization\'s management system has been assessed against the applicable standard requirements. Click to edit this conclusion.'}</div>
+                        <div style="margin-top:14px;"><strong style="color:#334155;font-size:0.85rem;">Unresolved Issues / Diverging Opinions:</strong> <span id="rp-unresolved" class="rp-edit" contenteditable="true" style="margin-left:6px;">${d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.'}</span></div>
+                        <p style="font-style:italic;font-size:0.78rem;color:#64748b;margin-top:12px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>
                     </div>
                 </div>
                 <!-- Signature Block -->
@@ -1951,6 +1971,19 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const editedCriteria = document.getElementById('rp-criteria')?.innerText || d.auditPlan?.auditCriteria || '';
         const editedMethodology = document.getElementById('rp-methodology')?.innerText || d.auditPlan?.auditMethodology || '';
         const editedChanges = document.getElementById('rp-changes')?.innerText || d.report.changesSinceLastAudit || '';
+        // Audit type helpers — drives PREVIOUS FINDINGS STATUS and MANAGEMENT SYSTEM
+        // EFFECTIVENESS section defaults (ISO 17021-1 §9.4.8 / Big-CB practice).
+        const auditTypeStr = String(d.auditPlan?.auditType || '').toLowerCase();
+        const isSurveillanceOrRecert = /surveillance|recert/.test(auditTypeStr);
+        const isInitialOrStage = /initial|stage/.test(auditTypeStr) || !auditTypeStr;
+        let editedPrevFindings = document.getElementById('rp-prev-findings')?.innerText || d.report.previousFindingsStatus || '';
+        editedPrevFindings = editedPrevFindings.replace(/Click to edit[^.]*\.?/gi, '').trim();
+        const editedUnresolved = document.getElementById('rp-unresolved')?.innerText || d.report.unresolvedIssues || 'None. All findings were acknowledged by the auditee at the closing meeting.';
+        const editedEffInternalAudit = document.getElementById('rp-eff-internal-audit')?.innerText || d.report.effInternalAudit || 'Implemented and effective; conforms to the requirements of the standard.';
+        const editedEffMgmtReview = document.getElementById('rp-eff-mgmt-review')?.innerText || d.report.effMgmtReview || 'Implemented and effective; conforms to the requirements of the standard.';
+        const editedEffComplaints = document.getElementById('rp-eff-complaints')?.innerText || d.report.effComplaints || 'Implemented and effective; conforms to the requirements of the standard.';
+        const editedEffMarks = document.getElementById('rp-eff-marks')?.innerText || d.report.effMarks || (isInitialOrStage ? 'Not applicable — initial certification audit.' : 'Usage verified as conforming to CB rules.');
+        const editedEffLegal = document.getElementById('rp-eff-legal')?.innerText || d.report.effLegal || 'Implemented and effective; conforms to the requirements of the standard.';
         const editedReviewerName = document.getElementById('rp-reviewer-name')?.innerText || d.report.technicalReviewer || '';
         const editedSigDate = document.getElementById('rp-sig-date')?.innerText || new Date().toLocaleDateString('en-GB');
         const editedReviewerDate = document.getElementById('rp-reviewer-date')?.innerText || '';
@@ -2169,21 +2202,43 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const hasEvidence = evidenceItemsCount > 0;
         const hasNcrs = (d.report.ncrs || []).length > 0;
         const hasCorrective = (d.stats.majorNC + d.stats.minorNC) > 0;
-        // Previous-findings section currently has no body renderer — keep present:false
-        // until follow-up status data is wired through.
+        // auditTypeStr / isSurveillanceOrRecert / isInitialOrStage computed earlier in this
+        // function (see editedPrevFindings block) — reused here for section presence.
+        // Previous-findings follow-up rows, sourced from the prior audit report for this client (if any).
+        const prevFindingsRowsHtml = (function () {
+            const allReports = window.state?.auditReports || [];
+            const prevReports = allReports
+                .filter(function (r) { return r.clientId === d.report.clientId && String(r.id) !== String(d.report.id); })
+                .sort(function (a, b) { return new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt); });
+            const prevReport = prevReports[0];
+            if (!prevReport) return '';
+            const prevNCs = (prevReport.checklistProgress || [])
+                .filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; });
+            const prevNCRs = prevReport.ncrs || [];
+            if (prevNCs.length === 0 && prevNCRs.length === 0) return '';
+            let rows = '';
+            prevNCs.forEach(function (nc, i) {
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (nc.ncrType === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
+            });
+            prevNCRs.forEach(function (ncr, i) {
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (ncr.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
+            });
+            return rows;
+        })();
         const sectionDefs = [
             { key: 'audit-info',   name: 'AUDIT INFORMATION',                  desc: 'Organization details, scope, audit team and dates',     color: '#2563eb', present: en['audit-info'] !== false },
             { key: 'objectives',   name: 'OBJECTIVES, CRITERIA &amp; METHODOLOGY', desc: 'Audit objectives, criteria and methodology',         color: '#0891b2', present: en['objectives'] !== false },
             { key: 'summary',      name: 'EXECUTIVE SUMMARY',                  desc: 'Key findings, opening meeting, positive observations',  color: '#059669', present: en['summary'] !== false },
             { key: 'charts',       name: 'ANALYTICS DASHBOARD',                desc: 'Compliance charts, KPIs and clause-based breakdown',    color: '#7c3aed', present: en['charts'] !== false },
             { key: 'conformance',  name: 'CONFORMANCE VERIFICATION',           desc: 'Verified conforming items with supporting evidence',    color: '#10b981', present: en['conformance'] !== false && !!conformRowsHtml },
-            { key: 'prev-findings',name: 'PREVIOUS FINDINGS STATUS',           desc: 'Follow-up status of findings from previous audit',      color: '#6366f1', present: false },
+            { key: 'prev-findings',name: 'PREVIOUS FINDINGS STATUS',           desc: 'Follow-up status of findings from previous audit',      color: '#6366f1', present: en['prev-findings'] !== false && isSurveillanceOrRecert },
             { key: 'obs',          name: 'OBSERVATIONS',                       desc: 'Audit observations noted during assessment',            color: '#7c3aed', present: !!obsOnlyRowsHtml },
             { key: 'ofi',          name: 'OPPORTUNITIES FOR IMPROVEMENT',      desc: 'Opportunities for improvement identified',              color: '#f59e0b', present: !!(ofiOnlyRowsHtml || editedOfi) },
             { key: 'findings',     name: 'FINDING DETAILS',                    desc: 'Detailed non-conformity findings with evidence',        color: '#dc2626', present: en['findings'] !== false },
             { key: 'ncrs',         name: 'NCR REGISTER',                       desc: 'Formal NCR register with severity classifications',     color: '#ea580c', present: en['ncrs'] !== false && hasNcrs },
             { key: 'corrective',   name: 'CORRECTIVE ACTION REQUIREMENTS',     desc: 'Required corrective actions with due dates',            color: '#be185d', present: hasCorrective && en['corrective'] !== false },
             { key: 'changes',      name: 'CHANGES SINCE LAST AUDIT',           desc: 'Changes to management system since last audit',         color: '#78716c', present: en['changes'] !== false },
+            { key: 'mgmt-effectiveness', name: 'MANAGEMENT SYSTEM EFFECTIVENESS', desc: 'Effectiveness of key management system processes',   color: '#0e7490', present: en['mgmt-effectiveness'] !== false },
             { key: 'conclusion',   name: 'AUDIT CONCLUSION &amp; RECOMMENDATION', desc: 'Closing meeting, certification recommendation',      color: '#4338ca', present: en['conclusion'] !== false },
             { key: 'signature',    name: 'SIGNATURE &amp; ATTESTATION',        desc: 'Signatures and attestation',                            color: '#1e293b', present: en['signature'] !== false },
             { key: 'distribution', name: 'DISTRIBUTION LIST',                  desc: 'Controlled distribution of this report',                color: '#0d9488', present: en['distribution'] !== false },
@@ -2374,6 +2429,13 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</div>' : '')
             // SECTION: CONFORMANCE VERIFICATION
             + (secMap['conformance'] ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:18%;">Clause</th><th style="width:22%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
+            // SECTION: PREVIOUS FINDINGS STATUS
+            + (secMap['prev-findings'] ? '<div id="sec-prev-findings" class="sh page-break" style="background:#eef2ff;border-left-color:#6366f1;">' + sBadge('prev-findings') + 'PREVIOUS FINDINGS STATUS</div><div class="sb">'
+                + (prevFindingsRowsHtml
+                    ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i>Nonconformities and observations raised at the previous audit were reviewed for effective closure.</div>'
+                        + '<table class="f-tbl"><thead><tr style="background:#eef2ff;"><th style="width:14%;">Ref</th><th style="width:18%;">Clause</th><th style="width:12%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
+                    : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedPrevFindings || 'Nonconformities and observations from the previous audit were reviewed. All corrective actions were verified as effectively implemented unless otherwise stated below.') + '</div>')
+                + '</div>' : '')
             // SECTION: OBSERVATIONS
             + (secMap['obs'] ? '<div id="sec-obs" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;">' + sBadge('obs') + 'OBSERVATIONS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f5f3ff;"><th style="width:18%;">Clause</th><th style="width:22%;">ISO Requirement</th><th style="width:12%;text-align:center;">Type</th><th style="width:48%;">Details</th></tr></thead><tbody>' + obsOnlyRowsHtml + '</tbody></table></div>' : '')
             // SECTION: OPPORTUNITIES FOR IMPROVEMENT (narrative + table)
@@ -2397,12 +2459,22 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['changes'] ? '<div id="sec-changes" class="sh page-break" style="background:#f5f5f4;border-left-color:#78716c;">' + sBadge('changes') + 'CHANGES SINCE LAST AUDIT</div><div class="sb">'
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedChanges || 'No significant changes to the management system scope, documentation, or organizational structure have been reported since the last audit.') + '</div>'
                 + '</div>' : '')
+            // SECTION: MANAGEMENT SYSTEM EFFECTIVENESS
+            + (secMap['mgmt-effectiveness'] ? '<div id="sec-mgmt-effectiveness" class="sh page-break" style="background:#ecfeff;border-left-color:#0e7490;">' + sBadge('mgmt-effectiveness') + 'MANAGEMENT SYSTEM EFFECTIVENESS</div><div class="sb" style="padding:0;">'
+                + '<table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:38%;">Process</th><th style="width:62%;">Effectiveness Status</th></tr></thead><tbody>'
+                + '<tr><td style="font-weight:600;">Internal Audit Programme</td><td>' + editedEffInternalAudit + '</td></tr>'
+                + '<tr><td style="font-weight:600;">Management Review</td><td>' + editedEffMgmtReview + '</td></tr>'
+                + '<tr><td style="font-weight:600;">Handling of Complaints</td><td>' + editedEffComplaints + '</td></tr>'
+                + '<tr><td style="font-weight:600;">Use of Certification Marks / Logo</td><td>' + editedEffMarks + '</td></tr>'
+                + '<tr><td style="font-weight:600;">Legal &amp; Regulatory Compliance</td><td>' + editedEffLegal + '</td></tr>'
+                + '</tbody></table></div>' : '')
             // SECTION: AUDIT CONCLUSION & RECOMMENDATION
             + (secMap['conclusion'] ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;">' + sBadge('conclusion') + 'AUDIT CONCLUSION &amp; RECOMMENDATION</div><div class="sb">'
                 + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
-                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr></table></div>'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;">'
+                + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + editedUnresolved + '</td></tr></table></div>'
+                + '<p style="font-style:italic;font-size:0.8rem;color:#64748b;margin-top:16px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
             // SECTION: SIGNATURE & ATTESTATION
