@@ -47,6 +47,33 @@
 
     const safeArr = (a) => Array.isArray(a) ? a : [];
 
+    // ------------------------------------------------------------------
+    // Inline outline icon set (stroke-based, currentColor, 1.5 stroke width, 16px default)
+    // ------------------------------------------------------------------
+    const ICON_PATHS = {
+        audit: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+        risk: '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86l-8.5 14.7A1.5 1.5 0 0 0 3.07 21h17.86a1.5 1.5 0 0 0 1.28-2.44l-8.5-14.7a1.5 1.5 0 0 0-2.62 0z"/>',
+        department: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+        evidence: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-4.5-4.5L9 18"/>',
+        capa: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+        observation: '<circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>',
+        finding: '<circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/>',
+        management: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/>',
+        trend: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+        clause: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+        shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        check: '<path d="M20 6L9 17l-5-5"/>',
+        alert: '<path d="M10.29 3.86l-8.5 14.7A1.5 1.5 0 0 0 3.07 21h17.86a1.5 1.5 0 0 0 1.28-2.44l-8.5-14.7a1.5 1.5 0 0 0-2.62 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+        clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+        target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
+    };
+    function icon(name, opts) {
+        const size = (opts && opts.size) || 16;
+        const cls = (opts && opts.cls) || '';
+        const paths = ICON_PATHS[name] || ICON_PATHS.finding;
+        return `<svg class="b4-icon${cls ? ' ' + cls : ''}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+    }
+
     // Cache of prepared async results, keyed by report id (falls back to a fixed key if no id present).
     const _cache = {};
     const cacheKey = (d) => 'rpt_' + (d && d.report && (d.report.id != null) ? String(d.report.id) : 'default');
@@ -108,9 +135,17 @@
         ).join('\n');
 
         return `
-You are a Certification Body Lead Auditor preparing a CEO/Board-level Executive Summary for an ISO management system certification audit report. Write for senior executives who will not read the full report — they need the strategic picture in under 400 words.
+You are a senior engagement partner at a Big Four consulting firm (Deloitte/PwC/EY/KPMG style), presenting the outcome of an ISO management system audit directly to the CEO and Board. They will read nothing else — this must stand alone as the strategic picture.
 
-Audit Context:
+Voice rules (strict):
+- Lead every statement with the business consequence, not the audit mechanic. Do not write "an audit was conducted" — write what it means for the business.
+- EVERY paragraph-level field (outcome, health, businessImpact, risks) MUST contain at least one concrete quantified reference — a score, a count, a clause number, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
+- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
+- For each bullet list (strengths, weaknesses, concerns, priorities, managementActions): identify only genuinely DISTINCT points — do not restate the same underlying theme in different words to pad the list. Cap each list at 3 bullets maximum, even if fewer than 3 distinct points exist. It is better to return 1 sharp bullet than 3 that repeat one theme.
+- No hedging. Take a clear position. Quantify wherever possible (percentages, counts, timeframes).
+- Write in plain, declarative sentences a CEO reads in 90 seconds. No jargon, no markdown symbols.
+
+Audit Data:
 - Client: ${report.client || client.name || 'the organization'}
 - Standard: ${report.standard || 'ISO Standard'}
 - Audit Type: ${report.auditType || 'Audit'}
@@ -127,16 +162,19 @@ Audit Context:
 Non-Conformity Detail:
 ${ncLines || 'None recorded.'}
 
-Write a JSON object with these fields (plain text, NO markdown symbols like ** or ##, use complete sentences):
+Write a JSON object with these fields (plain text, NO markdown symbols like ** or ##, use complete sentences, reference real numbers/clauses/departments from above):
 {
-  "outcome": "1-2 sentence overall audit outcome statement",
-  "health": "1-2 sentence overall organizational health / management system maturity statement",
-  "strengths": ["3-5 short bullet strings, key strengths"],
-  "weaknesses": ["3-5 short bullet strings, key weaknesses"],
-  "concerns": ["2-4 short bullet strings, strategic concerns for leadership"],
-  "priorities": ["3-5 short bullet strings, recommended management priorities, action-oriented"],
+  "verdict": "one short phrase, 2-5 words, the overall health verdict a CEO could repeat in a hallway (e.g. 'Certifiable with targeted fixes' or 'At risk — major gaps in Production')",
+  "outcome": "1-2 sentence overall audit outcome statement citing actual counts",
+  "health": "1-2 sentence organizational health / management system maturity statement",
+  "strengths": ["up to 3 short bullet strings, each a genuinely distinct key strength, cite departments/clauses"],
+  "weaknesses": ["up to 3 short bullet strings, each a genuinely distinct key weakness, cite departments/clauses — do not repeat the same theme worded differently"],
+  "concerns": ["up to 3 short bullet strings, each a genuinely distinct strategic concern for leadership"],
+  "priorities": ["up to 3 short bullet strings, recommended management priorities, action-oriented, owner-implied"],
   "recommendation": "1-2 sentence certification recommendation statement",
-  "risks": "1-2 sentence forward-looking risk statement (what could jeopardize certification/performance if unaddressed)"
+  "risks": "1-2 sentence forward-looking business-impact risk statement with at least one number/clause/department (what could jeopardize certification, revenue, or customer trust if unaddressed)",
+  "businessImpact": "1-2 sentence statement translating the findings into business terms with at least one number/clause/department (cost of delay, customer/contract exposure, operational risk)",
+  "managementActions": ["up to 3 short bullet strings, each a genuinely distinct top-management responsibility per ISO clause 5/9.3 style, action-oriented with implied ownership"]
 }
 Return ONLY the raw JSON object, no markdown fences.`;
     }
@@ -164,53 +202,157 @@ Return ONLY the raw JSON object, no markdown fences.`;
         if (stats.minorNC > 2) concerns.push(`A cluster of ${stats.minorNC} minor non-conformities suggests systemic process gaps rather than isolated incidents.`);
         if (!concerns.length) concerns.push('No material strategic concerns identified at this time.');
 
-        const priorities = realNCs.slice(0, 5).map(i => `Address ${((i.ncrType || 'nc')).toUpperCase()} finding at clause ${clauseLabel(i)}${i.department ? ' (' + i.department + ')' : ''}.`);
-        if (!priorities.length) priorities.push('Maintain current management system practices and monitor for continual improvement opportunities.');
+        const priorities = realNCs.slice(0, 5).map(i => `Close the ${((i.ncrType || 'nc')).toUpperCase()} finding at clause ${clauseLabel(i)}${i.department ? ' in ' + i.department : ''} within the required timeframe.`);
+        if (!priorities.length) priorities.push('Sustain current controls and formalize continual-improvement review cadence.');
+
+        const worstDept = deptEntries.filter(([, v]) => v.major > 0 || v.minor > 0).sort((a, b) => (b[1].major * 2 + b[1].minor) - (a[1].major * 2 + a[1].minor))[0];
+
+        const managementActions = [];
+        if (stats.majorNC > 0) managementActions.push(`Assign an executive owner to drive closure of ${stats.majorNC} major non-conformity(ies) within 30 days.`);
+        if (worstDept) managementActions.push(`Direct ${worstDept[0]} leadership to root-cause its ${worstDept[1].major + worstDept[1].minor} open finding(s), not just remediate symptoms.`);
+        managementActions.push('Review evidence-capture discipline at the next management review to ensure findings are defensible under accreditation scrutiny.');
+        if (!managementActions.length) managementActions.push('Maintain current management review cadence; no elevated management action required this cycle.');
+
+        let verdict;
+        if (stats.majorNC > 0) verdict = 'At risk — major gaps require immediate closure';
+        else if (stats.minorNC > 3) verdict = 'Certifiable, with clustered minor gaps to close';
+        else if (conformPct >= 85) verdict = 'Strong — certifiable with minimal follow-up';
+        else verdict = 'Certifiable with targeted corrective action';
 
         return {
-            outcome: `The audit of ${report.client || 'the organization'} against ${report.standard || 'the applicable standard'} identified ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) for improvement across ${stats.applicableCount || 0} applicable requirements.`,
-            health: `Based on the ${conformPct}% conformity rate observed, the management system demonstrates ${conformPct >= 80 ? 'a mature and well-embedded' : conformPct >= 60 ? 'a developing' : 'an early-stage'} level of operational discipline.`,
+            verdict,
+            outcome: `The audit of ${report.client || 'the organization'} against ${report.standard || 'the applicable standard'} identified ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) across ${stats.applicableCount || 0} applicable requirements.`,
+            health: `At a ${conformPct}% conformity rate, the management system runs at ${conformPct >= 80 ? 'a mature, well-embedded' : conformPct >= 60 ? 'a developing' : 'an early-stage'} level of operational discipline${worstDept ? `, with ${worstDept[0]} the clearest outlier` : ''}.`,
             strengths,
             weaknesses,
             concerns,
             recommendation: stats.recommendation || (stats.majorNC > 0 ? 'Conditional Recommendation, pending closure of major non-conformities.' : 'Recommended for Certification.'),
             priorities,
+            businessImpact: stats.majorNC > 0
+                ? `Unresolved major findings put certification timing and downstream customer/contract commitments at risk; each week of delay compounds audit and re-audit cost.`
+                : `Findings are contained; no material threat to certification timing or customer commitments if the priority items below are closed on schedule.`,
+            managementActions,
             risks: stats.majorNC > 0
                 ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
                 : 'Continued monitoring of minor findings and observations is advised to prevent escalation into systemic issues.'
         };
     }
 
-    function renderExecSummaryHtml(data) {
-        const list = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('') || '<li style="color:#94a3b8;">None identified.</li>';
+    function renderExecSummaryHtml(data, glance) {
+        const list = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('') || `<li class="b4-muted-item">None identified.</li>`;
+        const verdictClass = /at risk/i.test(data.verdict || '') ? 'b4-bad' : /strong|minimal/i.test(data.verdict || '') ? 'b4-good' : 'b4-warn';
+        const g = glance || {};
+
         return `
-<div class="b4-rule"></div>
-<p style="font-size:0.95rem;line-height:1.7;color:#1e293b;"><strong>Overall Outcome:</strong> ${esc(data.outcome)}</p>
-<p style="font-size:0.95rem;line-height:1.7;color:#1e293b;"><strong>Organizational Health:</strong> ${esc(data.health)}</p>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:18px 0;">
-  <div class="b4-insight-card">
-    <div style="font-weight:700;color:#0f2a43;text-transform:uppercase;letter-spacing:0.06em;font-size:0.78rem;margin-bottom:8px;">Key Strengths</div>
-    <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#334155;line-height:1.6;">${list(data.strengths)}</ul>
+<div class="b4-glance-strip">
+  <div class="b4-glance-item">
+    <div class="b4-eyebrow">Verdict</div>
+    <div class="b4-glance-value b4-glance-value--${verdictClass}">${esc(data.verdict || 'Under Review')}</div>
   </div>
-  <div class="b4-insight-card">
-    <div style="font-weight:700;color:#0f2a43;text-transform:uppercase;letter-spacing:0.06em;font-size:0.78rem;margin-bottom:8px;">Key Weaknesses</div>
-    <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#334155;line-height:1.6;">${list(data.weaknesses)}</ul>
+  <div class="b4-glance-item">
+    <div class="b4-eyebrow">Conformity Score</div>
+    <div class="b4-glance-value">${g.conformPct != null ? g.conformPct + '%' : '—'}</div>
   </div>
-  <div class="b4-insight-card">
-    <div style="font-weight:700;color:#0f2a43;text-transform:uppercase;letter-spacing:0.06em;font-size:0.78rem;margin-bottom:8px;">Strategic Concerns</div>
-    <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#334155;line-height:1.6;">${list(data.concerns)}</ul>
+  <div class="b4-glance-item">
+    <div class="b4-eyebrow">Recommendation</div>
+    <div class="b4-glance-value b4-glance-value--sm">${esc(g.recommendationShort || data.recommendation || '—')}</div>
+  </div>
+  <div class="b4-glance-item">
+    <div class="b4-eyebrow">Findings</div>
+    <div class="b4-glance-value">${g.majorNC || 0}<span class="b4-glance-unit">MAJOR</span> &nbsp;/&nbsp; ${g.minorNC || 0}<span class="b4-glance-unit">MINOR</span></div>
   </div>
 </div>
-<p style="font-size:0.95rem;line-height:1.7;color:#1e293b;"><strong>Management Priorities:</strong></p>
-<ul style="margin:4px 0 14px 0;padding-left:20px;font-size:0.9rem;color:#334155;line-height:1.7;">${list(data.priorities)}</ul>
-<p style="font-size:0.95rem;line-height:1.7;color:#1e293b;"><strong>Certification Recommendation:</strong> ${esc(data.recommendation)}</p>
-<p style="font-size:0.95rem;line-height:1.7;color:#1e293b;"><strong>Forward-Looking Risks:</strong> ${esc(data.risks)}</p>`;
+
+<div class="b4-highlight b4-highlight--${verdictClass}" style="margin-top:var(--b4-s5);">
+  <div class="b4-eyebrow">Overall Health Verdict</div>
+  <div class="b4-highlight-title">${esc(data.verdict || 'Under Review')}</div>
+  <p class="b4-body">${esc(data.outcome)}</p>
+  <p class="b4-body" style="margin:0;">${esc(data.health)}</p>
+</div>
+
+<div class="b4-grid-2" style="margin:var(--b4-s5) 0;">
+  <div class="b4-card b4-callout b4-callout--info">
+    <div class="b4-eyebrow">${icon('shield')} Business Impact</div>
+    <p class="b4-body" style="margin:0;">${esc(data.businessImpact || '')}</p>
+  </div>
+  <div class="b4-card b4-callout b4-callout--warn">
+    <div class="b4-eyebrow">${icon('alert')} Forward-Looking Risk</div>
+    <p class="b4-body" style="margin:0;">${esc(data.risks)}</p>
+  </div>
+</div>
+
+<div class="b4-section-title" style="margin-top:var(--b4-s5);">At a Glance — Findings</div>
+<div class="b4-grid-2">
+  <div class="b4-card b4-insight-card">
+    <div class="b4-card-heading">${icon('check')} Key Strengths</div>
+    <ul class="b4-bullets b4-bullets--wide">${list(data.strengths)}</ul>
+  </div>
+  <div class="b4-card b4-insight-card">
+    <div class="b4-card-heading">${icon('alert')} Key Weaknesses</div>
+    <ul class="b4-bullets b4-bullets--wide">${list(data.weaknesses)}</ul>
+  </div>
+</div>
+<div class="b4-card b4-insight-card" style="margin-top:var(--b4-s4);">
+  <div class="b4-card-heading">${icon('risk')} Strategic Concerns</div>
+  <ul class="b4-bullets b4-bullets--wide">${list(data.concerns)}</ul>
+</div>
+
+<div class="b4-grid-2" style="margin-top:var(--b4-s5);">
+  <div class="b4-card">
+    <div class="b4-card-heading">${icon('target')} Management Priorities</div>
+    <ul class="b4-bullets b4-bullets--wide">${list(data.priorities)}</ul>
+  </div>
+  <div class="b4-card">
+    <div class="b4-card-heading">${icon('management')} Top-Management Responsibilities</div>
+    <ul class="b4-bullets b4-bullets--wide">${list(data.managementActions)}</ul>
+  </div>
+</div>
+
+<div class="b4-highlight b4-highlight--neutral" style="margin-top:var(--b4-s5);">
+  <div class="b4-eyebrow">${icon('clause')} Certification Recommendation</div>
+  <p class="b4-body" style="margin:0;">${esc(data.recommendation)}</p>
+</div>`;
+    }
+
+    function buildGlance(d, data) {
+        const stats = getStats(d);
+        const conformPct = stats.applicableCount ? Math.round((stats.conformCount / stats.applicableCount) * 100) : null;
+        const recShort = (stats.recommendation || data.recommendation || '').split(/[.;]/)[0].trim().substring(0, 40);
+        return {
+            conformPct,
+            majorNC: stats.majorNC || 0,
+            minorNC: stats.minorNC || 0,
+            recommendationShort: recShort
+        };
+    }
+
+    // Dedupe near-identical bullets (same leading theme worded differently) and cap list length.
+    function dedupeCap(arr, max) {
+        const out = [];
+        const seenThemes = new Set();
+        safeArr(arr).forEach(raw => {
+            const s = String(raw == null ? '' : raw).trim();
+            if (!s) return;
+            const theme = s.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').slice(0, 4).join(' ');
+            if (seenThemes.has(theme)) return;
+            seenThemes.add(theme);
+            out.push(s);
+        });
+        return out.slice(0, max || 3);
+    }
+
+    const BULLET_FIELDS = ['strengths', 'weaknesses', 'concerns', 'priorities', 'managementActions'];
+    function capExecSummaryLists(data) {
+        const out = Object.assign({}, data);
+        BULLET_FIELDS.forEach(f => { out[f] = dedupeCap(out[f], 3); });
+        return out;
     }
 
     async function generateExecutiveSummary(d) {
         const fallback = fallbackExecSummaryData(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
-            return { html: renderExecSummaryHtml(fallback) };
+            const capped = capExecSummaryLists(fallback);
+            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped)) };
         }
         try {
             const prompt = buildExecSummaryPrompt(d);
@@ -218,11 +360,12 @@ Return ONLY the raw JSON object, no markdown fences.`;
             const cleaned = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
             const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
-            const merged = Object.assign({}, fallback, parsed);
-            return { html: renderExecSummaryHtml(merged) };
+            const merged = capExecSummaryLists(Object.assign({}, fallback, parsed));
+            return { html: renderExecSummaryHtml(merged, buildGlance(d, merged)) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveSummary AI failed, using fallback:', err);
-            return { html: renderExecSummaryHtml(fallback) };
+            const capped = capExecSummaryLists(fallback);
+            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped)) };
         }
     }
 
@@ -235,6 +378,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
         const total = items.length;
         let withEvidence = 0;
         const missingEvidence = [];
+        const evidenced = [];
         const byDepartment = {};
 
         items.forEach(item => {
@@ -247,6 +391,16 @@ Return ONLY the raw JSON object, no markdown fences.`;
             if (hasEvidence) {
                 withEvidence++;
                 byDepartment[dept].withEvidence++;
+                evidenced.push({
+                    clause: clauseLabel(item),
+                    title: clauseTitle(item) || (item.requirement || '').substring(0, 100) || '',
+                    department: dept,
+                    status: item.status,
+                    ncrType: item.ncrType || '',
+                    comment: (item.comment || '').substring(0, 160),
+                    imageCount: imgs.length,
+                    timestamp: item.timestamp || item.capturedAt || item.date || null
+                });
             } else {
                 // "findings with no evidence" — prioritize NC items, but also flag conform items lacking evidence
                 const hasFinding = item.status === 'nc' || !!(item.comment && item.comment.trim());
@@ -275,53 +429,80 @@ Return ONLY the raw JSON object, no markdown fences.`;
             qualityNote = `Evidence coverage is low at ${coveragePct}%. A significant number of findings (${missingEvidence.length}) are not backed by evidence images, which may weaken the defensibility of this report under accreditation review.`;
         }
 
-        return { coveragePct, missingEvidence, byDepartment, qualityNote, totalApplicable: total, withEvidence };
+        return { coveragePct, missingEvidence, evidenced, byDepartment, qualityNote, totalApplicable: total, withEvidence };
     }
 
     function renderEvidenceIntelHtml(intel) {
-        const rows = intel.missingEvidence.slice(0, 40).map((m, idx) => `
-<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};">
-  <td style="padding:8px 12px;font-weight:700;">${esc(m.clause)}</td>
-  <td style="padding:8px 12px;">${esc(m.item)}</td>
-  <td style="padding:8px 12px;">${esc(m.department)}</td>
+        const rows = intel.missingEvidence.slice(0, 40).map(m => `
+<tr>
+  <td><strong>${esc(m.clause)}</strong></td>
+  <td>${esc(m.item)}</td>
+  <td>${esc(m.department)}</td>
+  <td>${m.status === 'nc' ? `<span class="b4-badge b4-badge--${m.ncrType === 'major' ? 'bad' : 'warn'}">${esc((m.ncrType || 'nc').toUpperCase())}</span>` : `<span class="b4-badge b4-badge--neutral">${esc(m.status || '')}</span>`}</td>
 </tr>`).join('');
 
         const deptRows = Object.entries(intel.byDepartment).map(([name, v]) => {
             const pct = v.total ? Math.round((v.withEvidence / v.total) * 100) : 0;
-            return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-  <div style="min-width:130px;font-size:0.82rem;color:#334155;font-weight:600;">${esc(name)}</div>
-  <div class="b4-maturity-bar"><div class="b4-maturity-bar-fill" style="width:${pct}%;"></div></div>
-  <div style="min-width:40px;text-align:right;font-size:0.8rem;color:#64748b;">${pct}%</div>
+            const sev = pct >= 80 ? 'good' : pct >= 50 ? 'warn' : 'bad';
+            return `<div class="b4-bar-row">
+  <div class="b4-bar-label">${esc(name)}</div>
+  <div class="b4-bar"><div class="b4-bar-fill b4-bar-fill--${sev}" style="width:${pct}%;"></div></div>
+  <div class="b4-bar-pct">${pct}%</div>
 </div>`;
-        }).join('') || '<div style="color:#94a3b8;font-size:0.85rem;">No department data available.</div>';
+        }).join('') || '<div class="b4-muted-item">No department data available.</div>';
+
+        // richer evidence samples — show a small gallery of captured evidence with whatever metadata exists
+        const sampleCards = intel.evidenced.slice(0, 6).map(e => `
+<div class="b4-card b4-evidence-card">
+  <div class="b4-evidence-card-head">
+    <span class="b4-badge b4-badge--${e.status === 'nc' ? (e.ncrType === 'major' ? 'bad' : 'warn') : 'good'}">${esc(e.status === 'nc' ? (e.ncrType || 'NC').toUpperCase() : 'CONFORM')}</span>
+    <span class="b4-caption">${icon('evidence', { size: 13 })} ${e.imageCount} image${e.imageCount === 1 ? '' : 's'}</span>
+  </div>
+  <div class="b4-card-heading" style="margin-top:6px;">${icon('clause', { size: 14 })} ${esc(e.clause)}</div>
+  ${e.title ? `<div class="b4-caption">${esc(e.title)}</div>` : ''}
+  <div class="b4-caption" style="margin-top:4px;">${icon('department', { size: 13 })} ${esc(e.department)}${e.timestamp ? ` &middot; ${icon('clock', { size: 13 })} ${esc(e.timestamp)}` : ''}</div>
+  ${e.comment ? `<p class="b4-body" style="margin-top:6px;">${esc(e.comment)}</p>` : ''}
+</div>`).join('');
 
         return `
 <div class="b4-rule"></div>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
-  <div class="b4-kpi-card">
+<div class="b4-kpi-grid">
+  <div class="b4-kpi-card b4-kpi-card--accent">
+    <div class="b4-kpi-icon">${icon('evidence')}</div>
     <div class="b4-kpi-value">${intel.coveragePct}%</div>
     <div class="b4-kpi-label">Evidence Coverage</div>
   </div>
   <div class="b4-kpi-card">
+    <div class="b4-kpi-icon">${icon('check')}</div>
     <div class="b4-kpi-value">${intel.withEvidence}</div>
     <div class="b4-kpi-label">Items with Evidence</div>
   </div>
   <div class="b4-kpi-card">
-    <div class="b4-kpi-value" style="color:${intel.missingEvidence.length > 0 ? '#dc2626' : '#0f2a43'};">${intel.missingEvidence.length}</div>
+    <div class="b4-kpi-icon">${icon('alert')}</div>
+    <div class="b4-kpi-value" style="color:${intel.missingEvidence.length > 0 ? 'var(--b4-bad)' : 'var(--b4-navy)'};">${intel.missingEvidence.length}</div>
     <div class="b4-kpi-label">Missing Evidence</div>
   </div>
 </div>
-<div style="font-weight:700;color:#0f2a43;text-transform:uppercase;letter-spacing:0.06em;font-size:0.78rem;margin:16px 0 10px;">Evidence Coverage by Department</div>
-${deptRows}
-<div style="font-weight:700;color:#0f2a43;text-transform:uppercase;letter-spacing:0.06em;font-size:0.78rem;margin:20px 0 10px;">Findings Without Supporting Evidence</div>
+
+<div class="b4-section-title" style="margin-top:var(--b4-s5);">Evidence Coverage by Department</div>
+<div class="b4-card">${deptRows}</div>
+
+${sampleCards ? `
+<div class="b4-section-title" style="margin-top:var(--b4-s5);">${icon('evidence')} Evidence Samples</div>
+<div class="b4-grid-3">${sampleCards}</div>` : ''}
+
+<div class="b4-section-title" style="margin-top:var(--b4-s5);">Findings Without Supporting Evidence</div>
 ${intel.missingEvidence.length ? `
-<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
-  <thead><tr style="background:#0f2a43;color:white;text-transform:uppercase;letter-spacing:0.04em;font-size:0.72rem;">
-    <th style="padding:8px 12px;text-align:left;">Clause</th><th style="padding:8px 12px;text-align:left;">Item</th><th style="padding:8px 12px;text-align:left;">Department</th>
+<table class="b4-tbl">
+  <thead><tr>
+    <th>Clause</th><th>Item</th><th>Department</th><th>Status</th>
   </tr></thead>
   <tbody>${rows}</tbody>
-</table>` : '<p style="color:#64748b;font-size:0.85rem;">All findings are supported by documented evidence.</p>'}
-<p style="margin-top:16px;font-size:0.88rem;line-height:1.6;color:#334155;">${esc(intel.qualityNote)}</p>`;
+</table>` : '<div class="b4-callout b4-callout--good">All findings are supported by documented evidence.</div>'}
+
+<div class="b4-highlight b4-highlight--neutral" style="margin-top:var(--b4-s5);">
+  <p class="b4-body" style="margin:0;">${esc(intel.qualityNote)}</p>
+</div>`;
     }
 
     // ------------------------------------------------------------------
@@ -348,7 +529,7 @@ ${intel.missingEvidence.length ? `
         if (stats.majorNC > 0) risks.push(`${stats.majorNC} major non-conformity(ies) could delay certification issuance.`);
         if (intel.coveragePct < 50) risks.push('Low evidence coverage weakens the defensibility of findings under accreditation scrutiny.');
         if (stats.minorNC > 3) risks.push(`${stats.minorNC} minor non-conformities suggest possible systemic control gaps.`);
-        if (!risks.length) risks.push('No significant business risks identified from this audit cycle.');
+        if (!risks.length) risks.push('No material business risk identified from this audit cycle; current controls hold.');
 
         const departments = deptEntries
             .filter(([, v]) => v.major > 0 || v.minor > 0)
@@ -387,7 +568,7 @@ ${intel.missingEvidence.length ? `
         const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseLabel(i)} (${i.department || 'General'})`).join('\n');
 
         return `
-You are a Senior Lead Auditor generating executive insight cards for a CEO-level ISO audit report dashboard.
+You are a senior engagement partner at a Big Four consulting firm generating executive insight cards for a CEO/Board-level ISO audit report dashboard. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall"). Lead with the business consequence.
 
 Context:
 - Client: ${report.client || ''}
@@ -408,19 +589,18 @@ Return ONLY a raw JSON object (no markdown fences) with these keys, each an arra
 }`;
     }
 
+    const INSIGHT_ICON_MAP = { risks: 'risk', departments: 'department', recurring: 'trend', improvements: 'check', readiness: 'target', strategic: 'shield' };
+
     function renderInsightsHtml(data) {
         const cards = INSIGHT_CARD_DEFS.map(def => {
-            const bullets = safeArr(data[def.key]).slice(0, 3).map(b => `<li>${esc(b)}</li>`).join('') || '<li style="color:#94a3b8;">No data available.</li>';
+            const bullets = safeArr(data[def.key]).slice(0, 3).map(b => `<li>${esc(b)}</li>`).join('') || '<li class="b4-muted-item">No data available.</li>';
             return `
-<div class="b4-insight-card">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-    <span style="font-size:1.1rem;">${def.icon}</span>
-    <span style="font-weight:700;color:#0f2a43;text-transform:uppercase;letter-spacing:0.05em;font-size:0.76rem;">${esc(def.title)}</span>
-  </div>
-  <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#334155;line-height:1.6;">${bullets}</ul>
+<div class="b4-card b4-insight-card">
+  <div class="b4-card-heading">${icon(INSIGHT_ICON_MAP[def.key] || 'finding')} ${esc(def.title)}</div>
+  <ul class="b4-bullets">${bullets}</ul>
 </div>`;
         }).join('');
-        return `<div class="b4-rule"></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">${cards}</div>`;
+        return `<div class="b4-rule"></div><div class="b4-grid-2">${cards}</div>`;
     }
 
     async function generateExecutiveInsights(d) {
@@ -465,13 +645,16 @@ Return ONLY a raw JSON object (no markdown fences) with these keys, each an arra
         const cached = _cache[key];
         const intel = computeEvidenceIntel(d);
 
-        const summaryHtml = (cached && cached.summary && cached.summary.html) || renderExecSummaryHtml(fallbackExecSummaryData(d));
+        const summaryHtml = (cached && cached.summary && cached.summary.html) || (function () {
+            const capped = capExecSummaryLists(fallbackExecSummaryData(d));
+            return renderExecSummaryHtml(capped, buildGlance(d, capped));
+        })();
         const insightsHtml = (cached && cached.insights && cached.insights.html) || renderInsightsHtml(fallbackInsights(d));
 
         return [
             {
                 key: 'exec-summary',
-                name: 'EXECUTIVE SUMMARY (BOARD EDITION)',
+                name: 'EXECUTIVE SUMMARY',
                 desc: 'CEO-level summary of audit outcome, organizational health, and strategic priorities.',
                 color: '#0f2a43',
                 bodyHtml: summaryHtml,
@@ -636,33 +819,201 @@ Answer:`;
 
     function bigFourCss() {
         return `
-/* ============ Big-Four Style Component Library (ReportExecutive) ============ */
-.b4-kpi-card, .b4-insight-card, .b4-pill, .b4-heat-cell {
+/* ============================================================
+   Big-Four Style Component Library (ReportExecutive)
+   Executive-consulting design system: Deloitte/PwC/EY/KPMG-grade,
+   Fluent/Notion/Stripe/Linear influenced. Print-safe, no gradients,
+   no heavy shadows. Extends — never breaks — existing b4-* classes.
+   ============================================================ */
+
+/* ---------- Design tokens ---------- */
+:root, .b4-scope {
+  --b4-navy: #0f2a43;
+  --b4-navy-2: #16324e;
+  --b4-ink: #1e293b;
+  --b4-muted: #64748b;
+  --b4-line: #e7ecf1;
+  --b4-line-2: #eef1f5;
+  --b4-surface: #ffffff;
+  --b4-surface-2: #f8fafc;
+
+  --b4-good: #15803d;
+  --b4-good-bg: #ecfdf5;
+  --b4-good-line: #a7d9bb;
+  --b4-warn: #b45309;
+  --b4-warn-bg: #fffbeb;
+  --b4-warn-line: #f3d99a;
+  --b4-bad: #b91c1c;
+  --b4-bad-bg: #fef2f2;
+  --b4-bad-line: #f1b7b7;
+  --b4-info: #1d4ed8;
+  --b4-info-bg: #eff6ff;
+  --b4-info-line: #bcd2f7;
+  --b4-neutral: #475569;
+  --b4-neutral-bg: #f1f5f9;
+  --b4-neutral-line: #d7dee6;
+
+  /* spacing scale */
+  --b4-s1: 4px;
+  --b4-s2: 8px;
+  --b4-s3: 12px;
+  --b4-s4: 16px;
+  --b4-s5: 24px;
+  --b4-s6: 36px;
+}
+
+/* ---------- Print safety ---------- */
+.b4-kpi-card, .b4-insight-card, .b4-card, .b4-pill, .b4-badge, .b4-heat-cell,
+.b4-callout, .b4-highlight, .b4-tbl, .b4-bar-fill, .b4-maturity-bar-fill {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/* ---------- Typography scale ---------- */
+.b4-page-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26pt;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--b4-navy);
+  margin: 0 0 var(--b4-s3);
+}
+.b4-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--b4-navy);
+  margin: 0 0 var(--b4-s3);
+}
+.b4-card-heading {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13pt;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--b4-navy);
+  display: flex;
+  align-items: center;
+  gap: var(--b4-s2);
+  margin: 0 0 var(--b4-s2);
+}
+.b4-body {
+  font-size: 11pt;
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--b4-ink);
+  margin: 0 0 var(--b4-s2);
+}
+.b4-caption {
+  font-size: 9.5pt;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--b4-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.b4-eyebrow {
+  font-size: 9.5pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--b4-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--b4-s2);
+  margin: 0 0 var(--b4-s2);
+}
+
+/* ---------- Spacing utilities ---------- */
+.b4-mt-1{margin-top:var(--b4-s1)} .b4-mt-2{margin-top:var(--b4-s2)} .b4-mt-3{margin-top:var(--b4-s3)}
+.b4-mt-4{margin-top:var(--b4-s4)} .b4-mt-5{margin-top:var(--b4-s5)} .b4-mt-6{margin-top:var(--b4-s6)}
+.b4-mb-1{margin-bottom:var(--b4-s1)} .b4-mb-2{margin-bottom:var(--b4-s2)} .b4-mb-3{margin-bottom:var(--b4-s3)}
+.b4-mb-4{margin-bottom:var(--b4-s4)} .b4-mb-5{margin-bottom:var(--b4-s5)} .b4-mb-6{margin-bottom:var(--b4-s6)}
+.b4-stack > * + * { margin-top: var(--b4-s4); }
+
+.b4-rule {
+  height: 1px;
+  background: var(--b4-line);
+  margin: var(--b4-s3) 0 var(--b4-s5);
+  border: none;
+}
+
+/* ---------- Grids ---------- */
+.b4-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--b4-s4); }
+.b4-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--b4-s4); }
+.b4-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--b4-s4); }
+
+/* ---------- Icons ---------- */
+.b4-icon { flex: 0 0 auto; vertical-align: -3px; color: currentColor; }
+.b4-eyebrow .b4-icon, .b4-caption .b4-icon { color: var(--b4-muted); }
+.b4-card-heading .b4-icon { color: var(--b4-navy); }
+/* tolerate legacy <i class="fa-..."> usage from other modules */
+.b4-card-heading i[class*="fa-"], .b4-eyebrow i[class*="fa-"] { color: inherit; margin-right: 4px; }
+
+/* ---------- KPI cards ---------- */
+.b4-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--b4-s4);
+}
 .b4-kpi-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  padding: 20px 18px;
+  background: var(--b4-surface);
+  border: 1px solid var(--b4-line);
+  border-radius: 6px;
+  padding: var(--b4-s4) var(--b4-s4);
   text-align: center;
+  position: relative;
+}
+.b4-kpi-card--accent { border-left: 3px solid var(--b4-navy); }
+.b4-kpi-icon {
+  color: var(--b4-navy);
+  opacity: 0.55;
+  margin-bottom: var(--b4-s2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .b4-kpi-value {
   font-family: 'Outfit', sans-serif;
-  font-size: 2rem;
+  font-size: 26pt;
   font-weight: 700;
-  color: #0f2a43;
+  color: var(--b4-navy);
   line-height: 1.1;
 }
 .b4-kpi-label {
-  margin-top: 6px;
-  font-size: 0.72rem;
+  margin-top: var(--b4-s1);
+  font-size: 9.5pt;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #64748b;
+  letter-spacing: 0.07em;
+  color: var(--b4-muted);
 }
+.b4-kpi-sub {
+  margin-top: var(--b4-s1);
+  font-size: 9.5pt;
+  color: var(--b4-muted);
+}
+.b4-kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5pt;
+  font-weight: 700;
+  margin-top: var(--b4-s1);
+}
+.b4-kpi-trend.up   { color: var(--b4-good); }
+.b4-kpi-trend.down { color: var(--b4-bad); }
+.b4-kpi-trend.flat { color: var(--b4-muted); }
+.b4-kpi-trend.up::before   { content: "\\25B2"; }
+.b4-kpi-trend.down::before { content: "\\25BC"; }
+.b4-kpi-trend.flat::before { content: "\\25A0"; font-size: 7pt; }
+
+@media print {
+  .b4-kpi-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ---------- Pills / badges ---------- */
 .b4-pill {
   display: inline-block;
   padding: 3px 12px;
@@ -671,33 +1022,180 @@ Answer:`;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #f1f5f9;
-  color: #334155;
-  border: 1px solid #cbd5e1;
+  background: var(--b4-neutral-bg);
+  color: var(--b4-neutral);
+  border: 1px solid var(--b4-neutral-line);
 }
-.b4-pill-good    { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
-.b4-pill-warn    { background: #fffbeb; color: #92400e; border-color: #fde68a; }
-.b4-pill-bad     { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+.b4-pill-good    { background: var(--b4-good-bg); color: var(--b4-good); border-color: var(--b4-good-line); }
+.b4-pill-warn    { background: var(--b4-warn-bg); color: var(--b4-warn); border-color: var(--b4-warn-line); }
+.b4-pill-bad     { background: var(--b4-bad-bg);  color: var(--b4-bad);  border-color: var(--b4-bad-line); }
 .b4-pill-critical{ background: #7f1d1d; color: #ffffff; border-color: #7f1d1d; }
-.b4-insight-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-left: 3px solid #0f2a43;
-  border-radius: 4px;
-  padding: 16px 18px;
+
+.b4-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--b4-neutral-bg);
+  color: var(--b4-neutral);
+  border: 1px solid var(--b4-neutral-line);
 }
+.b4-badge--good    { background: var(--b4-good-bg); color: var(--b4-good); border-color: var(--b4-good-line); }
+.b4-badge--warn    { background: var(--b4-warn-bg); color: var(--b4-warn); border-color: var(--b4-warn-line); }
+.b4-badge--bad     { background: var(--b4-bad-bg);  color: var(--b4-bad);  border-color: var(--b4-bad-line); }
+.b4-badge--info    { background: var(--b4-info-bg); color: var(--b4-info); border-color: var(--b4-info-line); }
+.b4-badge--neutral { background: var(--b4-neutral-bg); color: var(--b4-neutral); border-color: var(--b4-neutral-line); }
+
+/* ---------- Tables ---------- */
+.b4-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+.b4-tbl thead th {
+  text-align: left;
+  padding: var(--b4-s2) var(--b4-s3);
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--b4-muted);
+  border-bottom: 1px solid var(--b4-navy);
+  background: transparent;
+}
+.b4-tbl tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--b4-line-2);
+  color: var(--b4-ink);
+  vertical-align: top;
+}
+.b4-tbl tbody tr:nth-child(even) td { background: var(--b4-surface-2); }
+.b4-tbl .b4-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Cards / callouts ---------- */
+.b4-card {
+  background: var(--b4-surface);
+  border: 1px solid var(--b4-line);
+  border-radius: 6px;
+  padding: var(--b4-s4);
+}
+.b4-insight-card {
+  background: var(--b4-surface);
+  border: 1px solid var(--b4-line);
+  border-left: 3px solid var(--b4-navy);
+  border-radius: 6px;
+  padding: var(--b4-s4);
+}
+.b4-callout {
+  border-radius: 6px;
+  padding: var(--b4-s4);
+  border: 1px solid var(--b4-line);
+  background: var(--b4-surface-2);
+}
+.b4-callout--good { background: var(--b4-good-bg); border-color: var(--b4-good-line); }
+.b4-callout--warn { background: var(--b4-warn-bg); border-color: var(--b4-warn-line); }
+.b4-callout--bad  { background: var(--b4-bad-bg);  border-color: var(--b4-bad-line); }
+.b4-callout--info { background: var(--b4-info-bg); border-color: var(--b4-info-line); }
+
+.b4-highlight {
+  border-radius: 8px;
+  padding: var(--b4-s5);
+  border: 1px solid var(--b4-line);
+  background: var(--b4-surface-2);
+}
+.b4-highlight--neutral { background: var(--b4-surface-2); border-color: var(--b4-line); }
+.b4-highlight--b4-good, .b4-highlight--good { background: var(--b4-good-bg); border-color: var(--b4-good-line); }
+.b4-highlight--b4-warn, .b4-highlight--warn { background: var(--b4-warn-bg); border-color: var(--b4-warn-line); }
+.b4-highlight--b4-bad,  .b4-highlight--bad  { background: var(--b4-bad-bg);  border-color: var(--b4-bad-line); }
+.b4-highlight--b4-info, .b4-highlight--info { background: var(--b4-info-bg); border-color: var(--b4-info-line); }
+.b4-highlight-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  color: var(--b4-navy);
+  margin: 2px 0 var(--b4-s3);
+}
+
+.b4-bullets {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 10.5pt;
+  color: var(--b4-ink);
+  line-height: 1.65;
+}
+.b4-bullets li { min-width: 0; white-space: normal; word-break: normal; overflow-wrap: break-word; }
+.b4-bullets li + li { margin-top: 4px; }
+.b4-bullets--wide { column-gap: var(--b4-s5); }
+.b4-muted-item { color: #94a3b8; list-style: none; margin-left: -18px; }
+
+/* ---------- "At a glance" strip (top-of-section executive readout) ---------- */
+.b4-glance-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--b4-s4);
+  border: 1px solid var(--b4-line);
+  border-radius: 8px;
+  background: var(--b4-surface);
+  padding: var(--b4-s4) var(--b4-s5);
+}
+.b4-glance-item { min-width: 0; }
+.b4-glance-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15pt;
+  font-weight: 700;
+  color: var(--b4-navy);
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.b4-glance-value--sm { font-size: 10.5pt; font-weight: 600; }
+.b4-glance-value--b4-good, .b4-glance-value--good { color: var(--b4-good); }
+.b4-glance-value--b4-warn, .b4-glance-value--warn { color: var(--b4-warn); }
+.b4-glance-value--b4-bad,  .b4-glance-value--bad  { color: var(--b4-bad); }
+.b4-glance-unit { font-size: 7.5pt; font-weight: 700; color: var(--b4-muted); margin-left: 2px; letter-spacing: 0.04em; }
+
+@media print {
+  .b4-glance-strip { grid-template-columns: repeat(4, 1fr); break-inside: avoid; }
+}
+
+.b4-evidence-card { padding: var(--b4-s3) var(--b4-s4); }
+.b4-evidence-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--b4-s2); }
+
+/* ---------- Data viz support ---------- */
+.b4-bar-row { display: flex; align-items: center; gap: var(--b4-s3); padding: 6px 0; }
+.b4-bar-row + .b4-bar-row { border-top: 1px solid var(--b4-line-2); }
+.b4-bar-label { min-width: 140px; font-size: 9.5pt; color: var(--b4-ink); font-weight: 600; }
+.b4-bar-pct { min-width: 40px; text-align: right; font-size: 9.5pt; color: var(--b4-muted); font-variant-numeric: tabular-nums; }
+.b4-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--b4-line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.b4-bar-fill { height: 100%; background: var(--b4-navy); border-radius: 4px; }
+.b4-bar-fill--good { background: var(--b4-good); }
+.b4-bar-fill--warn { background: var(--b4-warn); }
+.b4-bar-fill--bad  { background: var(--b4-bad); }
+.b4-bar-fill--info { background: var(--b4-info); }
+
 .b4-maturity-bar {
   flex: 1;
   height: 8px;
-  background: #e2e8f0;
+  background: var(--b4-line);
   border-radius: 4px;
   overflow: hidden;
 }
 .b4-maturity-bar-fill {
   height: 100%;
-  background: #0f2a43;
+  background: var(--b4-navy);
   border-radius: 4px;
 }
+
 .b4-heat-cell {
   display: inline-flex;
   align-items: center;
@@ -705,22 +1203,63 @@ Answer:`;
   min-width: 34px;
   height: 28px;
   padding: 0 6px;
-  border-radius: 3px;
-  font-size: 0.72rem;
+  border-radius: 4px;
+  font-size: 9pt;
   font-weight: 700;
   color: #ffffff;
-  background: #94a3b8;
+  background: var(--b4-neutral);
 }
-.b4-heat-cell.b4-heat-0 { background: #e2e8f0; color: #334155; }
-.b4-heat-cell.b4-heat-low { background: #10b981; }
-.b4-heat-cell.b4-heat-med { background: #f59e0b; }
-.b4-heat-cell.b4-heat-high { background: #ef4444; }
+.b4-heat-cell.b4-heat-0 { background: var(--b4-neutral-bg); color: var(--b4-neutral); }
+.b4-heat-cell.b4-heat-low { background: var(--b4-good); }
+.b4-heat-cell.b4-heat-med { background: var(--b4-warn); }
+.b4-heat-cell.b4-heat-high { background: var(--b4-bad); }
 .b4-heat-cell.b4-heat-crit { background: #7f1d1d; }
-.b4-rule {
-  height: 1px;
-  background: #e2e8f0;
-  margin: 14px 0 18px;
-  border: none;
+
+.b4-chart-box {
+  border: 1px solid var(--b4-line);
+  border-radius: 6px;
+  background: var(--b4-surface);
+  padding: var(--b4-s4);
+}
+.b4-chart-box-caption {
+  margin-top: var(--b4-s2);
+  font-size: 9pt;
+  color: var(--b4-muted);
+  text-align: center;
+}
+
+.b4-timeline { position: relative; margin: var(--b4-s4) 0; padding-left: 22px; }
+.b4-timeline::before {
+  content: "";
+  position: absolute;
+  left: 5px; top: 4px; bottom: 4px;
+  width: 1px;
+  background: var(--b4-line);
+}
+.b4-timeline-item { position: relative; padding-bottom: var(--b4-s5); }
+.b4-timeline-item:last-child { padding-bottom: 0; }
+.b4-timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -22px; top: 3px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--b4-navy);
+  border: 2px solid var(--b4-surface);
+  box-shadow: 0 0 0 1px var(--b4-line);
+}
+.b4-timeline-item.good::before { background: var(--b4-good); }
+.b4-timeline-item.warn::before { background: var(--b4-warn); }
+.b4-timeline-item.bad::before  { background: var(--b4-bad); }
+.b4-timeline-item-date { font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--b4-muted); }
+.b4-timeline-item-title { font-size: 10.5pt; font-weight: 700; color: var(--b4-navy); margin: 2px 0; }
+.b4-timeline-item-body { font-size: 9.5pt; color: var(--b4-ink); line-height: 1.55; }
+
+@media print {
+  .b4-card, .b4-kpi-card, .b4-insight-card, .b4-callout, .b4-highlight, .b4-chart-box {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
 }
 `;
     }
@@ -739,7 +1278,8 @@ Answer:`;
         askAuditAI,
         renderAssistantPanel,
         handleAsk,
-        bigFourCss
+        bigFourCss,
+        icon
     };
 
     // CSP-safe wiring: inline handlers are blocked (no 'unsafe-inline' in script-src),

@@ -2443,14 +2443,54 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 });
                 const personnelTxt = g.personnel.size ? Array.from(g.personnel).join(', ') : '<span style="color:#94a3b8;">Not recorded</span>';
                 const clausesTxt = clausesSorted.length ? clausesSorted.join(', ') : '—';
-                return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';">'
-                    + '<td style="padding:10px 14px;font-weight:700;">' + window.UTILS.escapeHtml(dept) + '</td>'
-                    + '<td style="padding:10px 14px;color:#334155;">' + personnelTxt + '</td>'
-                    + '<td style="padding:10px 14px;color:#334155;">' + clausesTxt + '</td>'
-                    + '<td style="padding:10px 14px;text-align:center;">' + g.count + '</td>'
-                    + '<td style="padding:10px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;' + worstStyle[g.worst] + '">' + worstLabel[g.worst] + '</span></td>'
+                return '<tr style="background:' + (idx % 2 ? '#fafbfc' : 'white') + ';">'
+                    + '<td style="padding:11px 14px;font-weight:700;">' + window.UTILS.escapeHtml(dept) + '</td>'
+                    + '<td style="padding:11px 14px;color:#334155;">' + personnelTxt + '</td>'
+                    + '<td style="padding:11px 14px;color:#334155;">' + clausesTxt + '</td>'
+                    + '<td style="padding:11px 14px;text-align:center;">' + g.count + '</td>'
+                    + '<td style="padding:11px 14px;text-align:center;"><span style="display:inline-block;white-space:nowrap;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;' + worstStyle[g.worst] + '">' + worstLabel[g.worst] + '</span></td>'
                     + '</tr>';
             }).join('');
+        })();
+
+        // Audit trail as a chronological timeline — the sequence of areas covered,
+        // who was interviewed and what each pass concluded. Complements the table
+        // above (which stays for auditor/accreditation traceability).
+        const auditTrailTimelineHtml = (function () {
+            const groups = {};
+            const order = [];
+            (d.hydratedProgress || []).forEach(function (item) {
+                const dept = (item.department && String(item.department).trim()) || 'General';
+                if (!groups[dept]) { groups[dept] = { personnel: new Set(), clauses: new Set(), count: 0, nc: 0, major: 0 }; order.push(dept); }
+                const g = groups[dept];
+                if (item.personnel) String(item.personnel).split(/[,;]/).map(function (p) { return p.trim(); }).filter(Boolean).forEach(function (p) { g.personnel.add(p); });
+                const clause = (item.kbMatch ? item.kbMatch.clause : item.clause) || item.clause;
+                if (clause) g.clauses.add(String(clause));
+                g.count++;
+                if (item.status === 'nc') {
+                    const t = (item.ncrType || '').toLowerCase();
+                    if (t === 'major' || t === 'minor' || !t) g.nc++;
+                    if (t === 'major') g.major++;
+                }
+            });
+            if (!order.length) return '';
+            return '<div class="b4-timeline" style="position:relative;padding-left:22px;">'
+                + order.map(function (dept) {
+                    const g = groups[dept];
+                    const tone = g.major ? 'bad' : g.nc ? 'warn' : 'good';
+                    const dot = tone === 'bad' ? '#b91c1c' : tone === 'warn' ? '#b45309' : '#15803d';
+                    const outcome = g.major ? (g.major + ' major finding' + (g.major > 1 ? 's' : ''))
+                        : g.nc ? (g.nc + ' finding' + (g.nc > 1 ? 's' : '') + ' raised')
+                            : 'No findings raised';
+                    const people = g.personnel.size ? Array.from(g.personnel).join(', ') : 'Personnel not recorded';
+                    return '<div class="b4-timeline-item ' + tone + '" style="position:relative;padding:0 0 20px 18px;border-left:1px solid #e7ecf1;break-inside:avoid;">'
+                        + '<span style="position:absolute;left:-5px;top:3px;width:9px;height:9px;border-radius:50%;background:' + dot + ';box-shadow:0 0 0 3px #fff;"></span>'
+                        + '<div style="font-weight:700;color:#0f2a43;font-size:0.88rem;">' + window.UTILS.escapeHtml(dept) + '</div>'
+                        + '<div style="font-size:0.75rem;color:#64748b;margin-top:2px;">' + window.UTILS.escapeHtml(people) + '</div>'
+                        + '<div style="font-size:0.78rem;color:#475569;margin-top:5px;">' + g.count + ' item' + (g.count > 1 ? 's' : '') + ' sampled across ' + g.clauses.size + ' clause' + (g.clauses.size === 1 ? '' : 's') + ' · <span style="color:' + dot + ';font-weight:600;">' + outcome + '</span></div>'
+                        + '</div>';
+                }).join('')
+                + '</div>';
         })();
 
         // ─── Unified section numbering ────────────────────────────────────
@@ -2530,7 +2570,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'audit-programme', name: 'AUDIT PROGRAMME',                 desc: '3-year certification cycle plan and current status',    color: '#0ea5e9', present: en['audit-programme'] !== false },
             { key: 'multi-site',   name: 'MULTI-SITE SAMPLING',                desc: 'Sampling plan across client sites for this audit',      color: '#16a34a', present: en['multi-site'] !== false && isMultiSite },
             { key: 'objectives',   name: 'OBJECTIVES, CRITERIA &amp; METHODOLOGY', desc: 'Audit objectives, criteria and methodology',         color: '#0891b2', present: en['objectives'] !== false },
-            { key: 'summary',      name: 'EXECUTIVE SUMMARY',                  desc: 'Key findings, opening meeting, positive observations',  color: '#059669', present: en['summary'] !== false },
+            { key: 'summary',      name: 'AUDIT SUMMARY &amp; OPENING MEETING', desc: 'Audit narrative, opening meeting record and positive observations', color: '#059669', present: en['summary'] !== false },
             { key: 'charts',       name: 'ANALYTICS DASHBOARD',                desc: 'Compliance charts, KPIs and clause-based breakdown',    color: '#7c3aed', present: en['charts'] !== false },
             { key: 'conformance',  name: 'CONFORMANCE VERIFICATION',           desc: 'Verified conforming items with supporting evidence',    color: '#10b981', present: en['conformance'] !== false && !!conformRowsHtml },
             { key: 'audit-trails', name: 'AUDIT TRAILS',                       desc: 'Areas sampled, personnel interviewed and clauses covered', color: '#0ea5e9', present: en['audit-trails'] !== false && !!auditTrailsRowsHtml },
@@ -2549,22 +2589,60 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             { key: 'evidence',     name: 'EVIDENCE GALLERY',                   desc: 'Photographic evidence collected during the audit',      color: '#c2410c', present: hasEvidence }
         ];
         // ─── Executive module sections (report-scoring / report-risk / report-executive) ──
-        // Each module returns [{key,name,desc,color,bodyHtml,charts}]; bodies are inserted
-        // as one block after ANALYTICS DASHBOARD, and defs are spliced in at the same spot
-        // so TOC numbering stays synchronized with body order.
-        const moduleSections = []
+        // Each module returns [{key,name,desc,color,bodyHtml,charts}]. Placement is
+        // deliberate and audience-driven: a CEO/Board must understand overall health
+        // within the first minutes, so the executive briefing sits BEFORE the ISO
+        // administrative front matter. Deeper analysis sits mid-report for management,
+        // and evidence analytics sit with the evidence annexes for auditors.
+        //   TIER 1 'front'    — executive briefing, ahead of AUDIT INFORMATION
+        //   TIER 2 'analysis' — management analytics, after ANALYTICS DASHBOARD
+        //   TIER 3 'appendix' — auditor-facing detail, before EVIDENCE GALLERY
+        const secMapRef = { map: {}, badge: function () { return ''; } };
+        const MODULE_PLACEMENT = {
+            'exec-summary': 'front', 'exec-dashboard': 'front', 'exec-insights': 'front',
+            'evidence-intel': 'appendix'
+        };
+        const allModuleSections = []
             .concat(
                 (window.ReportExecutive && window.ReportExecutive.sections) ? window.ReportExecutive.sections(d) : [],
                 (window.ReportScoring && window.ReportScoring.sections) ? window.ReportScoring.sections(d) : [],
                 (window.ReportRisk && window.ReportRisk.sections) ? window.ReportRisk.sections(d) : []
             )
             .filter(function (s) { return s && s.bodyHtml && en[s.key] !== false; });
-        const modChartEntries = moduleSections.reduce(function (acc, s) { return acc.concat(s.charts || []); }, []);
+        // Preserve the intended reading order within the executive briefing tier.
+        const FRONT_ORDER = ['exec-summary', 'exec-dashboard', 'exec-insights'];
+        const modGroup = function (tier) {
+            const g = allModuleSections.filter(function (s) { return (MODULE_PLACEMENT[s.key] || 'analysis') === tier; });
+            if (tier !== 'front') return g;
+            return g.sort(function (a, b) {
+                const ia = FRONT_ORDER.indexOf(a.key), ib = FRONT_ORDER.indexOf(b.key);
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+            });
+        };
+        const modFront = modGroup('front');
+        const modAnalysis = modGroup('analysis');
+        const modAppendix = modGroup('appendix');
+        const modChartEntries = allModuleSections.reduce(function (acc, s) { return acc.concat(s.charts || []); }, []);
+        // Splice defs at each anchor (last first, so earlier indexes stay valid).
         (function () {
-            const idx = sectionDefs.findIndex(function (s) { return s.key === 'conformance'; });
-            const defs = moduleSections.map(function (s) { return { key: s.key, name: s.name, desc: s.desc, color: s.color, present: true }; });
-            sectionDefs.splice.apply(sectionDefs, [idx < 0 ? sectionDefs.length : idx, 0].concat(defs));
+            const toDefs = function (arr) { return arr.map(function (s) { return { key: s.key, name: s.name, desc: s.desc, color: s.color, present: true }; }); };
+            const anchor = function (key, fallback) {
+                const i = sectionDefs.findIndex(function (s) { return s.key === key; });
+                return i < 0 ? fallback : i;
+            };
+            const iAppendix = anchor('evidence', sectionDefs.length);
+            sectionDefs.splice.apply(sectionDefs, [iAppendix, 0].concat(toDefs(modAppendix)));
+            const iAnalysis = anchor('conformance', sectionDefs.length);
+            sectionDefs.splice.apply(sectionDefs, [iAnalysis, 0].concat(toDefs(modAnalysis)));
+            sectionDefs.splice.apply(sectionDefs, [anchor('audit-info', 0), 0].concat(toDefs(modFront)));
         })();
+        // Shared renderer for a module tier's section bodies.
+        const renderModSections = function (arr) {
+            return arr.map(function (s) {
+                if (!secMapRef.map[s.key]) return '';
+                return '<div id="sec-' + s.key + '" class="sh page-break" style="border-left-color:' + s.color + ';">' + secMapRef.badge(s.key) + s.name + '</div><div class="sb">' + s.bodyHtml + '</div>';
+            }).join('');
+        };
         const secMap = {};
         let _secCounter = 0;
         sectionDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color }; } });
@@ -2572,6 +2650,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const m = secMap[key]; if (!m) return '';
             return '<span class="sn" style="background:' + m.color + ';">' + m.num + '</span>';
         };
+        // Late-bound refs so renderModSections (defined above secMap) can use them.
+        secMapRef.map = secMap;
+        secMapRef.badge = sBadge;
 
         const reportHtml = '<!DOCTYPE html><html lang="en"><head>'
             + '<meta charset="UTF-8">'
@@ -2615,13 +2696,22 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.rpt-ftr-left{font-weight:600;color:#1e3a5f;font-size:0.65rem;max-width:35%;}'
             + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.58rem;color:#94a3b8;font-style:italic;padding:0 6px;}'
             + '.rpt-ftr-right{text-align:right;font-weight:700;color:#1e3a5f;font-size:0.68rem;white-space:nowrap;}'
-            + '.cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(180deg,#f8fafc 0%,#e0e7ff 50%,#f8fafc 100%);padding:80px 50px;position:relative;}'
-            + '.cover-line{width:80px;height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin:0 auto 30px;}'
-            + '.sh{background:#f8fafc;color:#1e293b;padding:14px 20px;font-weight:700;font-size:0.95rem;letter-spacing:0.5px;display:flex;align-items:center;gap:10px;border-radius:6px 6px 0 0;margin-top:28px;border-left:5px solid #2563eb;border-bottom:2px solid #e2e8f0;}'
-            + '.sn{background:#2563eb;color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;}'
-            + '.sb{padding:20px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;}'
+            // Consulting-deliverable cover: flat, restrained, no gradient wash.
+            + '.cover{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:#fbfcfd;border-top:6px solid #0f2a43;padding:88px 56px;position:relative;}'
+            + '.cover-line{width:64px;height:3px;background:#0f2a43;border-radius:0;margin:0 auto 32px;}'
+            + '.sh{background:#f8fafc;color:#0f2a43;padding:16px 22px;font-weight:700;font-size:0.95rem;letter-spacing:0.06em;display:flex;align-items:center;gap:12px;border-radius:6px 6px 0 0;margin-top:40px;border-left:4px solid #2563eb;border-bottom:1px solid #e2e8f0;}'
+            + '.sn{background:#0f2a43;color:white;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.74rem;font-weight:700;flex-shrink:0;}'
+            + '.sb{padding:26px 24px 28px;border:1px solid #e7ecf1;border-top:none;border-radius:0 0 6px 6px;margin-bottom:8px;}'
+            + '.sb > * + *{margin-top:18px;}.sb table + table{margin-top:22px;}'
             + '.info-tbl{width:100%;border-collapse:collapse;}.info-tbl td{padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:0.88rem;}.info-tbl td:first-child{width:28%;color:#64748b;font-weight:600;}.info-tbl tr:nth-child(even){background:#f8fafc;}'
-            + '.f-tbl{width:100%;border-collapse:collapse;font-size:0.85rem;table-layout:fixed;}.f-tbl th{background:#f1f5f9;color:#475569;font-weight:700;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0;}.f-tbl td{padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;}.f-tbl tbody tr:nth-child(even){background:#f8fafc;}.f-tbl tbody tr{break-inside:avoid;}'
+            // Consulting-grade table: airy rows, hairline rules only, eyebrow header.
+            // word-break stays normal so short words like "Medium" never fragment;
+            // only genuinely unbreakable tokens (long refs/URLs) are allowed to break.
+            + '.f-tbl{width:100%;border-collapse:collapse;font-size:0.85rem;table-layout:fixed;}'
+            + '.f-tbl th{background:transparent;color:#64748b;font-weight:700;text-align:left;padding:9px 14px 7px;border-bottom:1px solid #cbd5e1;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.07em;}'
+            + '.f-tbl td{padding:11px 14px;border-bottom:1px solid #eef2f6;vertical-align:top;word-break:normal;overflow-wrap:anywhere;line-height:1.5;}'
+            + '.f-tbl tbody tr:nth-child(even){background:#fafbfc;}.f-tbl tbody tr{break-inside:avoid;}'
+            + '.f-tbl td .badge,.f-tbl td .pill,.f-tbl td .b4-badge,.f-tbl td .b4-pill,.f-tbl td span[style*="border-radius"]{white-space:nowrap;}'
             + '.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}'
             + '.stat-box{text-align:center;padding:16px 10px;border-radius:10px;border-bottom:3px solid transparent;}'
             + '.stat-val{font-size:1.8rem;font-weight:800;line-height:1;margin-bottom:4px;}'
@@ -2703,6 +2793,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + tocItems.length + ' sections in this report</div></div>';
             })()
             + '<div class="content">'
+            // TIER 1: executive briefing — first thing the CEO/Board reads
+            + renderModSections(modFront)
             // SECTION: AUDIT INFORMATION
             + (secMap['audit-info'] ? '<div id="sec-audit-info" class="sh page-break" style="background:#eff6ff;border-left-color:#2563eb;">' + sBadge('audit-info') + 'AUDIT INFORMATION</div><div class="sb"><table class="info-tbl">'
                 + '<tr><td>Client Name</td><td><strong>' + d.report.client + '</strong></td></tr>'
@@ -2752,7 +2844,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:4px;"></i>Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
                 + '</div></div>' : '')
             // SECTION: EXECUTIVE SUMMARY
-            + (secMap['summary'] ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;">' + sBadge('summary') + 'EXECUTIVE SUMMARY</div><div class="sb">'
+            + (secMap['summary'] ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
                 + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
                 + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
@@ -2774,15 +2866,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
                 + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
                 + '</div>' : '')
-            // SECTIONS: EXECUTIVE MODULES (scoring / risk / AI) — bodies in sectionDefs order
-            + moduleSections.map(function (s) {
-                if (!secMap[s.key]) return '';
-                return '<div id="sec-' + s.key + '" class="sh page-break" style="border-left-color:' + s.color + ';">' + sBadge(s.key) + s.name + '</div><div class="sb">' + s.bodyHtml + '</div>';
-            }).join('')
+            // TIER 2: management analytics modules (scoring / risk)
+            + renderModSections(modAnalysis)
             // SECTION: CONFORMANCE VERIFICATION
             + (secMap['conformance'] ? '<div id="sec-conformance" class="sh page-break" style="background:#ecfdf5;border-left-color:#10b981;">' + sBadge('conformance') + 'CONFORMANCE VERIFICATION</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:18%;">Clause</th><th style="width:22%;">ISO Requirement</th><th style="width:12%;text-align:center;">Status</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + conformRowsHtml + '</tbody></table></div>' : '')
             // SECTION: AUDIT TRAILS
-            + (secMap['audit-trails'] ? '<div id="sec-audit-trails" class="sh page-break" style="background:#f0f9ff;border-left-color:#0ea5e9;">' + sBadge('audit-trails') + 'AUDIT TRAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr style="background:#f0f9ff;"><th style="width:18%;">Area / Process</th><th style="width:27%;">Personnel Interviewed</th><th style="width:22%;">Clauses Covered</th><th style="width:11%;text-align:center;">Items Sampled</th><th style="width:22%;text-align:center;">Result</th></tr></thead><tbody>' + auditTrailsRowsHtml + '</tbody></table></div>' : '')
+            + (secMap['audit-trails'] ? '<div id="sec-audit-trails" class="sh page-break" style="background:#f0f9ff;border-left-color:#0ea5e9;">' + sBadge('audit-trails') + 'AUDIT TRAILS</div><div class="sb">'
+                + (auditTrailTimelineHtml ? '<div style="margin-bottom:22px;">' + auditTrailTimelineHtml + '</div>' : '')
+                + '<table class="f-tbl"><thead><tr><th style="width:18%;">Area / Process</th><th style="width:27%;">Personnel Interviewed</th><th style="width:21%;">Clauses Covered</th><th style="width:12%;text-align:center;">Items Sampled</th><th style="width:22%;text-align:center;">Result</th></tr></thead><tbody>' + auditTrailsRowsHtml + '</tbody></table></div>' : '')
             // SECTION: PREVIOUS FINDINGS STATUS
             + (secMap['prev-findings'] ? '<div id="sec-prev-findings" class="sh page-break" style="background:#eef2ff;border-left-color:#6366f1;">' + sBadge('prev-findings') + 'PREVIOUS FINDINGS STATUS</div><div class="sb">'
                 + (prevFindingsRowsHtml
@@ -2862,25 +2953,63 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.majorNC + d.stats.minorNC) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
                 + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
                 + '</div></div>' : '')
+            // TIER 3: auditor-facing evidence analytics, ahead of the photo appendix
+            + renderModSections(modAppendix)
             // SECTION: EVIDENCE GALLERY (always last — photographic appendix)
             + (function () {
                 if (!secMap['evidence']) return '';
                 let evidenceItems = [];
+                // Capture the richer metadata the auditor already recorded so each exhibit
+                // is self-describing: linked clause, department, auditor note, capture time
+                // and geolocation where the device supplied them.
+                const evMeta = function (src) {
+                    return {
+                        department: src.department || '',
+                        note: (src.comment || src.description || '').toString().replace(/<[^>]*>/g, '').trim(),
+                        when: src.evidenceCapturedAt || src.capturedAt || src.createdAt || src.updatedAt || '',
+                        geo: src.evidenceLocation || src.location || src.gps || ''
+                    };
+                };
                 (d.hydratedProgress || []).forEach(function (item) {
                     let imgs = item.evidenceImages || (item.evidenceImage ? [item.evidenceImage] : []);
                     imgs.forEach(function (img) {
-                        evidenceItems.push({ clause: item.kbMatch ? item.kbMatch.clause : item.clause, title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''), img: img, status: item.status });
+                        evidenceItems.push(Object.assign({
+                            clause: item.kbMatch ? item.kbMatch.clause : item.clause,
+                            title: item.kbMatch ? item.kbMatch.title : (item.requirement || ''),
+                            img: img, status: item.status, ncrType: item.ncrType || ''
+                        }, evMeta(item)));
                     });
                 });
                 (d.report.ncrs || []).forEach(function (ncr) {
                     if (ncr.evidenceImage) {
-                        evidenceItems.push({ clause: ncr.clause, title: ncr.type + ' Non-Conformity', img: ncr.evidenceImage, status: 'nc' });
+                        evidenceItems.push(Object.assign({
+                            clause: ncr.clause, title: ncr.type + ' Non-Conformity',
+                            img: ncr.evidenceImage, status: 'nc', ncrType: ncr.type || ''
+                        }, evMeta(ncr)));
                     }
                 });
                 if (evidenceItems.length === 0) return '';
-                let cards = evidenceItems.map(function (ev) {
-                    let borderColor = ev.status === 'nc' ? '#ef4444' : ev.status === 'observation' ? '#3b82f6' : '#22c55e';
-                    return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';"><img src="' + ev.img + '" alt="Evidence"><div class="ev-cap"><strong>Clause ' + ev.clause + '</strong><span>' + (ev.title || 'Audit Evidence') + '</span></div></div>';
+                const fmtWhen = function (v) {
+                    if (!v) return '';
+                    const dt = new Date(v);
+                    return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                };
+                let cards = evidenceItems.map(function (ev, i) {
+                    let borderColor = ev.status === 'nc' ? '#b91c1c' : ev.status === 'observation' ? '#1d4ed8' : '#15803d';
+                    const meta = [];
+                    if (ev.department) meta.push('<span>' + ev.department + '</span>');
+                    const w = fmtWhen(ev.when); if (w) meta.push('<span>' + w + '</span>');
+                    if (ev.geo) meta.push('<span>' + String(ev.geo).slice(0, 40) + '</span>');
+                    return '<div class="ev-card" style="border-top:3px solid ' + borderColor + ';">'
+                        + '<img src="' + ev.img + '" alt="Evidence exhibit ' + (i + 1) + '">'
+                        + '<div class="ev-cap">'
+                        + '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:3px;">'
+                        + '<span style="font-size:0.62rem;font-weight:700;color:#94a3b8;letter-spacing:0.06em;">EX-' + String(i + 1).padStart(2, '0') + '</span>'
+                        + '<strong style="margin:0;">Clause ' + (ev.clause || '—') + '</strong></div>'
+                        + '<span>' + (ev.title || 'Audit Evidence') + '</span>'
+                        + (ev.note ? '<div style="margin-top:5px;color:#475569;font-size:0.73rem;line-height:1.45;">' + ev.note.slice(0, 140) + (ev.note.length > 140 ? '…' : '') + '</div>' : '')
+                        + (meta.length ? '<div style="margin-top:6px;padding-top:5px;border-top:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:8px;font-size:0.66rem;color:#94a3b8;">' + meta.join('') + '</div>' : '')
+                        + '</div></div>';
                 }).join('');
                 return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
             })()
@@ -2894,25 +3023,25 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const chartScriptCode = ''
             + 'function rc(){'
             + 'var c1=document.getElementById("chart-doughnut");'
-            + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#22c55e","#f59e0b","#ef4444","#3b82f6"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#15803d","#b45309","#b91c1c","#1d4ed8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
             + 'var c2=document.getElementById("chart-clause");'
-            + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#2563eb",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
+            + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#1d4ed8",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
             + 'var c3=document.getElementById("chart-findings");'
-            + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","Observations/OFI","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.actualNCCount + ',' + d.stats.obsOfiCount + ',' + d.stats.naCount + '],backgroundColor:["#22c55e","#ef4444","#3b82f6","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'if(c3)new Chart(c3,{type:"pie",data:{labels:["Conform","Non-Conformity","Observations/OFI","N/A"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.actualNCCount + ',' + d.stats.obsOfiCount + ',' + d.stats.naCount + '],backgroundColor:["#15803d","#b91c1c","#1d4ed8","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
             + 'var c4=document.getElementById("chart-area");'
-            + 'if(c4){var ad=' + areaChartData + ';new Chart(c4,{type:"bar",data:{labels:ad.names,datasets:[{label:"Conform",data:ad.conform,backgroundColor:"#22c55e",borderRadius:3},{label:"NC",data:ad.nc,backgroundColor:"#ef4444",borderRadius:3},{label:"OBS",data:ad.obs,backgroundColor:"#3b82f6",borderRadius:3},{label:"OFI",data:ad.ofi,backgroundColor:"#f59e0b",borderRadius:3}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}'
+            + 'if(c4){var ad=' + areaChartData + ';new Chart(c4,{type:"bar",data:{labels:ad.names,datasets:[{label:"Conform",data:ad.conform,backgroundColor:"#15803d",borderRadius:3},{label:"NC",data:ad.nc,backgroundColor:"#b91c1c",borderRadius:3},{label:"OBS",data:ad.obs,backgroundColor:"#1d4ed8",borderRadius:3},{label:"OFI",data:ad.ofi,backgroundColor:"#b45309",borderRadius:3}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}'
             // Chart 5: Department Findings
             + 'var c5=document.getElementById("chart-dept");'
             + 'if(c5){var dd=' + JSON.stringify((function () { var deptData = {}; (d.hydratedProgress || []).forEach(function (item) { var dept = item.department || ''; if (!dept) return; if (!deptData[dept]) deptData[dept] = { major: 0, minor: 0, obs: 0, conform: 0 }; if (item.status === 'nc') { var t = (item.ncrType || '').toLowerCase(); if (t === 'major') deptData[dept].major++; else if (t === 'minor') deptData[dept].minor++; else deptData[dept].obs++; } else if (item.status === 'conform') deptData[dept].conform++; }); var labels = Object.keys(deptData).sort(); return { labels: labels, major: labels.map(function (l) { return deptData[l].major; }), minor: labels.map(function (l) { return deptData[l].minor; }), obs: labels.map(function (l) { return deptData[l].obs; }), conform: labels.map(function (l) { return deptData[l].conform; }) }; })()) + ';'
-            + 'if(dd.labels.length>0){new Chart(c5,{type:"bar",data:{labels:dd.labels,datasets:[{label:"Major NC",data:dd.major,backgroundColor:"#dc2626",stack:"d"},{label:"Minor NC",data:dd.minor,backgroundColor:"#f59e0b",stack:"d"},{label:"OBS",data:dd.obs,backgroundColor:"#fbbf24",stack:"d"},{label:"Conform",data:dd.conform,backgroundColor:"#22c55e",stack:"d"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}else{var pB5=c5.closest(".chart-box");if(pB5)pB5.style.display="none";}}'
+            + 'if(dd.labels.length>0){new Chart(c5,{type:"bar",data:{labels:dd.labels,datasets:[{label:"Major NC",data:dd.major,backgroundColor:"#991b1b",stack:"d"},{label:"Minor NC",data:dd.minor,backgroundColor:"#b45309",stack:"d"},{label:"OBS",data:dd.obs,backgroundColor:"#d97706",stack:"d"},{label:"Conform",data:dd.conform,backgroundColor:"#15803d",stack:"d"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}else{var pB5=c5.closest(".chart-box");if(pB5)pB5.style.display="none";}}'
             // Chart 6: Personnel Workload
             + 'var c6=document.getElementById("chart-workload");'
             + 'if(c6){var pd=' + JSON.stringify((function () { var persData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.personnel) return; if (!persData[item.personnel]) persData[item.personnel] = { conform: 0, nc: 0, na: 0 }; if (item.status === 'conform') persData[item.personnel].conform++; else if (item.status === 'nc') persData[item.personnel].nc++; else if (item.status === 'na') persData[item.personnel].na++; }); var labels = Object.keys(persData).sort(function (a, b) { return (persData[b].conform + persData[b].nc + persData[b].na) - (persData[a].conform + persData[a].nc + persData[a].na); }).slice(0, 10); return { labels: labels, conform: labels.map(function (p) { return persData[p].conform; }), nc: labels.map(function (p) { return persData[p].nc; }), na: labels.map(function (p) { return persData[p].na; }) }; })()) + ';'
-            + 'if(pd.labels.length>0){new Chart(c6,{type:"bar",data:{labels:pd.labels,datasets:[{label:"Conform",data:pd.conform,backgroundColor:"#22c55e",stack:"p"},{label:"NC",data:pd.nc,backgroundColor:"#ef4444",stack:"p"},{label:"N/A",data:pd.na,backgroundColor:"#94a3b8",stack:"p"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}else{var pB6=c6.closest(".chart-box");if(pB6)pB6.style.display="none";}}'
+            + 'if(pd.labels.length>0){new Chart(c6,{type:"bar",data:{labels:pd.labels,datasets:[{label:"Conform",data:pd.conform,backgroundColor:"#15803d",stack:"p"},{label:"NC",data:pd.nc,backgroundColor:"#b91c1c",stack:"p"},{label:"N/A",data:pd.na,backgroundColor:"#94a3b8",stack:"p"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true,ticks:{font:{size:9}}}}}});}else{var pB6=c6.closest(".chart-box");if(pB6)pB6.style.display="none";}}'
             // Chart 7: Compliance Radar
             + 'var c7=document.getElementById("chart-radar");'
             + 'if(c7){var rd=' + JSON.stringify((function () { var rData = {}; (d.hydratedProgress || []).forEach(function (item) { if (!item.department) return; if (!rData[item.department]) rData[item.department] = { total: 0, conform: 0 }; rData[item.department].total++; if (item.status === 'conform') rData[item.department].conform++; }); var labels = Object.keys(rData).sort(); return { labels: labels, data: labels.map(function (l) { return rData[l].total > 0 ? Math.round((rData[l].conform / rData[l].total) * 100) : 0; }) }; })()) + ';'
-            + 'if(rd.labels.length>=3){new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Conformance %",data:rd.data,borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,0.15)",borderWidth:2,pointBackgroundColor:"#6366f1"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});}else{var pBox=c7.closest(".chart-box");if(pBox)pBox.style.display="none";var pGrid=c7.closest(".chart-grid");if(pGrid)pGrid.style.display="none";}}'
+            + 'if(rd.labels.length>=3){new Chart(c7,{type:"radar",data:{labels:rd.labels,datasets:[{label:"Conformance %",data:rd.data,borderColor:"#4338ca",backgroundColor:"rgba(67,56,202,0.12)",borderWidth:2,pointBackgroundColor:"#4338ca"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:10}}}}}});}else{var pBox=c7.closest(".chart-box");if(pBox)pBox.style.display="none";var pGrid=c7.closest(".chart-grid");if(pGrid)pGrid.style.display="none";}}'
             + modChartEntries.map(function (ch, i) {
                 return 'var mc' + i + '=document.getElementById(' + JSON.stringify(ch.canvasId) + ');if(mc' + i + ')try{new Chart(mc' + i + ',' + ch.configJson + ');}catch(e){}';
             }).join('')

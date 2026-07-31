@@ -121,7 +121,10 @@
     }
 
     function collectFindings(d) {
-        var checklist = (d && d.report && d.report.checklistProgress) || [];
+        // Prefer the hydrated items (they carry resolved kbMatch/evidence); fall back to
+        // the raw stored progress so this still works if hydration was skipped.
+        var hydrated = (d && d.hydratedProgress) || [];
+        var checklist = hydrated.length ? hydrated : ((d && d.report && d.report.checklistProgress) || []);
         var ncrs = (d && d.report && d.report.ncrs) || [];
         var out = [];
         checklist.forEach(function (item, i) {
@@ -255,16 +258,21 @@
 
         var baseDate = (d.report && (d.report.date || d.report.createdAt)) || null;
         var riskRegister = scoredFindings.map(function (f) {
+            var targetDate = f.caDueDate || addDays(baseDate, 90);
+            var status = deriveStatus(Object.assign({}, f, { caDueDate: targetDate }), baseDate);
             return {
                 ref: f.ref,
                 risk: (f.clause ? 'Clause ' + f.clause + ' — ' : '') + (f.text || 'Non-conformance identified').substring(0, 160),
                 likelihood: f.likelihood,
                 impact: f.impact,
+                score: f.score,
                 existingControls: f.status === 'closed' ? 'Corrective action implemented and verified' : 'Corrective action pending / in progress',
                 residualRisk: f.residualRisk,
+                priority: f.priority,
+                status: status,
                 riskOwner: f.department || 'Process Owner (TBD)',
                 treatmentPlan: f.rootCause.correctiveAction,
-                reviewDate: f.caDueDate || addDays(baseDate, 90)
+                reviewDate: targetDate
             };
         });
 
@@ -272,54 +280,63 @@
         var actionPlan = scoredFindings.slice().sort(function (a, b) {
             return (priorityOrder[a.priority] - priorityOrder[b.priority]) || (b.score - a.score);
         }).map(function (f) {
+            var dueDate = f.caDueDate || addDays(baseDate, /major/i.test(f.ncrType) ? 30 : 90);
             return {
                 priority: f.priority,
                 action: f.rootCause.correctiveAction,
                 owner: f.department || 'Process Owner (TBD)',
-                dueDate: f.caDueDate || addDays(baseDate, /major/i.test(f.ncrType) ? 30 : 90),
+                dueDate: dueDate,
+                expectedCompletion: dueDate,
                 resources: 'Process owner time, training materials, documentation update',
                 expectedOutcome: 'Elimination of the identified non-conformance and reduction of residual risk to Low/Medium',
-                status: f.status === 'closed' ? 'Closed' : (f.status === 'verifying' ? 'Verification Pending' : 'Open'),
+                status: deriveStatus(Object.assign({}, f, { caDueDate: dueDate }), baseDate),
                 businessImpact: f.businessImpacts.join(', ')
             };
         });
 
-        // CAPA dashboard stats
-        var today = new Date();
-        var open = 0, closed = 0, overdue = 0, verificationPending = 0;
+        // CAPA dashboard stats — full lifecycle: Open / In Progress / Overdue / Verified / Closed.
+        // Note: underlying data may not carry a real capaStatus/verificationStatus field yet
+        // (documented limitation) — deriveStatus() degrades gracefully via due-date inference,
+        // and will flow the real field straight through the moment it appears in a finding.
         var closureDurations = [];
-        scoredFindings.forEach(function (f) {
-            var status = (f.status || '').toLowerCase();
-            var isClosed = status === 'closed' || status === 'verified' || status === 'complete';
-            if (isClosed) {
-                closed++;
-                if (f.caDueDate && baseDate) {
-                    var dur = daysBetween(baseDate, f.caDueDate);
-                    if (dur !== null) closureDurations.push(Math.abs(dur));
-                }
-            } else {
-                open++;
-                if (status === 'verifying' || status === 'pending verification') verificationPending++;
-                if (f.caDueDate) {
-                    var due = new Date(f.caDueDate);
-                    if (!isNaN(due.getTime()) && due < today) overdue++;
-                }
+        var lifecycleCounts = { Open: 0, 'In Progress': 0, Overdue: 0, Verified: 0, Closed: 0 };
+        var capaItems = scoredFindings.map(function (f) {
+            var status = deriveStatus(f, baseDate);
+            lifecycleCounts[status] = (lifecycleCounts[status] || 0) + 1;
+            if (status === 'Closed' && f.caDueDate && baseDate) {
+                var dur = daysBetween(baseDate, f.caDueDate);
+                if (dur !== null) closureDurations.push(Math.abs(dur));
             }
+            return {
+                ref: f.ref,
+                clause: f.clause,
+                text: f.text,
+                priority: f.priority,
+                status: status,
+                completion: completionPct(status)
+            };
         });
         var avgClosureDays = closureDurations.length
             ? Math.round(closureDurations.reduce(function (a, b) { return a + b; }, 0) / closureDurations.length)
             : null;
+        var overallCompletion = capaItems.length
+            ? Math.round(capaItems.reduce(function (sum, it) { return sum + it.completion; }, 0) / capaItems.length)
+            : 0;
 
         var capa = {
-            open: open,
-            closed: closed,
-            overdue: overdue,
+            open: lifecycleCounts.Open,
+            inProgress: lifecycleCounts['In Progress'],
+            overdue: lifecycleCounts.Overdue,
+            verified: lifecycleCounts.Verified,
+            closed: lifecycleCounts.Closed,
+            overallCompletion: overallCompletion,
             avgClosureDays: avgClosureDays,
+            items: capaItems,
             repeatedFindings: repeatInfo.repeated.map(function (f) {
                 var sf = scoredFindings.find(function (s) { return s.ref === f.ref; });
                 return sf || f;
             }),
-            verificationPending: verificationPending
+            verificationPending: lifecycleCounts.Verified
         };
 
         return {
@@ -336,9 +353,70 @@
     var RISK_COLORS = { Low: '#16a34a', Medium: '#d97706', High: '#dc2626', Critical: '#7c1d3f' };
     var RISK_BG = { Low: '#f0fdf4', Medium: '#fffbeb', High: '#fef2f2', Critical: '#fdf2f8' };
     var PRIORITY_COLORS = { P1: '#dc2626', P2: '#ea580c', P3: '#d97706', P4: '#64748b' };
+    // Muted, desaturated heat-map palette (Big-Four style — not neon).
+    var HEAT_COLORS = { Low: '#5b8c6e', Medium: '#c08a34', High: '#b8503f', Critical: '#7f1d3f' };
+    var STATUS_COLORS = {
+        'Open': { color: '#991b1b', bg: '#fef2f2' },
+        'In Progress': { color: '#92400e', bg: '#fffbeb' },
+        'Overdue': { color: '#ffffff', bg: '#b8503f' },
+        'Verified': { color: '#0e7490', bg: '#ecfeff' },
+        'Closed': { color: '#065f46', bg: '#ecfdf5' }
+    };
+    var STATUS_COMPLETION = { 'Open': 0, 'In Progress': 50, 'Overdue': 25, 'Verified': 90, 'Closed': 100 };
+
+    // Derives a lifecycle status (Open / In Progress / Overdue / Verified / Closed)
+    // for a finding. Prefers explicit capaStatus/verificationStatus/status fields
+    // (already folded into f.status by normalizeFinding); falls back to a
+    // due-date-based inference so the dashboard degrades gracefully when the
+    // underlying data has no real CAPA status field yet.
+    function deriveStatus(f, baseDate) {
+        var raw = String((f && f.status) || '').toLowerCase();
+        if (/closed|complete/.test(raw)) return 'Closed';
+        if (/verif/.test(raw)) return 'Verified';
+        if (/progress|in.?work/.test(raw)) return 'In Progress';
+        // Unrecognized/absent explicit status — fall back to due-date inference.
+        var due = f && f.caDueDate ? new Date(f.caDueDate) : null;
+        var today = new Date();
+        if (due && !isNaN(due.getTime()) && due < today) return 'Overdue';
+        return 'Open';
+    }
+
+    function completionPct(status) {
+        return STATUS_COMPLETION.hasOwnProperty(status) ? STATUS_COMPLETION[status] : 0;
+    }
 
     function pill(label, color, bg) {
-        return '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;color:' + color + ';background:' + (bg || (color + '1a')) + ';">' + esc(label) + '</span>';
+        return '<span class="b4-pill b4-badge" style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;color:' + color + ';background:' + (bg || (color + '1a')) + ';border:1px solid ' + color + '33;">' + esc(label) + '</span>';
+    }
+
+    function statusPill(status) {
+        var s = STATUS_COLORS[status] || STATUS_COLORS.Open;
+        return pill(status, s.color, s.bg);
+    }
+
+    // Compact 1-5 pip indicator for Likelihood / Impact columns.
+    function pipBar(value, max) {
+        max = max || 5;
+        var pips = '';
+        for (var i = 1; i <= max; i++) {
+            var on = i <= value;
+            pips += '<span style="display:inline-block;width:8px;height:8px;margin-right:2px;border-radius:2px;background:' + (on ? '#334155' : '#e2e8f0') + ';"></span>';
+        }
+        return '<div style="display:inline-flex;align-items:center;" title="' + value + '/' + max + '">' + pips + '</div><div style="font-size:0.68rem;color:#64748b;">' + value + '/' + max + '</div>';
+    }
+
+    // Numeric risk-score badge, colored by band.
+    function scoreBadge(score, band) {
+        var color = RISK_COLORS[band] || '#64748b';
+        return '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:22px;padding:0 6px;border-radius:5px;font-weight:800;font-size:0.8rem;color:#fff;background:' + color + ';">' + esc(score) + '</span>';
+    }
+
+    // Thin horizontal progress bar (falls back cleanly without .b4-bar CSS).
+    function progressBar(pct, color) {
+        pct = Math.max(0, Math.min(100, pct || 0));
+        return '<div class="b4-bar" style="background:#e2e8f0;border-radius:4px;height:7px;width:100%;overflow:hidden;">'
+            + '<div class="b4-bar-fill" style="width:' + pct + '%;height:100%;background:' + (color || '#0f2a43') + ';border-radius:4px;"></div>'
+            + '</div><div style="font-size:0.68rem;color:#64748b;margin-top:2px;">' + pct + '%</div>';
     }
 
     function emptyState(msg) {
@@ -347,37 +425,43 @@
 
     function renderHeatmap(heatMatrix) {
         // rows = impact 5..1 (top = highest impact), cols = likelihood 1..5
-        var maxCount = 1;
-        heatMatrix.forEach(function (row) { row.forEach(function (c) { if (c > maxCount) maxCount = c; }); });
-        function cellColor(impactIdx, likIdx) {
-            var score = (impactIdx + 1) * (likIdx + 1);
-            if (score <= 4) return RISK_COLORS.Low;
-            if (score <= 9) return RISK_COLORS.Medium;
-            if (score <= 15) return RISK_COLORS.High;
-            return RISK_COLORS.Critical;
+        function bandFor(score) {
+            if (score <= 4) return 'Low';
+            if (score <= 9) return 'Medium';
+            if (score <= 15) return 'High';
+            return 'Critical';
         }
         var rowsHtml = '';
         for (var impactIdx = 4; impactIdx >= 0; impactIdx--) {
             rowsHtml += '<div style="display:flex;align-items:center;gap:4px;">';
-            rowsHtml += '<div style="width:70px;font-size:0.72rem;font-weight:700;color:#475569;text-align:right;padding-right:6px;">Impact ' + (impactIdx + 1) + '</div>';
+            rowsHtml += '<div style="width:76px;font-size:0.72rem;font-weight:700;color:#475569;text-align:right;padding-right:8px;">Impact ' + (impactIdx + 1) + '</div>';
             for (var likIdx = 0; likIdx < 5; likIdx++) {
                 var count = heatMatrix[impactIdx][likIdx] || 0;
-                var bg = cellColor(impactIdx, likIdx);
-                rowsHtml += '<div style="flex:1;aspect-ratio:1.4;min-height:44px;background:' + bg + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.95rem;border-radius:4px;border:1px solid rgba(255,255,255,0.5);">' + (count || '') + '</div>';
+                var band = bandFor((impactIdx + 1) * (likIdx + 1));
+                var bg = HEAT_COLORS[band];
+                var bubble = count
+                    ? '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;border-radius:50%;background:rgba(255,255,255,0.92);color:' + bg + ';font-weight:800;font-size:0.85rem;">' + count + '</span>'
+                    : '';
+                rowsHtml += '<div class="b4-heat-cell" style="flex:1;aspect-ratio:1.4;min-height:44px;background:' + bg + ';color:#fff;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px solid rgba(255,255,255,0.4);">' + bubble + '</div>';
             }
             rowsHtml += '</div>';
         }
         var likLabelsHtml = '<div style="display:flex;gap:4px;margin-top:2px;">'
-            + '<div style="width:70px;"></div>'
+            + '<div style="width:76px;"></div>'
             + [1, 2, 3, 4, 5].map(function (n) { return '<div style="flex:1;text-align:center;font-size:0.72rem;font-weight:700;color:#475569;">L' + n + '</div>'; }).join('')
-            + '</div>';
-        var legend = '<div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;">'
-            + Object.keys(RISK_COLORS).map(function (k) {
-                return '<div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#334155;"><span style="width:14px;height:14px;border-radius:3px;background:' + RISK_COLORS[k] + ';display:inline-block;"></span>' + k + '</div>';
+            + '</div>'
+            + '<div style="text-align:center;font-size:0.72rem;font-weight:700;color:#94a3b8;margin-top:4px;letter-spacing:0.04em;">LIKELIHOOD &rarr;</div>';
+        var legend = '<div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;justify-content:center;">'
+            + Object.keys(HEAT_COLORS).map(function (k) {
+                return '<div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#334155;"><span style="width:14px;height:14px;border-radius:3px;background:' + HEAT_COLORS[k] + ';display:inline-block;"></span>' + k + '</div>';
             }).join('')
             + '</div>';
-        return '<div style="max-width:520px;margin:0 auto 8px auto;">' + rowsHtml + likLabelsHtml + '</div>' + legend
-            + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;margin-top:6px;">Likelihood (horizontal) × Impact (vertical) — cell value = number of findings</div>';
+        var vAxis = '<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.72rem;font-weight:700;color:#94a3b8;letter-spacing:0.04em;text-align:center;padding-right:4px;">IMPACT &uarr;</div>';
+        return '<div style="page-break-inside:avoid;break-inside:avoid;">'
+            + '<div style="display:flex;justify-content:center;align-items:stretch;gap:4px;">' + vAxis + '<div style="max-width:520px;">' + rowsHtml + likLabelsHtml + '</div></div>'
+            + legend
+            + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;margin-top:6px;">Cell value = number of findings at that Likelihood &times; Impact combination</div>'
+            + '</div>';
     }
 
     function sections(d) {
@@ -388,10 +472,11 @@
         // 1. RISK HEAT MAP
         var findingsRows = r.scoredFindings.length
             ? r.scoredFindings.map(function (f) {
-                return '<tr><td style="font-family:monospace;font-weight:600;">' + esc(f.ref) + '</td>'
+                return '<tr style="page-break-inside:avoid;break-inside:avoid;"><td style="font-family:monospace;font-weight:600;">' + esc(f.ref) + '</td>'
                     + '<td>' + esc((f.clause ? '[' + f.clause + '] ' : '') + (f.text || '').substring(0, 140)) + '</td>'
-                    + '<td style="text-align:center;">' + f.likelihood + '</td>'
-                    + '<td style="text-align:center;">' + f.impact + '</td>'
+                    + '<td style="text-align:center;">' + pipBar(f.likelihood) + '</td>'
+                    + '<td style="text-align:center;">' + pipBar(f.impact) + '</td>'
+                    + '<td style="text-align:center;">' + scoreBadge(f.score, f.residualRisk) + '</td>'
                     + '<td style="text-align:center;">' + pill(f.residualRisk, RISK_COLORS[f.residualRisk], RISK_BG[f.residualRisk]) + '</td>'
                     + '<td style="text-align:center;">' + pill(f.priority, PRIORITY_COLORS[f.priority]) + '</td></tr>';
             }).join('')
@@ -404,7 +489,7 @@
             charts: [],
             bodyHtml: r.scoredFindings.length
                 ? renderHeatmap(r.heatMatrix)
-                    + '<table class="f-tbl" style="margin-top:18px;"><thead><tr style="background:#fef2f2;"><th style="width:12%;">Ref</th><th style="width:40%;">Finding</th><th style="width:10%;text-align:center;">Likelihood</th><th style="width:10%;text-align:center;">Impact</th><th style="width:14%;text-align:center;">Residual Risk</th><th style="width:14%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table>'
+                    + '<div style="overflow-x:auto;"><table class="b4-tbl f-tbl" style="margin-top:18px;table-layout:auto;min-width:820px;"><thead><tr style="background:#fef2f2;"><th style="width:10%;">Ref</th><th style="width:34%;">Finding</th><th style="width:11%;text-align:center;">Likelihood</th><th style="width:11%;text-align:center;">Impact</th><th style="width:10%;text-align:center;">Score</th><th style="width:12%;text-align:center;">Residual Risk</th><th style="width:12%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table></div>'
                 : emptyState('No non-conformities identified — no risk items to plot.')
         });
 
@@ -414,15 +499,21 @@
             f.businessImpacts.forEach(function (cat) { impactCounts[cat] = (impactCounts[cat] || 0) + 1; });
         });
         var impactRows = r.scoredFindings.map(function (f) {
-            return '<tr><td style="font-family:monospace;font-weight:600;">' + esc(f.ref) + '</td>'
+            return '<tr style="page-break-inside:avoid;break-inside:avoid;"><td style="font-family:monospace;font-weight:600;">' + esc(f.ref) + '</td>'
                 + '<td>' + esc(f.clause || '') + '</td>'
                 + '<td>' + esc((f.text || '').substring(0, 120)) + '</td>'
                 + '<td>' + f.businessImpacts.map(function (c) { return pill(c, '#4338ca', '#eef2ff'); }).join(' ') + '</td>'
                 + '<td style="text-align:center;">' + pill(f.residualRisk, RISK_COLORS[f.residualRisk], RISK_BG[f.residualRisk]) + '</td></tr>';
         }).join('');
-        var impactSummary = Object.keys(impactCounts).length
-            ? '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">' + Object.keys(impactCounts).map(function (cat) {
-                return '<div style="padding:8px 14px;background:#eef2ff;border-radius:8px;font-size:0.8rem;color:#3730a3;font-weight:600;">' + esc(cat) + ': ' + impactCounts[cat] + '</div>';
+        var impactCats = Object.keys(impactCounts);
+        var maxImpactCount = impactCats.reduce(function (m, c) { return Math.max(m, impactCounts[c]); }, 1);
+        var impactSummary = impactCats.length
+            ? '<div class="b4-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;page-break-inside:avoid;break-inside:avoid;">' + impactCats.map(function (cat) {
+                return '<div class="b4-kpi-card" style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;text-align:center;">'
+                    + '<div class="b4-kpi-value" style="font-size:1.6rem;font-weight:800;color:#3730a3;">' + impactCounts[cat] + '</div>'
+                    + '<div class="b4-kpi-label" style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-top:4px;">' + esc(cat) + '</div>'
+                    + progressBar(Math.round(impactCounts[cat] / maxImpactCount * 100), '#4338ca')
+                    + '</div>';
             }).join('') + '</div>'
             : '';
         out.push({
@@ -432,26 +523,33 @@
             color: '#4338ca',
             charts: [],
             bodyHtml: r.scoredFindings.length
-                ? impactSummary + '<table class="f-tbl"><thead><tr style="background:#eef2ff;"><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Categories</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table>'
+                ? impactSummary + '<div style="overflow-x:auto;"><table class="b4-tbl f-tbl" style="table-layout:auto;min-width:760px;"><thead><tr style="background:#eef2ff;"><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Categories</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table></div>'
                 : emptyState('No non-conformities identified — no business impact to analyze.')
         });
 
         // 3. ROOT CAUSE ANALYSIS
+        function rcField(label, value) {
+            return '<div><div style="font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:3px;">' + esc(label) + '</div>'
+                + '<div style="font-size:0.85rem;color:#334155;line-height:1.45;">' + esc(value) + '</div></div>';
+        }
         var rcCards = r.scoredFindings.map(function (f) {
             var rc = f.rootCause;
-            return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px;background:#fafafa;">'
-                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+            return '<div class="b4-card" style="border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:14px;background:#ffffff;page-break-inside:avoid;break-inside:avoid;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
                 + '<div style="font-weight:700;color:#1e293b;">' + esc(f.ref) + (f.clause ? ' — Clause ' + esc(f.clause) : '') + '</div>'
                 + pill(f.priority, PRIORITY_COLORS[f.priority])
                 + '</div>'
-                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.85rem;color:#334155;">'
-                + '<div><strong>Immediate Cause:</strong><br>' + esc(rc.immediateCause) + '</div>'
-                + '<div><strong>Root Cause:</strong><br>' + esc(rc.rootCause) + '</div>'
-                + '<div><strong>Systemic Cause:</strong><br>' + esc(rc.systemicCause) + '</div>'
-                + '<div><strong>Corrective Action:</strong><br>' + esc(rc.correctiveAction) + '</div>'
-                + '<div style="grid-column:1/-1;"><strong>Preventive Action:</strong><br>' + esc(rc.preventiveAction) + '</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;">'
+                + rcField('Immediate Cause', rc.immediateCause)
+                + rcField('Root Cause', rc.rootCause)
+                + rcField('Systemic Cause', rc.systemicCause)
+                + '<div></div>'
                 + '</div>'
-                + '<div style="margin-top:10px;font-style:italic;font-size:0.75rem;color:#94a3b8;"><i class="fa-solid fa-robot" style="margin-right:4px;"></i>AI-assisted draft — auditor review required</div>'
+                + '<div class="b4-callout" style="margin-top:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-left:3px solid #16a34a;border-radius:6px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;">'
+                + rcField('Corrective Action', rc.correctiveAction)
+                + rcField('Preventive Action', rc.preventiveAction)
+                + '</div>'
+                + '<div style="margin-top:8px;font-size:0.68rem;color:#94a3b8;"><i class="fa-solid fa-robot" style="margin-right:4px;"></i>AI-assisted draft — auditor review required</div>'
                 + '</div>';
         }).join('');
         out.push({
@@ -465,15 +563,16 @@
 
         // 4. EXECUTIVE RISK REGISTER
         var registerRows = r.riskRegister.map(function (row) {
-            return '<tr><td style="font-family:monospace;font-weight:600;">' + esc(row.ref) + '</td>'
-                + '<td>' + esc(row.risk) + '</td>'
-                + '<td style="text-align:center;">' + row.likelihood + '</td>'
-                + '<td style="text-align:center;">' + row.impact + '</td>'
-                + '<td>' + esc(row.existingControls) + '</td>'
-                + '<td style="text-align:center;">' + pill(row.residualRisk, RISK_COLORS[row.residualRisk], RISK_BG[row.residualRisk]) + '</td>'
+            return '<tr style="page-break-inside:avoid;break-inside:avoid;"><td style="font-family:monospace;font-weight:600;">' + esc(row.ref) + '</td>'
+                + '<td>' + esc(row.risk) + '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8;"><strong>Controls:</strong> ' + esc(row.existingControls) + ' &nbsp;|&nbsp; <strong>Treatment:</strong> ' + esc(row.treatmentPlan) + '</div></td>'
+                + '<td style="text-align:center;">' + pipBar(row.likelihood) + '</td>'
+                + '<td style="text-align:center;">' + pipBar(row.impact) + '</td>'
+                + '<td style="text-align:center;">' + scoreBadge(row.score, row.residualRisk) + '</td>'
                 + '<td>' + esc(row.riskOwner) + '</td>'
-                + '<td>' + esc(row.treatmentPlan) + '</td>'
-                + '<td style="white-space:nowrap;">' + esc(row.reviewDate) + '</td></tr>';
+                + '<td style="white-space:nowrap;">' + esc(row.reviewDate) + '</td>'
+                + '<td style="text-align:center;">' + statusPill(row.status) + '</td>'
+                + '<td style="text-align:center;">' + pill(row.priority, PRIORITY_COLORS[row.priority]) + '</td>'
+                + '<td style="text-align:center;">' + pill(row.residualRisk, RISK_COLORS[row.residualRisk], RISK_BG[row.residualRisk]) + '</td></tr>';
         }).join('');
         out.push({
             key: 'risk-register',
@@ -482,67 +581,93 @@
             color: '#be185d',
             charts: [],
             bodyHtml: r.riskRegister.length
-                ? '<div style="overflow-x:auto;"><table class="f-tbl" style="table-layout:auto;min-width:900px;"><thead><tr style="background:#fdf2f8;"><th>Ref</th><th>Risk</th><th style="text-align:center;">L</th><th style="text-align:center;">I</th><th>Existing Controls</th><th style="text-align:center;">Residual Risk</th><th>Risk Owner</th><th>Treatment Plan</th><th>Review Date</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>'
+                ? '<div style="overflow-x:auto;"><table class="b4-tbl f-tbl" style="table-layout:auto;min-width:1050px;"><thead><tr style="background:#fdf2f8;"><th style="width:8%;">Ref</th><th style="width:26%;">Risk</th><th style="width:8%;text-align:center;">Likelihood</th><th style="width:8%;text-align:center;">Impact</th><th style="width:8%;text-align:center;">Risk Score</th><th style="width:12%;">Owner</th><th style="width:9%;">Target Date</th><th style="width:9%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>'
                 : emptyState('No risks identified during this audit.')
         });
 
         // 5. MANAGEMENT ACTION PLAN
         var actionRows = r.actionPlan.map(function (a) {
-            return '<tr><td style="text-align:center;">' + pill(a.priority, PRIORITY_COLORS[a.priority]) + '</td>'
+            return '<tr style="page-break-inside:avoid;break-inside:avoid;"><td style="text-align:center;">' + pill(a.priority, PRIORITY_COLORS[a.priority]) + '</td>'
                 + '<td>' + esc(a.action) + '</td>'
                 + '<td>' + esc(a.owner) + '</td>'
-                + '<td style="white-space:nowrap;">' + esc(a.dueDate) + '</td>'
+                + '<td style="white-space:nowrap;">' + esc(a.expectedCompletion) + '</td>'
                 + '<td>' + esc(a.resources) + '</td>'
                 + '<td>' + esc(a.expectedOutcome) + '</td>'
-                + '<td style="text-align:center;">' + esc(a.status) + '</td>'
-                + '<td>' + esc(a.businessImpact) + '</td></tr>';
+                + '<td style="text-align:center;">' + statusPill(a.status) + '</td>'
+                + '<td>' + a.businessImpact.split(', ').filter(Boolean).map(function (c) { return pill(c, '#4338ca', '#eef2ff'); }).join(' ') + '</td></tr>';
         }).join('');
         out.push({
             key: 'action-plan',
             name: 'MANAGEMENT ACTION PLAN',
-            desc: 'Prioritized corrective action plan for management',
+            desc: 'Board-ready corrective action tracker, prioritized P1 (Critical) through P4',
             color: '#dc2626',
             charts: [],
             bodyHtml: r.actionPlan.length
-                ? '<div style="overflow-x:auto;"><table class="f-tbl" style="table-layout:auto;min-width:950px;"><thead><tr style="background:#fef2f2;"><th>Priority</th><th>Action</th><th>Owner</th><th>Due Date</th><th>Resources</th><th>Expected Outcome</th><th>Status</th><th>Business Impact</th></tr></thead><tbody>' + actionRows + '</tbody></table></div>'
+                ? '<div style="overflow-x:auto;"><table class="b4-tbl f-tbl" style="table-layout:auto;min-width:980px;"><thead><tr style="background:#fef2f2;"><th>Priority</th><th>Action</th><th>Owner</th><th>Expected Completion</th><th>Resources</th><th>Expected Outcome</th><th style="text-align:center;">Status</th><th>Business Impact</th></tr></thead><tbody>' + actionRows + '</tbody></table></div>'
                 : emptyState('No corrective actions required for this audit.')
         });
 
-        // 6. CAPA DASHBOARD
+        // 6. CAPA DASHBOARD — full lifecycle (Open / In Progress / Overdue / Verified / Closed)
         var capa = r.capa;
         var chartId = 'chart-capa';
-        var hasCapaData = (capa.open + capa.closed) > 0;
-        var capaStatBoxes = '<div class="stat-grid" style="grid-template-columns:repeat(5,1fr);">'
-            + '<div class="stat-box" style="background:#f0fdf4;border-color:#16a34a;"><div class="stat-val" style="color:#16a34a;">' + capa.open + '</div><div class="stat-lbl">Open</div></div>'
-            + '<div class="stat-box" style="background:#eff6ff;border-color:#2563eb;"><div class="stat-val" style="color:#2563eb;">' + capa.closed + '</div><div class="stat-lbl">Closed</div></div>'
-            + '<div class="stat-box" style="background:#fef2f2;border-color:#dc2626;"><div class="stat-val" style="color:#dc2626;">' + capa.overdue + '</div><div class="stat-lbl">Overdue</div></div>'
-            + '<div class="stat-box" style="background:#fffbeb;border-color:#d97706;"><div class="stat-val" style="color:#d97706;">' + capa.repeatedFindings.length + '</div><div class="stat-lbl">Repeated Findings</div></div>'
-            + '<div class="stat-box" style="background:#faf5ff;border-color:#7c3aed;"><div class="stat-val" style="color:#7c3aed;">' + (capa.avgClosureDays != null ? capa.avgClosureDays : '—') + '</div><div class="stat-lbl">Avg Closure Days</div></div>'
+        var hasCapaData = capa.items.length > 0;
+        // Desaturated Big-Four-style palette, one shade per lifecycle status.
+        var CAPA_PALETTE = { Open: '#94a3b8', 'In Progress': '#c08a34', Overdue: '#b8503f', Verified: '#5b8ca0', Closed: '#5b8c6e' };
+        var capaStatBoxes = '<div class="b4-kpi-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;page-break-inside:avoid;break-inside:avoid;">'
+            + '<div class="b4-kpi-card" style="background:#0f2a43;border-color:#0f2a43;padding:12px 8px;text-align:center;border-radius:6px;">'
+            + '<div class="b4-kpi-value" style="font-size:1.5rem;font-weight:800;color:#fff;">' + capa.overallCompletion + '%</div>'
+            + '<div class="b4-kpi-label" style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#cbd5e1;">Overall Completion</div></div>'
+            + ['Open', 'In Progress', 'Overdue', 'Verified', 'Closed'].map(function (s) {
+                var c = CAPA_PALETTE[s];
+                return '<div class="b4-kpi-card" style="background:#fff;border:1px solid ' + c + '55;border-top:3px solid ' + c + ';padding:12px 8px;text-align:center;border-radius:6px;">'
+                    + '<div class="b4-kpi-value" style="font-size:1.4rem;font-weight:800;color:' + c + ';">' + (capa[s === 'In Progress' ? 'inProgress' : s.toLowerCase()] || 0) + '</div>'
+                    + '<div class="b4-kpi-label" style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;">' + s + '</div></div>';
+            }).join('')
+            + '</div>'
+            + '<div style="display:flex;gap:14px;margin-top:10px;font-size:0.75rem;color:#64748b;flex-wrap:wrap;">'
+            + '<span><strong>' + capa.repeatedFindings.length + '</strong> repeated findings</span>'
+            + '<span><strong>' + (capa.avgClosureDays != null ? capa.avgClosureDays : '—') + '</strong> avg closure days</span>'
             + '</div>';
+        var itemBars = capa.items.length
+            ? '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">' + capa.items.map(function (it) {
+                var c = CAPA_PALETTE[it.status] || '#94a3b8';
+                return '<div style="page-break-inside:avoid;break-inside:avoid;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">'
+                    + '<div style="font-size:0.8rem;color:#334155;"><span style="font-family:monospace;font-weight:700;">' + esc(it.ref) + '</span>' + (it.clause ? ' &middot; Clause ' + esc(it.clause) : '') + '</div>'
+                    + statusPill(it.status)
+                    + '</div>'
+                    + progressBar(it.completion, c)
+                    + '</div>';
+            }).join('') + '</div>'
+            : '';
         var repeatedTable = capa.repeatedFindings.length
-            ? '<table class="f-tbl" style="margin-top:16px;"><thead><tr style="background:#fffbeb;"><th style="width:14%;">Ref</th><th style="width:16%;">Clause</th><th style="width:50%;">Finding</th><th style="width:20%;text-align:center;">Priority</th></tr></thead><tbody>'
+            ? '<table class="b4-tbl f-tbl" style="margin-top:16px;"><thead><tr style="background:#fffbeb;"><th style="width:14%;">Ref</th><th style="width:16%;">Clause</th><th style="width:50%;">Finding</th><th style="width:20%;text-align:center;">Priority</th></tr></thead><tbody>'
                 + capa.repeatedFindings.map(function (f) {
-                    return '<tr><td style="font-family:monospace;font-weight:600;">' + esc(f.ref) + '</td><td>' + esc(f.clause || '') + '</td><td>' + esc((f.text || '').substring(0, 130)) + '</td><td style="text-align:center;">' + pill(f.priority || 'P3', PRIORITY_COLORS[f.priority || 'P3']) + '</td></tr>';
+                    return '<tr style="page-break-inside:avoid;break-inside:avoid;"><td style="font-family:monospace;font-weight:600;">' + esc(f.ref) + '</td><td>' + esc(f.clause || '') + '</td><td>' + esc((f.text || '').substring(0, 130)) + '</td><td style="text-align:center;">' + pill(f.priority || 'P3', PRIORITY_COLORS[f.priority || 'P3']) + '</td></tr>';
                 }).join('') + '</tbody></table>'
             : '';
         out.push({
             key: 'capa-dashboard',
             name: 'CAPA DASHBOARD',
-            desc: 'Corrective and preventive action status overview',
+            desc: 'Corrective and preventive action status overview across the full lifecycle',
             color: '#16a34a',
             charts: hasCapaData ? [{
                 id: chartId,
                 configJson: JSON.stringify({
                     type: 'doughnut',
                     data: {
-                        labels: ['Open', 'Closed', 'Overdue'],
-                        datasets: [{ data: [capa.open, capa.closed, capa.overdue], backgroundColor: ['#16a34a', '#2563eb', '#dc2626'], borderWidth: 0 }]
+                        labels: ['Open', 'In Progress', 'Overdue', 'Verified', 'Closed'],
+                        datasets: [{
+                            data: [capa.open, capa.inProgress, capa.overdue, capa.verified, capa.closed],
+                            backgroundColor: [CAPA_PALETTE.Open, CAPA_PALETTE['In Progress'], CAPA_PALETTE.Overdue, CAPA_PALETTE.Verified, CAPA_PALETTE.Closed],
+                            borderWidth: 0
+                        }]
                     },
-                    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+                    options: { responsive: true, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
                 })
             }] : [],
             bodyHtml: hasCapaData
-                ? capaStatBoxes + '<div style="max-width:320px;margin:16px auto;"><canvas id="' + chartId + '"></canvas></div>' + repeatedTable
+                ? capaStatBoxes + '<div style="max-width:300px;margin:18px auto;"><canvas id="' + chartId + '"></canvas></div>' + itemBars + repeatedTable
                 : emptyState('No CAPA records to display for this audit.')
         });
 
