@@ -2661,9 +2661,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">'
             + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'
             + '<style>'
-            + "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');"
+            + "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');"
             + '*{margin:0;padding:0;box-sizing:border-box;}'
-            + "body{font-family:'Outfit',sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
+            + "body{font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;background:white;max-width:1050px;margin:0 auto;font-size:11pt;line-height:1.6;}"
             + '@media print{'
             +   'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10pt;}'
             +   '.rpt-hdr,.rpt-ftr{display:none !important;}'
@@ -2675,12 +2675,19 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   '.sb{page-break-before:avoid;break-before:avoid;}'
             +   (d.report.reportStatus === 'draft' ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
+            // Print-quality guarantees: no orphan/widow lines, headings keep their
+            // first block, tables never leave a lone header row, charts never clip.
+            +   'p,li,td{orphans:3;widows:3;}'
+            +   'h1,h2,h3,h4{break-after:avoid;page-break-after:avoid;}'
+            +   'table{break-inside:auto;}'
+            +   '.chart-box,.b4-chart-box,canvas,img{break-inside:avoid;page-break-inside:avoid;max-width:100% !important;}'
+            +   '.b4-kpi-card,.b4-card,.b4-callout,.b4-insight-card,.ev-card{break-inside:avoid;page-break-inside:avoid;}'
             +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;'
-            +     '@top-left{content:' + pgHdrLeft + ';font-family:"Outfit",sans-serif;font-size:8pt;font-weight:600;color:#475569;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
-            +     '@top-right{content:' + pgHdrRight + ';font-family:"Outfit",sans-serif;font-size:8pt;color:#64748b;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
-            +     '@bottom-left{content:' + pgFtrLeft + ';font-family:"Outfit",sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
-            +     '@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:"Outfit",sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;}'
-            +     '@bottom-right{content:' + pgFtrRight + ';font-family:"Outfit",sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
+            +     '@top-left{content:' + pgHdrLeft + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:8pt;font-weight:500;color:#475569;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
+            +     '@top-right{content:' + pgHdrRight + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:8pt;color:#64748b;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
+            +     '@bottom-left{content:' + pgFtrLeft + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
+            +     '@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;}'
+            +     '@bottom-right{content:' + pgFtrRight + ';font-family:"Inter","Segoe UI",Helvetica,Arial,sans-serif;font-size:7.5pt;color:#64748b;vertical-align:top;padding-top:3mm;white-space:nowrap;}'
             +   '}'
             +   '@page :first{@top-left{content:none;}@top-right{content:none;}@bottom-left{content:none;}@bottom-center{content:none;}@bottom-right{content:none;}}'
             + '}'
@@ -2693,7 +2700,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.rpt-hdr-center{text-align:center;flex:1;font-size:0.68rem;color:#475569;letter-spacing:0.3px;text-transform:uppercase;}'
             + '.rpt-hdr-right{text-align:right;font-size:0.68rem;color:#64748b;}'
             + '.rpt-ftr{display:none;position:fixed;bottom:0;left:0;right:0;height:14mm;border-top:2px solid #2563eb;padding:2mm 12mm;align-items:center;justify-content:space-between;font-size:0.65rem;color:#64748b;background:white;z-index:100;}'
-            + '.rpt-ftr-left{font-weight:600;color:#1e3a5f;font-size:0.65rem;max-width:35%;}'
+            + '.rpt-ftr-left{font-weight:500;color:#1e3a5f;font-size:0.65rem;max-width:35%;}'
             + '.rpt-ftr-center{flex:1;text-align:center;font-size:0.58rem;color:#94a3b8;font-style:italic;padding:0 6px;}'
             + '.rpt-ftr-right{text-align:right;font-weight:700;color:#1e3a5f;font-size:0.68rem;white-space:nowrap;}'
             // Consulting-deliverable cover: flat, restrained, no gradient wash.
@@ -2703,7 +2710,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.sn{background:#0f2a43;color:white;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.74rem;font-weight:700;flex-shrink:0;}'
             + '.sb{padding:26px 24px 28px;border:1px solid #e7ecf1;border-top:none;border-radius:0 0 6px 6px;margin-bottom:8px;}'
             + '.sb > * + *{margin-top:18px;}.sb table + table{margin-top:22px;}'
-            + '.info-tbl{width:100%;border-collapse:collapse;}.info-tbl td{padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:0.88rem;}.info-tbl td:first-child{width:28%;color:#64748b;font-weight:600;}.info-tbl tr:nth-child(even){background:#f8fafc;}'
+            + '.info-tbl{width:100%;border-collapse:collapse;}.info-tbl td{padding:10px 14px;border-bottom:1px solid #eef2f6;font-size:0.86rem;line-height:1.5;}.info-tbl td:first-child{width:28%;color:#64748b;font-weight:500;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;}.info-tbl tr:nth-child(even){background:#fafbfc;}'
             // Consulting-grade table: airy rows, hairline rules only, eyebrow header.
             // word-break stays normal so short words like "Medium" never fragment;
             // only genuinely unbreakable tokens (long refs/URLs) are allowed to break.
@@ -2714,30 +2721,30 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.f-tbl td .badge,.f-tbl td .pill,.f-tbl td .b4-badge,.f-tbl td .b4-pill,.f-tbl td span[style*="border-radius"]{white-space:nowrap;}'
             + '.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}'
             + '.stat-box{text-align:center;padding:16px 10px;border-radius:10px;border-bottom:3px solid transparent;}'
-            + '.stat-val{font-size:1.8rem;font-weight:800;line-height:1;margin-bottom:4px;}'
-            + '.stat-lbl{font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;}'
+            + '.stat-val{font-size:1.8rem;font-weight:700;line-height:1;margin-bottom:4px;}'
+            + '.stat-lbl{font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;}'
             + '.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}'
             + '.chart-box{background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;}'
             + '.chart-box canvas{max-height:200px;max-width:100%;}'
             + '.chart-title{font-size:0.8rem;font-weight:700;color:#1e293b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.3px;}'
             + '.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}.ev-card{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;break-inside:avoid;}.ev-card img{width:100%;height:160px;object-fit:cover;}.ev-cap{padding:8px 12px;font-size:0.78rem;}.ev-cap strong{display:block;color:#1e293b;margin-bottom:2px;}.ev-cap span{color:#64748b;}'
-            + '.toc{padding:30px 40px;}.toc-title{font-size:1.6rem;font-weight:800;color:#0f172a;margin-bottom:4px;}.toc-sub{font-size:0.88rem;color:#64748b;margin-bottom:20px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin-bottom:25px;}'
-            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}'
+            + '.toc{padding:30px 40px;}.toc-title{font-size:1.6rem;font-weight:700;color:#0f172a;margin-bottom:4px;}.toc-sub{font-size:0.88rem;color:#64748b;margin-bottom:20px;}.toc-line{width:60px;height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:2px;margin-bottom:25px;}'
+            + '.toc-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;}.toc-num{min-width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.82rem;color:white;flex-shrink:0;}.toc-item-body{flex:1;}.toc-item-title{font-weight:700;font-size:0.95rem;color:#1e293b;}.toc-item-desc{font-size:0.78rem;color:#94a3b8;margin-top:3px;}'
             + 'footer{display:none;}'
             + '.content{padding:0 32px;}'
             + '.callout{padding:12px 16px;border-radius:8px;margin-top:14px;font-size:0.88rem;line-height:1.7;}'
             + '.ev-inline{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}.ev-inline img{height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;}'
-            + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;justify-content:center;align-items:center;overflow:hidden;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:900;color:rgba(148,163,184,0.05);letter-spacing:8px;white-space:nowrap;font-family:Outfit,sans-serif;text-align:center;user-select:none;}body{position:relative;z-index:1;}'
+            + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;justify-content:center;align-items:center;overflow:hidden;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:700;color:rgba(148,163,184,0.05);letter-spacing:8px;white-space:nowrap;font-family:Inter,"Segoe UI",Helvetica,Arial,sans-serif;text-align:center;user-select:none;}body{position:relative;z-index:1;}'
             + ((window.ReportExecutive && window.ReportExecutive.bigFourCss) ? window.ReportExecutive.bigFourCss() : '')
             + '</style></head><body>'
             + (d.report.reportStatus === 'draft'
                 ? '<div class="watermark"><span style="color:rgba(220,38,38,0.14);">DRAFT</span></div>'
                 : '<div class="watermark"><span>CONFIDENTIAL</span></div>')
-            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
+            + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
-            + '<button data-action="print" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
-            + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Close</button></div>'
+            + '<button data-action="print" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:500;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Download"><i class="fa fa-download" style="margin-right:6px;"></i>Download PDF</button>'
+            + '<button data-action="close" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:500;">Close</button></div>'
             // COVER PAGE
             + '<div class="cover">'
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;position:absolute;top:40px;left:0;right:0;padding:0 50px;">'
@@ -2747,25 +2754,25 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 try { qrHost = new URL(d.cardUrl).host; } catch (_e) { qrHost = ''; }
                 return '<div style="text-align:center;max-width:160px;">'
                     + '<img src="' + d.qrCodeUrl + '" style="height:120px;width:120px;display:block;margin:0 auto;" alt="Scan to verify">'
-                    + '<div style="font-size:0.58rem;color:#64748b;margin-top:4px;letter-spacing:0.2px;font-weight:600;">Scan to view report card</div>'
+                    + '<div style="font-size:0.58rem;color:#64748b;margin-top:4px;letter-spacing:0.2px;font-weight:500;">Scan to view report card</div>'
                     + (qrHost ? '<div style="font-size:0.52rem;color:#94a3b8;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;">' + window.UTILS.escapeHtml(qrHost) + '</div>' : '')
                     + (d.qrFallback ? '<div class="no-print" style="font-size:0.52rem;color:#dc2626;margin-top:4px;font-weight:700;">⚠ Set CB website in Settings — QR points to a placeholder URL.</div>' : '')
                     + '</div></div>';
             })()
             + '<div style="margin-top:40px;"></div>'
             + '<div class="cover-line"></div>'
-            + '<h1 style="font-size:2.8rem;font-weight:800;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
+            + '<h1 style="font-size:2.8rem;font-weight:700;color:#0f172a;letter-spacing:1px;">AUDIT REPORT</h1>'
             + '<p style="font-size:1.15rem;color:#64748b;margin-top:8px;">' + standard + '</p>'
             + '<div style="margin-top:50px;">'
             + (d.clientLogo ? '<img src="' + d.clientLogo + '" style="height:60px;object-fit:contain;margin-bottom:16px;" alt="Client">' : '')
             + '<div style="font-size:2rem;font-weight:700;color:#2563eb;">' + d.report.client + '</div>'
             + (d.client.industry ? '<div style="font-size:1rem;color:#64748b;margin-top:6px;">' + d.client.industry + '</div>' : '') + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:480px;text-align:left;margin-top:50px;">'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || '—') + '</div></div>'
-            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
-            + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report Date</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Report ID</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">#' + d.report.id.substring(0, 8) + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Lead Auditor</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.leadAuditor || '—') + '</div></div>'
+            + '<div><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
+            + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:500;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
             + '<div style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
             + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;margin-bottom:10px;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
@@ -2789,7 +2796,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + '<div class="toc-line"></div>'
                     + tocItems.join('')
                     + '<div style="margin-top:30px;text-align:center;font-size:0.78rem;color:#94a3b8;">'
-                    + '<i class="fa-solid fa-file-lines" style="margin-right:4px;"></i>'
+                    + ''
                     + tocItems.length + ' sections in this report</div></div>';
             })()
             + '<div class="content">'
@@ -2839,21 +2846,21 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: OBJECTIVES, CRITERIA & METHODOLOGY
             + (secMap['objectives'] ? '<div id="sec-objectives" class="sh page-break" style="background:#ecfeff;border-left-color:#0891b2;">' + sBadge('objectives') + 'AUDIT OBJECTIVES, CRITERIA &amp; METHODOLOGY</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0891b2;"><i class="fa-solid fa-bullseye" style="margin-right:4px;"></i>Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#6366f1;"><i class="fa-solid fa-scale-balanced" style="margin-right:4px;"></i>Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
-                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0d9488;"><i class="fa-solid fa-microscope" style="margin-right:4px;"></i>Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0891b2;">Audit Objectives</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedObjectives || '• Determine conformity of the management system with audit criteria\n• Evaluate the ability of the management system to ensure compliance with statutory, regulatory and contractual requirements\n• Evaluate the effectiveness of the management system in meeting its specified objectives\n• Identify areas for potential improvement of the management system') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#6366f1;">Audit Criteria</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedCriteria || '• ' + standard + '\n• Organization management system documentation\n• Applicable legal and regulatory requirements\n• Previous audit findings and corrective action records') + '</div></div>'
+                + '<div><h4 style="margin:0 0 8px;font-size:0.9rem;color:#0d9488;">Audit Methodology</h4><div style="white-space:pre-line;line-height:1.7;font-size:0.88rem;color:#334155;">' + (editedMethodology || '• Risk-based sampling of processes, records, and documentation\n• Interviews with management and operational personnel\n• Observation of activities and work environment on-site\n• Review of documented information and objective evidence') + '</div></div>'
                 + '</div></div>' : '')
             // SECTION: EXECUTIVE SUMMARY
             + (secMap['summary'] ? '<div id="sec-summary" class="sh page-break" style="background:#ecfdf5;border-left-color:#059669;">' + sBadge('summary') + 'AUDIT SUMMARY &amp; OPENING MEETING</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
-                + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
-                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
-                + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:600;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
+                + '<div style="padding:10px 14px;background:#f0f9ff;border-radius:8px;border-left:3px solid #2563eb;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Type</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditType || 'Initial') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#f0fdf4;border-radius:8px;border-left:3px solid #059669;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Audit Dates</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.report.date || '—') + (d.report.endDate ? ' — ' + d.report.endDate : '') + '</div></div>'
+                + '<div style="padding:10px 14px;background:#faf5ff;border-radius:8px;border-left:3px solid #7c3aed;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Duration</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (function () { var md = d.auditPlan?.manDays || d.auditPlan?.man_days || '—'; var method = (d.auditPlan?.auditMethod || '').toLowerCase(); var suffix = method === 'remote' ? ' (Remote Audit)' : (method === 'hybrid' ? ' (Hybrid)' : (d.auditPlan?.onsiteDays ? ' (' + d.auditPlan.onsiteDays + ' On-site)' : '')); return md + ' Man-Days' + suffix; })() + '</div></div>'
+                + '<div style="padding:10px 14px;background:#fff7ed;border-radius:8px;border-left:3px solid #ea580c;"><div style="font-size:0.72rem;color:#64748b;font-weight:500;text-transform:uppercase;">Method</div><div style="font-size:0.9rem;color:#1e293b;font-weight:500;margin-top:2px;">' + (d.auditPlan?.auditMethod || 'On-site') + '</div></div></div>'
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (formatRichText(editedSummary) || '<em>No executive summary recorded.</em>') + '</div>'
                 + areaTableHtml
                 + '<div style="padding:16px;background:#f0fdf4;border-radius:10px;margin-top:14px;border-left:4px solid #0891b2;"><strong style="color:#0e7490;font-size:0.9rem;">Opening Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.openingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.openingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr>' + (editedOpeningNotes ? '<tr><td>Notes</td><td>' + fmtRemark(editedOpeningNotes) + '</td></tr>' : '') + '</table></div>'
-                + (editedPositiveObs ? '<div style="margin-top:20px;padding:14px 16px;background:#f0fdf4;border-radius:10px;border-left:4px solid #22c55e;break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><i class="fa-solid fa-thumbs-up" style="color:#16a34a;font-size:1rem;"></i><h4 style="margin:0;color:#166534;font-size:0.95rem;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;">Positive Observations</h4></div><div style="color:#15803d;font-size:0.9rem;line-height:1.6;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
+                + (editedPositiveObs ? '<div style="margin-top:20px;padding:14px 16px;background:#f0fdf4;border-radius:10px;border-left:4px solid #22c55e;break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><h4 style="margin:0;color:#166534;font-size:0.95rem;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;">Positive Observations</h4></div><div style="color:#15803d;font-size:0.9rem;line-height:1.6;">' + formatPositiveObs(editedPositiveObs) + '</div></div>' : '')
                 + '</div>' : '')
             // SECTION: ANALYTICS DASHBOARD
             + (secMap['charts'] ? '<div id="sec-charts" class="sh page-break" style="background:#f5f3ff;border-left-color:#7c3aed;">' + sBadge('charts') + 'ANALYTICS DASHBOARD</div><div class="sb">'
@@ -2877,7 +2884,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: PREVIOUS FINDINGS STATUS
             + (secMap['prev-findings'] ? '<div id="sec-prev-findings" class="sh page-break" style="background:#eef2ff;border-left-color:#6366f1;">' + sBadge('prev-findings') + 'PREVIOUS FINDINGS STATUS</div><div class="sb">'
                 + (prevFindingsRowsHtml
-                    ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i>Nonconformities and observations raised at the previous audit were reviewed for effective closure.</div>'
+                    ? '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;">Nonconformities and observations raised at the previous audit were reviewed for effective closure.</div>'
                         + '<table class="f-tbl"><thead><tr style="background:#eef2ff;"><th style="width:14%;">Ref</th><th style="width:18%;">Clause</th><th style="width:12%;text-align:center;">Type</th><th style="width:56%;">Follow-up Status</th></tr></thead><tbody>' + prevFindingsRowsHtml + '</tbody></table>'
                     : '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + (editedPrevFindings || 'Nonconformities and observations from the previous audit were reviewed. All corrective actions were verified as effectively implemented unless otherwise stated below.') + '</div>')
                 + '</div>' : '')
@@ -2902,7 +2909,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // here so regenerating the PDF does not shift due dates. Fall back to computing
                     // from today only for legacy records that predate persistence.
                     var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
-                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var dueStr = item.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var dueStr = ncr.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:600;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:600;color:#be185d;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var dueStr = item.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#be185d;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var dueStr = ncr.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#be185d;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typ === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#be185d;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
                 + '<div style="margin-top:12px;padding:10px;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
                 + '</div>' : '')
@@ -2913,11 +2920,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: MANAGEMENT SYSTEM EFFECTIVENESS
             + (secMap['mgmt-effectiveness'] ? '<div id="sec-mgmt-effectiveness" class="sh page-break" style="background:#ecfeff;border-left-color:#0e7490;">' + sBadge('mgmt-effectiveness') + 'MANAGEMENT SYSTEM EFFECTIVENESS</div><div class="sb" style="padding:0;">'
                 + '<table class="f-tbl"><thead><tr style="background:#ecfeff;"><th style="width:38%;">Process</th><th style="width:62%;">Effectiveness Status</th></tr></thead><tbody>'
-                + '<tr><td style="font-weight:600;">Internal Audit Programme</td><td>' + editedEffInternalAudit + '</td></tr>'
-                + '<tr><td style="font-weight:600;">Management Review</td><td>' + editedEffMgmtReview + '</td></tr>'
-                + '<tr><td style="font-weight:600;">Handling of Complaints</td><td>' + editedEffComplaints + '</td></tr>'
-                + '<tr><td style="font-weight:600;">Use of Certification Marks / Logo</td><td>' + editedEffMarks + '</td></tr>'
-                + '<tr><td style="font-weight:600;">Legal &amp; Regulatory Compliance</td><td>' + editedEffLegal + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Internal Audit Programme</td><td>' + editedEffInternalAudit + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Management Review</td><td>' + editedEffMgmtReview + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Handling of Complaints</td><td>' + editedEffComplaints + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Use of Certification Marks / Logo</td><td>' + editedEffMarks + '</td></tr>'
+                + '<tr><td style="font-weight:500;">Legal &amp; Regulatory Compliance</td><td>' + editedEffLegal + '</td></tr>'
                 + '</tbody></table></div>' : '')
             // SECTION: AUDIT CONCLUSION & RECOMMENDATION
             + (secMap['conclusion'] ? '<div id="sec-conclusion" class="sh page-break" style="background:#eef2ff;border-left-color:#4338ca;">' + sBadge('conclusion') + 'AUDIT CONCLUSION &amp; RECOMMENDATION</div><div class="sb">'
@@ -2926,15 +2933,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1e40af;"><strong style="color:#1e40af;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + editedUnresolved + '</td></tr></table></div>'
                 + '<p style="font-style:italic;font-size:0.8rem;color:#64748b;margin-top:16px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">'
-                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:600;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
+                + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Lead Auditor Signature</div><div style="font-size:0.88rem;color:#1e293b;font-weight:500;margin-top:4px;">' + (d.report.leadAuditor || '') + '</div></div>'
                 + '<div style="text-align:center;"><div style="border-bottom:1px solid #94a3b8;padding-bottom:8px;margin-bottom:6px;">&nbsp;</div><div style="font-size:0.85rem;color:#64748b;">Client Representative</div></div></div></div>' : '')
             // SECTION: SIGNATURE & ATTESTATION
             + (secMap['signature'] ? '<div id="sec-signature" class="sh page-break" style="background:#f8fafc;border-left-color:#1e293b;">' + sBadge('signature') + 'SIGNATURE &amp; ATTESTATION</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedSigDate || d.today) + '</div></div>'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || '____________________') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedSigDate || d.today) + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || '____________________') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
                 + '</div>'
-                + '<div style="margin-top:20px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:4px;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
+                + '<div style="margin-top:20px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;">This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
                 + '</div>' : '')
             // SECTION: DISTRIBUTION LIST
             + (secMap['distribution'] ? '<div id="sec-distribution" class="sh page-break" style="background:#f0fdfa;border-left-color:#0d9488;">' + sBadge('distribution') + 'DISTRIBUTION LIST</div><div class="sb">'
@@ -3011,7 +3018,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                         + (meta.length ? '<div style="margin-top:6px;padding-top:5px;border-top:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:8px;font-size:0.66rem;color:#94a3b8;">' + meta.join('') + '</div>' : '')
                         + '</div></div>';
                 }).join('');
-                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
+                return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;">' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
             })()
             + '</div>'
             // FOOTER
@@ -3022,6 +3029,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Build chart init script SEPARATELY (will become its own Blob URL to bypass inline-script CSP)
         const chartScriptCode = ''
             + 'function rc(){'
+            // One typeface across every chart: set Chart.js global defaults before
+            // any chart is constructed so per-config font objects only vary size.
+            + 'if(window.Chart&&Chart.defaults){Chart.defaults.font.family="Inter, Segoe UI, Helvetica, Arial, sans-serif";Chart.defaults.font.size=9;Chart.defaults.color="#475569";}'
             + 'var c1=document.getElementById("chart-doughnut");'
             + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#15803d","#b45309","#b91c1c","#1d4ed8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
             + 'var c2=document.getElementById("chart-clause");'

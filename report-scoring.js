@@ -478,8 +478,8 @@
 
     function countNoteHtml(shownLen, total, noun) {
         if (!total) return '';
-        if (total < 5) return `<div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">${pluralize(total, noun)} identified</div>`;
-        if (total > shownLen) return `<div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">Showing top ${shownLen} of ${pluralize(total, noun)}</div>`;
+        if (total < 5) return `<div class="b4-footnote" style="margin-top:var(--b4-s1);">${pluralize(total, noun)} identified</div>`;
+        if (total > shownLen) return `<div class="b4-footnote" style="margin-top:var(--b4-s1);">Showing top ${shownLen} of ${pluralize(total, noun)}</div>`;
         return '';
     }
 
@@ -634,8 +634,31 @@
         const compliancePct = overall.applicable > 0 ? overall.complianceScore : null;
         const hasRecurring = (clauseIntel.recurring || []).length > 0;
 
+        // Man-days: prefer explicit man-days, fall back to on-site days.
+        const manDays = d?.auditPlan?.manDays;
+        const onsiteDays = d?.auditPlan?.onsiteDays;
+        const auditDuration = (manDays != null && manDays !== '') ? Number(manDays)
+            : ((onsiteDays != null && onsiteDays !== '') ? Number(onsiteDays) : null);
+
+        // Top business-impact category, sourced defensively from window.ReportRisk
+        // (a sibling module) if it has already been loaded. Omitted gracefully
+        // when unavailable so this card never fabricates data.
+        let businessImpact = null;
+        try {
+            if (global.ReportRisk && typeof global.ReportRisk.compute === 'function') {
+                const riskCompute = global.ReportRisk.compute(d);
+                const counts = {};
+                (riskCompute?.scoredFindings || []).forEach((f) => {
+                    (f?.businessImpacts || []).forEach((cat) => { counts[cat] = (counts[cat] || 0) + 1; });
+                });
+                const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+                if (top) businessImpact = { category: top[0], count: top[1] };
+            }
+        } catch (_e) { businessImpact = null; }
+
         const execDashboard = {
             auditScore,
+            grade: gradeFromScore(auditScore),
             maturityOverall: maturity.overall,
             riskRating: deriveRiskRating(majorNC, minorNC, hasRecurring, departments, auditScore),
             certificationRecommendation: stats.recommendation || null,
@@ -644,6 +667,8 @@
             controlEffectiveness: breakdown.Operations,
             processEffectiveness: breakdown.Monitoring,
             majorNC, minorNC, obsCount, ofiCount, capaProgress,
+            businessImpact,
+            auditDuration,
             hasPrior: !!prior,
             deltas: {
                 auditScore: prior ? delta(auditScore, prior.auditScore) : null,
@@ -664,46 +689,73 @@
         return { auditScore, breakdown, maturity, departments, clauseIntel, trends, execDashboard };
     }
 
-    // ── HTML rendering helpers ────────────────────────────────────────────────
-    function scorePillHtml(score) {
-        if (score == null) return '<span style="color:#94a3b8;font-size:0.8rem;">—</span>';
-        const color = score >= 80 ? '#16a34a' : score >= 60 ? '#d97706' : '#dc2626';
-        const bg = score >= 80 ? '#f0fdf4' : score >= 60 ? '#fffbeb' : '#fef2f2';
-        return `<span class="b4-badge" style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.8rem;font-weight:700;color:${color};background:${bg};white-space:nowrap;">${score}</span>`;
+    // ── Design-system helpers (consume report-executive.js's bigFourCss()) ────
+    // Icons come exclusively from window.ReportExecutive.icon(); guarded so a
+    // missing/late-loading executive module never breaks rendering.
+    function iconSafe(name, opts) {
+        try {
+            if (global.ReportExecutive && typeof global.ReportExecutive.icon === 'function') {
+                return global.ReportExecutive.icon(name, opts);
+            }
+        } catch (_e) { /* defensive no-op */ }
+        return '';
     }
 
-    function barHtml(valuePct, color) {
+    // Severity classification -> canonical b4-* modifier suffix ('good'|'warn'|'bad'|'neutral'|'info').
+    function scoreSeverity(score, goodMin, warnMin) {
+        if (score == null) return 'neutral';
+        goodMin = goodMin == null ? 80 : goodMin;
+        warnMin = warnMin == null ? 60 : warnMin;
+        return score >= goodMin ? 'good' : score >= warnMin ? 'warn' : 'bad';
+    }
+    const LEVEL_SEVERITY = { Critical: 'bad', High: 'bad', Medium: 'warn', Low: 'good', Major: 'bad', Minor: 'warn', Observation: 'info' };
+    function levelSeverity(level) { return LEVEL_SEVERITY[level] || 'neutral'; }
+    const STATUS_SEVERITY = { Recurring: 'bad', Critical: 'bad', Attention: 'warn', Conforming: 'good' };
+    function statusSeverity(status) { return STATUS_SEVERITY[status] || 'neutral'; }
+
+    function gradeFromScore(score) {
+        if (score == null) return null;
+        let letter = 'D', severity = 'bad';
+        if (score >= 90) { letter = 'A'; severity = 'good'; }
+        else if (score >= 75) { letter = 'B'; severity = 'good'; }
+        else if (score >= 60) { letter = 'C'; severity = 'warn'; }
+        return { letter, score, severity };
+    }
+
+    // ── HTML rendering helpers ────────────────────────────────────────────────
+    function scorePillHtml(score) {
+        if (score == null) return '<span class="b4-badge b4-badge--neutral">—</span>';
+        return `<span class="b4-badge b4-badge--${scoreSeverity(score)}">${score}</span>`;
+    }
+
+    function barHtml(valuePct, severity) {
         const v = clamp(valuePct == null ? 0 : valuePct, 0, 100);
-        return `<div class="b4-bar" style="background:#e2e8f0;border-radius:6px;height:8px;overflow:hidden;min-width:70px;">
-            <div class="b4-bar-fill" style="width:${v}%;background:${color};height:100%;border-radius:6px;"></div>
-        </div>`;
+        return `<div class="b4-bar"><div class="b4-bar-fill b4-bar-fill--${severity || 'info'}" style="width:${v}%;"></div></div>`;
     }
 
     function maturityBarHtml(label, value, meta) {
         const n = meta?.n ?? 0;
         if (value == null) {
-            const reason = meta?.insufficient ? `N/A — insufficient sample (n=${n})` : 'N/A';
+            const reason = meta?.insufficient ? `N/A (n=${n})` : 'N/A';
             return `
-            <div style="margin-bottom:14px;break-inside:avoid;">
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;font-weight:600;color:#334155;margin-bottom:4px;gap:8px;">
-                    <span>${esc(label)}</span>
-                    <span class="b4-badge" style="color:#94a3b8;background:#f1f5f9;padding:1px 8px;border-radius:10px;font-weight:700;font-size:0.7rem;white-space:nowrap;">${esc(reason)}</span>
+            <div class="b4-bar-row" style="flex-direction:column;align-items:stretch;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--b4-s3);">
+                    <span class="b4-bar-label">${esc(label)}</span>
+                    <span class="b4-badge b4-badge--neutral">${esc(reason)}</span>
                 </div>
-                <div class="b4-maturity-bar b4-bar" style="background:#e2e8f0;border-radius:6px;height:10px;overflow:hidden;"><div style="width:0;height:100%;"></div></div>
+                <div class="b4-maturity-bar b4-bar"><div class="b4-maturity-bar-fill" style="width:0;"></div></div>
             </div>`;
         }
         const v = clamp(value, 0, 5);
         const pctW = (v / 5) * 100;
-        const color = v >= 4 ? '#16a34a' : v >= 3 ? '#2563eb' : v >= 2 ? '#d97706' : '#dc2626';
+        const sev = v >= 4 ? 'good' : v >= 3 ? 'info' : v >= 2 ? 'warn' : 'bad';
         return `
-        <div style="margin-bottom:14px;break-inside:avoid;">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;font-weight:600;color:#334155;margin-bottom:4px;gap:8px;">
-                <span>${esc(label)} <span style="color:#94a3b8;font-weight:500;font-size:0.68rem;">(n=${n})</span></span>
-                <span class="b4-badge" style="color:${color};background:${color}15;padding:1px 8px;border-radius:10px;font-weight:800;white-space:nowrap;">${v.toFixed(1)}/5</span>
+        <div class="b4-bar-row" style="flex-direction:column;align-items:stretch;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--b4-s3);">
+                <span class="b4-bar-label">${esc(label)} <span class="b4-caption" style="display:inline;">(n=${n})</span></span>
+                <span class="b4-badge b4-badge--${sev}">${v.toFixed(1)}/5</span>
             </div>
-            <div class="b4-maturity-bar b4-bar" style="background:#e2e8f0;border-radius:6px;height:10px;overflow:hidden;">
-                <div class="b4-maturity-bar-fill b4-bar-fill" style="width:${pctW}%;background:${color};height:100%;border-radius:6px;"></div>
-            </div>
+            <div class="b4-maturity-bar b4-bar"><div class="b4-maturity-bar-fill b4-bar-fill--${sev}" style="width:${pctW}%;"></div></div>
         </div>`;
     }
 
@@ -711,101 +763,99 @@
     function trendHtml(deltaVal, direction, suffix) {
         suffix = suffix || '';
         if (deltaVal == null) {
-            return '<span class="b4-kpi-trend flat" style="color:#94a3b8;font-weight:700;">— vs previous audit</span>';
+            return '<span class="b4-kpi-trend flat">vs previous audit</span>';
         }
         const dirClass = deltaVal > 0 ? 'up' : deltaVal < 0 ? 'down' : 'flat';
-        const arrow = deltaVal > 0 ? '▲' : deltaVal < 0 ? '▼' : '■';
-        let color = '#64748b';
-        if (direction === 'higherBetter') color = deltaVal > 0 ? '#16a34a' : deltaVal < 0 ? '#dc2626' : '#64748b';
-        else if (direction === 'lowerBetter') color = deltaVal < 0 ? '#16a34a' : deltaVal > 0 ? '#dc2626' : '#64748b';
         const magnitude = Math.abs(deltaVal);
-        return `<span class="b4-kpi-trend ${dirClass}" style="color:${color};font-weight:700;">${arrow} ${magnitude}${suffix} vs previous</span>`;
+        return `<span class="b4-kpi-trend ${dirClass}">${magnitude}${suffix} vs previous</span>`;
     }
 
     function kpiCardHtml(opts) {
-        const { icon, label, value, suffix, sub, color, deltaVal, direction, deltaSuffix, isText } = opts;
+        const { icon, label, value, suffix, sub, severity, deltaVal, direction, deltaSuffix, isText, accent } = opts;
         const valHtml = value == null
             ? '—'
             : (isText
                 ? esc(String(value))
-                : `${value}${suffix ? `<span style="font-size:0.95rem;font-weight:600;color:#94a3b8;">${suffix}</span>` : ''}`);
+                : `${value}${suffix ? `<span style="font-size:0.6em;font-weight:500;color:var(--b4-muted);">${suffix}</span>` : ''}`);
+        const colorStyle = severity && severity !== 'neutral' ? ` style="color:var(--b4-${severity});"` : '';
         return `
-        <div class="b4-kpi-card" style="break-inside:avoid;text-align:center;padding:18px 12px;background:#fff;border:1px solid #e2e8f0;border-top:4px solid ${color};border-radius:6px;">
-            ${icon ? `<div class="b4-kpi-icon" style="font-size:1rem;color:${color};margin-bottom:6px;opacity:0.85;"><i class="fa-solid ${icon}"></i></div>` : ''}
-            <div class="b4-kpi-value" style="font-size:${isText ? '1.15rem' : '1.9rem'};font-weight:800;color:${color};line-height:1.15;">${valHtml}</div>
-            <div class="b4-kpi-label" style="font-size:0.68rem;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:7px;">${esc(label)}</div>
-            ${sub ? `<div class="b4-kpi-sub" style="font-size:0.7rem;color:#94a3b8;margin-top:2px;">${esc(sub)}</div>` : ''}
-            <div style="margin-top:8px;font-size:0.68rem;">${trendHtml(deltaVal, direction, deltaSuffix)}</div>
+        <div class="b4-kpi-card${accent ? ' b4-kpi-card--accent' : ''}">
+            ${icon ? `<div class="b4-kpi-icon">${iconSafe(icon)}</div>` : ''}
+            <div class="b4-kpi-value"${colorStyle}>${valHtml}</div>
+            <div class="b4-kpi-label">${esc(label)}</div>
+            ${sub ? `<div class="b4-kpi-sub">${esc(sub)}</div>` : ''}
+            ${(deltaVal !== undefined) ? `<div>${trendHtml(deltaVal, direction, deltaSuffix)}</div>` : ''}
         </div>`;
     }
 
     function riskBadgeHtml(level) {
-        const map = { Critical: '#7f1d1d', High: '#dc2626', Medium: '#d97706', Low: '#16a34a', Major: '#dc2626', Minor: '#d97706' };
-        const color = map[level] || '#64748b';
-        return `<span class="b4-badge" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.75rem;font-weight:700;color:white;background:${color};white-space:nowrap;">${esc(level || '—')}</span>`;
+        return `<span class="b4-badge b4-badge--${levelSeverity(level)}">${esc(level || '—')}</span>`;
     }
 
     function statusBadgeHtml(status) {
-        const map = { Recurring: '#7f1d1d', Critical: '#dc2626', Attention: '#d97706', Conforming: '#16a34a' };
-        const color = map[status] || '#64748b';
-        return `<span class="b4-badge" style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.72rem;font-weight:700;color:white;background:${color};white-space:nowrap;">${esc(status || '—')}</span>`;
+        return `<span class="b4-badge b4-badge--${statusSeverity(status)}">${esc(status || '—')}</span>`;
     }
 
     function insufficientDataHtml(msg) {
-        return `<div class="b4-card" style="text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem;border:1px dashed #e2e8f0;border-radius:8px;"><i class="fa-solid fa-chart-simple" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>${esc(msg || 'Insufficient data available for this section.')}</div>`;
+        return `<div class="b4-card b4-callout--info" style="text-align:center;padding:var(--b4-s6);">${iconSafe('finding', { size: 22 })}<div class="b4-caption" style="justify-content:center;margin-top:var(--b4-s2);">${esc(msg || 'Insufficient data available for this section.')}</div></div>`;
     }
 
     // ── Section builders ────────────────────────────────────────────────────
     function buildExecDashboardSection(metrics) {
         const ed = metrics.execDashboard || {};
         const dl = ed.deltas || {};
-        const riskColor = { Critical: '#7f1d1d', High: '#dc2626', Medium: '#d97706', Low: '#16a34a' }[ed.riskRating] || '#64748b';
+
+        const findingsSummary = pluralize(ed.majorNC, 'major') + ', ' + pluralize(ed.minorNC, 'minor')
+            + (ed.obsCount || ed.ofiCount ? ', ' + pluralize((ed.obsCount || 0) + (ed.ofiCount || 0), 'obs/OFI') : '');
 
         const cards = [
-            kpiCardHtml({ icon: 'fa-gauge-high', label: 'Overall Audit Score', value: ed.auditScore, suffix: '/100', color: '#2563eb', deltaVal: dl.auditScore, direction: 'higherBetter' }),
-            kpiCardHtml({ icon: 'fa-certificate', label: 'Certification Recommendation', value: ed.certificationRecommendation || 'Pending', color: '#4338ca', isText: true }),
-            kpiCardHtml({ icon: 'fa-layer-group', label: 'Maturity Score', value: ed.maturityOverall, suffix: '/5', color: '#7c3aed', deltaVal: dl.maturity, direction: 'higherBetter' }),
-            kpiCardHtml({ icon: 'fa-check-circle', label: 'Compliance %', value: ed.compliancePct, suffix: '%', color: '#0891b2', deltaVal: dl.compliance, direction: 'higherBetter', deltaSuffix: 'pt' }),
-            kpiCardHtml({ icon: 'fa-triangle-exclamation', label: 'Risk Rating', value: ed.riskRating, color: riskColor, isText: true }),
-            kpiCardHtml({ icon: 'fa-circle-exclamation', label: 'Major NC', value: ed.majorNC, color: '#dc2626', deltaVal: dl.majorNC, direction: 'lowerBetter' }),
-            kpiCardHtml({ icon: 'fa-circle-minus', label: 'Minor NC', value: ed.minorNC, color: '#d97706', deltaVal: dl.minorNC, direction: 'lowerBetter' }),
-            kpiCardHtml({ icon: 'fa-eye', label: 'Observations', value: ed.obsCount, color: '#3b82f6', deltaVal: dl.obs, direction: 'neutral' }),
-            kpiCardHtml({ icon: 'fa-lightbulb', label: 'OFIs', value: ed.ofiCount, color: '#06b6d4', deltaVal: dl.ofi, direction: 'neutral' })
+            kpiCardHtml({ icon: 'check', label: 'Overall Compliance', value: ed.compliancePct, suffix: '%', severity: scoreSeverity(ed.compliancePct), deltaVal: dl.compliance, direction: 'higherBetter', deltaSuffix: 'pt' }),
+            kpiCardHtml({ icon: 'shield', label: 'Certification Recommendation', value: ed.certificationRecommendation || 'Pending', isText: true }),
+            kpiCardHtml({ icon: 'target', label: 'Audit Grade', value: ed.grade ? ed.grade.letter : null, sub: ed.grade ? `${ed.grade.score}/100` : null, severity: ed.grade ? ed.grade.severity : 'neutral', deltaVal: dl.auditScore, direction: 'higherBetter' }),
+            kpiCardHtml({ icon: 'department', label: 'Maturity Score', value: ed.maturityOverall, suffix: '/5', severity: scoreSeverity(ed.maturityOverall != null ? ed.maturityOverall * 20 : null), deltaVal: dl.maturity, direction: 'higherBetter' }),
+            kpiCardHtml({ icon: 'finding', label: 'Findings Summary', value: (ed.majorNC || 0) + (ed.minorNC || 0), sub: findingsSummary, severity: (ed.majorNC || 0) > 0 ? 'bad' : (ed.minorNC || 0) > 0 ? 'warn' : 'good' }),
+            kpiCardHtml({ icon: 'risk', label: 'High Risks', value: ed.riskRating, severity: levelSeverity(ed.riskRating), isText: true })
         ];
+        if (ed.businessImpact) {
+            cards.push(kpiCardHtml({ icon: 'alert', label: 'Business Impact', value: ed.businessImpact.count, sub: ed.businessImpact.category, severity: 'info' }));
+        }
+        if (ed.auditDuration != null) {
+            cards.push(kpiCardHtml({ icon: 'clock', label: 'Audit Duration', value: ed.auditDuration, suffix: ' man-days' }));
+        }
         if (ed.capaProgress != null) {
-            cards.push(kpiCardHtml({ icon: 'fa-list-check', label: 'CAPA Progress', value: ed.capaProgress, suffix: '%', color: '#16a34a', deltaVal: dl.capaProgress, direction: 'higherBetter', deltaSuffix: 'pt' }));
+            cards.push(kpiCardHtml({ icon: 'capa', label: 'CAPA Progress', value: ed.capaProgress, suffix: '%', severity: scoreSeverity(ed.capaProgress), deltaVal: dl.capaProgress, direction: 'higherBetter', deltaSuffix: 'pt' }));
         }
 
-        const kpis = `<div class="b4-kpi-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">${cards.join('')}</div>`;
+        const kpis = `<div class="b4-kpi-grid">${cards.join('')}</div>`;
 
         const risksList = (ed.top5Risks && ed.top5Risks.length)
-            ? ed.top5Risks.map((r, idx) => `<li style="margin-bottom:8px;font-size:0.83rem;color:#334155;display:flex;align-items:center;justify-content:space-between;gap:10px;break-inside:avoid;">
-                <span><span style="display:inline-block;width:18px;color:#94a3b8;font-weight:700;">${idx + 1}.</span>${esc(r.title)}</span>${riskBadgeHtml(r.level)}</li>`).join('')
-            : '<li style="color:#94a3b8;font-size:0.85rem;">No significant risks identified</li>';
+            ? ed.top5Risks.map((r, idx) => `<li style="display:flex;align-items:center;justify-content:space-between;gap:var(--b4-s3);">
+                <span><span class="b4-caption" style="display:inline;">${idx + 1}.</span> ${esc(r.title)}</span>${riskBadgeHtml(r.level)}</li>`).join('')
+            : '<li class="b4-muted-item">No significant risks identified</li>';
 
         const prioritiesList = (ed.top5Priorities && ed.top5Priorities.length)
-            ? ed.top5Priorities.map((p, idx) => `<li style="margin-bottom:8px;font-size:0.83rem;color:#334155;break-inside:avoid;"><span style="display:inline-block;width:18px;color:#94a3b8;font-weight:700;">${idx + 1}.</span>${esc(p)}</li>`).join('')
-            : '<li style="color:#94a3b8;font-size:0.85rem;">No priority actions identified</li>';
+            ? ed.top5Priorities.map((p, idx) => `<li><span class="b4-caption" style="display:inline;">${idx + 1}.</span> ${esc(p)}</li>`).join('')
+            : '<li class="b4-muted-item">No priority actions identified</li>';
 
         const risksNote = countNoteHtml((ed.top5Risks || []).length, ed.risksTotal || (ed.top5Risks || []).length, 'risk');
         const prioritiesNote = countNoteHtml((ed.top5Priorities || []).length, ed.prioritiesTotal || (ed.top5Priorities || []).length, 'priority action');
 
         const lists = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:22px;">
-            <div class="b4-card" style="border:1px solid #e2e8f0;border-radius:8px;padding:16px;break-inside:avoid;">
-                <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#dc2626;margin-bottom:10px;border-bottom:2px solid #fee2e2;padding-bottom:6px;">Top 5 Risks</div>
-                <ul style="list-style:none;margin:0;padding:0;">${risksList}</ul>
+        <div class="b4-grid-2" style="margin-top:var(--b4-s5);">
+            <div class="b4-card" style="break-inside:avoid;">
+                <div class="b4-card-heading">${iconSafe('risk', { size: 14 })} Top Risks</div>
+                <ul class="b4-bullets" style="list-style:none;padding-left:0;">${risksList}</ul>
                 ${risksNote}
             </div>
-            <div class="b4-card" style="border:1px solid #e2e8f0;border-radius:8px;padding:16px;break-inside:avoid;">
-                <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#2563eb;margin-bottom:10px;border-bottom:2px solid #dbeafe;padding-bottom:6px;">Top 5 Priorities</div>
-                <ul style="list-style:none;margin:0;padding:0;">${prioritiesList}</ul>
+            <div class="b4-card" style="break-inside:avoid;">
+                <div class="b4-card-heading">${iconSafe('target', { size: 14 })} Top Priorities</div>
+                <ul class="b4-bullets" style="list-style:none;padding-left:0;">${prioritiesList}</ul>
                 ${prioritiesNote}
             </div>
         </div>`;
 
         const recLine = ed.certificationRecommendation
-            ? `<div class="b4-callout" style="margin-top:18px;padding:12px 16px;background:#f8fafc;border-left:4px solid #4338ca;border-radius:0 6px 6px 0;font-size:0.85rem;"><strong>Certification Recommendation:</strong> ${esc(ed.certificationRecommendation)}</div>`
+            ? `<div class="b4-callout b4-callout--info" style="margin-top:var(--b4-s5);"><strong>Certification Recommendation:</strong> ${esc(ed.certificationRecommendation)}</div>`
             : '';
 
         return { bodyHtml: kpis + lists + recLine, charts: [] };
@@ -818,18 +868,18 @@
         if (!hasAny) return { bodyHtml: insufficientDataHtml('No maturity data could be derived from this audit\'s checklist coverage.'), charts: [] };
 
         const bars = dims.map((k) => maturityBarHtml(k, m[k], m.meta?.[k])).join('');
-        const headline = `<div class="b4-card" style="text-align:center;margin-bottom:22px;padding:18px;background:#f5f3ff;border-radius:10px;break-inside:avoid;">
-            <div class="b4-kpi-value" style="font-size:2.3rem;font-weight:800;color:#7c3aed;line-height:1;">${m.overall != null ? m.overall.toFixed(1) : '—'}<span style="font-size:1.1rem;color:#a78bfa;">/5</span></div>
-            <div style="font-size:0.72rem;color:#6d28d9;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;">Overall Management System Maturity</div>
-            ${m.interpretation ? `<div style="font-size:0.82rem;color:#4c1d95;margin-top:10px;font-weight:500;">${esc(m.interpretation)}</div>` : ''}
+        const headline = `<div class="b4-card b4-kpi-card--accent" style="text-align:center;break-inside:avoid;">
+            <div class="b4-kpi-value">${m.overall != null ? m.overall.toFixed(1) : '—'}<span style="font-size:0.5em;font-weight:500;color:var(--b4-muted);">/5</span></div>
+            <div class="b4-kpi-label">Overall Management System Maturity</div>
+            ${m.interpretation ? `<div class="b4-kpi-sub">${esc(m.interpretation)}</div>` : ''}
         </div>`;
 
         const radarLabels = dims.filter((k) => m[k] != null);
         const radarData = radarLabels.map((k) => m[k]);
         const bodyHtml = headline + `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;">
+        <div class="b4-grid-2" style="align-items:start;margin-top:var(--b4-s5);">
             <div>${bars}</div>
-            <div class="b4-chart-box" style="background:#f8fafc;border-radius:10px;padding:14px;break-inside:avoid;">
+            <div class="b4-chart-box">
                 <canvas id="chart-maturity" style="max-height:280px;"></canvas>
             </div>
         </div>`;
@@ -849,8 +899,9 @@
                 options: {
                     responsive: true,
                     layout: { padding: 8 },
+                    font: { family: 'Inter, "Segoe UI", Helvetica, Arial, sans-serif', size: 9 },
                     plugins: { legend: { display: false } },
-                    scales: { r: { beginAtZero: true, max: 5, grid: { color: PALETTE.grid }, angleLines: { color: PALETTE.grid }, ticks: { stepSize: 1, font: { size: 9 }, backdropColor: 'transparent' }, pointLabels: { font: { size: 10 } } } }
+                    scales: { r: { beginAtZero: true, max: 5, grid: { color: PALETTE.grid }, angleLines: { color: PALETTE.grid }, ticks: { stepSize: 1, font: { family: 'Inter, "Segoe UI", Helvetica, Arial, sans-serif', size: 9 }, backdropColor: 'transparent' }, pointLabels: { font: { family: 'Inter, "Segoe UI", Helvetica, Arial, sans-serif', size: 10 } } } }
                 }
             })
         };
@@ -862,30 +913,46 @@
         const depts = metrics.departments || [];
         if (!depts.length) return { bodyHtml: insufficientDataHtml('No department data available. Assign departments to checklist items to populate this section.'), charts: [] };
 
-        const rows = depts.map((d) => {
+        const cards = depts.map((d) => {
             const hasScore = d.score != null;
-            const barColor = !hasScore ? '#cbd5e1' : d.score >= 80 ? '#16a34a' : d.score >= 60 ? '#d97706' : '#dc2626';
-            const rowStyle = d.needsAttention ? 'background:#fef2f2;' : '';
+            const sev = hasScore ? scoreSeverity(d.score) : 'neutral';
             const scoreCell = hasScore
-                ? `<div style="display:flex;align-items:center;gap:8px;">${barHtml(d.score, barColor)}<span style="font-weight:700;color:${barColor};font-size:0.8rem;white-space:nowrap;">${Math.round(d.score)}</span></div>`
-                : `<span style="color:#94a3b8;font-size:0.72rem;white-space:nowrap;">N/A (n=${d.n})</span>`;
+                ? `<div style="display:flex;align-items:center;gap:var(--b4-s2);">${barHtml(d.score, sev)}<span class="b4-badge b4-badge--${sev}">${Math.round(d.score)}</span></div>`
+                : `<span class="b4-caption">N/A (n=${d.n})</span>`;
             return `
-            <tr style="${rowStyle}break-inside:avoid;">
-                <td style="font-weight:600;">${d.needsAttention ? '<i class="fa-solid fa-flag" style="color:#dc2626;margin-right:6px;font-size:0.7rem;"></i>' : ''}${esc(d.name)}</td>
-                <td style="text-align:center;">${d.findings}</td>
-                <td style="text-align:center;">${d.ncCount}</td>
-                <td style="text-align:left;min-width:130px;">${scoreCell}</td>
-                <td style="text-align:center;white-space:nowrap;">${d.maturity != null ? (d.maturity.toFixed ? d.maturity.toFixed(1) : d.maturity) : '—'}/5</td>
-                <td style="text-align:center;min-width:90px;white-space:nowrap;">${riskBadgeHtml(d.riskLevel)}</td>
-                <td style="text-align:center;min-width:120px;white-space:nowrap;">${trendHtml(d.scoreDelta, 'higherBetter', 'pt')}</td>
-            </tr>`;
+            <div class="b4-card" style="break-inside:avoid;${d.needsAttention ? 'border-left:3px solid var(--b4-bad);' : ''}">
+                <div class="b4-card-heading">${d.needsAttention ? iconSafe('alert', { size: 14 }) : iconSafe('department', { size: 14 })} ${esc(d.name)}</div>
+                ${scoreCell}
+                <div class="b4-kpi-sub" style="margin-top:var(--b4-s2);">${pluralize(d.findings, 'item')} · ${pluralize(d.ncCount, 'finding')} · Maturity ${d.maturity != null ? (d.maturity.toFixed ? d.maturity.toFixed(1) : d.maturity) : '—'}/5</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--b4-s2);">
+                    ${riskBadgeHtml(d.riskLevel)}
+                    ${trendHtml(d.scoreDelta, 'higherBetter', 'pt')}
+                </div>
+            </div>`;
         }).join('');
 
-        const bodyHtml = `<table class="b4-tbl f-tbl" style="width:100%;border-collapse:collapse;">
-            <thead><tr><th>Department</th><th style="text-align:center;width:11%;">Items</th><th style="text-align:center;width:10%;">Findings</th><th style="text-align:left;width:18%;min-width:130px;">Score</th><th style="text-align:center;width:10%;">Maturity</th><th style="text-align:center;width:11%;min-width:90px;">Risk</th><th style="text-align:center;width:16%;min-width:120px;">Trend</th></tr></thead>
-            <tbody>${rows}</tbody>
-        </table>
-        <div style="font-size:0.7rem;color:#94a3b8;margin-top:8px;">Sorted worst-first — departments flagged <i class="fa-solid fa-flag" style="color:#dc2626;"></i> require priority attention. Scores based on fewer than ${MIN_SAMPLE_N} sampled items are shown as N/A rather than a misleading percentage. Trend compares against the client's most recent prior audit where available.</div>`;
+        const cardsHtml = `<div class="b4-grid-3">${cards}</div>`;
+
+        let tableHtml = '';
+        if (depts.length > 6) {
+            const rows = depts.map((d) => `
+            <tr style="${d.needsAttention ? 'background:var(--b4-bad-bg);' : ''}break-inside:avoid;">
+                <td>${esc(d.name)}</td>
+                <td class="b4-num">${d.findings}</td>
+                <td class="b4-num">${d.ncCount}</td>
+                <td style="min-width:130px;">${d.score != null ? `<div style="display:flex;align-items:center;gap:var(--b4-s2);">${barHtml(d.score, scoreSeverity(d.score))}<span class="b4-num">${Math.round(d.score)}</span></div>` : `<span class="b4-caption">N/A (n=${d.n})</span>`}</td>
+                <td class="b4-num">${d.maturity != null ? (d.maturity.toFixed ? d.maturity.toFixed(1) : d.maturity) : '—'}/5</td>
+                <td style="text-align:center;">${riskBadgeHtml(d.riskLevel)}</td>
+                <td style="text-align:center;">${trendHtml(d.scoreDelta, 'higherBetter', 'pt')}</td>
+            </tr>`).join('');
+            tableHtml = `<table class="b4-tbl" style="margin-top:var(--b4-s5);">
+                <thead><tr><th>Department</th><th style="text-align:right;">Items</th><th style="text-align:right;">Findings</th><th>Score</th><th style="text-align:right;">Maturity</th><th style="text-align:center;">Risk</th><th style="text-align:center;">Trend</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        const bodyHtml = cardsHtml + tableHtml
+            + `<div class="b4-footnote" style="margin-top:var(--b4-s3);">Sorted worst-first — flagged departments require priority attention. Scores based on fewer than ${MIN_SAMPLE_N} sampled items are shown as N/A rather than a misleading percentage. Trend compares against the client's most recent prior audit where available.</div>`;
 
         return { bodyHtml, charts: [] };
     }
@@ -900,45 +967,62 @@
             return { bodyHtml: insufficientDataHtml('No clause-level intelligence could be derived from this audit.'), charts: [] };
         }
 
-        const stripItem = (clause, title, color) => `<span class="b4-badge" style="display:inline-block;margin:0 8px 8px 0;padding:4px 10px;border-radius:14px;font-size:0.74rem;font-weight:700;color:${color};background:${color}15;border:1px solid ${color}30;">${esc(clause)}${title ? ' · ' + esc(title) : ''}</span>`;
+        const rankedStrip = (rows, emptyMsg) => rows.length
+            ? `<div class="b4-bullets" style="padding-left:0;list-style:none;">${rows.slice(0, 5).map((r) => `
+                <div class="b4-bar-row">
+                    <span class="b4-bar-label" style="min-width:170px;">${esc(r.clause)}${r.title ? ' — ' + esc(r.title) : ''}</span>
+                    ${barHtml(pct(r.conform, r.total), pct(r.conform, r.total) >= 80 ? 'good' : pct(r.conform, r.total) >= 60 ? 'warn' : 'bad')}
+                    ${riskBadgeHtml(r.nc > 0 ? (r.major > 0 ? 'High' : 'Low') : 'Low')}
+                </div>`).join('')}</div>`
+            : `<div class="b4-caption">${esc(emptyMsg)}</div>`;
 
-        const failedStrip = mostFailed.length
-            ? `<div style="margin-bottom:6px;">${mostFailed.map((r) => stripItem(r.clause, r.title, '#dc2626')).join('')}</div>`
-            : `<div style="font-size:0.78rem;color:#94a3b8;">No failed clauses.</div>`;
-
-        const successStrip = mostSuccessful.length
-            ? `<div style="margin-bottom:6px;">${mostSuccessful.map((r) => stripItem(r.clause, r.title, '#16a34a')).join('')}</div>`
-            : `<div style="font-size:0.78rem;color:#94a3b8;">No fully-conforming clauses recorded.</div>`;
+        const recurring = ci.recurring || [];
+        const recurringCallout = recurring.length
+            ? `<div class="b4-callout b4-callout--bad" style="margin-bottom:var(--b4-s5);">
+                <div class="b4-card-heading">${iconSafe('alert', { size: 14 })} Recurring Issues</div>
+                <div>${recurring.map((r) => `<span class="b4-badge b4-badge--bad" style="margin:0 var(--b4-s2) var(--b4-s2) 0;">${esc(r.clause)}</span>`).join('')}</div>
+            </div>`
+            : '';
 
         const strips = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
-            <div class="b4-card" style="border:1px solid #fecaca;border-radius:8px;padding:14px;break-inside:avoid;">
-                <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#dc2626;margin-bottom:8px;">Most Failed</div>
-                ${failedStrip}
+        <div class="b4-grid-2" style="margin-bottom:var(--b4-s5);">
+            <div class="b4-card" style="break-inside:avoid;">
+                <div class="b4-card-heading">${iconSafe('alert', { size: 14 })} Weakest Clauses</div>
+                ${rankedStrip(mostFailed, 'No failed clauses.')}
             </div>
-            <div class="b4-card" style="border:1px solid #bbf7d0;border-radius:8px;padding:14px;break-inside:avoid;">
-                <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#16a34a;margin-bottom:8px;">Strongest</div>
-                ${successStrip}
+            <div class="b4-card" style="break-inside:avoid;">
+                <div class="b4-card-heading">${iconSafe('check', { size: 14 })} Strongest Clauses</div>
+                ${rankedStrip(mostSuccessful, 'No fully-conforming clauses recorded.')}
             </div>
         </div>`;
 
-        const rows = table.map((r) => `
-            <tr style="${r.status === 'Recurring' ? 'background:#fef2f2;' : ''}break-inside:avoid;">
-                <td style="font-family:monospace;font-weight:700;">${esc(r.clause)}</td>
+        // Full table: only clauses with findings or <100% compliance, capped at 15 rows.
+        const notableRows = table.filter((r) => r.status !== 'Conforming' || (r.compliancePct != null && r.compliancePct < 100));
+        const omittedCount = table.length - notableRows.length;
+        const shownRows = notableRows.slice(0, 15);
+
+        const rows = shownRows.map((r) => `
+            <tr style="${r.status === 'Recurring' ? 'background:var(--b4-bad-bg);' : ''}break-inside:avoid;">
+                <td style="font-weight:700;">${esc(r.clause)}</td>
                 <td>${esc(r.title || '—')}</td>
-                <td style="text-align:left;min-width:130px;">${r.compliancePct != null ? `<div style="display:flex;align-items:center;gap:8px;">${barHtml(r.compliancePct, r.compliancePct >= 80 ? '#16a34a' : r.compliancePct >= 60 ? '#d97706' : '#dc2626')}<span style="font-size:0.78rem;font-weight:700;white-space:nowrap;">${r.compliancePct}%</span></div>` : '—'}</td>
-                <td style="text-align:center;min-width:90px;white-space:nowrap;">${riskBadgeHtml(r.risk)}</td>
-                <td style="min-width:120px;">${esc(r.department)}</td>
-                <td style="text-align:center;min-width:70px;white-space:nowrap;">${esc(r.priority)}</td>
-                <td style="text-align:center;min-width:110px;white-space:nowrap;">${statusBadgeHtml(r.status)}${r.isRecurring ? ' <i class="fa-solid fa-rotate-left" title="Repeat finding" style="color:#7f1d1d;font-size:0.7rem;margin-left:4px;"></i>' : ''}</td>
+                <td style="min-width:130px;">${r.compliancePct != null ? `<div style="display:flex;align-items:center;gap:var(--b4-s2);">${barHtml(r.compliancePct, scoreSeverity(r.compliancePct))}<span class="b4-num">${r.compliancePct}%</span></div>` : '—'}</td>
+                <td style="text-align:center;">${riskBadgeHtml(r.risk)}</td>
+                <td>${esc(r.department)}</td>
+                <td style="text-align:center;">${esc(r.priority)}</td>
+                <td style="text-align:center;">${statusBadgeHtml(r.status)}</td>
             </tr>`).join('');
 
-        const bodyHtml = strips + `
-        <table class="b4-tbl f-tbl" style="width:100%;border-collapse:collapse;">
-            <thead><tr><th style="width:9%;">Clause</th><th>Title</th><th style="width:16%;min-width:130px;">Compliance %</th><th style="text-align:center;width:9%;min-width:90px;">Risk</th><th style="width:14%;min-width:120px;">Department</th><th style="text-align:center;width:10%;min-width:70px;">Priority</th><th style="text-align:center;width:12%;min-width:110px;">Status</th></tr></thead>
+        const omittedNote = omittedCount > 0
+            ? `<div class="b4-footnote" style="margin-top:var(--b4-s2);">${pluralize(omittedCount, 'fully conforming clause')} omitted for brevity.</div>`
+            : '';
+
+        const bodyHtml = strips + recurringCallout + `
+        <table class="b4-tbl">
+            <thead><tr><th>Clause</th><th>Title</th><th>Compliance</th><th style="text-align:center;">Risk</th><th>Department</th><th style="text-align:center;">Priority</th><th style="text-align:center;">Status</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
-        <div style="font-size:0.7rem;color:#94a3b8;margin-top:8px;"><i class="fa-solid fa-rotate-left" style="color:#7f1d1d;"></i> denotes a repeat finding from the client's previous audit — certification bodies weight recurrence heavily when assessing corrective action effectiveness.</div>`;
+        ${omittedNote}
+        <div class="b4-footnote" style="margin-top:var(--b4-s2);">Rows marked Recurring repeat a finding from the client's previous audit — certification bodies weight recurrence heavily when assessing corrective action effectiveness.</div>`;
 
         return { bodyHtml, charts: [] };
     }
@@ -963,19 +1047,16 @@
             + trendRow('Open CAPA', t.capaOpen, 'lowerBetter');
 
         const bodyHtml = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;">
-            <div class="b4-chart-box" style="background:#f8fafc;border-radius:10px;padding:14px;break-inside:avoid;">
-                <canvas id="chart-trend-findings" style="max-height:240px;"></canvas>
-            </div>
-            <div class="b4-chart-box" style="background:#f8fafc;border-radius:10px;padding:14px;break-inside:avoid;">
-                <canvas id="chart-trend-score" style="max-height:240px;"></canvas>
-            </div>
+        <div class="b4-grid-2" style="margin-bottom:var(--b4-s5);">
+            <div class="b4-chart-box"><canvas id="chart-trend-findings" style="max-height:240px;"></canvas></div>
+            <div class="b4-chart-box"><canvas id="chart-trend-score" style="max-height:240px;"></canvas></div>
         </div>
-        <table class="b4-tbl f-tbl" style="width:100%;border-collapse:collapse;">
-            <thead><tr><th>Metric</th><th style="text-align:center;width:18%;">This Audit</th><th style="text-align:center;width:18%;">Previous Audit</th><th style="text-align:center;width:22%;">Trend</th></tr></thead>
+        <table class="b4-tbl">
+            <thead><tr><th>Metric</th><th style="text-align:center;">This Audit</th><th style="text-align:center;">Previous Audit</th><th style="text-align:center;">Trend</th></tr></thead>
             <tbody>${compRows}</tbody>
         </table>`;
 
+        const chartFont = { family: 'Inter, "Segoe UI", Helvetica, Arial, sans-serif', size: 9 };
         const lineDefaults = { borderWidth: 1.5, pointRadius: 2, pointHoverRadius: 4, tension: 0.3 };
         const chartFindings = {
             canvasId: 'chart-trend-findings',
@@ -993,10 +1074,11 @@
                 options: {
                     responsive: true,
                     layout: { padding: 8 },
-                    plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, boxHeight: 10, usePointStyle: true } } },
+                    font: chartFont,
+                    plugins: { legend: { position: 'bottom', labels: { font: chartFont, boxWidth: 10, boxHeight: 10, usePointStyle: true } } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
-                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: PALETTE.grid } }
+                        x: { grid: { display: false }, ticks: { font: chartFont } },
+                        y: { beginAtZero: true, ticks: { stepSize: 1, font: chartFont }, grid: { color: PALETTE.grid, drawTicks: false } }
                     }
                 }
             })
@@ -1009,10 +1091,11 @@
                 options: {
                     responsive: true,
                     layout: { padding: 8 },
+                    font: chartFont,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
-                        y: { beginAtZero: true, max: 100, ticks: { font: { size: 9 } }, grid: { color: PALETTE.grid } }
+                        x: { grid: { display: false }, ticks: { font: chartFont } },
+                        y: { beginAtZero: true, max: 100, ticks: { font: chartFont }, grid: { color: PALETTE.grid, drawTicks: false } }
                     }
                 }
             })

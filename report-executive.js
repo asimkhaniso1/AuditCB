@@ -48,7 +48,12 @@
     const safeArr = (a) => Array.isArray(a) ? a : [];
 
     // ------------------------------------------------------------------
-    // Inline outline icon set (stroke-based, currentColor, 1.5 stroke width, 16px default)
+    // Inline outline icon set — the ONLY icon language in the printed report.
+    // Stroke-based, currentColor, 1.5 stroke width, outline style, 14px default in body context.
+    // Exported names (reference for other report-*.js modules — do not rename):
+    //   audit, risk, department, evidence, capa, observation, finding, management, trend,
+    //   clause, shield, check, alert, clock, target, document, interview, site, camera,
+    //   gauge, arrow-up, arrow-down
     // ------------------------------------------------------------------
     const ICON_PATHS = {
         audit: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
@@ -65,10 +70,17 @@
         check: '<path d="M20 6L9 17l-5-5"/>',
         alert: '<path d="M10.29 3.86l-8.5 14.7A1.5 1.5 0 0 0 3.07 21h17.86a1.5 1.5 0 0 0 1.28-2.44l-8.5-14.7a1.5 1.5 0 0 0-2.62 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
         clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-        target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
+        target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+        document: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/><path d="M9 9h1"/>',
+        interview: '<path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M2 21v-1a6 6 0 0 1 6-6h0"/><path d="M16 12a4 4 0 1 0 0-8"/><path d="M14 21v-1a6 6 0 0 0-4.5-5.8"/><path d="M22 21v-1a6 6 0 0 0-6-6"/>',
+        site: '<path d="M3 21h18"/><path d="M6 21V10l6-6 6 6v11"/><path d="M10 21v-6h4v6"/>',
+        camera: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
+        gauge: '<path d="M12 21a9 9 0 1 0-9-9"/><path d="M12 12l4-4"/><path d="M12 21v-3"/>',
+        'arrow-up': '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>',
+        'arrow-down': '<path d="M12 5v14"/><path d="M18 13l-6 6-6-6"/>'
     };
     function icon(name, opts) {
-        const size = (opts && opts.size) || 16;
+        const size = (opts && opts.size) || 14;
         const cls = (opts && opts.cls) || '';
         const paths = ICON_PATHS[name] || ICON_PATHS.finding;
         return `<svg class="b4-icon${cls ? ' ' + cls : ''}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -140,7 +152,7 @@ You are a senior engagement partner at a Big Four consulting firm (Deloitte/PwC/
 Voice rules (strict):
 - Lead every statement with the business consequence, not the audit mechanic. Do not write "an audit was conducted" — write what it means for the business.
 - EVERY paragraph-level field (outcome, health, businessImpact, risks) MUST contain at least one concrete quantified reference — a score, a count, a clause number, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
-- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged.
+- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "the organization demonstrates compliance", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged. Target register instead, e.g.: "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."
 - For each bullet list (strengths, weaknesses, concerns, priorities, managementActions): identify only genuinely DISTINCT points — do not restate the same underlying theme in different words to pad the list. Cap each list at 3 bullets maximum, even if fewer than 3 distinct points exist. It is better to return 1 sharp bullet than 3 that repeat one theme.
 - No hedging. Take a clear position. Quantify wherever possible (percentages, counts, timeframes).
 - Write in plain, declarative sentences a CEO reads in 90 seconds. No jargon, no markdown symbols.
@@ -221,8 +233,8 @@ Return ONLY the raw JSON object, no markdown fences.`;
 
         return {
             verdict,
-            outcome: `The audit of ${report.client || 'the organization'} against ${report.standard || 'the applicable standard'} identified ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) across ${stats.applicableCount || 0} applicable requirements.`,
-            health: `At a ${conformPct}% conformity rate, the management system runs at ${conformPct >= 80 ? 'a mature, well-embedded' : conformPct >= 60 ? 'a developing' : 'an early-stage'} level of operational discipline${worstDept ? `, with ${worstDept[0]} the clearest outlier` : ''}.`,
+            outcome: `Against ${report.standard || 'the applicable standard'}, ${report.client || 'the organization'} closed this audit cycle with ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) across ${stats.applicableCount || 0} applicable requirements.`,
+            health: `The management system is ${conformPct >= 80 ? 'effectively implemented and supports operational resilience' : conformPct >= 60 ? 'functioning but unevenly embedded across departments' : 'still maturing, with core controls not yet consistently applied'} at a ${conformPct}% conformity rate${worstDept ? `. Opportunities remain to strengthen preventive controls within ${worstDept[0]}` : ''}.`,
             strengths,
             weaknesses,
             concerns,
@@ -373,10 +385,17 @@ Return ONLY the raw JSON object, no markdown fences.`;
     // 2. EVIDENCE INTELLIGENCE  (deterministic)
     // ------------------------------------------------------------------
 
+    // Heuristic: an item reads as a "document review" touchpoint if its comment/evidence
+    // text references reviewing records/documents rather than an observed activity.
+    const DOC_REVIEW_RX = /\b(document|procedure|record|policy|manual|register|log|form|report|certificate)s?\b.{0,20}\b(review|reviewed|verified|checked|examined|inspected|sighted|seen)\b|\b(review|reviewed|verified|checked|examined)\b.{0,20}\b(document|procedure|record|policy|manual|register|log|form|report|certificate)s?\b/i;
+
     function computeEvidenceIntel(d) {
         const items = safeArr(d && d.hydratedProgress).filter(i => i.status !== 'na');
         const total = items.length;
         let withEvidence = 0;
+        let totalPhotos = 0;
+        let docsReviewed = 0;
+        const personnelSet = new Set();
         const missingEvidence = [];
         const evidenced = [];
         const byDepartment = {};
@@ -386,6 +405,21 @@ Return ONLY the raw JSON object, no markdown fences.`;
             const dept = (item.department && String(item.department).trim()) || 'General';
             if (!byDepartment[dept]) byDepartment[dept] = { total: 0, withEvidence: 0 };
             byDepartment[dept].total++;
+
+            totalPhotos += (imgs && imgs.length) || 0;
+
+            // personnel is stored as a comma/semicolon-separated string on checklist
+            // items (see audit-trails in execution-reporting.js); tolerate arrays too.
+            const personnel = Array.isArray(item.personnel)
+                ? item.personnel
+                : String(item.personnel || '').split(/[,;]/);
+            personnel.forEach(p => {
+                const name = (p && (p.name || p)) ? String(p.name || p).trim() : '';
+                if (name) personnelSet.add(name.toLowerCase());
+            });
+
+            const commentText = String(item.comment || '');
+            if (DOC_REVIEW_RX.test(commentText)) docsReviewed++;
 
             const hasEvidence = !!(imgs && imgs.length);
             if (hasEvidence) {
@@ -417,19 +451,26 @@ Return ONLY the raw JSON object, no markdown fences.`;
         });
 
         const coveragePct = total > 0 ? Math.round((withEvidence / total) * 100) : 0;
+        const interviewCount = personnelSet.size;
 
         let qualityNote;
         if (total === 0) {
-            qualityNote = 'No applicable checklist items were recorded for this audit; evidence coverage cannot be assessed.';
+            qualityNote = 'No applicable items recorded — coverage cannot be assessed.';
         } else if (coveragePct >= 80) {
-            qualityNote = `Evidence collection was strong across this audit, with ${coveragePct}% of applicable items supported by documented evidence — indicating rigorous objective-evidence-based assessment practice.`;
+            qualityNote = `Objective evidence is well-documented at ${coveragePct}% coverage.`;
         } else if (coveragePct >= 50) {
-            qualityNote = `Evidence collection was moderate at ${coveragePct}% coverage. ${missingEvidence.length} item(s) with findings lack supporting evidence images and should be reviewed before final issuance.`;
+            qualityNote = `Coverage is moderate at ${coveragePct}%; ${missingEvidence.length} finding(s) need supporting evidence before issuance.`;
         } else {
-            qualityNote = `Evidence coverage is low at ${coveragePct}%. A significant number of findings (${missingEvidence.length}) are not backed by evidence images, which may weaken the defensibility of this report under accreditation review.`;
+            qualityNote = `Coverage is low at ${coveragePct}%, weakening defensibility of ${missingEvidence.length} finding(s) under accreditation review.`;
         }
 
-        return { coveragePct, missingEvidence, evidenced, byDepartment, qualityNote, totalApplicable: total, withEvidence };
+        return {
+            coveragePct, missingEvidence, evidenced, byDepartment, qualityNote,
+            totalApplicable: total, withEvidence,
+            documentsReviewed: docsReviewed,
+            interviewCount,
+            photoCount: totalPhotos
+        };
     }
 
     function renderEvidenceIntelHtml(intel) {
@@ -464,6 +505,34 @@ Return ONLY the raw JSON object, no markdown fences.`;
   ${e.comment ? `<p class="b4-body" style="margin-top:6px;">${esc(e.comment)}</p>` : ''}
 </div>`).join('');
 
+        // Core KPIs always shown; derivable-only KPIs (documents/interviews/photos) are
+        // omitted gracefully when the underlying signal is zero across the whole audit.
+        const extraKpis = [];
+        if (intel.documentsReviewed > 0) {
+            extraKpis.push(`
+  <div class="b4-kpi-card">
+    <div class="b4-kpi-icon">${icon('document')}</div>
+    <div class="b4-kpi-value">${intel.documentsReviewed}</div>
+    <div class="b4-kpi-label">Documents Reviewed</div>
+  </div>`);
+        }
+        if (intel.interviewCount > 0) {
+            extraKpis.push(`
+  <div class="b4-kpi-card">
+    <div class="b4-kpi-icon">${icon('interview')}</div>
+    <div class="b4-kpi-value">${intel.interviewCount}</div>
+    <div class="b4-kpi-label">Interviews</div>
+  </div>`);
+        }
+        if (intel.photoCount > 0) {
+            extraKpis.push(`
+  <div class="b4-kpi-card">
+    <div class="b4-kpi-icon">${icon('camera')}</div>
+    <div class="b4-kpi-value">${intel.photoCount}</div>
+    <div class="b4-kpi-label">Photos</div>
+  </div>`);
+        }
+
         return `
 <div class="b4-rule"></div>
 <div class="b4-kpi-grid">
@@ -481,8 +550,9 @@ Return ONLY the raw JSON object, no markdown fences.`;
     <div class="b4-kpi-icon">${icon('alert')}</div>
     <div class="b4-kpi-value" style="color:${intel.missingEvidence.length > 0 ? 'var(--b4-bad)' : 'var(--b4-navy)'};">${intel.missingEvidence.length}</div>
     <div class="b4-kpi-label">Missing Evidence</div>
-  </div>
+  </div>${extraKpis.join('')}
 </div>
+<p class="b4-caption" style="margin-top:var(--b4-s3);">${esc(intel.qualityNote)}</p>
 
 <div class="b4-section-title" style="margin-top:var(--b4-s5);">Evidence Coverage by Department</div>
 <div class="b4-card">${deptRows}</div>
@@ -498,11 +568,7 @@ ${intel.missingEvidence.length ? `
     <th>Clause</th><th>Item</th><th>Department</th><th>Status</th>
   </tr></thead>
   <tbody>${rows}</tbody>
-</table>` : '<div class="b4-callout b4-callout--good">All findings are supported by documented evidence.</div>'}
-
-<div class="b4-highlight b4-highlight--neutral" style="margin-top:var(--b4-s5);">
-  <p class="b4-body" style="margin:0;">${esc(intel.qualityNote)}</p>
-</div>`;
+</table>` : '<div class="b4-callout b4-callout--good">All findings are supported by documented evidence.</div>'}`;
     }
 
     // ------------------------------------------------------------------
@@ -568,7 +634,7 @@ ${intel.missingEvidence.length ? `
         const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseLabel(i)} (${i.department || 'General'})`).join('\n');
 
         return `
-You are a senior engagement partner at a Big Four consulting firm generating executive insight cards for a CEO/Board-level ISO audit report dashboard. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall"). Lead with the business consequence.
+You are a senior engagement partner at a Big Four consulting firm generating executive insight cards for a CEO/Board-level ISO audit report dashboard. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Lead with the business consequence. Write in the senior-consultant register (e.g. "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."), not generic audit-speak.
 
 Context:
 - Client: ${report.client || ''}
@@ -790,7 +856,7 @@ Answer:`;
     <input type="text" id="report-ai-ask-input" placeholder="e.g. top five risks, overdue CAPAs, which department needs attention"
       style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.85rem;font-family:inherit;">
     <button type="button" data-action="reportExecutiveAsk"
-      style="padding:8px 16px;border:none;border-radius:6px;background:#0f2a43;color:white;font-weight:600;font-size:0.82rem;cursor:pointer;">Ask</button>
+      style="padding:8px 16px;border:none;border-radius:6px;background:#0f2a43;color:white;font-weight:700;font-size:0.82rem;cursor:pointer;">Ask</button>
   </div>
   <div id="report-ai-ask-answer" style="margin-top:12px;font-size:0.85rem;line-height:1.6;color:#334155;min-height:20px;"></div>
 </div>`;
@@ -828,6 +894,7 @@ Answer:`;
 
 /* ---------- Design tokens ---------- */
 :root, .b4-scope {
+  --b4-font: 'Inter','Segoe UI',Helvetica,Arial,sans-serif;
   --b4-navy: #0f2a43;
   --b4-navy-2: #16324e;
   --b4-ink: #1e293b;
@@ -860,6 +927,25 @@ Answer:`;
   --b4-s4: 16px;
   --b4-s5: 24px;
   --b4-s6: 36px;
+
+  /* geometry */
+  --b4-radius: 6px;
+  --b4-radius-kpi: 10px;
+  --b4-hairline: 1px solid var(--b4-line);
+
+  /* typography scale (print-first, pt-based) — exactly 3 weights: 400 / 500 / 700 */
+  --b4-fs-title: 24pt;      /* report title, 700 */
+  --b4-fs-section: 13pt;    /* section heading, 700 uppercase tracked */
+  --b4-fs-subhead: 11pt;    /* subheading, 700 */
+  --b4-fs-body: 9.75pt;     /* body, 400, line-height 1.55 */
+  --b4-fs-tbl-head: 7.5pt;  /* table header, 700 uppercase */
+  --b4-fs-tbl-body: 9pt;    /* table content, 400 */
+  --b4-fs-caption: 8pt;     /* caption, 400 muted */
+  --b4-fs-footnote: 7pt;    /* footnote */
+
+  --b4-fw-regular: 400;
+  --b4-fw-medium: 500;
+  --b4-fw-bold: 700;
 }
 
 /* ---------- Print safety ---------- */
@@ -870,52 +956,64 @@ Answer:`;
 }
 
 /* ---------- Typography scale ---------- */
+.b4-scope, .b4-scope * { font-family: var(--b4-font); }
+
 .b4-page-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 26pt;
-  font-weight: 700;
-  line-height: 1.15;
-  color: var(--b4-navy);
-  margin: 0 0 var(--b4-s3);
-}
-.b4-section-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 18pt;
-  font-weight: 700;
+  font-family: var(--b4-font);
+  font-size: var(--b4-fs-title);
+  font-weight: var(--b4-fw-bold);
   line-height: 1.2;
   color: var(--b4-navy);
   margin: 0 0 var(--b4-s3);
 }
-.b4-card-heading {
-  font-family: 'Outfit', sans-serif;
-  font-size: 13pt;
-  font-weight: 700;
+.b4-section-title {
+  font-family: var(--b4-font);
+  font-size: var(--b4-fs-section);
+  font-weight: var(--b4-fw-bold);
   line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--b4-navy);
+  margin: 0 0 var(--b4-s3);
+  break-after: avoid;
+}
+.b4-card-heading {
+  font-family: var(--b4-font);
+  font-size: var(--b4-fs-subhead);
+  font-weight: var(--b4-fw-bold);
+  line-height: 1.35;
   color: var(--b4-navy);
   display: flex;
   align-items: center;
   gap: var(--b4-s2);
   margin: 0 0 var(--b4-s2);
+  break-after: avoid;
 }
 .b4-body {
-  font-size: 11pt;
-  font-weight: 400;
-  line-height: 1.65;
+  font-size: var(--b4-fs-body);
+  font-weight: var(--b4-fw-regular);
+  line-height: 1.55;
   color: var(--b4-ink);
   margin: 0 0 var(--b4-s2);
 }
 .b4-caption {
-  font-size: 9.5pt;
-  font-weight: 500;
+  font-size: var(--b4-fs-caption);
+  font-weight: var(--b4-fw-regular);
   line-height: 1.5;
   color: var(--b4-muted);
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
+.b4-footnote {
+  font-size: var(--b4-fs-footnote);
+  font-weight: var(--b4-fw-regular);
+  line-height: 1.5;
+  color: var(--b4-muted);
+}
 .b4-eyebrow {
-  font-size: 9.5pt;
-  font-weight: 700;
+  font-size: var(--b4-fs-tbl-head);
+  font-weight: var(--b4-fw-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--b4-muted);
@@ -954,16 +1052,17 @@ Answer:`;
 /* ---------- KPI cards ---------- */
 .b4-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--b4-s4);
 }
 .b4-kpi-card {
   background: var(--b4-surface);
-  border: 1px solid var(--b4-line);
-  border-radius: 6px;
+  border: var(--b4-hairline);
+  border-radius: var(--b4-radius-kpi);
   padding: var(--b4-s4) var(--b4-s4);
   text-align: center;
   position: relative;
+  break-inside: avoid;
 }
 .b4-kpi-card--accent { border-left: 3px solid var(--b4-navy); }
 .b4-kpi-icon {
@@ -975,31 +1074,32 @@ Answer:`;
   justify-content: center;
 }
 .b4-kpi-value {
-  font-family: 'Outfit', sans-serif;
-  font-size: 26pt;
-  font-weight: 700;
+  font-family: var(--b4-font);
+  font-size: 22pt;
+  font-weight: var(--b4-fw-bold);
   color: var(--b4-navy);
   line-height: 1.1;
 }
 .b4-kpi-label {
   margin-top: var(--b4-s1);
-  font-size: 9.5pt;
-  font-weight: 600;
+  font-size: var(--b4-fs-caption);
+  font-weight: var(--b4-fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--b4-muted);
 }
 .b4-kpi-sub {
   margin-top: var(--b4-s1);
-  font-size: 9.5pt;
+  font-size: var(--b4-fs-caption);
+  font-weight: var(--b4-fw-regular);
   color: var(--b4-muted);
 }
 .b4-kpi-trend {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 9.5pt;
-  font-weight: 700;
+  font-size: var(--b4-fs-caption);
+  font-weight: var(--b4-fw-bold);
   margin-top: var(--b4-s1);
 }
 .b4-kpi-trend.up   { color: var(--b4-good); }
@@ -1010,61 +1110,64 @@ Answer:`;
 .b4-kpi-trend.flat::before { content: "\\25A0"; font-size: 7pt; }
 
 @media print {
-  .b4-kpi-grid { grid-template-columns: repeat(4, 1fr); }
+  .b4-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
 
-/* ---------- Pills / badges ---------- */
-.b4-pill {
-  display: inline-block;
-  padding: 3px 12px;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: var(--b4-neutral-bg);
-  color: var(--b4-neutral);
-  border: 1px solid var(--b4-neutral-line);
-}
-.b4-pill-good    { background: var(--b4-good-bg); color: var(--b4-good); border-color: var(--b4-good-line); }
-.b4-pill-warn    { background: var(--b4-warn-bg); color: var(--b4-warn); border-color: var(--b4-warn-line); }
-.b4-pill-bad     { background: var(--b4-bad-bg);  color: var(--b4-bad);  border-color: var(--b4-bad-line); }
-.b4-pill-critical{ background: #7f1d1d; color: #ffffff; border-color: #7f1d1d; }
-
-.b4-badge {
+/* ---------- Badges (canonical) — .b4-pill* are IDENTICAL-rendering aliases ---------- */
+.b4-badge, .b4-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-size: 8.5pt;
-  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: var(--b4-fs-tbl-head);
+  font-weight: var(--b4-fw-medium);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
   background: var(--b4-neutral-bg);
   color: var(--b4-neutral);
-  border: 1px solid var(--b4-neutral-line);
+  border: none;
 }
-.b4-badge--good    { background: var(--b4-good-bg); color: var(--b4-good); border-color: var(--b4-good-line); }
-.b4-badge--warn    { background: var(--b4-warn-bg); color: var(--b4-warn); border-color: var(--b4-warn-line); }
-.b4-badge--bad     { background: var(--b4-bad-bg);  color: var(--b4-bad);  border-color: var(--b4-bad-line); }
-.b4-badge--info    { background: var(--b4-info-bg); color: var(--b4-info); border-color: var(--b4-info-line); }
-.b4-badge--neutral { background: var(--b4-neutral-bg); color: var(--b4-neutral); border-color: var(--b4-neutral-line); }
+.b4-badge--good, .b4-pill-good {
+  background: var(--b4-good-bg); color: var(--b4-good); font-weight: var(--b4-fw-medium);
+  border-left: 2px solid var(--b4-good);
+}
+.b4-badge--warn, .b4-pill-warn {
+  background: var(--b4-warn-bg); color: var(--b4-warn); font-weight: var(--b4-fw-medium);
+  border-left: 3px solid var(--b4-warn);
+}
+.b4-badge--bad, .b4-pill-bad {
+  background: var(--b4-bad-bg); color: var(--b4-bad); font-weight: var(--b4-fw-bold);
+  border-left: 4px solid var(--b4-bad);
+}
+.b4-badge--info, .b4-pill-info {
+  background: var(--b4-info-bg); color: var(--b4-info); font-weight: var(--b4-fw-medium);
+  border-left: 2px solid var(--b4-info);
+}
+.b4-badge--neutral, .b4-pill-neutral {
+  background: var(--b4-neutral-bg); color: var(--b4-neutral); font-weight: var(--b4-fw-medium);
+}
+.b4-badge--critical, .b4-pill-critical {
+  background: #7f1d1d; color: #ffffff; font-weight: var(--b4-fw-bold);
+  border-left: 4px solid #5c1414;
+}
 
-/* ---------- Tables ---------- */
+/* ---------- Tables — .b4-tbl is the ONLY table style ---------- */
 .b4-tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9.5pt;
+  font-size: var(--b4-fs-tbl-body);
+  font-weight: var(--b4-fw-regular);
 }
 .b4-tbl thead th {
   text-align: left;
-  padding: var(--b4-s2) var(--b4-s3);
-  font-size: 8.5pt;
-  font-weight: 700;
+  padding: 10px 14px;
+  font-size: var(--b4-fs-tbl-head);
+  font-weight: var(--b4-fw-bold);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--b4-muted);
-  border-bottom: 1px solid var(--b4-navy);
+  border-bottom: 1px solid #cbd5e1;
   background: transparent;
 }
 .b4-tbl tbody td {
@@ -1072,65 +1175,84 @@ Answer:`;
   border-bottom: 1px solid var(--b4-line-2);
   color: var(--b4-ink);
   vertical-align: top;
+  font-weight: var(--b4-fw-regular);
 }
-.b4-tbl tbody tr:nth-child(even) td { background: var(--b4-surface-2); }
+.b4-tbl tbody tr:nth-child(odd) td { background: #fafbfc; }
+.b4-tbl tbody tr:last-child td { border-bottom: none; }
 .b4-tbl .b4-num { text-align: right; font-variant-numeric: tabular-nums; }
+.b4-tbl .b4-badge, .b4-tbl .b4-pill { white-space: nowrap; }
 
 /* ---------- Cards / callouts ---------- */
 .b4-card {
   background: var(--b4-surface);
-  border: 1px solid var(--b4-line);
-  border-radius: 6px;
+  border: var(--b4-hairline);
+  border-radius: var(--b4-radius);
   padding: var(--b4-s4);
+  break-inside: avoid;
 }
 .b4-insight-card {
   background: var(--b4-surface);
-  border: 1px solid var(--b4-line);
+  border: var(--b4-hairline);
   border-left: 3px solid var(--b4-navy);
-  border-radius: 6px;
+  border-radius: var(--b4-radius);
   padding: var(--b4-s4);
+  break-inside: avoid;
 }
 .b4-callout {
-  border-radius: 6px;
+  border-radius: var(--b4-radius);
   padding: var(--b4-s4);
-  border: 1px solid var(--b4-line);
+  border: var(--b4-hairline);
+  border-left: 2px solid var(--b4-neutral);
   background: var(--b4-surface-2);
+  break-inside: avoid;
 }
-.b4-callout--good { background: var(--b4-good-bg); border-color: var(--b4-good-line); }
-.b4-callout--warn { background: var(--b4-warn-bg); border-color: var(--b4-warn-line); }
-.b4-callout--bad  { background: var(--b4-bad-bg);  border-color: var(--b4-bad-line); }
-.b4-callout--info { background: var(--b4-info-bg); border-color: var(--b4-info-line); }
+/* Monochrome-safe severity cue: left-border thickness scales with severity so it still
+   reads under grayscale printing even if color reproduction is lost. */
+.b4-callout--good { background: var(--b4-good-bg); border-color: var(--b4-good-line); border-left: 2px solid var(--b4-good); }
+.b4-callout--info { background: var(--b4-info-bg); border-color: var(--b4-info-line); border-left: 2px solid var(--b4-info); }
+.b4-callout--warn { background: var(--b4-warn-bg); border-color: var(--b4-warn-line); border-left: 3px solid var(--b4-warn); }
+.b4-callout--bad  { background: var(--b4-bad-bg);  border-color: var(--b4-bad-line);  border-left: 4px solid var(--b4-bad); font-weight: var(--b4-fw-medium); }
 
 .b4-highlight {
   border-radius: 8px;
   padding: var(--b4-s5);
-  border: 1px solid var(--b4-line);
+  border: var(--b4-hairline);
   background: var(--b4-surface-2);
+  break-inside: avoid;
 }
 .b4-highlight--neutral { background: var(--b4-surface-2); border-color: var(--b4-line); }
-.b4-highlight--b4-good, .b4-highlight--good { background: var(--b4-good-bg); border-color: var(--b4-good-line); }
-.b4-highlight--b4-warn, .b4-highlight--warn { background: var(--b4-warn-bg); border-color: var(--b4-warn-line); }
-.b4-highlight--b4-bad,  .b4-highlight--bad  { background: var(--b4-bad-bg);  border-color: var(--b4-bad-line); }
-.b4-highlight--b4-info, .b4-highlight--info { background: var(--b4-info-bg); border-color: var(--b4-info-line); }
+.b4-highlight--b4-good, .b4-highlight--good { background: var(--b4-good-bg); border-color: var(--b4-good-line); border-left: 2px solid var(--b4-good); }
+.b4-highlight--b4-warn, .b4-highlight--warn { background: var(--b4-warn-bg); border-color: var(--b4-warn-line); border-left: 3px solid var(--b4-warn); }
+.b4-highlight--b4-bad,  .b4-highlight--bad  { background: var(--b4-bad-bg);  border-color: var(--b4-bad-line);  border-left: 4px solid var(--b4-bad); }
+.b4-highlight--b4-info, .b4-highlight--info { background: var(--b4-info-bg); border-color: var(--b4-info-line); border-left: 2px solid var(--b4-info); }
 .b4-highlight-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 18pt;
-  font-weight: 700;
+  font-family: var(--b4-font);
+  font-size: var(--b4-fs-section);
+  font-weight: var(--b4-fw-bold);
   color: var(--b4-navy);
   margin: 2px 0 var(--b4-s3);
+  break-after: avoid;
 }
 
 .b4-bullets {
   margin: 0;
   padding-left: 18px;
-  font-size: 10.5pt;
+  font-size: var(--b4-fs-body);
+  font-weight: var(--b4-fw-regular);
   color: var(--b4-ink);
-  line-height: 1.65;
+  line-height: 1.55;
 }
 .b4-bullets li { min-width: 0; white-space: normal; word-break: normal; overflow-wrap: break-word; }
 .b4-bullets li + li { margin-top: 4px; }
 .b4-bullets--wide { column-gap: var(--b4-s5); }
 .b4-muted-item { color: #94a3b8; list-style: none; margin-left: -18px; }
+
+/* screen-only affordance — never printed */
+@media screen and not print {
+  .b4-card, .b4-kpi-card, .b4-insight-card, .b4-callout, .b4-highlight, .b4-chart-box {
+    box-shadow: 0 1px 2px rgba(15, 42, 67, 0.05);
+  }
+}
 
 /* ---------- "At a glance" strip (top-of-section executive readout) ---------- */
 .b4-glance-strip {
@@ -1144,19 +1266,19 @@ Answer:`;
 }
 .b4-glance-item { min-width: 0; }
 .b4-glance-value {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--b4-font);
   font-size: 15pt;
-  font-weight: 700;
+  font-weight: var(--b4-fw-bold);
   color: var(--b4-navy);
   line-height: 1.25;
   white-space: normal;
   overflow-wrap: break-word;
 }
-.b4-glance-value--sm { font-size: 10.5pt; font-weight: 600; }
+.b4-glance-value--sm { font-size: var(--b4-fs-subhead); font-weight: var(--b4-fw-bold); }
 .b4-glance-value--b4-good, .b4-glance-value--good { color: var(--b4-good); }
 .b4-glance-value--b4-warn, .b4-glance-value--warn { color: var(--b4-warn); }
 .b4-glance-value--b4-bad,  .b4-glance-value--bad  { color: var(--b4-bad); }
-.b4-glance-unit { font-size: 7.5pt; font-weight: 700; color: var(--b4-muted); margin-left: 2px; letter-spacing: 0.04em; }
+.b4-glance-unit { font-size: var(--b4-fs-footnote); font-weight: var(--b4-fw-bold); color: var(--b4-muted); margin-left: 2px; letter-spacing: 0.04em; }
 
 @media print {
   .b4-glance-strip { grid-template-columns: repeat(4, 1fr); break-inside: avoid; }
@@ -1168,8 +1290,12 @@ Answer:`;
 /* ---------- Data viz support ---------- */
 .b4-bar-row { display: flex; align-items: center; gap: var(--b4-s3); padding: 6px 0; }
 .b4-bar-row + .b4-bar-row { border-top: 1px solid var(--b4-line-2); }
-.b4-bar-label { min-width: 140px; font-size: 9.5pt; color: var(--b4-ink); font-weight: 600; }
-.b4-bar-pct { min-width: 40px; text-align: right; font-size: 9.5pt; color: var(--b4-muted); font-variant-numeric: tabular-nums; }
+.b4-bar-row--stacked { flex-direction: column; align-items: stretch; gap: 4px; }
+.b4-heat-cell--lg { min-width: 64px; min-height: 64px; font-size: 12pt; }
+.b4-card--flagged { border-left: 3px solid var(--b4-bad); }
+.b4-kpi-value-unit { font-size: 0.5em; font-weight: var(--b4-fw-medium); color: var(--b4-muted); margin-left: 2px; }
+.b4-bar-label { min-width: 140px; font-size: var(--b4-fs-tbl-body); color: var(--b4-ink); font-weight: var(--b4-fw-medium); }
+.b4-bar-pct { min-width: 40px; text-align: right; font-size: var(--b4-fs-tbl-body); color: var(--b4-muted); font-variant-numeric: tabular-nums; }
 .b4-bar {
   flex: 1;
   height: 8px;
@@ -1251,12 +1377,19 @@ Answer:`;
 .b4-timeline-item.good::before { background: var(--b4-good); }
 .b4-timeline-item.warn::before { background: var(--b4-warn); }
 .b4-timeline-item.bad::before  { background: var(--b4-bad); }
-.b4-timeline-item-date { font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--b4-muted); }
-.b4-timeline-item-title { font-size: 10.5pt; font-weight: 700; color: var(--b4-navy); margin: 2px 0; }
-.b4-timeline-item-body { font-size: 9.5pt; color: var(--b4-ink); line-height: 1.55; }
+.b4-timeline-item-date { font-size: var(--b4-fs-caption); font-weight: var(--b4-fw-bold); text-transform: uppercase; letter-spacing: 0.05em; color: var(--b4-muted); }
+.b4-timeline-item-title { font-size: var(--b4-fs-subhead); font-weight: var(--b4-fw-bold); color: var(--b4-navy); margin: 2px 0; break-after: avoid; }
+.b4-timeline-item-body { font-size: var(--b4-fs-tbl-body); font-weight: var(--b4-fw-regular); color: var(--b4-ink); line-height: 1.55; }
 
+/* ---------- Print quality: no orphaned headings, no shadows, atomic blocks ---------- */
+h1, h2, h3, h4, .b4-page-title, .b4-section-title, .b4-card-heading, .b4-highlight-title, .b4-timeline-item-title {
+  break-after: avoid;
+}
+.b4-kpi-grid, .b4-grid-2, .b4-grid-3, .b4-grid-4, .b4-glance-strip {
+  break-inside: avoid;
+}
 @media print {
-  .b4-card, .b4-kpi-card, .b4-insight-card, .b4-callout, .b4-highlight, .b4-chart-box {
+  .b4-card, .b4-kpi-card, .b4-insight-card, .b4-callout, .b4-highlight, .b4-chart-box, .b4-evidence-card {
     box-shadow: none !important;
     break-inside: avoid;
   }
