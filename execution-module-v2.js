@@ -1620,6 +1620,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // Get all evidence images from thumbnail strip
                 const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
                 const evidenceImages = [];
+                // Capture metadata recorded by execution-evidence.js at capture time.
+                // Kept aligned to evidenceImages[] so exhibit N maps to timestamp N.
+                const evidenceCapturedAtList = [];
                 if (previewDiv) {
                     previewDiv.querySelectorAll('.ev-thumb').forEach(thumb => {
                         // Prefer data-save-url (cloud URL or idb:// key) over img.src (may be base64)
@@ -1628,9 +1631,25 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                         const url = saveUrl || (imgEl && imgEl.src) || '';
                         if (url && !url.includes('data:,') && url !== window.location.href) {
                             evidenceImages.push(url);
+                            evidenceCapturedAtList.push(thumb.dataset.capturedAt || '');
                         }
                     });
                 }
+                // Prior saves already hold capture metadata for existing evidence; the
+                // in-memory store only knows about captures made in this session, so
+                // fall back to what was persisted before rather than dropping it.
+                // execution-evidence.js exposes the in-session store as
+                // {capturedAt, capturedAtList, location, locationRaw}; the persisted
+                // checklist item uses the evidence*-prefixed names the report reads.
+                const capMeta = (typeof window.getEvidenceCaptureMeta === 'function')
+                    ? (window.getEvidenceCaptureMeta(uniqueId) || {}) : {};
+                const priorItem = (window.state?.currentReport?.checklistProgress || [])
+                    .find(p => p && String(p.checklistId) === String(input.dataset.checklist) && String(p.itemIdx) === String(input.dataset.item)) || {};
+                const evidenceCapturedAt = capMeta.capturedAt
+                    || evidenceCapturedAtList.find(Boolean)
+                    || priorItem.evidenceCapturedAt || '';
+                const evidenceLocation = capMeta.location || priorItem.evidenceLocation || '';
+                const evidenceLocationRaw = capMeta.locationRaw || priorItem.evidenceLocationRaw || null;
                 // Backward compat: also store first image as evidenceImage
                 const evidenceImage = evidenceImages.length > 0 ? evidenceImages[0] : '';
                 const evidenceSize = '';
@@ -1658,6 +1677,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     evidenceImage: evidenceImage,
                     evidenceImages: evidenceImages,
                     evidenceSize: evidenceSize,
+                    evidenceCapturedAt: evidenceCapturedAt,
+                    evidenceCapturedAtList: evidenceCapturedAtList,
+                    evidenceLocation: evidenceLocation,
+                    evidenceLocationRaw: evidenceLocationRaw,
                     personnel: personnel,
                     designation: designation,
                     department: department,

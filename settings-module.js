@@ -24,6 +24,8 @@ if (!window.state.cbSettings) {
         geographicScope: ['United States', 'Canada', 'Mexico'],
         availableStandards: ['ISO 9001:2015', 'ISO 14001:2015', 'ISO 45001:2018', 'ISO 27001:2022', 'ISO 50001:2018', 'ISO 22000:2018', 'ISO 13485:2016'],
         iafMlaStatus: true,
+        // Privacy: evidence geolocation is opt-in and off by default.
+        captureEvidenceLocation: false,
 
         // Quality Policy
         qualityPolicy: 'We are committed to providing impartial, competent, and consistent certification services that meet the requirements of ISO 17021-1 and exceed our clients\' expectations.',
@@ -696,6 +698,15 @@ function getAccreditationHTML() {
                             <input type="checkbox" id="iaf-mla" ${settings.iafMlaStatus ? 'checked' : ''} style="width: 18px; height: 18px;">
                             <span>IAF MLA Signatory</span>
                         </label>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="capture-evidence-location" ${settings.captureEvidenceLocation ? 'checked' : ''} style="width: 18px; height: 18px;">
+                            <span>Record location with audit evidence</span>
+                        </label>
+                        <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                            Off by default. When enabled, the device asks permission and stores approximate coordinates alongside evidence photos; they appear in the report's Evidence Gallery. Coordinates are stored with the audit record only and are never transmitted elsewhere.
+                        </small>
                     </div>
                 </div>
                 
@@ -1789,6 +1800,9 @@ window.saveAccreditation = async function () {
     settings.accreditationNumber = window.Sanitizer.sanitizeText(document.getElementById('ab-number').value);
     settings.accreditationExpiry = document.getElementById('ab-expiry').value;
     settings.iafMlaStatus = document.getElementById('iaf-mla').checked;
+    // Opt-in, off by default: geolocation is only sampled during evidence capture
+    // when this is enabled, and the coordinates stay with the audit record.
+    settings.captureEvidenceLocation = !!document.getElementById('capture-evidence-location')?.checked;
 
     settings.standardsOffered = Array.from(document.querySelectorAll('.standard-checkbox:checked')).map(cb => window.Sanitizer.sanitizeText(cb.value));
 

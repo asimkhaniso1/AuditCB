@@ -59,6 +59,72 @@
     };
     window._EvidenceDB = EvidenceDB;
 
+    // ============================================
+    // EVIDENCE CAPTURE METADATA (timestamp + opt-in geolocation)
+    // ============================================
+    // In-memory store keyed by uniqueId (the checklist item's DOM id suffix).
+    // Populated at the moment evidence is actually captured (never on re-render).
+    // Shape: { capturedAt: ISOString|null, capturedAtList: ISOString[], location: string|null, locationRaw: {lat,lng,accuracy}|null }
+    // Other files (e.g. the save/persist path in execution-module-v2.js) can read this via
+    // window.getEvidenceCaptureMeta(uniqueId) when building the checklist item to persist.
+    window._evidenceMeta = window._evidenceMeta || {};
+
+    window.getEvidenceCaptureMeta = function (uniqueId) {
+        return window._evidenceMeta[uniqueId] || null;
+    };
+
+    // Record a capture event's timestamp. Only sets evidenceCapturedAt on the FIRST capture
+    // for a given item (never overwrites an earlier timestamp); every capture is appended
+    // to capturedAtList so it stays aligned with evidenceImages[].
+    function recordCaptureMeta(uniqueId) {
+        const meta = window._evidenceMeta[uniqueId] || (window._evidenceMeta[uniqueId] = {
+            capturedAt: null, capturedAtList: [], location: null, locationRaw: null
+        });
+        const iso = new Date().toISOString();
+        if (!meta.capturedAt) meta.capturedAt = iso; // first capture wins, never overwritten later
+        meta.capturedAtList.push(iso);
+        return iso;
+    }
+
+    // Attempt to attach geolocation to the most recent capture for this item.
+    // OPT-IN AND OFF BY DEFAULT: only runs when window.state.settings.captureEvidenceLocation === true
+    // (a settings toggle elsewhere can flip this flag; no UI for it lives in this file).
+    // Never blocks or delays capture — fire-and-forget with a short timeout; on denial/error/timeout
+    // we simply proceed without location. The coordinates are only ever stored locally with the
+    // audit record (evidenceLocation / evidenceLocationRaw) and are never transmitted anywhere else;
+    // they are rendered only in the report's Evidence Gallery.
+    function maybeCaptureLocation(uniqueId) {
+        try {
+            // Prefer window.state.cbSettings (CB settings module) — fall back to window.state.settings
+            // in case the flag was set through a different path. Off unless explicitly true.
+            const cbFlag = window.state && window.state.cbSettings && window.state.cbSettings.captureEvidenceLocation;
+            const fallbackFlag = window.state && window.state.settings && window.state.settings.captureEvidenceLocation;
+            const optedIn = !!(cbFlag ?? fallbackFlag);
+            if (!optedIn) return;
+            if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') return;
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    try {
+                        const meta = window._evidenceMeta[uniqueId];
+                        if (!meta) return; // item no longer tracked (unlikely)
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        const accuracy = pos.coords.accuracy;
+                        const locStr = `${lat.toFixed(4)}, ${lng.toFixed(4)}` + (Number.isFinite(accuracy) ? ` (±${Math.round(accuracy)}m)` : '');
+                        // Keep the first location captured for this item; don't clobber on later images.
+                        if (!meta.location) {
+                            meta.location = locStr;
+                            meta.locationRaw = { lat, lng, accuracy };
+                        }
+                    } catch (e) { /* non-fatal, ignore */ }
+                },
+                () => { /* denied / unavailable / timeout: proceed silently, no location attached */ },
+                { timeout: 4000, maximumAge: 60000, enableHighAccuracy: false }
+            );
+        } catch (e) { /* geolocation API not available in this environment; ignore */ }
+    }
+
     // Resolve idb:// references to displayable blob URLs
     window.resolveEvidenceUrl = async function (url) {
         if (!url || !url.startsWith('idb://')) return url;
@@ -189,6 +255,10 @@
                         }
                     }
 
+                    // 2c. Record capture timestamp (and, if opted in, attempt geolocation)
+                    const capturedAtIso = recordCaptureMeta(uniqueId);
+                    maybeCaptureLocation(uniqueId);
+
                     // 3. Append to multi-image preview strip
                     if (previewDiv) {
                         previewDiv.style.display = 'flex';
@@ -199,6 +269,7 @@
                         thumb.className = 'ev-thumb';
                         thumb.dataset.idx = newIdx;
                         thumb.dataset.saveUrl = finalUrl; // store URL/idb-key for saving
+                        thumb.dataset.capturedAt = capturedAtIso; // ISO 8601 capture time, for future consumers
                         thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                         thumb.innerHTML = `
                             <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
@@ -482,6 +553,10 @@
                 }
             }
 
+            // Record capture timestamp (and, if opted in, attempt geolocation)
+            const capturedAtIso = recordCaptureMeta(uniqueId);
+            maybeCaptureLocation(uniqueId);
+
             // Append thumbnail to multi-image preview strip
             const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
             if (previewDiv) {
@@ -497,6 +572,7 @@
                 thumb.className = 'ev-thumb';
                 thumb.dataset.idx = newIdx;
                 thumb.dataset.saveUrl = finalUrl;
+                thumb.dataset.capturedAt = capturedAtIso;
                 thumb.style.cssText = 'position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden; border: 1px solid #cbd5e1;';
                 thumb.innerHTML = `
                     <img src="${displayUrl}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" data-action="viewEvidenceImageByUrl" data-id="${safeDisplay}"/>
@@ -611,6 +687,10 @@
             window.activeWebcamStream.getTracks().forEach(track => track.stop());
             window.activeWebcamStream = null;
 
+            // Record capture timestamp (and, if opted in, attempt geolocation)
+            const capturedAtIso = recordCaptureMeta(uniqueId);
+            maybeCaptureLocation(uniqueId);
+
             // Update UI
             const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
             const imgElem = document.getElementById('evidence-img-' + uniqueId);
@@ -619,7 +699,7 @@
 
             if (imgElem) imgElem.src = dataUrl;
             if (previewDiv) previewDiv.style.display = 'block';
-            if (dataInput) dataInput.value = 'attached';
+            if (dataInput) { dataInput.value = 'attached'; dataInput.dataset.capturedAt = capturedAtIso; }
             if (sizeElem) sizeElem.textContent = 'Captured from Webcam';
 
             // Close modal
@@ -634,5 +714,5 @@
 
 // Support CommonJS/test environments
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam };
+    module.exports = { handleEvidenceUpload: window.handleEvidenceUpload, viewEvidenceImage: window.viewEvidenceImage, viewEvidenceImageDirect: window.viewEvidenceImageDirect, removeEvidence: window.removeEvidence, removeEvidenceByIdx: window.removeEvidenceByIdx, viewEvidenceImageByUrl: window.viewEvidenceImageByUrl, captureScreenEvidence: window.captureScreenEvidence, handleCameraButton: window.handleCameraButton, captureWebcam: window.captureWebcam, getEvidenceCaptureMeta: window.getEvidenceCaptureMeta };
 }

@@ -142,6 +142,83 @@
         return out;
     }
 
+    // ─── linkedCapaRecords ──────────────────────────────────────────────────
+    // Joins the live NCR/CAPA register (window.state.ncrs) to this report.
+    // Primary match: register entry's auditId === this report's audit plan id.
+    // Secondary match: same clientId + clause matches a finding in this report
+    // + raisedDate falls within the audit period (or has no date). Records
+    // already matched primarily are never double-counted.
+    function linkedCapaRecords(d) {
+        try {
+            var ncrs = (global.state && global.state.ncrs) || [];
+            if (!ncrs || !ncrs.length) return [];
+
+            var planId = (d && d.report && d.report.planId) || (d && d.auditPlan && d.auditPlan.id) || null;
+            var clientId = d && d.report && d.report.clientId;
+            var findingClauses = {};
+            collectFindings(d).forEach(function (f) {
+                if (f.clause) findingClauses[String(f.clause).trim()] = true;
+            });
+
+            var baseDate = (d && d.report && (d.report.date || d.report.createdAt)) || null;
+            var auditStart = (d && d.auditPlan && (d.auditPlan.startDate || d.auditPlan.date)) || baseDate;
+            var auditEnd = (d && d.auditPlan && (d.auditPlan.endDate || d.auditPlan.date)) || baseDate;
+            var startTime = auditStart ? new Date(auditStart).getTime() : null;
+            var endTime = auditEnd ? new Date(auditEnd).getTime() : null;
+            if (startTime !== null && isNaN(startTime)) startTime = null;
+            if (endTime !== null && isNaN(endTime)) endTime = null;
+            // Widen window slightly to tolerate same-day audits / date-only precision.
+            if (startTime !== null) startTime -= 7 * 86400000;
+            if (endTime !== null) endTime += 7 * 86400000;
+
+            var matched = [];
+            var matchedIds = {};
+
+            ncrs.forEach(function (n) {
+                if (!n) return;
+                if (planId != null && n.auditId != null && String(n.auditId) === String(planId)) {
+                    matched.push(n);
+                    if (n.id != null) matchedIds[String(n.id)] = true;
+                }
+            });
+
+            ncrs.forEach(function (n) {
+                if (!n) return;
+                if (n.id != null && matchedIds[String(n.id)]) return;
+                if (clientId == null || n.clientId == null || String(n.clientId) !== String(clientId)) return;
+                if (!n.clause || !findingClauses[String(n.clause).trim()]) return;
+                if (n.raisedDate) {
+                    var rt = new Date(n.raisedDate).getTime();
+                    if (!isNaN(rt)) {
+                        if (startTime !== null && rt < startTime) return;
+                        if (endTime !== null && rt > endTime) return;
+                    }
+                }
+                matched.push(n);
+                if (n.id != null) matchedIds[String(n.id)] = true;
+            });
+
+            return matched;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // Derives lifecycle status for a REAL register record from its actual
+    // status / effectiveness / verifiedDate fields (not inferred from due date
+    // alone, except for the Overdue case which genuinely depends on today vs due).
+    function realCapaStatus(rec) {
+        var status = String((rec && rec.status) || '').toLowerCase();
+        var effectiveness = String((rec && rec.effectiveness) || '').toLowerCase();
+        if (status === 'closed' || effectiveness === 'effective') return 'Closed';
+        if (rec && rec.verifiedDate) return 'Verified';
+        var due = rec && rec.dueDate ? new Date(rec.dueDate) : null;
+        var today = new Date();
+        if (due && !isNaN(due.getTime()) && due < today && status !== 'closed') return 'Overdue';
+        if (rec && (rec.correctiveAction || rec.capaImplementedDate)) return 'In Progress';
+        return 'Open';
+    }
+
     // ─── scoreFinding ───────────────────────────────────────────────────────
 
     function scoreFinding(finding) {
@@ -247,6 +324,27 @@
             return Object.assign({}, f, scored);
         });
 
+        // Join to the live NCR/CAPA register and attach the best-matching real
+        // record (by clause) to each scored finding as f.capaRecord, so the
+        // Root Cause and Risk Register sections can prefer real auditor data.
+        var linked = linkedCapaRecords(d);
+        var recordsByClause = {};
+        linked.forEach(function (rec) {
+            var c = rec && rec.clause ? String(rec.clause).trim() : '';
+            if (!c) return;
+            (recordsByClause[c] = recordsByClause[c] || []).push(rec);
+        });
+        var claimedRecordIds = {};
+        scoredFindings.forEach(function (f) {
+            var c = f.clause ? String(f.clause).trim() : '';
+            var pool = c ? (recordsByClause[c] || []) : [];
+            var rec = pool.find(function (r) { return !(r.id != null && claimedRecordIds[String(r.id)]); });
+            if (rec) {
+                f.capaRecord = rec;
+                if (rec.id != null) claimedRecordIds[String(rec.id)] = true;
+            }
+        });
+
         // Heat matrix: 5x5, rows = impact (1-5, index 0 = impact 1), cols = likelihood (1-5)
         var heatMatrix = [];
         for (var i = 0; i < 5; i++) { heatMatrix.push([0, 0, 0, 0, 0]); }
@@ -258,20 +356,21 @@
 
         var baseDate = (d.report && (d.report.date || d.report.createdAt)) || null;
         var riskRegister = scoredFindings.map(function (f) {
-            var targetDate = f.caDueDate || addDays(baseDate, 90);
-            var status = deriveStatus(Object.assign({}, f, { caDueDate: targetDate }), baseDate);
+            var rec = f.capaRecord;
+            var targetDate = (rec && rec.dueDate) || f.caDueDate || addDays(baseDate, 90);
+            var status = rec ? realCapaStatus(rec) : deriveStatus(Object.assign({}, f, { caDueDate: targetDate }), baseDate);
             return {
                 ref: f.ref,
                 risk: (f.clause ? 'Clause ' + f.clause + ' — ' : '') + (f.text || 'Non-conformance identified').substring(0, 160),
                 likelihood: f.likelihood,
                 impact: f.impact,
                 score: f.score,
-                existingControls: f.status === 'closed' ? 'Corrective action implemented and verified' : 'Corrective action pending / in progress',
+                existingControls: (rec && (rec.correction || rec.correctiveAction)) || (f.status === 'closed' ? 'Corrective action implemented and verified' : 'Corrective action pending / in progress'),
                 residualRisk: f.residualRisk,
                 priority: f.priority,
                 status: status,
-                riskOwner: f.department || 'Process Owner (TBD)',
-                treatmentPlan: f.rootCause.correctiveAction,
+                riskOwner: (rec && rec.capaResponsible) || f.department || 'Process Owner (TBD)',
+                treatmentPlan: (rec && rec.correctiveAction) || f.rootCause.correctiveAction,
                 reviewDate: targetDate
             };
         });
@@ -295,27 +394,84 @@
         });
 
         // CAPA dashboard stats — full lifecycle: Open / In Progress / Overdue / Verified / Closed.
-        // Note: underlying data may not carry a real capaStatus/verificationStatus field yet
-        // (documented limitation) — deriveStatus() degrades gracefully via due-date inference,
-        // and will flow the real field straight through the moment it appears in a finding.
-        var closureDurations = [];
-        var lifecycleCounts = { Open: 0, 'In Progress': 0, Overdue: 0, Verified: 0, Closed: 0 };
-        var capaItems = scoredFindings.map(function (f) {
-            var status = deriveStatus(f, baseDate);
-            lifecycleCounts[status] = (lifecycleCounts[status] || 0) + 1;
-            if (status === 'Closed' && f.caDueDate && baseDate) {
-                var dur = daysBetween(baseDate, f.caDueDate);
-                if (dur !== null) closureDurations.push(Math.abs(dur));
-            }
-            return {
-                ref: f.ref,
-                clause: f.clause,
-                text: f.text,
-                priority: f.priority,
-                status: status,
-                completion: completionPct(status)
-            };
-        });
+        // When the live NCR/CAPA register (window.state.ncrs) has records linked to this
+        // report, those are authoritative (source: 'register'). Otherwise fall back to the
+        // due-date-inference degrade path (source: 'inferred') so the report never implies
+        // register data it doesn't have.
+        var today = new Date();
+        var capaItems, lifecycleCounts, closureDurations, overdueItems, capaSource;
+
+        if (linked.length > 0) {
+            capaSource = 'register';
+            lifecycleCounts = { Open: 0, 'In Progress': 0, Overdue: 0, Verified: 0, Closed: 0 };
+            closureDurations = [];
+            overdueItems = [];
+            capaItems = linked.map(function (rec, idx) {
+                var status = realCapaStatus(rec);
+                lifecycleCounts[status] = (lifecycleCounts[status] || 0) + 1;
+                if ((status === 'Closed' || status === 'Verified') && rec.raisedDate) {
+                    var endDate = rec.verifiedDate || rec.correctionDate;
+                    if (endDate) {
+                        var dur = daysBetween(rec.raisedDate, endDate);
+                        if (dur !== null) closureDurations.push(Math.abs(dur));
+                    }
+                }
+                if (status === 'Overdue') {
+                    var due = rec.dueDate ? new Date(rec.dueDate) : null;
+                    var daysOverdue = (due && !isNaN(due.getTime())) ? Math.max(0, Math.round((today.getTime() - due.getTime()) / 86400000)) : null;
+                    overdueItems.push({
+                        ref: 'CAPA-' + (rec.id != null ? rec.id : idx + 1),
+                        clause: rec.clause || '',
+                        text: rec.description || '',
+                        owner: rec.capaResponsible || 'Process Owner (TBD)',
+                        dueDate: rec.dueDate || null,
+                        daysOverdue: daysOverdue
+                    });
+                }
+                return {
+                    ref: 'CAPA-' + (rec.id != null ? rec.id : idx + 1),
+                    clause: rec.clause || '',
+                    text: rec.description || '',
+                    priority: rec.severity || '',
+                    status: status,
+                    completion: completionPct(status)
+                };
+            });
+        } else {
+            capaSource = 'inferred';
+            closureDurations = [];
+            overdueItems = [];
+            lifecycleCounts = { Open: 0, 'In Progress': 0, Overdue: 0, Verified: 0, Closed: 0 };
+            capaItems = scoredFindings.map(function (f) {
+                var status = deriveStatus(f, baseDate);
+                lifecycleCounts[status] = (lifecycleCounts[status] || 0) + 1;
+                if (status === 'Closed' && f.caDueDate && baseDate) {
+                    var dur = daysBetween(baseDate, f.caDueDate);
+                    if (dur !== null) closureDurations.push(Math.abs(dur));
+                }
+                if (status === 'Overdue') {
+                    var due2 = f.caDueDate ? new Date(f.caDueDate) : null;
+                    var daysOverdue2 = (due2 && !isNaN(due2.getTime())) ? Math.max(0, Math.round((today.getTime() - due2.getTime()) / 86400000)) : null;
+                    overdueItems.push({
+                        ref: f.ref,
+                        clause: f.clause || '',
+                        text: f.text || '',
+                        owner: f.department || 'Process Owner (TBD)',
+                        dueDate: f.caDueDate || null,
+                        daysOverdue: daysOverdue2
+                    });
+                }
+                return {
+                    ref: f.ref,
+                    clause: f.clause,
+                    text: f.text,
+                    priority: f.priority,
+                    status: status,
+                    completion: completionPct(status)
+                };
+            });
+        }
+
         var avgClosureDays = closureDurations.length
             ? Math.round(closureDurations.reduce(function (a, b) { return a + b; }, 0) / closureDurations.length)
             : null;
@@ -332,6 +488,9 @@
             overallCompletion: overallCompletion,
             avgClosureDays: avgClosureDays,
             items: capaItems,
+            linkedCount: linked.length,
+            source: capaSource,
+            overdueItems: overdueItems,
             repeatedFindings: repeatInfo.repeated.map(function (f) {
                 var sf = scoredFindings.find(function (s) { return s.ref === f.ref; });
                 return sf || f;
@@ -533,23 +692,31 @@
                 + '<div style="font-size:0.85rem;color:#334155;line-height:1.45;">' + esc(value) + '</div></div>';
         }
         var rcCards = r.scoredFindings.map(function (f) {
+            var rec = f.capaRecord;
+            var hasReal = !!(rec && (rec.rootCause || rec.correctiveAction || rec.correction));
             var rc = f.rootCause;
+            var immediateCause = (rec && rec.correction) || rc.immediateCause;
+            var rootCauseText = (rec && rec.rootCause) || rc.rootCause;
+            var correctiveActionText = (rec && rec.correctiveAction) || rc.correctiveAction;
+            var provenance = hasReal
+                ? '<div style="margin-top:8px;font-size:0.68rem;color:#0e7490;"><i class="fa-solid fa-user-check" style="margin-right:4px;"></i>Recorded by auditor' + (rec.raisedBy ? ' (' + esc(rec.raisedBy) + ')' : '') + '</div>'
+                : '<div style="margin-top:8px;font-size:0.68rem;color:#94a3b8;"><i class="fa-solid fa-robot" style="margin-right:4px;"></i>AI-assisted draft — auditor review required</div>';
             return '<div class="b4-card" style="border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:14px;background:#ffffff;page-break-inside:avoid;break-inside:avoid;">'
                 + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
                 + '<div style="font-weight:700;color:#1e293b;">' + esc(f.ref) + (f.clause ? ' — Clause ' + esc(f.clause) : '') + '</div>'
                 + pill(f.priority, PRIORITY_COLORS[f.priority])
                 + '</div>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;">'
-                + rcField('Immediate Cause', rc.immediateCause)
-                + rcField('Root Cause', rc.rootCause)
+                + rcField(hasReal && rec.correction ? 'Correction' : 'Immediate Cause', immediateCause)
+                + rcField('Root Cause', rootCauseText)
                 + rcField('Systemic Cause', rc.systemicCause)
                 + '<div></div>'
                 + '</div>'
                 + '<div class="b4-callout" style="margin-top:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-left:3px solid #16a34a;border-radius:6px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;">'
-                + rcField('Corrective Action', rc.correctiveAction)
+                + rcField('Corrective Action', correctiveActionText)
                 + rcField('Preventive Action', rc.preventiveAction)
                 + '</div>'
-                + '<div style="margin-top:8px;font-size:0.68rem;color:#94a3b8;"><i class="fa-solid fa-robot" style="margin-right:4px;"></i>AI-assisted draft — auditor review required</div>'
+                + provenance
                 + '</div>';
         }).join('');
         out.push({
@@ -627,7 +794,10 @@
             + '<div style="display:flex;gap:14px;margin-top:10px;font-size:0.75rem;color:#64748b;flex-wrap:wrap;">'
             + '<span><strong>' + capa.repeatedFindings.length + '</strong> repeated findings</span>'
             + '<span><strong>' + (capa.avgClosureDays != null ? capa.avgClosureDays : '—') + '</strong> avg closure days</span>'
-            + '</div>';
+            + '</div>'
+            + (capa.source === 'register'
+                ? '<div style="margin-top:8px;font-size:0.7rem;color:#0e7490;"><i class="fa-solid fa-database" style="margin-right:4px;"></i>' + capa.linkedCount + ' CAPA record' + (capa.linkedCount === 1 ? '' : 's') + ' linked from the NCR/CAPA register</div>'
+                : '<div style="margin-top:8px;font-size:0.7rem;color:#94a3b8;"><i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>No linked NCR/CAPA register records found — status shown is inferred from due dates, not the CAPA register</div>');
         var itemBars = capa.items.length
             ? '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">' + capa.items.map(function (it) {
                 var c = CAPA_PALETTE[it.status] || '#94a3b8';
@@ -639,6 +809,12 @@
                     + progressBar(it.completion, c)
                     + '</div>';
             }).join('') + '</div>'
+            : '';
+        var overdueTable = capa.overdueItems.length
+            ? '<table class="b4-tbl f-tbl" style="margin-top:16px;"><thead><tr style="background:#fef2f2;"><th style="width:14%;">Ref</th><th style="width:14%;">Clause</th><th style="width:32%;">Finding</th><th style="width:16%;">Owner</th><th style="width:12%;">Due Date</th><th style="width:12%;text-align:center;">Days Overdue</th></tr></thead><tbody>'
+                + capa.overdueItems.map(function (o) {
+                    return '<tr style="page-break-inside:avoid;break-inside:avoid;"><td style="font-family:monospace;font-weight:600;">' + esc(o.ref) + '</td><td>' + esc(o.clause || '') + '</td><td>' + esc((o.text || '').substring(0, 130)) + '</td><td>' + esc(o.owner) + '</td><td style="white-space:nowrap;">' + esc(o.dueDate || '—') + '</td><td style="text-align:center;">' + esc(o.daysOverdue != null ? o.daysOverdue : '—') + '</td></tr>';
+                }).join('') + '</tbody></table>'
             : '';
         var repeatedTable = capa.repeatedFindings.length
             ? '<table class="b4-tbl f-tbl" style="margin-top:16px;"><thead><tr style="background:#fffbeb;"><th style="width:14%;">Ref</th><th style="width:16%;">Clause</th><th style="width:50%;">Finding</th><th style="width:20%;text-align:center;">Priority</th></tr></thead><tbody>'
@@ -667,7 +843,7 @@
                 })
             }] : [],
             bodyHtml: hasCapaData
-                ? capaStatBoxes + '<div style="max-width:300px;margin:18px auto;"><canvas id="' + chartId + '"></canvas></div>' + itemBars + repeatedTable
+                ? capaStatBoxes + '<div style="max-width:300px;margin:18px auto;"><canvas id="' + chartId + '"></canvas></div>' + itemBars + overdueTable + repeatedTable
                 : emptyState('No CAPA records to display for this audit.')
         });
 
@@ -690,6 +866,7 @@
         compute: compute,
         sections: sections,
         sectionsPreviewToggles: sectionsPreviewToggles,
+        linkedCapaRecords: linkedCapaRecords,
         // Exposed rule tables for extension by other standards.
         CLAUSE_THEMES: CLAUSE_THEMES,
         BUSINESS_IMPACT_RULES: BUSINESS_IMPACT_RULES
