@@ -2643,6 +2643,25 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 return '<div id="sec-' + s.key + '" class="sh page-break" style="border-left-color:' + s.color + ';">' + secMapRef.badge(s.key) + s.name + '</div><div class="sb">' + s.bodyHtml + '</div>';
             }).join('');
         };
+        // Section category colors: subtle audience-based coding instead of a
+        // different hue per section. Executive=blue, Management=slate, Risk=red
+        // accent, Evidence=green, Certification=navy, Annex=neutral.
+        const SECTION_CATEGORY_COLOR = {
+            'exec-summary': '#1d4ed8', 'exec-dashboard': '#1d4ed8', 'exec-insights': '#1d4ed8',
+            'audit-info': '#475569', 'audit-programme': '#475569', 'multi-site': '#475569',
+            'objectives': '#475569', 'summary': '#475569', 'charts': '#475569',
+            'maturity': '#475569', 'dept-performance': '#475569', 'clause-intel': '#475569',
+            'trends': '#475569', 'changes': '#475569', 'mgmt-effectiveness': '#475569',
+            'risk-heatmap': '#b91c1c', 'business-impact': '#b91c1c', 'root-cause': '#b91c1c',
+            'risk-register': '#b91c1c', 'action-plan': '#b91c1c', 'capa-dashboard': '#b91c1c',
+            'findings': '#b91c1c', 'ncrs': '#b91c1c', 'corrective': '#b91c1c',
+            'obs': '#b91c1c', 'ofi': '#b91c1c',
+            'conformance': '#15803d', 'audit-trails': '#15803d', 'prev-findings': '#15803d',
+            'evidence-intel': '#15803d', 'evidence': '#15803d',
+            'conclusion': '#0f2a43', 'signature': '#0f2a43',
+            'distribution': '#64748b', 'annexures': '#64748b'
+        };
+        sectionDefs.forEach(function (s) { if (SECTION_CATEGORY_COLOR[s.key]) s.color = SECTION_CATEGORY_COLOR[s.key]; });
         const secMap = {};
         let _secCounter = 0;
         sectionDefs.forEach(function (s) { if (s.present) { _secCounter++; secMap[s.key] = { num: _secCounter, name: s.name, desc: s.desc, color: s.color }; } });
@@ -3021,10 +3040,38 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 return '<div id="sec-evidence" class="sh page-break" style="background:#fff7ed;border-left-color:#c2410c;">' + sBadge('evidence') + 'EVIDENCE GALLERY</div><div class="sb"><div class="ev-grid">' + cards + '</div><div style="margin-top:16px;font-size:0.82rem;color:#64748b;text-align:center;">' + evidenceItems.length + ' evidence photo(s) collected during audit</div></div>';
             })()
             + '</div>'
-            // FOOTER
-            + '<footer><div>' + (cbName ? '<strong>' + cbName + '</strong>' : '') + (cbEmail ? '<br>' + cbEmail : '') + '</div>'
-            + '<div style="text-align:center;font-size:0.75rem;color:#94a3b8;font-style:italic;max-width:340px;">This report has been prepared in accordance with ' + standard + ' requirements. Distribution is limited to authorized personnel only.</div>'
-            + '<div style="text-align:right;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>Issue Date: ' + d.today + '</div></footer>';
+            // CLOSING PAGE — the report ends confidently, board-presentation style.
+            + (function () {
+                const nextStage = (function () {
+                    // Reuse the audit-programme stage logic: the stage after the current one.
+                    const stages = ['Stage 1', 'Stage 2 (Initial Certification)', 'Surveillance 1', 'Surveillance 2', 'Recertification'];
+                    const offsets = [0, 0, 12, 24, 36];
+                    if (typeof auditStageBase !== 'number' || auditStageBase >= stages.length - 1) return null;
+                    const dt = new Date(auditBaseDate.getTime());
+                    dt.setMonth(dt.getMonth() + offsets[auditStageBase + 1]);
+                    return stages[auditStageBase + 1] + ' — ' + dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+                })();
+                const row = function (label, value) {
+                    return value ? '<tr><td style="padding:9px 14px;color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:500;width:40%;">' + label + '</td><td style="padding:9px 14px;color:#0f2a43;font-weight:500;font-size:0.9rem;">' + value + '</td></tr>' : '';
+                };
+                return '<div class="page-break" style="min-height:88vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;">'
+                    + '<div style="width:64px;height:3px;background:#0f2a43;margin-bottom:34px;"></div>'
+                    + '<div style="font-size:0.78rem;letter-spacing:0.18em;color:#64748b;text-transform:uppercase;font-weight:500;margin-bottom:10px;">Audit Completed</div>'
+                    + '<div style="font-size:1.5rem;font-weight:700;color:#0f2a43;margin-bottom:6px;">' + d.report.client + '</div>'
+                    + '<div style="font-size:0.9rem;color:#475569;margin-bottom:30px;">' + standard + '</div>'
+                    + '<div style="display:inline-block;padding:10px 26px;border:1px solid ' + d.stats.recColor + ';border-radius:6px;color:' + d.stats.recColor + ';font-weight:700;font-size:0.95rem;margin-bottom:34px;">' + d.stats.recommendation + '</div>'
+                    + '<table style="border-collapse:collapse;width:100%;max-width:460px;text-align:left;border-top:1px solid #e7ecf1;border-bottom:1px solid #e7ecf1;margin-bottom:32px;">'
+                    + row('Audit Reference', String(d.report.id))
+                    + row('Report Status', (d.report.reportStatus === 'final' ? 'Final — Issued' : 'Draft — not yet issued'))
+                    + row('Lead Auditor', d.report.leadAuditor || '')
+                    + row('Next Audit', nextStage)
+                    + row('Contact', (cbName || '') + (cbEmail ? ' · ' + cbEmail : ''))
+                    + '</table>'
+                    + (d.qrCodeUrl ? '<img src="' + d.qrCodeUrl + '" alt="Verification QR" style="width:84px;height:84px;margin-bottom:12px;">' + '<div style="font-size:0.68rem;color:#94a3b8;margin-bottom:26px;">Scan to verify this report</div>' : '')
+                    + '<div style="font-size:0.85rem;color:#475569;max-width:440px;line-height:1.6;">Thank you for the professional cooperation extended to the audit team. This report has been prepared in accordance with ' + standard + ' requirements; distribution is limited to authorized recipients listed herein.</div>'
+                    + '<div style="margin-top:26px;font-size:0.72rem;color:#94a3b8;">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + ' · Issue Date: ' + d.today + '</div>'
+                    + '</div>';
+            })();
 
         // Build chart init script SEPARATELY (will become its own Blob URL to bypass inline-script CSP)
         const chartScriptCode = ''
@@ -3069,7 +3116,17 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         // Append script via external Blob URL (not inline) to comply with parent CSP
         const chartScriptBlob = new Blob([chartScriptCode], { type: 'application/javascript' });
         const chartScriptUrl = URL.createObjectURL(chartScriptBlob);
-        const reportHtmlFinal = reportHtml + '<script src="' + chartScriptUrl + '"></script></body></html>';
+        // Normalize every section header to its category color (headers carry
+        // hardcoded per-section hues from earlier iterations; one uniform surface
+        // + category accent replaces them).
+        const reportHtmlColored = reportHtml.replace(
+            /<div id="sec-([a-z0-9-]+)" class="sh page-break" style="[^"]*">/g,
+            function (m, key) {
+                const c = (secMap[key] && secMap[key].color) || '#475569';
+                return '<div id="sec-' + key + '" class="sh page-break" style="background:#f8fafc;border-left-color:' + c + ';">';
+            }
+        );
+        const reportHtmlFinal = reportHtmlColored + '<script src="' + chartScriptUrl + '"></script></body></html>';
 
         // Open via Blob URL. Chart script is also a Blob URL (loaded via <script src>)
         // so it works even when parent page CSP disallows inline scripts.

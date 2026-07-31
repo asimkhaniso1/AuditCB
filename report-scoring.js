@@ -444,7 +444,15 @@
     // typed as major/minor: major NC -> minor NC -> recurring clause -> observation.
     function buildTop5Risks(items, clauseIntel) {
         const pool = [];
-        const label = (i, fallback) => (i?.kbMatch?.clause || i?.clause || 'General') + ' — ' + (i?.kbMatch?.title || i?.requirement || i?.comment || fallback);
+        // Title uses clause + kbMatch TITLE only when available (the standard's
+        // own wording); falls back to a cleaned first sentence of the raw item
+        // text (never the raw checklist instruction verbatim).
+        const label = (i, fallback) => {
+            const clause = i?.kbMatch?.clause || i?.clause || 'General';
+            const kbTitle = i?.kbMatch?.title;
+            const body = kbTitle ? kbTitle : (cleanFindingText(i?.requirement || i?.comment) || fallback);
+            return clause + ' — ' + body;
+        };
         items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'major')
             .forEach((i) => pool.push({ title: label(i, 'Non-conformity'), level: 'Major', clause: i?.clause }));
         items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'minor')
@@ -489,6 +497,45 @@
         if (score >= 75) return 'Good';
         if (score >= 55) return 'Fair';
         return 'Needs Attention';
+    }
+
+    // Short, data-supported contextual label for any score/compliance number
+    // (0-100 scale). No invented industry benchmarks — bands only describe
+    // what the number itself means.
+    function scoreInterpretationLabel(score) {
+        if (score == null) return null;
+        if (score >= 90) return 'Operationally Mature';
+        if (score >= 75) return 'Well Controlled';
+        if (score >= 60) return 'Developing';
+        return 'Requires Attention';
+    }
+
+    // Short tag pulled from MATURITY_INTERPRETATION's headline (the word(s)
+    // between "Level N — " and the following colon), for compact KPI display.
+    function maturityShortLabel(level) {
+        const lvl = clamp(Math.round(Number(level) || 0), 1, 5);
+        const full = MATURITY_INTERPRETATION[lvl];
+        if (!full) return null;
+        const m = full.match(/—\s*([^:]+):/);
+        return m ? m[1].trim() : null;
+    }
+
+    // Strips checklist-instruction artifacts out of raw item text so risk/
+    // priority titles never surface the auditor-facing evidence request
+    // verbatim: removes [Ref: ...] bracketed content, keeps only the first
+    // sentence, drops a leading imperative verb, and hard-caps the length.
+    const IMPERATIVE_LEAD_RE = /^(show|verify|ensure|provide|demonstrate|confirm|check|review|assess|evaluate|obtain|inspect|examine|validate|describe|explain|confirm that|make sure)\s+/i;
+    function cleanFindingText(raw) {
+        let s = String(raw == null ? '' : raw).trim();
+        if (!s) return '';
+        s = s.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+        const m = s.match(/^[^.?!]+[.?!]?/);
+        if (m) s = m[0].trim();
+        s = s.replace(IMPERATIVE_LEAD_RE, '').trim();
+        if (s) s = s.charAt(0).toUpperCase() + s.slice(1);
+        const CAP = 70;
+        if (s.length > CAP) s = s.slice(0, CAP - 1).trim() + '…';
+        return s;
     }
 
     function capaProgressFromItems(items, ncrs) {
@@ -644,6 +691,11 @@
         // (a sibling module) if it has already been loaded. Omitted gracefully
         // when unavailable so this card never fabricates data.
         let businessImpact = null;
+        // CAPA Progress is only shown as a headline KPI when it is backed by real
+        // register records (window.ReportRisk's capa.source === 'register');
+        // otherwise capaProgress above is merely inferred from checklist due-dates
+        // and showing e.g. "0%" would read as an alarming, unsupported figure.
+        let capaProgressVerified = null;
         try {
             if (global.ReportRisk && typeof global.ReportRisk.compute === 'function') {
                 const riskCompute = global.ReportRisk.compute(d);
@@ -653,8 +705,11 @@
                 });
                 const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
                 if (top) businessImpact = { category: top[0], count: top[1] };
+                if (riskCompute?.capa?.source === 'register') {
+                    capaProgressVerified = capaProgress;
+                }
             }
-        } catch (_e) { businessImpact = null; }
+        } catch (_e) { businessImpact = null; capaProgressVerified = null; }
 
         const execDashboard = {
             auditScore,
@@ -667,6 +722,7 @@
             controlEffectiveness: breakdown.Operations,
             processEffectiveness: breakdown.Monitoring,
             majorNC, minorNC, obsCount, ofiCount, capaProgress,
+            capaProgressVerified,
             businessImpact,
             auditDuration,
             hasPrior: !!prior,
@@ -759,32 +815,55 @@
         </div>`;
     }
 
-    // Direction: 'higherBetter' | 'lowerBetter' | 'neutral'
-    function trendHtml(deltaVal, direction, suffix) {
+    // Direction: 'higherBetter' | 'lowerBetter' | 'neutral'.
+    // hasPrior: must be explicitly true — a flat "vs previous audit" chip is
+    // meaningless (and misleadingly implies stability) when no prior report
+    // exists for the client, so the trend row is omitted entirely rather than
+    // ever falling back to a "flat" default. Color follows real good/bad
+    // semantics for the metric (e.g. fewer findings = good, shown in green)
+    // rather than literally following the arrow direction.
+    function trendHtml(deltaVal, direction, suffix, hasPrior) {
         suffix = suffix || '';
-        if (deltaVal == null) {
-            return '<span class="b4-kpi-trend flat">vs previous audit</span>';
+        if (!hasPrior || deltaVal == null) return '';
+        if (deltaVal === 0) {
+            return '<span class="b4-kpi-trend flat">no change vs previous audit</span>';
         }
-        const dirClass = deltaVal > 0 ? 'up' : deltaVal < 0 ? 'down' : 'flat';
-        const magnitude = Math.abs(deltaVal);
-        return `<span class="b4-kpi-trend ${dirClass}">${magnitude}${suffix} vs previous</span>`;
+        const increased = deltaVal > 0;
+        const arrowClass = increased ? 'up' : 'down';
+        let isGood = null;
+        if (direction === 'higherBetter') isGood = increased;
+        else if (direction === 'lowerBetter') isGood = !increased;
+        const colorStyle = isGood == null ? '' : ` style="color:var(--b4-${isGood ? 'good' : 'bad'});"`;
+        const sign = increased ? '+' : '';
+        return `<span class="b4-kpi-trend ${arrowClass}"${colorStyle}>${sign}${deltaVal}${suffix} vs previous audit</span>`;
     }
 
     function kpiCardHtml(opts) {
-        const { icon, label, value, suffix, sub, severity, deltaVal, direction, deltaSuffix, isText, accent } = opts;
+        const { icon, label, value, suffix, sub, severity, deltaVal, direction, deltaSuffix, isText, accent, hasPrior } = opts;
+        // Long non-numeric values (e.g. "Recommended for Certification") must
+        // never use the huge numeric size or overflow-hide — render smaller
+        // with wrapping allowed instead of clipping.
+        const isLongText = isText && value != null && String(value).length > 8;
+        const valStyleParts = [];
+        if (isLongText) valStyleParts.push('font-size:11pt', 'font-weight:700', 'line-height:1.35', 'white-space:normal', 'word-break:break-word', 'text-transform:none');
+        if (severity && severity !== 'neutral') valStyleParts.push(`color:var(--b4-${severity})`);
+        const valStyle = valStyleParts.length ? ` style="${valStyleParts.join(';')};"` : '';
         const valHtml = value == null
             ? '—'
             : (isText
                 ? esc(String(value))
-                : `${value}${suffix ? `<span style="font-size:0.6em;font-weight:500;color:var(--b4-muted);">${suffix}</span>` : ''}`);
-        const colorStyle = severity && severity !== 'neutral' ? ` style="color:var(--b4-${severity});"` : '';
+                : `${value}${suffix ? `<span class="b4-kpi-value-unit">${suffix}</span>` : ''}`);
+        const trendPart = trendHtml(deltaVal, direction, deltaSuffix, hasPrior);
+        // Board-report style: number, label, one explanation line, trend —
+        // left-aligned, generous padding; icon is small/muted, tucked top-right
+        // rather than dominating the card.
         return `
-        <div class="b4-kpi-card${accent ? ' b4-kpi-card--accent' : ''}">
-            ${icon ? `<div class="b4-kpi-icon">${iconSafe(icon)}</div>` : ''}
-            <div class="b4-kpi-value"${colorStyle}>${valHtml}</div>
+        <div class="b4-kpi-card${accent ? ' b4-kpi-card--accent' : ''}" style="text-align:left;position:relative;padding:var(--b4-s5) var(--b4-s4);">
+            ${icon ? `<div class="b4-kpi-icon" style="position:absolute;top:var(--b4-s3);right:var(--b4-s3);margin-bottom:0;opacity:0.4;">${iconSafe(icon, { size: 13 })}</div>` : ''}
+            <div class="b4-kpi-value"${valStyle}>${valHtml}</div>
             <div class="b4-kpi-label">${esc(label)}</div>
             ${sub ? `<div class="b4-kpi-sub">${esc(sub)}</div>` : ''}
-            ${(deltaVal !== undefined) ? `<div>${trendHtml(deltaVal, direction, deltaSuffix)}</div>` : ''}
+            ${trendPart ? `<div>${trendPart}</div>` : ''}
         </div>`;
     }
 
@@ -808,11 +887,17 @@
         const findingsSummary = pluralize(ed.majorNC, 'major') + ', ' + pluralize(ed.minorNC, 'minor')
             + (ed.obsCount || ed.ofiCount ? ', ' + pluralize((ed.obsCount || 0) + (ed.ofiCount || 0), 'obs/OFI') : '');
 
+        const hasPrior = !!ed.hasPrior;
+        const gradeSub = ed.grade
+            ? `${ed.grade.score}/100 · ${scoreInterpretationLabel(ed.grade.score)}`
+            : null;
+        const maturitySub = ed.maturityOverall != null ? maturityShortLabel(ed.maturityOverall) : null;
+
         const cards = [
-            kpiCardHtml({ icon: 'check', label: 'Overall Compliance', value: ed.compliancePct, suffix: '%', severity: scoreSeverity(ed.compliancePct), deltaVal: dl.compliance, direction: 'higherBetter', deltaSuffix: 'pt' }),
+            kpiCardHtml({ icon: 'check', label: 'Overall Compliance', value: ed.compliancePct, suffix: '%', sub: scoreInterpretationLabel(ed.compliancePct), severity: scoreSeverity(ed.compliancePct), deltaVal: dl.compliance, direction: 'higherBetter', deltaSuffix: 'pt', hasPrior }),
             kpiCardHtml({ icon: 'shield', label: 'Certification Recommendation', value: ed.certificationRecommendation || 'Pending', isText: true }),
-            kpiCardHtml({ icon: 'target', label: 'Audit Grade', value: ed.grade ? ed.grade.letter : null, sub: ed.grade ? `${ed.grade.score}/100` : null, severity: ed.grade ? ed.grade.severity : 'neutral', deltaVal: dl.auditScore, direction: 'higherBetter' }),
-            kpiCardHtml({ icon: 'department', label: 'Maturity Score', value: ed.maturityOverall, suffix: '/5', severity: scoreSeverity(ed.maturityOverall != null ? ed.maturityOverall * 20 : null), deltaVal: dl.maturity, direction: 'higherBetter' }),
+            kpiCardHtml({ icon: 'target', label: 'Audit Grade', value: ed.grade ? ed.grade.letter : null, sub: gradeSub, severity: ed.grade ? ed.grade.severity : 'neutral', deltaVal: dl.auditScore, direction: 'higherBetter', hasPrior }),
+            kpiCardHtml({ icon: 'department', label: 'Maturity Score', value: ed.maturityOverall, suffix: '/5', sub: maturitySub, severity: scoreSeverity(ed.maturityOverall != null ? ed.maturityOverall * 20 : null), deltaVal: dl.maturity, direction: 'higherBetter', hasPrior }),
             kpiCardHtml({ icon: 'finding', label: 'Findings Summary', value: (ed.majorNC || 0) + (ed.minorNC || 0), sub: findingsSummary, severity: (ed.majorNC || 0) > 0 ? 'bad' : (ed.minorNC || 0) > 0 ? 'warn' : 'good' }),
             kpiCardHtml({ icon: 'risk', label: 'High Risks', value: ed.riskRating, severity: levelSeverity(ed.riskRating), isText: true })
         ];
@@ -822,11 +907,17 @@
         if (ed.auditDuration != null) {
             cards.push(kpiCardHtml({ icon: 'clock', label: 'Audit Duration', value: ed.auditDuration, suffix: ' man-days' }));
         }
-        if (ed.capaProgress != null) {
-            cards.push(kpiCardHtml({ icon: 'capa', label: 'CAPA Progress', value: ed.capaProgress, suffix: '%', severity: scoreSeverity(ed.capaProgress), deltaVal: dl.capaProgress, direction: 'higherBetter', deltaSuffix: 'pt' }));
+        // CAPA Progress is only rendered when backed by real register records
+        // (see compute()'s capaProgressVerified) — an inferred 0% would read as
+        // an alarming figure the data doesn't actually support.
+        if (ed.capaProgressVerified != null) {
+            cards.push(kpiCardHtml({ icon: 'capa', label: 'CAPA Progress', value: ed.capaProgressVerified, suffix: '%', sub: scoreInterpretationLabel(ed.capaProgressVerified), severity: scoreSeverity(ed.capaProgressVerified), deltaVal: dl.capaProgress, direction: 'higherBetter', deltaSuffix: 'pt', hasPrior }));
         }
 
         const kpis = `<div class="b4-kpi-grid">${cards.join('')}</div>`;
+        const noPriorCaption = !hasPrior
+            ? `<div class="b4-footnote" style="margin-top:var(--b4-s2);">First audit in cycle — trend comparison available from next audit.</div>`
+            : '';
 
         const risksList = (ed.top5Risks && ed.top5Risks.length)
             ? ed.top5Risks.map((r, idx) => `<li style="display:flex;align-items:center;justify-content:space-between;gap:var(--b4-s3);">
@@ -854,11 +945,9 @@
             </div>
         </div>`;
 
-        const recLine = ed.certificationRecommendation
-            ? `<div class="b4-callout b4-callout--info" style="margin-top:var(--b4-s5);"><strong>Certification Recommendation:</strong> ${esc(ed.certificationRecommendation)}</div>`
-            : '';
-
-        return { bodyHtml: kpis + lists + recLine, charts: [] };
+        // Certification recommendation is already carried by its KPI card above;
+        // a standalone repeat line was spilling onto its own near-empty page.
+        return { bodyHtml: kpis + noPriorCaption + lists, charts: [] };
     }
 
     function buildMaturitySection(metrics) {
@@ -868,21 +957,27 @@
         if (!hasAny) return { bodyHtml: insufficientDataHtml('No maturity data could be derived from this audit\'s checklist coverage.'), charts: [] };
 
         const bars = dims.map((k) => maturityBarHtml(k, m[k], m.meta?.[k])).join('');
-        const headline = `<div class="b4-card b4-kpi-card--accent" style="text-align:center;break-inside:avoid;">
-            <div class="b4-kpi-value">${m.overall != null ? m.overall.toFixed(1) : '—'}<span style="font-size:0.5em;font-weight:500;color:var(--b4-muted);">/5</span></div>
+        const headline = `<div class="b4-card b4-kpi-card--accent" style="text-align:center;break-inside:avoid;padding:var(--b4-s4);">
+            <div class="b4-kpi-value">${m.overall != null ? m.overall.toFixed(1) : '—'}<span class="b4-kpi-value-unit">/5</span></div>
             <div class="b4-kpi-label">Overall Management System Maturity</div>
             ${m.interpretation ? `<div class="b4-kpi-sub">${esc(m.interpretation)}</div>` : ''}
         </div>`;
 
         const radarLabels = dims.filter((k) => m[k] != null);
         const radarData = radarLabels.map((k) => m[k]);
-        const bodyHtml = headline + `
-        <div class="b4-grid-2" style="align-items:start;margin-top:var(--b4-s5);">
-            <div>${bars}</div>
-            <div class="b4-chart-box">
-                <canvas id="chart-maturity" style="max-height:280px;"></canvas>
-            </div>
-        </div>`;
+        // The radar chart only renders (Chart.js needs >=3 points to be legible
+        // as a shape) when 3+ dimensions have data. When it's omitted, the
+        // chart-box container is omitted too so the maturity bars use the full
+        // page width instead of leaving a blank rectangle beside them.
+        const showRadar = radarLabels.length >= 3;
+        const bodyHtml = headline + (showRadar
+            ? `<div class="b4-grid-2" style="align-items:start;margin-top:var(--b4-s3);">
+                <div>${bars}</div>
+                <div class="b4-chart-box">
+                    <canvas id="chart-maturity" style="max-height:240px;"></canvas>
+                </div>
+            </div>`
+            : `<div style="margin-top:var(--b4-s3);">${bars}</div>`);
 
         const chart = {
             canvasId: 'chart-maturity',
@@ -906,7 +1001,7 @@
             })
         };
 
-        return { bodyHtml, charts: radarLabels.length >= 3 ? [chart] : [] };
+        return { bodyHtml, charts: showRadar ? [chart] : [] };
     }
 
     function buildDeptPerformanceSection(metrics) {
@@ -923,10 +1018,10 @@
             <div class="b4-card" style="break-inside:avoid;${d.needsAttention ? 'border-left:3px solid var(--b4-bad);' : ''}">
                 <div class="b4-card-heading">${d.needsAttention ? iconSafe('alert', { size: 14 }) : iconSafe('department', { size: 14 })} ${esc(d.name)}</div>
                 ${scoreCell}
-                <div class="b4-kpi-sub" style="margin-top:var(--b4-s2);">${pluralize(d.findings, 'item')} · ${pluralize(d.ncCount, 'finding')} · Maturity ${d.maturity != null ? (d.maturity.toFixed ? d.maturity.toFixed(1) : d.maturity) : '—'}/5</div>
+                <div class="b4-kpi-sub" style="margin-top:var(--b4-s2);">${pluralize(d.findings, 'item')} · ${pluralize(d.ncCount, 'finding')} · Maturity ${d.maturity != null ? (d.maturity.toFixed ? d.maturity.toFixed(1) : d.maturity) : '—'}/5${hasScore ? ' · ' + scoreInterpretationLabel(d.score) : ''}</div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--b4-s2);">
                     ${riskBadgeHtml(d.riskLevel)}
-                    ${trendHtml(d.scoreDelta, 'higherBetter', 'pt')}
+                    ${trendHtml(d.scoreDelta, 'higherBetter', 'pt', d.hasTrend)}
                 </div>
             </div>`;
         }).join('');
@@ -943,7 +1038,7 @@
                 <td style="min-width:130px;">${d.score != null ? `<div style="display:flex;align-items:center;gap:var(--b4-s2);">${barHtml(d.score, scoreSeverity(d.score))}<span class="b4-num">${Math.round(d.score)}</span></div>` : `<span class="b4-caption">N/A (n=${d.n})</span>`}</td>
                 <td class="b4-num">${d.maturity != null ? (d.maturity.toFixed ? d.maturity.toFixed(1) : d.maturity) : '—'}/5</td>
                 <td style="text-align:center;">${riskBadgeHtml(d.riskLevel)}</td>
-                <td style="text-align:center;">${trendHtml(d.scoreDelta, 'higherBetter', 'pt')}</td>
+                <td style="text-align:center;">${trendHtml(d.scoreDelta, 'higherBetter', 'pt', d.hasTrend) || '<span class="b4-caption">—</span>'}</td>
             </tr>`).join('');
             tableHtml = `<table class="b4-tbl" style="margin-top:var(--b4-s5);">
                 <thead><tr><th>Department</th><th style="text-align:right;">Items</th><th style="text-align:right;">Findings</th><th>Score</th><th style="text-align:right;">Maturity</th><th style="text-align:center;">Risk</th><th style="text-align:center;">Trend</th></tr></thead>
@@ -1037,7 +1132,8 @@
             const curr = arr[lastIdx];
             const prev = arr[lastIdx - 1];
             const d = (curr != null && prev != null) ? round(curr - prev) : null;
-            return `<tr><td>${esc(label)}</td><td style="text-align:center;">${curr ?? '—'}</td><td style="text-align:center;">${prev ?? '—'}</td><td style="text-align:center;">${trendHtml(d, direction, suffix)}</td></tr>`;
+            const hasPrior = prev != null;
+            return `<tr><td>${esc(label)}</td><td style="text-align:center;">${curr ?? '—'}</td><td style="text-align:center;">${prev ?? '—'}</td><td style="text-align:center;">${trendHtml(d, direction, suffix, hasPrior) || '<span class="b4-caption">—</span>'}</td></tr>`;
         };
         const compRows = trendRow('Major NC', t.majorNC, 'lowerBetter')
             + trendRow('Minor NC', t.minorNC, 'lowerBetter')

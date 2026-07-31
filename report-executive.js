@@ -128,7 +128,24 @@
     };
 
     const clauseLabel = (item) => (item.kbMatch && item.kbMatch.clause) ? item.kbMatch.clause : (item.clause || 'General');
-    const clauseTitle = (item) => (item.kbMatch && item.kbMatch.title) ? item.kbMatch.title : '';
+
+    // ------------------------------------------------------------------
+    // Finding-text hygiene: strip "[Ref: ...]" bracketed content and imperative
+    // checklist phrasing ("Show...", "Verify...", "Check...") wherever finding
+    // text is printed in an executive context, and cap length so it reads as a
+    // noun-phrase summary rather than raw checklist copy.
+    // ------------------------------------------------------------------
+    function cleanFindingText(s, maxLen) {
+        let t = String(s == null ? '' : s);
+        t = t.replace(/\[Ref:[^\]]*\]/gi, ' ');
+        t = t.replace(/^\s*(show|verify|check|confirm|ensure|demonstrate|provide|review|assess|evaluate)\b[:\s\-]*/i, '');
+        t = t.replace(/\s{2,}/g, ' ').trim();
+        const cap = maxLen || 90;
+        if (t.length > cap) t = t.slice(0, Math.max(0, cap - 1)).trim() + '…';
+        return t;
+    }
+
+    const clauseTitle = (item) => cleanFindingText((item.kbMatch && item.kbMatch.title) ? item.kbMatch.title : '', 90);
 
     // ------------------------------------------------------------------
     // 1. EXECUTIVE SUMMARY (BOARD EDITION)
@@ -149,10 +166,22 @@
         return `
 You are a senior engagement partner at a Big Four consulting firm (Deloitte/PwC/EY/KPMG style), presenting the outcome of an ISO management system audit directly to the CEO and Board. They will read nothing else — this must stand alone as the strategic picture.
 
+Narrative structure (answer in this order across the fields, so a board member reading top-to-bottom gets the full story):
+1. Overall health (health field) — is the management system fundamentally sound?
+2. Certification status (outcome, recommendation) — where does this leave certification?
+3. Major risks and their business impact (risks, businessImpact, concerns) — what could this cost the business?
+4. What management should do (priorities, managementActions) — the concrete next steps.
+5. Forward readiness / confidence (forwardOutlook) — how confident should the board be heading into the next audit stage?
+
 Voice rules (strict):
 - Lead every statement with the business consequence, not the audit mechanic. Do not write "an audit was conducted" — write what it means for the business.
-- EVERY paragraph-level field (outcome, health, businessImpact, risks) MUST contain at least one concrete quantified reference — a score, a count, a clause number, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
-- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "the organization demonstrates compliance", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned: any sentence that could be pasted into a different company's report unchanged. Target register instead, e.g.: "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."
+- Register examples — transform certification-speak into executive consequence language exactly like these:
+  1. Certification-speak: "No material business risk identified." -> Executive register: "Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term."
+  2. Certification-speak: "The organization demonstrates compliance with clause 8.5.1." -> Executive register: "Production controls under clause 8.5.1 are operating as designed, supporting consistent on-time delivery."
+  3. Certification-speak: "It is recommended that corrective action be taken within 30 days." -> Executive register: "Closing this finding within 30 days keeps the certification timeline intact and avoids a follow-up audit cost."
+  4. Certification-speak: "The audit was conducted in accordance with the requirements of ISO 9001." -> Executive register: "This review tested whether the management system reliably protects quality, delivery, and compliance outcomes."
+- EVERY paragraph-level field (outcome, health, businessImpact, risks, forwardOutlook) MUST contain at least one concrete quantified reference — a score, a count, a clause number, or a named department — pulled from the data below. A sentence with no number, clause, or department name is not acceptable.
+- Never write generic filler like "it is important to note", "overall, the organization has demonstrated", "generally robust and well-maintained", "healthy operational posture", "in conclusion", or "moving forward". Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Banned: any sentence that could be pasted into a different company's report unchanged. Target register instead, e.g.: "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."
 - For each bullet list (strengths, weaknesses, concerns, priorities, managementActions): identify only genuinely DISTINCT points — do not restate the same underlying theme in different words to pad the list. Cap each list at 3 bullets maximum, even if fewer than 3 distinct points exist. It is better to return 1 sharp bullet than 3 that repeat one theme.
 - No hedging. Take a clear position. Quantify wherever possible (percentages, counts, timeframes).
 - Write in plain, declarative sentences a CEO reads in 90 seconds. No jargon, no markdown symbols.
@@ -186,7 +215,8 @@ Write a JSON object with these fields (plain text, NO markdown symbols like ** o
   "recommendation": "1-2 sentence certification recommendation statement",
   "risks": "1-2 sentence forward-looking business-impact risk statement with at least one number/clause/department (what could jeopardize certification, revenue, or customer trust if unaddressed)",
   "businessImpact": "1-2 sentence statement translating the findings into business terms with at least one number/clause/department (cost of delay, customer/contract exposure, operational risk)",
-  "managementActions": ["up to 3 short bullet strings, each a genuinely distinct top-management responsibility per ISO clause 5/9.3 style, action-oriented with implied ownership"]
+  "managementActions": ["up to 3 short bullet strings, each a genuinely distinct top-management responsibility per ISO clause 5/9.3 style, action-oriented with implied ownership"],
+  "forwardOutlook": "1-2 sentence statement on forward readiness/confidence heading into the next audit stage, citing at least one number/clause/department"
 }
 Return ONLY the raw JSON object, no markdown fences.`;
     }
@@ -231,6 +261,14 @@ Return ONLY the raw JSON object, no markdown fences.`;
         else if (conformPct >= 85) verdict = 'Strong — certifiable with minimal follow-up';
         else verdict = 'Certifiable with targeted corrective action';
 
+        const recommendation = stats.recommendation || (stats.majorNC > 0 ? 'Conditional Recommendation, pending closure of major non-conformities.' : 'Recommended for Certification.');
+
+        const forwardOutlook = stats.majorNC > 0
+            ? `Certification remains achievable on the current timeline if the ${stats.majorNC} major finding(s) above are closed within the corrective-action window; the audit team has moderate confidence in readiness pending that closure.`
+            : conformPct >= 80
+                ? `The management system is on a stable trajectory toward the next audit stage; the audit team has high confidence in continued conformity if current controls are sustained.`
+                : `The management system is progressing toward the maturity expected at the next audit stage; sustained attention to the priorities above will support continued readiness.`;
+
         return {
             verdict,
             outcome: `Against ${report.standard || 'the applicable standard'}, ${report.client || 'the organization'} closed this audit cycle with ${stats.actualNCCount || 0} non-conformity(ies) (${stats.majorNC || 0} major, ${stats.minorNC || 0} minor) and ${stats.obsOfiCount || 0} observation(s)/opportunity(ies) across ${stats.applicableCount || 0} applicable requirements.`,
@@ -238,24 +276,27 @@ Return ONLY the raw JSON object, no markdown fences.`;
             strengths,
             weaknesses,
             concerns,
-            recommendation: stats.recommendation || (stats.majorNC > 0 ? 'Conditional Recommendation, pending closure of major non-conformities.' : 'Recommended for Certification.'),
+            recommendation,
             priorities,
             businessImpact: stats.majorNC > 0
                 ? `Unresolved major findings put certification timing and downstream customer/contract commitments at risk; each week of delay compounds audit and re-audit cost.`
-                : `Findings are contained; no material threat to certification timing or customer commitments if the priority items below are closed on schedule.`,
+                : `Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.`,
             managementActions,
             risks: stats.majorNC > 0
                 ? 'Failure to close major non-conformities within the required timeframe may delay or jeopardize certification issuance.'
-                : 'Continued monitoring of minor findings and observations is advised to prevent escalation into systemic issues.'
+                : 'Continued monitoring of minor findings and observations is advised to prevent escalation into systemic issues.',
+            forwardOutlook
         };
     }
 
-    function renderExecSummaryHtml(data, glance) {
+    function renderExecSummaryHtml(data, glance, brief) {
         const list = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('') || `<li class="b4-muted-item">None identified.</li>`;
         const verdictClass = /at risk/i.test(data.verdict || '') ? 'b4-bad' : /strong|minimal/i.test(data.verdict || '') ? 'b4-good' : 'b4-warn';
         const g = glance || {};
+        const briefHtml = brief ? renderBoardBrief(brief) : '';
 
         return `
+${briefHtml}
 <div class="b4-glance-strip">
   <div class="b4-glance-item">
     <div class="b4-eyebrow">Verdict</div>
@@ -323,7 +364,12 @@ Return ONLY the raw JSON object, no markdown fences.`;
 <div class="b4-highlight b4-highlight--neutral" style="margin-top:var(--b4-s5);">
   <div class="b4-eyebrow">${icon('clause')} Certification Recommendation</div>
   <p class="b4-body" style="margin:0;">${esc(data.recommendation)}</p>
-</div>`;
+</div>
+
+${data.forwardOutlook ? `
+<div class="b4-rule"></div>
+<div class="b4-eyebrow">${icon('trend')} Forward Readiness &amp; Confidence</div>
+<p class="b4-body" style="margin:0;">${esc(data.forwardOutlook)}</p>` : ''}`;
     }
 
     function buildGlance(d, data) {
@@ -360,11 +406,121 @@ Return ONLY the raw JSON object, no markdown fences.`;
         return out;
     }
 
+    // ------------------------------------------------------------------
+    // Board Decision Brief — compact, one-printed-page-max block that leads
+    // the exec-summary section body. Derived honestly from the same data
+    // driving the narrative below it; nothing here is invented.
+    // ------------------------------------------------------------------
+
+    // Next audit-programme milestone, derived from the current audit type and
+    // the report date (or an explicit next-audit date on d.auditPlan, if present).
+    // Returns null (row omitted) when there isn't enough data to derive it honestly.
+    function computeNextMilestone(d) {
+        const report = (d && d.report) || {};
+        const auditPlan = (d && d.auditPlan) || {};
+        const type = String(report.auditType || auditPlan.type || auditPlan.auditType || '').toLowerCase();
+        const baseDateStr = report.endDate || report.date;
+        if (!baseDateStr) return null;
+        const baseDate = new Date(baseDateStr);
+        if (isNaN(baseDate.getTime())) return null;
+
+        let stage = null, monthsOffset = 12;
+        if (/stage\s*1/.test(type)) { stage = 'Stage 2 Audit'; monthsOffset = 1; }
+        else if (/stage\s*2/.test(type)) { stage = 'Surveillance Audit 1'; monthsOffset = 12; }
+        else if (/surveillance\s*2/.test(type)) { stage = 'Recertification Audit'; monthsOffset = 12; }
+        else if (/surveillance/.test(type)) { stage = 'Surveillance Audit 2'; monthsOffset = 12; }
+        else if (/recert/.test(type)) { stage = 'Surveillance Audit 1 (new cycle)'; monthsOffset = 12; }
+        else return null;
+
+        let nextDate = null;
+        const explicit = auditPlan.nextAuditDate || auditPlan.nextDate || auditPlan.surveillanceDate || auditPlan.nextSurveillanceDate;
+        if (explicit) {
+            const dd = new Date(explicit);
+            if (!isNaN(dd.getTime())) nextDate = dd;
+        }
+        if (!nextDate) {
+            nextDate = new Date(baseDate.getTime());
+            nextDate.setMonth(nextDate.getMonth() + monthsOffset);
+        }
+        if (isNaN(nextDate.getTime())) return null;
+        return { stage, date: nextDate.toISOString().slice(0, 10) };
+    }
+
+    function truncate(s, max) {
+        const t = String(s == null ? '' : s).trim();
+        return t.length > max ? t.slice(0, max - 1).trim() + '…' : t;
+    }
+
+    function buildBoardBrief(d, data) {
+        const stats = getStats(d);
+
+        const status = data.recommendation || stats.recommendation || 'Certification decision pending';
+
+        const riskSource = (data.concerns && data.concerns.length) ? data.concerns : (data.weaknesses || []);
+        let risks = dedupeCap(riskSource, 3).map(s => truncate(cleanFindingText(s, 140), 140));
+        if (!risks.length) risks = ['Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.'];
+
+        let actions = dedupeCap(data.managementActions || [], 3).map(s => truncate(cleanFindingText(s, 140), 140));
+        if (!actions.length) actions = ['Maintain current management review cadence; no elevated management action required this cycle.'];
+
+        let decisions;
+        if (stats.majorNC > 0) {
+            decisions = `Approve resourcing and timeline to close ${stats.majorNC} major non-conformity(ies) before the certification decision is finalized.`;
+        } else if (stats.minorNC > 0) {
+            decisions = `Approve corrective action resources for ${stats.minorNC} open minor non-conformity(ies); no certification-affecting decisions required.`;
+        } else {
+            decisions = 'Approve corrective action resources; no certification-affecting decisions required.';
+        }
+
+        const recommendation = data.recommendation || stats.recommendation || 'Pending';
+        const milestone = computeNextMilestone(d);
+
+        return { status, risks, actions, decisions, recommendation, milestone };
+    }
+
+    function renderBoardBrief(brief) {
+        const li = (arr) => safeArr(arr).map(x => `<li>${esc(x)}</li>`).join('');
+        const milestoneRow = brief.milestone ? `
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('clock', { size: 13 })} Next Milestone</div>
+    <div class="b4-board-brief-value">${esc(brief.milestone.stage)} — ${esc(brief.milestone.date)}</div>
+  </div>` : '';
+
+        return `
+<div class="b4-board-brief">
+  <div class="b4-board-brief-head">
+    <div class="b4-eyebrow">${icon('shield')} Board Decision Brief</div>
+    <div class="b4-caption">One page &middot; readable in under two minutes</div>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">Current Certification Status</div>
+    <div class="b4-board-brief-value">${esc(brief.status)}</div>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('risk', { size: 13 })} Top Business Risks</div>
+    <ul class="b4-bullets b4-board-brief-list">${li(brief.risks)}</ul>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('target', { size: 13 })} Key Management Actions</div>
+    <ul class="b4-bullets b4-board-brief-list">${li(brief.actions)}</ul>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('management', { size: 13 })} Decisions Required of the Board</div>
+    <div class="b4-board-brief-value">${esc(brief.decisions)}</div>
+  </div>
+  <div class="b4-board-brief-row">
+    <div class="b4-board-brief-label">${icon('check', { size: 13 })} Certification Recommendation</div>
+    <div class="b4-board-brief-value">${esc(brief.recommendation)}</div>
+  </div>${milestoneRow}
+</div>
+<div class="b4-rule"></div>`;
+    }
+
     async function generateExecutiveSummary(d) {
         const fallback = fallbackExecSummaryData(d);
         if (!window.AI_SERVICE || typeof window.AI_SERVICE.callProxyAPI !== 'function') {
             const capped = capExecSummaryLists(fallback);
-            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped)) };
+            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped), buildBoardBrief(d, capped)) };
         }
         try {
             const prompt = buildExecSummaryPrompt(d);
@@ -373,11 +529,11 @@ Return ONLY the raw JSON object, no markdown fences.`;
             const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
             const merged = capExecSummaryLists(Object.assign({}, fallback, parsed));
-            return { html: renderExecSummaryHtml(merged, buildGlance(d, merged)) };
+            return { html: renderExecSummaryHtml(merged, buildGlance(d, merged), buildBoardBrief(d, merged)) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveSummary AI failed, using fallback:', err);
             const capped = capExecSummaryLists(fallback);
-            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped)) };
+            return { html: renderExecSummaryHtml(capped, buildGlance(d, capped), buildBoardBrief(d, capped)) };
         }
     }
 
@@ -427,11 +583,11 @@ Return ONLY the raw JSON object, no markdown fences.`;
                 byDepartment[dept].withEvidence++;
                 evidenced.push({
                     clause: clauseLabel(item),
-                    title: clauseTitle(item) || (item.requirement || '').substring(0, 100) || '',
+                    title: clauseTitle(item) || cleanFindingText(item.requirement || '', 90),
                     department: dept,
                     status: item.status,
                     ncrType: item.ncrType || '',
-                    comment: (item.comment || '').substring(0, 160),
+                    comment: cleanFindingText(item.comment || '', 160),
                     imageCount: imgs.length,
                     timestamp: item.timestamp || item.capturedAt || item.date || null
                 });
@@ -441,7 +597,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
                 if (hasFinding) {
                     missingEvidence.push({
                         clause: clauseLabel(item),
-                        item: clauseTitle(item) || (item.requirement || item.description || '').substring(0, 100) || 'Untitled item',
+                        item: clauseTitle(item) || cleanFindingText(item.requirement || item.description || '', 90) || 'Untitled item',
                         department: dept,
                         status: item.status,
                         ncrType: item.ncrType || ''
@@ -584,6 +740,11 @@ ${intel.missingEvidence.length ? `
         { key: 'strategic', title: 'Suggested Strategic Priorities', icon: '&#127919;' }
     ];
 
+    // Confidence is "High" when a card is grounded directly in counted findings/register
+    // data (real NC counts, department tallies, evidence coverage numbers); "Moderate"
+    // when the card is heuristic/derived (pattern inference, forward-looking judgment).
+    // Priority reflects urgency: Immediate (major NCs / certification-affecting),
+    // Near-term (minor NCs / clustered gaps), Monitor (no material open item).
     function fallbackInsights(d) {
         const stats = getStats(d);
         const realNCs = getRealNCs(d);
@@ -595,7 +756,7 @@ ${intel.missingEvidence.length ? `
         if (stats.majorNC > 0) risks.push(`${stats.majorNC} major non-conformity(ies) could delay certification issuance.`);
         if (intel.coveragePct < 50) risks.push('Low evidence coverage weakens the defensibility of findings under accreditation scrutiny.');
         if (stats.minorNC > 3) risks.push(`${stats.minorNC} minor non-conformities suggest possible systemic control gaps.`);
-        if (!risks.length) risks.push('No material business risk identified from this audit cycle; current controls hold.');
+        if (!risks.length) risks.push('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.');
 
         const departments = deptEntries
             .filter(([, v]) => v.major > 0 || v.minor > 0)
@@ -603,15 +764,17 @@ ${intel.missingEvidence.length ? `
             .slice(0, 4)
             .map(([name, v]) => `${name}: ${v.major} major, ${v.minor} minor finding(s).`);
         if (!departments.length) departments.push('No department currently requires elevated attention.');
+        const worstDept = deptEntries.filter(([, v]) => v.major > 0 || v.minor > 0).sort((a, b) => (b[1].major * 2 + b[1].minor) - (a[1].major * 2 + a[1].minor))[0];
 
         const clauseCounts = {};
         realNCs.forEach(i => { const c = clauseLabel(i).split('.').slice(0, 2).join('.'); clauseCounts[c] = (clauseCounts[c] || 0) + 1; });
-        const recurring = Object.entries(clauseCounts).filter(([, c]) => c > 1).map(([c, count]) => `Clause ${c}: ${count} related findings — indicates a recurring weakness area.`);
+        const recurringPairs = Object.entries(clauseCounts).filter(([, c]) => c > 1);
+        const recurring = recurringPairs.map(([c, count]) => `Clause ${c}: ${count} related findings — indicates a recurring weakness area.`);
         if (!recurring.length) recurring.push('No recurring weakness patterns detected across clauses.');
 
         const improvements = [];
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 4).forEach(([name]) => improvements.push(`${name} showed full conformity — a positive indicator of process maturity.`));
-        if (stats.conformCount > 0) improvements.push(`${stats.conformCount} item(s) confirmed conforming, demonstrating baseline system effectiveness.`);
+        if (stats.conformCount > 0) improvements.push(`${stats.conformCount} item(s) confirmed conforming, supporting baseline system effectiveness.`);
         if (!improvements.length) improvements.push('No specific positive improvements identified in this cycle.');
 
         const readiness = [];
@@ -622,7 +785,54 @@ ${intel.missingEvidence.length ? `
         if (intel.coveragePct < 70) strategic.push('Improve evidence-capture discipline across audit teams.');
         if (!strategic.length) strategic.push('Sustain current practices; focus on continual improvement initiatives.');
 
-        return { risks, departments, recurring, improvements, readiness, strategic };
+        return {
+            risks: {
+                bullets: risks,
+                confidence: 'High',
+                priority: stats.majorNC > 0 ? 'Immediate' : (stats.minorNC > 3 ? 'Near-term' : 'Monitor'),
+                recommendation: stats.majorNC > 0
+                    ? `Direct an executive owner to close the ${stats.majorNC} major finding(s) above before the certification decision is finalized.`
+                    : 'Maintain current risk-monitoring cadence; no elevated management action required this cycle.'
+            },
+            departments: {
+                bullets: departments,
+                confidence: worstDept ? 'High' : 'Moderate',
+                priority: worstDept && worstDept[1].major > 0 ? 'Immediate' : (worstDept ? 'Near-term' : 'Monitor'),
+                recommendation: worstDept
+                    ? `Direct ${worstDept[0]} leadership to root-cause its open finding(s), not just remediate symptoms.`
+                    : 'No department currently requires elevated management attention.'
+            },
+            recurring: {
+                bullets: recurring,
+                confidence: recurringPairs.length ? 'High' : 'Moderate',
+                priority: recurringPairs.length ? 'Near-term' : 'Monitor',
+                recommendation: recurringPairs.length
+                    ? 'Commission a root-cause review of the recurring clause area(s) above rather than closing each finding in isolation.'
+                    : 'Continue routine clause-level trend monitoring at each management review.'
+            },
+            improvements: {
+                bullets: improvements,
+                confidence: 'High',
+                priority: 'Monitor',
+                recommendation: 'Recognize and sustain the practices behind these results at the next management review.'
+            },
+            readiness: {
+                bullets: readiness,
+                confidence: 'High',
+                priority: stats.majorNC > 0 ? 'Immediate' : 'Monitor',
+                recommendation: stats.majorNC > 0
+                    ? 'Confirm a corrective-action closure date before scheduling the next audit stage.'
+                    : 'Proceed with scheduling the next audit stage on the standard cycle.'
+            },
+            strategic: {
+                bullets: strategic,
+                confidence: 'Moderate',
+                priority: intel.coveragePct < 70 ? 'Near-term' : 'Monitor',
+                recommendation: intel.coveragePct < 70
+                    ? 'Set a minimum evidence-capture standard for audit teams ahead of the next cycle.'
+                    : 'Continue current continual-improvement initiatives; no additional management action required.'
+            }
+        };
     }
 
     function buildInsightsPrompt(d) {
@@ -634,7 +844,7 @@ ${intel.missingEvidence.length ? `
         const ncLines = realNCs.slice(0, 20).map((i, idx) => `${idx + 1}. [${(i.ncrType || 'NC').toUpperCase()}] ${clauseLabel(i)} (${i.department || 'General'})`).join('\n');
 
         return `
-You are a senior engagement partner at a Big Four consulting firm generating executive insight cards for a CEO/Board-level ISO audit report dashboard. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Lead with the business consequence. Write in the senior-consultant register (e.g. "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."), not generic audit-speak.
+You are a senior engagement partner at a Big Four consulting firm generating executive insight cards for a CEO/Board-level ISO audit report dashboard. Each bullet must be specific and decision-oriented — cite real numbers, clause numbers, and department names from the data. No hedging, no generic filler ("it is important to note", "overall", "the organization demonstrates compliance"). Banned phrases, do not use any of these anywhere: "demonstrates compliance", "it is recommended that", "the audit was conducted", "in accordance with the requirements of". Lead with the business consequence. Write in the senior-consultant register (e.g. "The management system is effectively implemented and supports operational resilience. Opportunities remain to strengthen preventive controls within supplier management."), not generic audit-speak. Example transformation: instead of "No material business risk identified", write "Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term."
 
 Context:
 - Client: ${report.client || ''}
@@ -644,29 +854,56 @@ Context:
 - Non-conformities:
 ${ncLines || 'None'}
 
-Return ONLY a raw JSON object (no markdown fences) with these keys, each an array of 2-3 short bullet strings (plain text, no markdown):
+For each key, return an object with: "bullets" (2-3 short plain-text bullet strings, no markdown), "confidence" (exactly "High" if the bullets are grounded directly in counted findings/register data from above, or "Moderate" if they are heuristic/derived judgment), "priority" (exactly "Immediate", "Near-term", or "Monitor" reflecting real urgency), and "recommendation" (one bolded-lead-in-ready sentence of management guidance, e.g. "Direct an executive owner to close the 2 major findings above before the certification decision is finalized.").
+
+Return ONLY a raw JSON object (no markdown fences) shaped exactly like this:
 {
-  "risks": [...],        // Biggest Business Risks
-  "departments": [...],  // Departments Needing Attention
-  "recurring": [...],    // Recurring Weaknesses
-  "improvements": [...], // Positive Improvements
-  "readiness": [...],    // Certification Readiness
-  "strategic": [...]     // Suggested Strategic Priorities
+  "risks": { "bullets": [...], "confidence": "High"|"Moderate", "priority": "Immediate"|"Near-term"|"Monitor", "recommendation": "..." },
+  "departments": { "bullets": [...], "confidence": "...", "priority": "...", "recommendation": "..." },
+  "recurring": { "bullets": [...], "confidence": "...", "priority": "...", "recommendation": "..." },
+  "improvements": { "bullets": [...], "confidence": "...", "priority": "...", "recommendation": "..." },
+  "readiness": { "bullets": [...], "confidence": "...", "priority": "...", "recommendation": "..." },
+  "strategic": { "bullets": [...], "confidence": "...", "priority": "...", "recommendation": "..." }
 }`;
     }
 
     const INSIGHT_ICON_MAP = { risks: 'risk', departments: 'department', recurring: 'trend', improvements: 'check', readiness: 'target', strategic: 'shield' };
 
+    const PRIORITY_BADGE_CLASS = { 'Immediate': 'b4-badge--bad', 'Near-term': 'b4-badge--warn', 'Monitor': 'b4-badge--neutral' };
+    const CONFIDENCE_BADGE_CLASS = { 'High': 'b4-badge--info', 'Moderate': 'b4-badge--neutral' };
+
+    // Normalize one AI/fallback insight entry into {bullets,confidence,priority,recommendation},
+    // tolerating a legacy plain-array shape from either source.
+    function normalizeInsightEntry(raw, fallbackEntry) {
+        const fb = fallbackEntry || { bullets: [], confidence: 'Moderate', priority: 'Monitor', recommendation: '' };
+        if (!raw) return fb;
+        if (Array.isArray(raw)) return Object.assign({}, fb, { bullets: raw });
+        return {
+            bullets: (Array.isArray(raw.bullets) && raw.bullets.length) ? raw.bullets : fb.bullets,
+            confidence: (raw.confidence === 'High' || raw.confidence === 'Moderate') ? raw.confidence : fb.confidence,
+            priority: (raw.priority === 'Immediate' || raw.priority === 'Near-term' || raw.priority === 'Monitor') ? raw.priority : fb.priority,
+            recommendation: raw.recommendation || fb.recommendation
+        };
+    }
+
     function renderInsightsHtml(data) {
         const cards = INSIGHT_CARD_DEFS.map(def => {
-            const bullets = safeArr(data[def.key]).slice(0, 3).map(b => `<li>${esc(b)}</li>`).join('') || '<li class="b4-muted-item">No data available.</li>';
+            const entry = (data && data[def.key]) || { bullets: [], confidence: 'Moderate', priority: 'Monitor', recommendation: '' };
+            const bulletItems = safeArr(entry.bullets).slice(0, 3).map(b => `<li>${esc(cleanFindingText(b, 140))}</li>`).join('') || '<li class="b4-muted-item">No data available.</li>';
+            const confClass = CONFIDENCE_BADGE_CLASS[entry.confidence] || 'b4-badge--neutral';
+            const prioClass = PRIORITY_BADGE_CLASS[entry.priority] || 'b4-badge--neutral';
             return `
 <div class="b4-card b4-insight-card">
   <div class="b4-card-heading">${icon(INSIGHT_ICON_MAP[def.key] || 'finding')} ${esc(def.title)}</div>
-  <ul class="b4-bullets">${bullets}</ul>
+  <div class="b4-badge-row">
+    <span class="b4-badge ${confClass}">${esc(entry.confidence || 'Moderate')} Confidence</span>
+    <span class="b4-badge ${prioClass}">${esc(entry.priority || 'Monitor')}</span>
+  </div>
+  <ul class="b4-bullets">${bulletItems}</ul>
+  ${entry.recommendation ? `<p class="b4-body b4-insight-rec"><strong>Management recommendation:</strong> ${esc(cleanFindingText(entry.recommendation, 180))}</p>` : ''}
 </div>`;
         }).join('');
-        return `<div class="b4-rule"></div><div class="b4-grid-2">${cards}</div>`;
+        return `<div class="b4-rule"></div><div class="b4-grid-2 b4-grid-2--roomy">${cards}</div>`;
     }
 
     async function generateExecutiveInsights(d) {
@@ -679,8 +916,9 @@ Return ONLY a raw JSON object (no markdown fences) with these keys, each an arra
             const text = await window.AI_SERVICE.callProxyAPI(prompt);
             const cleaned = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
             const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-            const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
-            const merged = Object.assign({}, fallback, parsed);
+            const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned) || {};
+            const merged = {};
+            INSIGHT_CARD_DEFS.forEach(def => { merged[def.key] = normalizeInsightEntry(parsed[def.key], fallback[def.key]); });
             return { html: renderInsightsHtml(merged) };
         } catch (err) {
             console.warn('[ReportExecutive] generateExecutiveInsights AI failed, using fallback:', err);
@@ -713,7 +951,7 @@ Return ONLY a raw JSON object (no markdown fences) with these keys, each an arra
 
         const summaryHtml = (cached && cached.summary && cached.summary.html) || (function () {
             const capped = capExecSummaryLists(fallbackExecSummaryData(d));
-            return renderExecSummaryHtml(capped, buildGlance(d, capped));
+            return renderExecSummaryHtml(capped, buildGlance(d, capped), buildBoardBrief(d, capped));
         })();
         const insightsHtml = (cached && cached.insights && cached.insights.html) || renderInsightsHtml(fallbackInsights(d));
 
@@ -794,7 +1032,7 @@ Return ONLY a raw JSON object (no markdown fences) with these keys, each an arra
         }
         if (/top\s*(five|5|three|3)?\s*risk/.test(q) || /biggest risk/.test(q)) {
             const insights = fallbackInsights(d);
-            return 'Top risks: ' + safeArr(insights.risks).join(' | ');
+            return 'Top risks: ' + safeArr(insights.risks && insights.risks.bullets).join(' | ');
         }
         if (/overdue/.test(q) && /capa|corrective|action/.test(q)) {
             const overdue = overdueCapas(d);
@@ -1283,6 +1521,67 @@ Answer:`;
 @media print {
   .b4-glance-strip { grid-template-columns: repeat(4, 1fr); break-inside: avoid; }
 }
+
+/* ---------- Board Decision Brief (top of exec-summary body) ---------- */
+.b4-board-brief {
+  border: 1px solid var(--b4-line);
+  border-left: 3px solid var(--b4-navy);
+  border-radius: 8px;
+  background: var(--b4-surface-2);
+  padding: var(--b4-s4) var(--b4-s5);
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.b4-board-brief-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--b4-s3);
+  margin-bottom: var(--b4-s3);
+  flex-wrap: wrap;
+}
+.b4-board-brief-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--b4-s4);
+  align-items: start;
+  padding: var(--b4-s2) 0;
+}
+.b4-board-brief-row + .b4-board-brief-row { border-top: 1px solid var(--b4-line-2); }
+.b4-board-brief-label {
+  font-size: var(--b4-fs-caption);
+  font-weight: var(--b4-fw-bold);
+  color: var(--b4-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.b4-board-brief-value {
+  font-size: var(--b4-fs-body);
+  font-weight: var(--b4-fw-medium);
+  color: var(--b4-ink);
+  line-height: 1.5;
+}
+.b4-board-brief-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: var(--b4-fs-body);
+  color: var(--b4-ink);
+  line-height: 1.5;
+}
+.b4-board-brief-list li + li { margin-top: 3px; }
+@media print {
+  .b4-board-brief { break-inside: avoid; page-break-inside: avoid; }
+}
+
+/* ---------- Insight card badges (confidence / priority) ---------- */
+.b4-badge-row { display: flex; gap: var(--b4-s2); margin: 2px 0 var(--b4-s3); flex-wrap: wrap; }
+.b4-insight-rec {
+  margin-top: var(--b4-s3);
+  padding-top: var(--b4-s3);
+  border-top: 1px solid var(--b4-line-2);
+}
+.b4-grid-2--roomy { gap: var(--b4-s5); }
 
 .b4-evidence-card { padding: var(--b4-s3) var(--b4-s4); }
 .b4-evidence-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--b4-s2); }

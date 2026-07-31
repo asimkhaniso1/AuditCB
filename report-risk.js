@@ -90,6 +90,50 @@
         });
     }
 
+    // ─── cleanFindingText ───────────────────────────────────────────────────
+    // Turns raw checklist/NCR text (often an evidence-request instruction, e.g.
+    // "Show backup logs and recent restore test results. [Ref: ISMS-PRD-003
+    // Business Continuity Management Procedure + backup/restore evidence]")
+    // into a concise noun-phrase finding description suitable for report
+    // display. DISPLAY-ONLY — never mutates the underlying data; callers keep
+    // using the raw f.text/f.comment for anything that isn't rendering.
+    //
+    // Rules (applied in order):
+    //   1. Strip every bracketed "[Ref: ...]" (or "[...]") segment.
+    //   2. Drop a leading imperative checklist lead-in verb phrase (Show/Verify/
+    //      Check/Confirm/Provide/Demonstrate/Ensure/Describe/Explain/Review...),
+    //      including a trailing "that"/"whether" if present, so the remainder
+    //      reads as a noun phrase.
+    //   3. Collapse whitespace, trim stray leading punctuation and a trailing
+    //      period-only artifact.
+    //   4. Capitalize the first letter.
+    //   5. Optionally cap to maxLen chars with an ellipsis (word-boundary safe)
+    //      — used for table cells; full text is left uncapped for cards.
+    var CHECKLIST_LEADIN = /^(show|verify|verify that|check|confirm|confirm that|provide|demonstrate|ensure|ensure that|describe|explain|review|observe|inspect|examine|validate|assess)\b\s*(that|whether)?\s*/i;
+
+    function cleanFindingText(raw, maxLen) {
+        var text = String(raw == null ? '' : raw);
+        // 1. Strip bracketed reference segments, e.g. "[Ref: ISMS-PRD-003 ...]".
+        text = text.replace(/\s*\[[^\]]*\]\s*/g, ' ');
+        // 2. Drop imperative checklist lead-ins (repeat once in case of nested lead-ins).
+        text = text.replace(CHECKLIST_LEADIN, '');
+        text = text.replace(CHECKLIST_LEADIN, '');
+        // 3. Collapse whitespace, trim stray punctuation.
+        text = text.replace(/\s+/g, ' ').trim();
+        text = text.replace(/^[\s,:;.\-]+/, '').replace(/[\s]+$/, '');
+        if (!text) text = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+        // 4. Capitalize first letter.
+        if (text) text = text.charAt(0).toUpperCase() + text.slice(1);
+        // 5. Cap length for table cells (word-boundary safe ellipsis).
+        if (maxLen && text.length > maxLen) {
+            var cut = text.slice(0, maxLen - 1);
+            var lastSpace = cut.lastIndexOf(' ');
+            if (lastSpace > maxLen * 0.6) cut = cut.slice(0, lastSpace);
+            text = cut.replace(/[\s,:;.\-]+$/, '') + '…';
+        }
+        return text;
+    }
+
     function addDays(dateStr, days) {
         var base = dateStr ? new Date(dateStr) : new Date();
         if (isNaN(base.getTime())) base = new Date();
@@ -259,13 +303,13 @@
         // Root cause scaffold (draft templates — auditor-editable)
         var themeLabel = theme.theme;
         var rootCause = {
-            immediateCause: 'Non-conformance observed at clause ' + (clause || 'N/A') + ': ' + (finding.text || finding.comment || 'requirement not fully met') + '.',
-            rootCause: 'Absence of an effective process for ' + themeLabel + ', or inconsistent application of the existing process.',
+            immediateCause: 'Non-conformance observed at clause ' + (clause || 'N/A') + ': ' + cleanFindingText(finding.text || finding.comment || 'requirement not fully met') + '.',
+            rootCause: 'Working hypothesis: the organization\'s process for ' + themeLabel + ' is either not fully defined or not consistently applied in practice — pending confirmation by the client\'s own root-cause investigation.',
             systemicCause: systemicHints.test(text)
-                ? 'Indications of a systemic gap affecting ' + themeLabel + ' across multiple areas/records.'
-                : 'Likely an isolated lapse rather than a systemic breakdown, pending root cause investigation by the client.',
-            correctiveAction: 'Define/update the process for ' + themeLabel + ', retrain relevant personnel, and correct the identified instance(s) of non-conformance.',
-            preventiveAction: 'Introduce periodic internal verification (e.g. internal audit checkpoint or management review item) for ' + themeLabel + ' to prevent recurrence.'
+                ? 'Evidence points to a systemic gap in ' + themeLabel + ' affecting multiple areas or records, rather than a one-off lapse.'
+                : 'Current evidence points to an isolated lapse rather than a systemic breakdown, pending the client\'s own root-cause investigation.',
+            correctiveAction: 'Define or update the process governing ' + themeLabel + ', retrain the relevant personnel, and correct the identified instance(s) of non-conformance.',
+            preventiveAction: 'Introduce periodic internal verification (e.g. an internal audit checkpoint or management review item) for ' + themeLabel + ' to prevent recurrence.'
         };
 
         return {
@@ -362,7 +406,7 @@
             var status = rec ? realCapaStatus(rec) : deriveStatus(Object.assign({}, f, { caDueDate: targetDate }), baseDate);
             return {
                 ref: f.ref,
-                risk: (f.clause ? 'Clause ' + f.clause + ' — ' : '') + (f.text || 'Non-conformance identified').substring(0, 160),
+                risk: (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified', 160),
                 likelihood: f.likelihood,
                 impact: f.impact,
                 score: f.score,
@@ -468,7 +512,8 @@
                     text: f.text,
                     priority: f.priority,
                     status: status,
-                    completion: completionPct(status)
+                    completion: completionPct(status),
+                    dueDate: f.caDueDate || null
                 };
             });
         }
@@ -545,6 +590,19 @@
         if (p === 'P1') return '<span class="b4-pill b4-pill-critical">P1</span>';
         var cls = { P2: 'bad', P3: 'warn', P4: 'neutral' }[p] || 'neutral';
         return '<span class="b4-badge b4-badge--' + cls + '">' + esc(p) + '</span>';
+    }
+
+    // Short, plain-language interpretation for a residual-risk band — drawn
+    // directly from the existing Low/Medium/High/Critical bands (no invented
+    // benchmarks), so a reader can see "Requires attention" / "Managed" next
+    // to the badge instead of having to infer meaning from the color alone.
+    function riskBandInterpretation(band) {
+        return { Low: 'Managed', Medium: 'Monitor', High: 'Requires attention', Critical: 'Immediate action' }[band] || '';
+    }
+
+    // Same idea for priority (P1-P4) summaries.
+    function priorityInterpretation(p) {
+        return { P1: 'Immediate action', P2: 'Requires attention', P3: 'Monitor', P4: 'Managed' }[p] || '';
     }
 
     function statusBadge(status) {
@@ -636,10 +694,9 @@
             for (var likIdx = 0; likIdx < 5; likIdx++) {
                 var count = heatMatrix[impactIdx][likIdx] || 0;
                 var band = bandFor((impactIdx + 1) * (likIdx + 1));
-                // b4-heat-cell is ~34x28 by default; enlarged here to the ~64px print
-                // size the brief calls for. No "large heat cell" variant exists yet in
-                // the system — see migration notes.
-                rowsHtml += '<div class="b4-heat-cell ' + bandHeatClass(band) + '" style="flex:1;min-width:64px;height:64px;border-radius:6px;font-size:1.05rem;">' + (count || '') + '</div>';
+                // b4-heat-cell--lg is the design system's enlarged print-size variant
+                // (min 64x64, 12pt) — used here instead of duplicating those dimensions inline.
+                rowsHtml += '<div class="b4-heat-cell b4-heat-cell--lg ' + bandHeatClass(band) + '" style="flex:1;border-radius:6px;">' + (count || '') + '</div>';
             }
             rowsHtml += '</div>';
         }
@@ -649,7 +706,9 @@
             + '</div>'
             + '<div class="b4-eyebrow" style="justify-content:center;margin-top:6px;">Likelihood &rarr;</div>';
         var legend = '<div style="display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;justify-content:center;">'
-            + ['Low', 'Medium', 'High', 'Critical'].map(function (band) { return bandBadge(band); }).join('')
+            + ['Low', 'Medium', 'High', 'Critical'].map(function (band) {
+                return '<span class="b4-caption">' + bandBadge(band) + '&nbsp;' + esc(riskBandInterpretation(band)) + '</span>';
+            }).join('')
             + '</div>';
         var vAxis = '<div class="b4-eyebrow" style="writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;padding-right:4px;">Impact &uarr;</div>';
         return '<div style="page-break-inside:avoid;break-inside:avoid;">'
@@ -669,7 +728,7 @@
         var findingsRows = r.scoredFindings.length
             ? r.scoredFindings.map(function (f) {
                 return '<tr style="page-break-inside:avoid;break-inside:avoid;">' + refCell(f.ref)
-                    + '<td>' + esc((f.clause ? '[' + f.clause + '] ' : '') + (f.text || '').substring(0, 140)) + '</td>'
+                    + '<td>' + esc((f.clause ? '[' + f.clause + '] ' : '') + cleanFindingText(f.text, 90)) + '</td>'
                     + '<td style="text-align:center;">' + pipBar(f.likelihood) + '</td>'
                     + '<td style="text-align:center;">' + pipBar(f.impact) + '</td>'
                     + '<td style="text-align:center;">' + bandBadge(f.residualRisk) + '</td>'
@@ -684,8 +743,8 @@
             charts: [],
             bodyHtml: r.scoredFindings.length
                 ? renderHeatmap(r.heatMatrix)
-                    + '<div style="overflow-x:auto;"><table class="b4-tbl" style="margin-top:18px;min-width:680px;"><thead><tr><th style="width:12%;">Ref</th><th style="width:44%;">Finding</th><th style="width:11%;text-align:center;">L</th><th style="width:11%;text-align:center;">I</th><th style="width:11%;text-align:center;">Residual</th><th style="width:11%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table></div>'
-                : emptyState('No non-conformities identified — no risk items to plot.')
+                    + '<div class="b4-mt-6" style="overflow-x:auto;"><table class="b4-tbl" style="min-width:680px;"><thead><tr><th style="width:12%;">Ref</th><th style="width:44%;">Finding</th><th style="width:11%;text-align:center;">L</th><th style="width:11%;text-align:center;">I</th><th style="width:11%;text-align:center;">Residual</th><th style="width:11%;text-align:center;">Priority</th></tr></thead><tbody>' + findingsRows + '</tbody></table></div>'
+                : emptyState('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.')
         });
 
         // 2. BUSINESS IMPACT ANALYSIS
@@ -696,7 +755,7 @@
         var impactRows = r.scoredFindings.map(function (f) {
             return '<tr style="page-break-inside:avoid;break-inside:avoid;">' + refCell(f.ref)
                 + '<td>' + esc(f.clause || '') + '</td>'
-                + '<td>' + esc((f.text || '').substring(0, 120)) + '</td>'
+                + '<td>' + esc(cleanFindingText(f.text, 90)) + '</td>'
                 + '<td>' + f.businessImpacts.map(tagBadge).join(' ') + '</td>'
                 + '<td style="text-align:center;">' + bandBadge(f.residualRisk) + '</td></tr>';
         }).join('');
@@ -719,7 +778,7 @@
             charts: [],
             bodyHtml: r.scoredFindings.length
                 ? impactSummary + '<div style="overflow-x:auto;"><table class="b4-tbl" style="min-width:760px;"><thead><tr><th style="width:10%;">Ref</th><th style="width:10%;">Clause</th><th style="width:34%;">Finding</th><th style="width:30%;">Impact Categories</th><th style="width:16%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + impactRows + '</tbody></table></div>'
-                : emptyState('No non-conformities identified — no business impact to analyze.')
+                : emptyState('No findings from this audit are assessed as carrying a material business impact at this time.')
         });
 
         // 3. ROOT CAUSE ANALYSIS — each finding as a vertical logical flow:
@@ -741,16 +800,16 @@
             var correctiveActionText = (rec && rec.correctiveAction) || rc.correctiveAction;
             var provenance = hasReal
                 ? '<div class="b4-caption b4-mt-2">' + iconSafe('check', { size: 12 }) + 'Recorded by auditor' + (rec.raisedBy ? ' (' + esc(rec.raisedBy) + ')' : '') + '</div>'
-                : '<div class="b4-caption b4-mt-2">' + iconSafe('finding', { size: 12 }) + 'AI-assisted draft — auditor review required</div>';
+                : '<div class="b4-caption b4-mt-2">' + iconSafe('finding', { size: 12 }) + 'Working hypothesis (rule-generated draft) — auditor review required</div>';
             var chain = '<div class="b4-timeline">'
-                + flowStep('Finding', (f.clause ? 'Clause ' + f.clause + ' — ' : '') + (f.text || 'Non-conformance identified'))
+                + flowStep('Finding', (f.clause ? 'Clause ' + f.clause + ' — ' : '') + cleanFindingText(f.text || 'Non-conformance identified'))
                 + flowStep(hasReal && rec.correction ? 'Correction' : 'Immediate Cause', immediateCause)
                 + flowStep('Root Cause', rootCauseText, 'warn')
                 + flowStep('Business Impact', f.businessImpacts.join(', '))
                 + flowStep('Corrective Action', correctiveActionText, 'good')
                 + flowStep('Preventive Action', rc.preventiveAction, 'good')
                 + '</div>';
-            return '<div class="b4-card b4-mb-4" style="page-break-inside:avoid;break-inside:avoid;">'
+            return '<div class="b4-card b4-mb-4' + (f.priority === 'P1' ? ' b4-card--flagged' : '') + '" style="page-break-inside:avoid;break-inside:avoid;">'
                 + '<div class="b4-card-heading" style="justify-content:space-between;">'
                 + '<span>' + esc(f.ref) + (f.clause ? ' — Clause ' + esc(f.clause) : '') + '</span>'
                 + priorityBadge(f.priority)
@@ -765,7 +824,7 @@
             desc: 'Rule-generated root cause scaffolding per finding (auditor-editable draft)',
             color: '#7c3aed',
             charts: [],
-            bodyHtml: r.scoredFindings.length ? rcCards : emptyState('No non-conformities identified — no root cause analysis required.')
+            bodyHtml: r.scoredFindings.length ? rcCards : emptyState('No non-conformities were identified during this audit, so no root-cause investigation is required.')
         });
 
         // 4. EXECUTIVE RISK REGISTER — treatment plans that repeat verbatim across
@@ -791,7 +850,7 @@
                 + '<td style="white-space:nowrap;">' + esc(row.reviewDate) + '</td>'
                 + '<td style="text-align:center;">' + statusBadge(row.status) + '</td>'
                 + '<td style="text-align:center;">' + priorityBadge(row.priority) + '</td>'
-                + '<td style="text-align:center;">' + bandBadge(row.residualRisk) + '</td></tr>';
+                + '<td style="text-align:center;">' + bandBadge(row.residualRisk) + '<div class="b4-caption">' + esc(riskBandInterpretation(row.residualRisk)) + '</div></td></tr>';
         }).join('');
         var registerNotes = sharedPlans.length
             ? '<div class="b4-callout b4-callout--info b4-mt-3"><div class="b4-eyebrow">Shared Treatment Plans</div><ol class="b4-bullets">'
@@ -806,7 +865,7 @@
             charts: [],
             bodyHtml: r.riskRegister.length
                 ? '<div style="overflow-x:auto;"><table class="b4-tbl" style="min-width:1050px;"><thead><tr><th style="width:8%;">Ref</th><th style="width:26%;">Risk</th><th style="width:8%;text-align:center;">Likelihood</th><th style="width:8%;text-align:center;">Impact</th><th style="width:8%;text-align:center;">Risk Score</th><th style="width:12%;">Owner</th><th style="width:9%;">Target Date</th><th style="width:9%;text-align:center;">Status</th><th style="width:6%;text-align:center;">Priority</th><th style="width:9%;text-align:center;">Residual Risk</th></tr></thead><tbody>' + registerRows + '</tbody></table></div>' + registerNotes
-                : emptyState('No risks identified during this audit.')
+                : emptyState('Current audit results do not indicate risks likely to affect certification status, customer delivery, or regulatory compliance in the short term.')
         });
 
         // 5. MANAGEMENT ACTION PLAN — "Resources" / "Expected Outcome" are drawn
@@ -822,7 +881,7 @@
         var sharedResources = commonValue(r.actionPlan, 'resources');
         var sharedOutcome = commonValue(r.actionPlan, 'expectedOutcome');
         var actionRows = r.actionPlan.map(function (a) {
-            var tds = '<td style="text-align:center;">' + priorityBadge(a.priority) + '</td>'
+            var tds = '<td style="text-align:center;">' + priorityBadge(a.priority) + '<div class="b4-caption">' + esc(priorityInterpretation(a.priority)) + '</div></td>'
                 + '<td>' + esc(a.action) + '</td>'
                 + '<td>' + esc(a.owner) + '</td>'
                 + '<td style="white-space:nowrap;">' + esc(a.expectedCompletion) + '</td>';
@@ -850,7 +909,7 @@
             charts: [],
             bodyHtml: r.actionPlan.length
                 ? actionNotes + '<div style="overflow-x:auto;"><table class="b4-tbl" style="min-width:820px;"><thead><tr>' + actionHead + '</tr></thead><tbody>' + actionRows + '</tbody></table></div>'
-                : emptyState('No corrective actions required for this audit.')
+                : emptyState('No corrective actions are required based on this audit\'s results.')
         });
 
         // 6. CAPA DASHBOARD — full lifecycle (Open / In Progress / Overdue / Verified /
@@ -859,24 +918,30 @@
         var capa = r.capa;
         var chartId = 'chart-capa';
         var hasCapaData = capa.items.length > 0;
+        var isInferred = capa.source === 'inferred';
         // Canvas fillStyle can't resolve CSS custom properties, so the chart palette
         // is a literal copy of the b4-good/warn/bad(critical)/info/neutral token values.
         var CAPA_PALETTE = { Open: '#475569', 'In Progress': '#b45309', Overdue: '#7f1d1d', Verified: '#1d4ed8', Closed: '#15803d' };
         var CAPA_STATUSES = ['Open', 'In Progress', 'Overdue', 'Verified', 'Closed'];
+        // In inferred mode (no linked NCR/CAPA register records) the completion-%
+        // headline KPI and per-item progress bars are dropped — with no register
+        // records to anchor them, a 0%/red "zero progress" visual reads as an
+        // alarming lifecycle claim the data doesn't support. Register mode keeps
+        // the full completion picture.
         var capaKpis = '<div class="b4-kpi-grid" style="page-break-inside:avoid;break-inside:avoid;">'
-            + '<div class="b4-kpi-card b4-kpi-card--accent"><div class="b4-kpi-value">' + capa.overallCompletion + '%</div><div class="b4-kpi-label">Overall Completion</div></div>'
+            + (isInferred ? '' : '<div class="b4-kpi-card b4-kpi-card--accent"><div class="b4-kpi-value">' + capa.overallCompletion + '<span class="b4-kpi-value-unit">%</span></div><div class="b4-kpi-label">Overall Completion</div></div>')
             + CAPA_STATUSES.map(function (s) {
                 var val = capa[s === 'In Progress' ? 'inProgress' : s.toLowerCase()] || 0;
                 return '<div class="b4-kpi-card"><div class="b4-kpi-value">' + val + '</div><div class="b4-kpi-label">' + s + '</div></div>';
             }).join('')
             + '</div>'
             + '<div class="b4-caption b4-mt-2">'
-            + '<span><strong>' + capa.repeatedFindings.length + '</strong> repeated findings</span>&nbsp;&middot;&nbsp;'
-            + '<span><strong>' + (capa.avgClosureDays != null ? capa.avgClosureDays : '—') + '</strong> avg closure days</span>'
+            + '<span><strong>' + capa.repeatedFindings.length + '</strong> repeated findings</span>'
+            + (isInferred ? '' : '&nbsp;&middot;&nbsp;<span><strong>' + (capa.avgClosureDays != null ? capa.avgClosureDays : '—') + '</strong> avg closure days</span>')
             + '</div>'
             + (capa.source === 'register'
                 ? '<div class="b4-caption b4-mt-1">' + iconSafe('shield', { size: 12 }) + capa.linkedCount + ' CAPA record' + (capa.linkedCount === 1 ? '' : 's') + ' linked from the NCR/CAPA register</div>'
-                : '<div class="b4-caption b4-mt-1">' + iconSafe('alert', { size: 12 }) + 'No linked NCR/CAPA register records found — status shown is inferred from due dates, not the CAPA register</div>');
+                : '<div class="b4-callout b4-callout--info b4-mt-2">' + iconSafe('info', { size: 12 }) + 'CAPA lifecycle tracking begins when corrective action records are linked in the NCR/CAPA register. Status shown is inferred from corrective-action due dates.</div>');
         // Aging: real day-counts are only available for Overdue items today (via
         // capa.overdueItems.daysOverdue, computed from compute()'s dueDate handling).
         // Open/In-Progress items don't carry raisedDate/dueDate in the compute()
@@ -886,14 +951,19 @@
         var capaRows = capa.items.map(function (it) {
             var od = overdueByRef[it.ref];
             var aging = od ? (od.daysOverdue != null ? od.daysOverdue + 'd overdue' : '—') : '—';
+            var lastCell = isInferred
+                ? '<td style="white-space:nowrap;">' + esc(it.dueDate || '—') + '</td>'
+                : '<td style="min-width:140px;">' + progressBar(it.completion, completionVariant(it.status)) + '</td>';
             return '<tr style="page-break-inside:avoid;break-inside:avoid;">' + refCell(it.ref)
                 + '<td>' + esc(it.clause || '') + '</td>'
-                + '<td>' + esc((it.text || '').substring(0, 120)) + '</td>'
+                + '<td>' + esc(cleanFindingText(it.text, 90)) + '</td>'
                 + '<td style="text-align:center;">' + freeBadge(it.priority) + '</td>'
                 + '<td style="text-align:center;">' + statusBadge(it.status) + '</td>'
                 + '<td style="text-align:center;white-space:nowrap;">' + esc(aging) + '</td>'
-                + '<td style="min-width:140px;">' + progressBar(it.completion, completionVariant(it.status)) + '</td></tr>';
+                + lastCell + '</tr>';
         }).join('');
+        var capaTableHead = '<th style="width:12%;">Ref</th><th style="width:12%;">Clause</th><th style="width:28%;">Finding</th><th style="width:10%;text-align:center;">Priority</th><th style="width:12%;text-align:center;">Status</th><th style="width:10%;text-align:center;">Aging</th>'
+            + (isInferred ? '<th style="width:16%;">Due Date</th>' : '<th style="width:16%;">Completion</th>');
         out.push({
             key: 'capa-dashboard',
             name: 'CAPA DASHBOARD',
@@ -920,8 +990,8 @@
             }] : [],
             bodyHtml: hasCapaData
                 ? capaKpis + '<div style="max-width:280px;margin:16px auto;"><canvas id="' + chartId + '"></canvas></div>'
-                    + '<div style="overflow-x:auto;" class="b4-mt-3"><table class="b4-tbl" style="min-width:800px;"><thead><tr><th style="width:12%;">Ref</th><th style="width:12%;">Clause</th><th style="width:28%;">Finding</th><th style="width:10%;text-align:center;">Priority</th><th style="width:12%;text-align:center;">Status</th><th style="width:10%;text-align:center;">Aging</th><th style="width:16%;">Completion</th></tr></thead><tbody>' + capaRows + '</tbody></table></div>'
-                : emptyState('No CAPA records to display for this audit.')
+                    + '<div style="overflow-x:auto;" class="b4-mt-5"><table class="b4-tbl" style="min-width:800px;"><thead><tr>' + capaTableHead + '</tr></thead><tbody>' + capaRows + '</tbody></table></div>'
+                : emptyState('No corrective/preventive actions are open for this audit.')
         });
 
         return out;
