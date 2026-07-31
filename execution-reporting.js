@@ -298,6 +298,8 @@
 
         const sections = [
             { id: 'audit-info', label: 'Audit Info', icon: 'fa-clipboard-list', color: '#2563eb' },
+            { id: 'audit-programme', label: 'Audit Programme', icon: 'fa-calendar-days', color: '#0ea5e9' },
+            ...((d.client && Array.isArray(d.client.sites) && d.client.sites.length > 1) ? [{ id: 'multi-site', label: 'Multi-Site Sampling', icon: 'fa-map-location-dot', color: '#16a34a' }] : []),
             { id: 'objectives', label: 'Objectives & Methodology', icon: 'fa-bullseye', color: '#0891b2' },
             { id: 'summary', label: 'Summary', icon: 'fa-file-lines', color: '#059669' },
             { id: 'charts', label: 'Charts', icon: 'fa-chart-pie', color: '#7c3aed' },
@@ -320,6 +322,39 @@
 
         window._reportSectionState = {};
         sections.forEach(s => { window._reportSectionState[s.id] = !s.hide; });
+
+        // ─── Audit Programme (3-year certification cycle) — preview data ──
+        const pvStandard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
+        const pvStageBase = (function () {
+            const t = (d.auditPlan?.auditType || d.report.auditType || 'Initial').toLowerCase();
+            if (/stage\s*1|stage1/.test(t)) return 0;
+            if (/stage\s*2|stage2|initial/.test(t)) return 1;
+            if (/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/.test(t)) return 2;
+            if (/surveillance\s*2|sv2|2nd\s*surveillance|second\s*surveillance/.test(t)) return 3;
+            if (/re-?cert/.test(t)) return 4;
+            if (/surveillance/.test(t)) return 2;
+            return 1;
+        })();
+        const pvBaseDate = (d.report.date || d.auditPlan?.startDate || d.auditPlan?.date) ? new Date(d.report.date || d.auditPlan?.startDate || d.auditPlan?.date) : new Date();
+        const pvMonthYear = (offset) => { const dt = new Date(pvBaseDate.getTime()); dt.setMonth(dt.getMonth() + offset); return dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }); };
+        const pvProgrammeStages = [
+            { id: 's1',     label: 'Stage 1',                         offset: 0,  editId: 'rp-prog-s1',     def: 'Readiness review — documentation, context, scope confirmation' },
+            { id: 's2',     label: 'Stage 2 (Initial Certification)', offset: 0,  editId: 'rp-prog-s2',     def: 'Full system implementation audit' },
+            { id: 'sv1',    label: 'Surveillance 1',                  offset: 12, editId: 'rp-prog-sv1',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
+            { id: 'sv2',    label: 'Surveillance 2',                  offset: 24, editId: 'rp-prog-sv2',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
+            { id: 'recert', label: 'Recertification',                 offset: 36, editId: 'rp-prog-recert', def: 'Full system re-assessment over the certification cycle' }
+        ].map((s, i) => Object.assign({}, s, { timing: pvMonthYear(s.offset), status: i < pvStageBase ? 'Completed' : (i === pvStageBase ? 'This audit' : 'Planned') }));
+
+        // ─── Multi-site sampling — preview data ────────────────────────────
+        const pvAllSites = (d.client && Array.isArray(d.client.sites)) ? d.client.sites : [];
+        const pvIsMultiSite = pvAllSites.length > 1;
+        const pvMatchingCert = pvIsMultiSite ? (d.client.certificates || []).find(c => (c.standard || '').toLowerCase() === pvStandard.toLowerCase()) : null;
+        const pvSiteScopes = (pvMatchingCert && pvMatchingCert.siteScopes) ? pvMatchingCert.siteScopes : {};
+        const pvSampledSiteNames = (function () {
+            const sel = d.auditPlan?.selectedSites;
+            if (Array.isArray(sel) && sel.length > 0) return sel.map(s => (typeof s === 'object' ? s.name : s));
+            return pvAllSites.length ? [pvAllSites[0].name] : [];
+        })();
 
         const pill = (s) => `<label class="rp-pill ${s.hide ? '' : 'active'}" id="pill-${s.id}" style="${s.hide ? 'background:white;color:#94a3b8;border-color:#cbd5e1;' : 'background:' + s.color + ';border-color:' + s.color + ';color:white;'}" data-action="toggleReportSection" data-arg1="${s.id}" data-arg2="${s.color}"><i class="fa-solid ${s.icon}"></i> ${s.label}</label>`;
 
@@ -527,6 +562,42 @@
                         </table>
                     </div>
                 </div>
+                <!-- Audit Programme -->
+                <div class="rp-sec" id="sec-audit-programme">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-calendar-days"></i></span>AUDIT PROGRAMME<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <div style="font-size:0.82rem;color:#64748b;margin-bottom:0.75rem;">3-year certification cycle, based on the current audit date of ${d.report.date || '—'}.</div>
+                        <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
+                            <thead><tr style="background:#f0f9ff;"><th style="padding:7px 12px;text-align:left;">Audit Stage</th><th style="padding:7px 12px;text-align:left;">Planned Timing</th><th style="padding:7px 12px;text-align:left;">Focus & Scope</th><th style="padding:7px 12px;text-align:center;">Status</th></tr></thead>
+                            <tbody>
+                            ${pvProgrammeStages.map(s => {
+        const statusBg = s.status === 'Completed' ? '#dcfce7' : (s.status === 'This audit' ? '#dbeafe' : '#f1f5f9');
+        const statusFg = s.status === 'Completed' ? '#166534' : (s.status === 'This audit' ? '#1e40af' : '#64748b');
+        return `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:7px 12px;font-weight:600;">${s.label}</td><td style="padding:7px 12px;">${s.timing}</td><td style="padding:7px 12px;"><div id="${s.editId}" class="rp-edit" contenteditable="true">${s.def}</div></td><td style="padding:7px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:${statusBg};color:${statusFg};">${s.status}</span></td></tr>`;
+    }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                ${pvIsMultiSite ? `
+                <!-- Multi-Site Sampling -->
+                <div class="rp-sec" id="sec-multi-site">
+                    <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#16a34a,#15803d);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-map-location-dot"></i></span>MULTI-SITE SAMPLING<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-body">
+                        <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
+                            <thead><tr style="background:#f0fdf4;"><th style="padding:7px 12px;text-align:left;">Site</th><th style="padding:7px 12px;text-align:left;">Address</th><th style="padding:7px 12px;text-align:left;">Scope at Site</th><th style="padding:7px 12px;text-align:center;">Sampled This Audit</th></tr></thead>
+                            <tbody>
+                            ${pvAllSites.map(s => {
+        const addr = [s.address, s.city, s.country].filter(Boolean).join(', ') || '—';
+        const scope = pvSiteScopes[s.name] || d.client.certificationScope || '—';
+        const sampled = pvSampledSiteNames.indexOf(s.name) !== -1;
+        return `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:7px 12px;font-weight:600;">${s.name}</td><td style="padding:7px 12px;">${addr}</td><td style="padding:7px 12px;">${scope}</td><td style="padding:7px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sampled ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;'}">${sampled ? 'Yes' : 'No'}</span></td></tr>`;
+    }).join('')}
+                            </tbody>
+                        </table>
+                        <div id="rp-site-sampling-note" class="rp-edit" contenteditable="true" style="margin-top:0.75rem;">Site sampling conducted in accordance with IAF MD 1.</div>
+                    </div>
+                </div>` : ''}
                 <!-- Objectives, Criteria & Methodology (from Plan) -->
                 <div class="rp-sec" id="sec-objectives">
                     <div class="rp-sec-hdr" style="background:linear-gradient(135deg,#0891b2,#0e7490);" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">2</span>AUDIT OBJECTIVES, CRITERIA & METHODOLOGY<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;" title="Click to edit"></i><i class="fa-solid fa-chevron-down"></i></span></div>
@@ -2029,6 +2100,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const editedReviewerName = document.getElementById('rp-reviewer-name')?.innerText || d.report.technicalReviewer || '';
         const editedSigDate = document.getElementById('rp-sig-date')?.innerText || new Date().toLocaleDateString('en-GB');
         const editedReviewerDate = document.getElementById('rp-reviewer-date')?.innerText || '';
+        const editedProgS1 = document.getElementById('rp-prog-s1')?.innerText || '';
+        const editedProgS2 = document.getElementById('rp-prog-s2')?.innerText || '';
+        const editedProgSv1 = document.getElementById('rp-prog-sv1')?.innerText || '';
+        const editedProgSv2 = document.getElementById('rp-prog-sv2')?.innerText || '';
+        const editedProgRecert = document.getElementById('rp-prog-recert')?.innerText || '';
+        const editedSiteSamplingNote = document.getElementById('rp-site-sampling-note')?.innerText || '';
         const _formatText = (text) => { if (!text) return ''; return text.replace(/\\n/g, '<br>').replace(/\n/g, '<br>').replace(/\*\*\*([^*]+)\*\*\*/g, '<strong>$1</strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\(Clause ([^)]+)\)/g, '<em style="font-size:0.9em;color:#059669;">(Clause $1)</em>'); };
         // Rich text formatter for PDF: handles numbered lists, bullets, paragraphing, markdown
         const formatRichText = (text, color) => {
@@ -2319,8 +2396,50 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             });
             return rows;
         })();
+        // ─── Audit Programme (3-year certification cycle) ────────────────
+        const auditStageBase = (function () {
+            const t = (d.auditPlan?.auditType || d.report.auditType || 'Initial').toLowerCase();
+            // Fuzzy-match the current audit type against the standard cycle stages.
+            if (/stage\s*1|stage1/.test(t)) return 0;
+            if (/stage\s*2|stage2|initial/.test(t)) return 1;
+            if (/surveillance\s*1|sv1|1st\s*surveillance|first\s*surveillance/.test(t)) return 2;
+            if (/surveillance\s*2|sv2|2nd\s*surveillance|second\s*surveillance/.test(t)) return 3;
+            if (/re-?cert/.test(t)) return 4;
+            if (/surveillance/.test(t)) return 2; // generic "Surveillance" defaults to SV1
+            return 1; // default to Stage 2 / Initial
+        })();
+        const auditBaseDateStr = d.report.date || d.auditPlan?.startDate || d.auditPlan?.date || null;
+        const auditBaseDate = auditBaseDateStr ? new Date(auditBaseDateStr) : new Date();
+        const monthYear = function (monthsOffset) {
+            const dt = new Date(auditBaseDate.getTime());
+            dt.setMonth(dt.getMonth() + monthsOffset);
+            return dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        };
+        const programmeStages = [
+            { id: 's1',     label: 'Stage 1',                         offset: 0,  editId: 'rp-prog-s1',     def: 'Readiness review — documentation, context, scope confirmation' },
+            { id: 's2',     label: 'Stage 2 (Initial Certification)', offset: 0,  editId: 'rp-prog-s2',     def: 'Full system implementation audit' },
+            { id: 'sv1',    label: 'Surveillance 1',                  offset: 12, editId: 'rp-prog-sv1',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
+            { id: 'sv2',    label: 'Surveillance 2',                  offset: 24, editId: 'rp-prog-sv2',    def: 'Key processes, use of marks, changes, previous findings follow-up' },
+            { id: 'recert', label: 'Recertification',                 offset: 36, editId: 'rp-prog-recert', def: 'Full system re-assessment over the certification cycle' }
+        ].map(function (s, i) {
+            const status = i < auditStageBase ? 'Completed' : (i === auditStageBase ? 'This audit' : 'Planned');
+            return Object.assign({}, s, { timing: monthYear(s.offset), status: status });
+        });
+        // ─── Multi-site sampling ──────────────────────────────────────────
+        const allSites = (d.client && Array.isArray(d.client.sites)) ? d.client.sites : [];
+        const isMultiSite = allSites.length > 1;
+        const matchingSiteCert = isMultiSite ? (d.client.certificates || []).find(function (c) { return (c.standard || '').toLowerCase() === (d.report.standard || d.auditPlan?.standard || '').toLowerCase(); }) : null;
+        const siteScopesMap = (matchingSiteCert && matchingSiteCert.siteScopes) ? matchingSiteCert.siteScopes : {};
+        const sampledSiteNames = (function () {
+            const sel = d.auditPlan?.selectedSites;
+            if (Array.isArray(sel) && sel.length > 0) return sel.map(function (s) { return (typeof s === 'object' ? s.name : s); });
+            // Fall back to the primary/head office site if nothing explicit was selected.
+            return allSites.length ? [allSites[0].name] : [];
+        })();
         const sectionDefs = [
             { key: 'audit-info',   name: 'AUDIT INFORMATION',                  desc: 'Organization details, scope, audit team and dates',     color: '#2563eb', present: en['audit-info'] !== false },
+            { key: 'audit-programme', name: 'AUDIT PROGRAMME',                 desc: '3-year certification cycle plan and current status',    color: '#0ea5e9', present: en['audit-programme'] !== false },
+            { key: 'multi-site',   name: 'MULTI-SITE SAMPLING',                desc: 'Sampling plan across client sites for this audit',      color: '#16a34a', present: en['multi-site'] !== false && isMultiSite },
             { key: 'objectives',   name: 'OBJECTIVES, CRITERIA &amp; METHODOLOGY', desc: 'Audit objectives, criteria and methodology',         color: '#0891b2', present: en['objectives'] !== false },
             { key: 'summary',      name: 'EXECUTIVE SUMMARY',                  desc: 'Key findings, opening meeting, positive observations',  color: '#059669', present: en['summary'] !== false },
             { key: 'charts',       name: 'ANALYTICS DASHBOARD',                desc: 'Compliance charts, KPIs and clause-based breakdown',    color: '#7c3aed', present: en['charts'] !== false },
@@ -2491,6 +2610,30 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</table>'
                 + (d.client.goodsServices && d.client.goodsServices.length > 0 ? '<div style="margin-top:10px;font-size:0.85rem;color:#334155;"><strong>Goods & Services:</strong> ' + d.client.goodsServices.map(g => g.name + (g.category ? ' (' + g.category + ')' : '')).join(', ') + '</div>' : '')
                 + (d.client.keyProcesses && d.client.keyProcesses.length > 0 ? '<div style="margin-top:6px;font-size:0.85rem;color:#334155;"><strong>Key Processes:</strong> ' + d.client.keyProcesses.map(p => (p.name || p)).join(', ') + '</div>' : '')
+                + '</div>' : '')
+            // SECTION: AUDIT PROGRAMME
+            + (secMap['audit-programme'] ? '<div id="sec-audit-programme" class="sh page-break" style="background:#f0f9ff;border-left-color:#0ea5e9;">' + sBadge('audit-programme') + 'AUDIT PROGRAMME</div><div class="sb">'
+                + '<div style="font-size:0.85rem;color:#475569;margin-bottom:12px;">Planned audit activities across the 3-year certification cycle, based on the current audit date of ' + (d.report.date || '—') + '.</div>'
+                + '<table class="f-tbl"><thead><tr style="background:#f0f9ff;"><th style="width:22%;">Audit Stage</th><th style="width:14%;">Planned Timing</th><th style="width:44%;">Focus &amp; Scope</th><th style="width:20%;text-align:center;">Status</th></tr></thead><tbody>'
+                + programmeStages.map(function (s) {
+                    const editedMap = { 'rp-prog-s1': editedProgS1, 'rp-prog-s2': editedProgS2, 'rp-prog-sv1': editedProgSv1, 'rp-prog-sv2': editedProgSv2, 'rp-prog-recert': editedProgRecert };
+                    const editedTxt = editedMap[s.editId] || s.def;
+                    const statusBg = s.status === 'Completed' ? '#dcfce7' : (s.status === 'This audit' ? '#dbeafe' : '#f1f5f9');
+                    const statusFg = s.status === 'Completed' ? '#166534' : (s.status === 'This audit' ? '#1e40af' : '#64748b');
+                    return '<tr><td style="font-weight:700;">' + s.label + '</td><td>' + s.timing + '</td><td>' + editedTxt + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + statusBg + ';color:' + statusFg + ';">' + s.status + '</span></td></tr>';
+                }).join('')
+                + '</tbody></table></div>' : '')
+            // SECTION: MULTI-SITE SAMPLING
+            + (secMap['multi-site'] ? '<div id="sec-multi-site" class="sh page-break" style="background:#f0fdf4;border-left-color:#16a34a;">' + sBadge('multi-site') + 'MULTI-SITE SAMPLING</div><div class="sb">'
+                + '<table class="f-tbl"><thead><tr style="background:#f0fdf4;"><th style="width:20%;">Site</th><th style="width:30%;">Address</th><th style="width:35%;">Scope at Site</th><th style="width:15%;text-align:center;">Sampled This Audit</th></tr></thead><tbody>'
+                + allSites.map(function (s) {
+                    const addr = [s.address, s.city, s.country].filter(Boolean).join(', ') || '—';
+                    const scope = siteScopesMap[s.name] || d.client.certificationScope || '—';
+                    const sampled = sampledSiteNames.indexOf(s.name) !== -1;
+                    return '<tr><td style="font-weight:700;">' + s.name + '</td><td>' + addr + '</td><td>' + scope + '</td><td style="text-align:center;"><span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;' + (sampled ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;') + '">' + (sampled ? 'Yes' : 'No') + '</span></td></tr>';
+                }).join('')
+                + '</tbody></table>'
+                + '<div style="margin-top:12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (editedSiteSamplingNote || 'Site sampling conducted in accordance with IAF MD 1.') + '</div>'
                 + '</div>' : '')
             // SECTION: OBJECTIVES, CRITERIA & METHODOLOGY
             + (secMap['objectives'] ? '<div id="sec-objectives" class="sh page-break" style="background:#ecfeff;border-left-color:#0891b2;">' + sBadge('objectives') + 'AUDIT OBJECTIVES, CRITERIA &amp; METHODOLOGY</div><div class="sb">'
