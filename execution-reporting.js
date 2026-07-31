@@ -30,6 +30,61 @@
     };
     window._fmtRemark = fmtRemark;
 
+    // Build the list of revision-history rows to render on the cover page.
+    // Does NOT mutate the report — pure read helper used by both the preview modal and PDF export.
+    // If the report has no recorded history yet, synthesize a single placeholder row so the
+    // table is never empty (draft reports show a "not yet issued" row, final reports show 1.0).
+    const getRevisionRows = (report, todayStr) => {
+        if (Array.isArray(report.revisionHistory) && report.revisionHistory.length > 0) {
+            return report.revisionHistory;
+        }
+        const isFinal = report.reportStatus === 'final';
+        return [{
+            ver: isFinal ? '1.0' : 'Draft',
+            date: report.date || todayStr,
+            author: report.leadAuditor || 'Lead Auditor',
+            desc: isFinal ? 'Initial issue' : 'Draft — not yet issued'
+        }];
+    };
+    window._getRevisionRows = getRevisionRows;
+
+    // Advance the report's revisionHistory when exporting a FINAL report.
+    // Called once per export while status === 'final'. Drafts never bump the version.
+    // Mutates report.revisionHistory in place and persists via window.saveData().
+    const bumpRevisionHistoryOnFinalExport = (report, todayStr) => {
+        if (report.reportStatus !== 'final') return;
+        if (!Array.isArray(report.revisionHistory)) report.revisionHistory = [];
+        if (report.revisionHistory.length === 0) {
+            report.revisionHistory.push({
+                ver: '1.0',
+                date: report.date || todayStr,
+                author: report.leadAuditor || 'Lead Auditor',
+                desc: 'Initial issue'
+            });
+        } else {
+            const last = report.revisionHistory[report.revisionHistory.length - 1];
+            const lastVer = parseFloat(last.ver) || 1.0;
+            report.revisionHistory.push({
+                ver: (lastVer + 0.1).toFixed(1),
+                date: todayStr,
+                author: report.leadAuditor || 'Lead Auditor',
+                desc: 'Revised and re-issued'
+            });
+        }
+        if (typeof window.saveData === 'function') window.saveData();
+    };
+    window._bumpRevisionHistoryOnFinalExport = bumpRevisionHistoryOnFinalExport;
+
+    // Toggle a report between 'draft' and 'final'. Draft is default. Persists immediately
+    // and re-renders the preview modal so the status pill / watermark hint stay in sync.
+    window.toggleReportStatus = function () {
+        const d = window._reportPreviewData;
+        if (!d || !d.report) return;
+        d.report.reportStatus = (d.report.reportStatus === 'final') ? 'draft' : 'final';
+        if (typeof window.saveData === 'function') window.saveData();
+        window.showReportPreviewModal();
+    };
+
     window.generateAuditReport = async function (reportId) {
         const report = window.DataService.findAuditReport(reportId);
         if (!report) {
@@ -444,8 +499,7 @@
                             <table style="width:100%;font-size:0.75rem;border-collapse:collapse;">
                                 <thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Ver</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Date</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Author</th><th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;">Description</th></tr></thead>
                                 <tbody>
-                                    <tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">1.0</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">${d.report.date || new Date().toLocaleDateString('en-GB')}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">${d.report.leadAuditor || 'Lead Auditor'}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true">Initial issue — Draft for review</td></tr>
-                                    <tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;" contenteditable="true"></td></tr>
+                                    ${window._getRevisionRows(d.report, d.today).map(r => `<tr><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.ver}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.date}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.author}</td><td style="padding:5px 10px;border-bottom:1px solid #e2e8f0;">${r.desc}</td></tr>`).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -1230,14 +1284,14 @@
                 <div class="rp-sec" id="sec-distribution">
                     <div class="rp-sec-hdr" style="border-left-color:#0d9488;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;"><i class="fa-solid fa-share-nodes"></i></span>DISTRIBUTION LIST<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="margin-bottom:12px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>
+                        <div style="margin-bottom:12px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited. <em style="color:#0d9488;">(Click any cell below to edit)</em></div>
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f0fdfa;"><th style="padding:10px 14px;text-align:left;width:5%;">#</th><th style="padding:10px 14px;text-align:left;width:30%;">Recipient</th><th style="padding:10px 14px;text-align:left;width:25%;">Role</th><th style="padding:10px 14px;text-align:left;width:25%;">Organization</th><th style="padding:10px 14px;text-align:left;width:15%;">Format</th></tr></thead>
-                            <tbody>
+                            <tbody id="rp-distribution" class="rp-edit" contenteditable="true">
                                 <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">1</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.leadAuditor || 'Lead Auditor'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Lead Auditor</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Original</td></tr>
-                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;" contenteditable="true" id="rp-dist-reviewer">${d.report.technicalReviewer || 'Technical Reviewer'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
-                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">3</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;" contenteditable="true" id="rp-dist-client">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Client Representative</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
-                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">4</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;" contenteditable="true">Certification Records</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">File / Archive</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Archive</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.technicalReviewer || 'Technical Reviewer'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">3</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Client Representative</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">4</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Certification Records</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">File / Archive</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Archive</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1262,9 +1316,10 @@
             </div>
             <div class="rp-footer">
                 <div style="font-size:0.82rem;color:#64748b;"><i class="fa-solid fa-info-circle" style="margin-right:4px;"></i>${sections.filter(s => !s.hide).length} sections • Click any section to edit • Changes reflect in PDF</div>
-                <div style="display:flex;gap:10px;">
+                <div style="display:flex;gap:10px;align-items:center;">
                     <button data-action="removeElement" data-id="report-preview-overlay" style="padding:10px 20px;border-radius:8px;border:1px solid #cbd5e1;background:white;font-weight:600;cursor:pointer;color:#475569;">Cancel</button>
                     <button id="ai-polish-btn" data-action="polishNotesWithAI" style="padding:10px 20px;border-radius:8px;border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);font-weight:600;cursor:pointer;color:#0369a1;" aria-label="Auto-generate"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>Polish Notes with AI</button>
+                    <button data-action="toggleReportStatus" id="rp-status-toggle" style="padding:10px 16px;border-radius:20px;border:2px solid ${(d.report.reportStatus === 'final') ? '#059669' : '#f59e0b'};background:${(d.report.reportStatus === 'final') ? '#ecfdf5' : '#fffbeb'};color:${(d.report.reportStatus === 'final') ? '#059669' : '#b45309'};font-weight:700;cursor:pointer;" aria-label="Toggle report status" title="Click to switch between Draft and Final. Draft exports show a DRAFT watermark and do not advance the revision history."><i class="fa-solid ${(d.report.reportStatus === 'final') ? 'fa-circle-check' : 'fa-pen'}" style="margin-right:6px;"></i>${(d.report.reportStatus === 'final') ? 'FINAL' : 'DRAFT'}</button>
                     <button data-action="exportReportPDF" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.3);" aria-label="Export PDF"><i class="fa-solid fa-file-pdf" style="margin-right:6px;"></i>Export PDF</button>
                 </div>
             </div>
@@ -1936,6 +1991,30 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const d = window._reportPreviewData;
         if (!d) return;
         const en = window._reportSectionState || {};
+        // Report status ('draft'|'final') controls the DRAFT watermark and whether the
+        // revision history advances. Only FINAL exports append a new revision row.
+        if (!d.report.reportStatus) d.report.reportStatus = 'draft';
+        window._bumpRevisionHistoryOnFinalExport(d.report, d.today);
+        const revisionRows = window._getRevisionRows(d.report, d.today);
+        // Distribution list: capture the operator's edits to the contenteditable tbody,
+        // sanitized to strip anything but simple table/text markup, falling back to the
+        // original default rows if the region was never touched (or was cleared out).
+        const defaultDistributionRows =
+            '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Original</td></tr>'
+            + '<tr><td>2</td><td style="font-weight:600;">' + (d.report.technicalReviewer || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
+            + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
+            + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Archive</td></tr>';
+        let editedDistribution = document.getElementById('rp-distribution')?.innerHTML || '';
+        editedDistribution = editedDistribution.replace(/&nbsp;/g, ' ').trim();
+        if (editedDistribution && window.Sanitizer && window.Sanitizer.sanitizeHTML) {
+            editedDistribution = window.Sanitizer.sanitizeHTML(editedDistribution, {
+                ALLOWED_TAGS: ['tr', 'td', 'th', 'span', 'strong', 'em', 'b', 'i', 'br'],
+                ALLOWED_ATTR: ['style', 'colspan', 'rowspan']
+            });
+        }
+        // Guard against a tbody left with only whitespace/empty tags after sanitization
+        const distributionRows = (editedDistribution && editedDistribution.replace(/<[^>]*>/g, '').trim())
+            ? editedDistribution : defaultDistributionRows;
         let editedSummary = document.getElementById('rp-exec-summary')?.innerHTML || d.report.executiveSummary || '';
         editedSummary = editedSummary.replace(/<em[^>]*>Click to add executive summary[^<]*<\/em>/gi, '').trim();
         let editedConclusion = document.getElementById('rp-conclusion')?.innerHTML || d.report.conclusion || '';
@@ -2217,7 +2296,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             +   'thead{display:table-header-group;}'
             +   '.sh{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}'
             +   '.sb{page-break-before:avoid;break-before:avoid;}'
-            +   '.watermark{display:flex !important;}'
+            +   (d.report.reportStatus === 'draft' ? '.watermark{display:flex !important;}' : '')
             +   '.toc-item{break-inside:avoid;page-break-inside:avoid;}'
             +   '@page{size:A4;margin:24mm 14mm 22mm 14mm;'
             +     '@top-left{content:' + pgHdrLeft + ';font-family:"Outfit",sans-serif;font-size:8pt;font-weight:600;color:#475569;vertical-align:bottom;padding-bottom:3mm;white-space:nowrap;}'
@@ -2264,7 +2343,9 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '.ev-inline{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}.ev-inline img{height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;}'
             + '.watermark{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;justify-content:center;align-items:center;overflow:hidden;}.watermark span{transform:rotate(-35deg);font-size:72pt;font-weight:900;color:rgba(148,163,184,0.05);letter-spacing:8px;white-space:nowrap;font-family:Outfit,sans-serif;text-align:center;user-select:none;}body{position:relative;z-index:1;}'
             + '</style></head><body>'
-            + '<div class="watermark"><span>CONFIDENTIAL</span></div>'
+            + (d.report.reportStatus === 'draft'
+                ? '<div class="watermark"><span style="color:rgba(220,38,38,0.14);">DRAFT</span></div>'
+                : '<div class="watermark"><span>CONFIDENTIAL</span></div>')
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"><i class="fa-solid fa-certificate"></i></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
@@ -2300,10 +2381,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (d.auditPlan?.team && d.auditPlan.team.length > 1 ? '<div style="grid-column:span 2;"><div style="font-size:0.78rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Audit Team</div><div style="font-size:0.95rem;color:#1e293b;font-weight:500;margin-top:2px;">' + d.auditPlan.team.join(', ') + '</div></div>' : '')
             + '</div>'
             + '<div style="position:absolute;bottom:50px;left:50px;right:50px;border-top:2px solid #cbd5e1;padding-top:16px;">'
-            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;margin-bottom:10px;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + (d.report.recommendation || 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;margin-bottom:10px;"><span><strong>Doc ID:</strong> RPT-' + d.report.id.substring(0, 8) + '</span><span><strong>Status:</strong> ' + ((d.report.reportStatus === 'final') ? 'Final' : 'Draft') + '</span><span><strong>Classification:</strong> Confidential</span></div>'
             + '<div style="font-size:0.68rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Document Revision History</div>'
             + '<table style="width:100%;font-size:0.68rem;border-collapse:collapse;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Ver</th><th style="padding:4px 8px;text-align:left;">Date</th><th style="padding:4px 8px;text-align:left;">Author</th><th style="padding:4px 8px;text-align:left;">Description</th></tr></thead><tbody>'
-            + '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">1.0</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + (d.report.date || d.today) + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">Initial issue</td></tr>'
+            + revisionRows.map(r => '<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.ver + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.date + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.author + '</td><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0;">' + r.desc + '</td></tr>').join('')
             + '</tbody></table></div>'
             + '</div>'
             // TABLE OF CONTENTS — driven by unified sectionDefs / secMap
@@ -2417,10 +2498,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['distribution'] ? '<div id="sec-distribution" class="sh page-break" style="background:#f0fdfa;border-left-color:#0d9488;">' + sBadge('distribution') + 'DISTRIBUTION LIST</div><div class="sb">'
                 + '<div style="margin-bottom:10px;font-size:0.85rem;color:#64748b;">This report is distributed to the following parties. Unauthorized distribution is prohibited.</div>'
                 + '<table class="info-tbl"><thead><tr style="background:#f0fdfa;"><th style="width:5%;">#</th><th style="width:30%;">Recipient</th><th style="width:25%;">Role</th><th style="width:25%;">Organization</th><th style="width:15%;">Format</th></tr></thead><tbody>'
-                + '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (cbName || 'Certification Body') + '</td><td>Original</td></tr>'
-                + '<tr><td>2</td><td style="font-weight:600;">' + (editedReviewerName || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
-                + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
-                + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (cbName || 'Certification Body') + '</td><td>Archive</td></tr>'
+                + distributionRows
                 + '</tbody></table></div>' : '')
             // SECTION: ANNEXURES
             + (secMap['annexures'] ? '<div id="sec-annexures" class="sh page-break" style="background:#faf5ff;border-left-color:#9333ea;">' + sBadge('annexures') + 'ANNEXURES &amp; APPENDICES</div><div class="sb">'
