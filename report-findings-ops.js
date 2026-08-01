@@ -85,7 +85,9 @@
 
     function linkedCapaRecordsLocal(d) {
         try {
-            var ncrs = (global.state && global.state.ncrs) || [];
+            var ncrs = ((global.state && global.state.ncrs) || []).filter(function (n) {
+                return n && n.status !== 'Withdrawn';
+            });
             if (!ncrs || !ncrs.length) return [];
 
             var planId = (d && d.report && d.report.planId) || (d && d.auditPlan && d.auditPlan.id) || null;
@@ -343,7 +345,14 @@
 
     function buildFindingLifecycleSection(d) {
         var hydratedProgress = (d && d.hydratedProgress) || [];
-        var findings = safeArr(hydratedProgress).filter(function (item) { return item && item.status === 'nc'; });
+        // Real NCs only (major/minor). Pending-classification items are shown
+        // with a badge; advisories (observation/ofi) have their own OBS/OFI
+        // sections elsewhere and are excluded entirely here.
+        var findings = safeArr(hydratedProgress).filter(function (item) {
+            if (!item || item.status !== 'nc') return false;
+            var t = String(item.ncrType || '').toLowerCase();
+            return /^(major|minor)$/.test(t) || t === 'pending_classification';
+        });
         if (!findings.length) return '';
 
         var capaIndex = buildCapaIndex(d);
@@ -357,7 +366,8 @@
             counts[status] = (counts[status] || 0) + 1;
 
             var capa = bestCapaFor(capaIndex, item.clause);
-            var severity = item.ncrType || '—';
+            var isPending = String(item.ncrType || '').toLowerCase() === 'pending_classification';
+            var severity = isPending ? 'Pending Classification' : (item.ncrType || '—');
 
             return '<tr style="break-inside:avoid;">'
                 + '<td style="font-weight:700;">' + esc(ref) + '</td>'
@@ -398,9 +408,12 @@
 
     function buildEvidenceTraceSection(d) {
         var hydratedProgress = (d && d.hydratedProgress) || [];
+        // Real NCs only (major/minor); pending-classification shown with badge;
+        // advisories excluded entirely (they have their own OBS/OFI sections).
         var items = safeArr(hydratedProgress).filter(function (item) {
             if (!item || item.status !== 'nc') return false;
-            return true;
+            var t = String(item.ncrType || '').toLowerCase();
+            return /^(major|minor)$/.test(t) || t === 'pending_classification';
         });
         if (!items.length) return '';
 
@@ -409,13 +422,17 @@
 
         var rows = items.map(function (item, i) {
             var ref = 'F-' + String(i + 1).padStart(2, '0');
+            var isPending = String(item.ncrType || '').toLowerCase() === 'pending_classification';
+            // _evidenceMeta is keyed by the checklist item's uniqueId (NOT the
+            // image id), with fields capturedAt (NOT timestamp) and optional location.
+            var itemKey = item.uniqueId != null ? item.uniqueId : (item.id != null ? item.id : null);
+            var itemMeta = (hasEvidenceMeta && itemKey != null) ? global._evidenceMeta[itemKey] : null;
             var imgs = safeArr(item.evidenceImages).length ? item.evidenceImages : (item.evidenceImage ? [item.evidenceImage] : []);
             var thumbs = imgs.slice(0, 3).map(function (img) {
                 var url = (img && img.url) || (img && img.dataUrl) || (typeof img === 'string' ? img : '');
                 var thumb = evidenceThumbHtml(url);
-                if (thumb && hasEvidenceMeta && img && img.id != null && global._evidenceMeta[img.id]) {
-                    var meta = global._evidenceMeta[img.id];
-                    var metaLine = [meta.timestamp ? fmtDate(meta.timestamp) : '', meta.location ? esc(meta.location) : ''].filter(Boolean).join(' · ');
+                if (thumb && itemMeta) {
+                    var metaLine = [itemMeta.capturedAt ? fmtDate(itemMeta.capturedAt) : '', itemMeta.location ? esc(itemMeta.location) : ''].filter(Boolean).join(' · ');
                     return '<div style="display:inline-block;text-align:center;">' + thumb + (metaLine ? '<div style="font-size:8px;color:var(--b4-muted,#666);">' + metaLine + '</div>' : '') + '</div>';
                 }
                 return thumb;
@@ -426,7 +443,7 @@
             var source = (item.kbMatch && item.kbMatch.sourceLabel) || 'ISO Clause';
 
             return '<tr style="break-inside:avoid;">'
-                + '<td style="font-weight:700;">' + esc(ref) + '</td>'
+                + '<td style="font-weight:700;">' + esc(ref) + (isPending ? ' ' + badge('Pending Classification', 'info') : '') + '</td>'
                 + '<td>' + esc(item.clause || '—') + '</td>'
                 + '<td>' + esc(truncate(item.requirement, 90) || '—') + '</td>'
                 + '<td>' + esc(item.department || '—') + '</td>'

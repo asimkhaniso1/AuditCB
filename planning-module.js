@@ -1202,10 +1202,19 @@ function viewAuditPlan(id) {
                     <div class="card" style="margin: 0; display: flex; flex-direction: column;">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;"><i class="fa-solid fa-flag-checkered" style="margin-right: 0.5rem; color: #64748b;"></i> Closing</h3>
                         <div style="flex: 1; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
-                            ${plan.status === 'Completed' ?
-            '<div style="text-align: center; color: var(--success-color);"><i class="fa-solid fa-certificate" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Certified</div></div>' :
-            '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>'
-        }
+                            ${(() => {
+            // "Certified" reflects an actual certification decision/certificate
+            // for this client+standard — not merely plan.status === 'Completed'.
+            const decisionExists = (window.state.certifications || window.state.certificates || [])
+                .some(c => c.client === plan.client && (c.standard === plan.standard || !plan.standard));
+            if (decisionExists) {
+                return '<div style="text-align: center; color: var(--success-color);"><i class="fa-solid fa-certificate" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Certified</div></div>';
+            }
+            if (plan.status === 'Completed') {
+                return '<div style="text-align: center; color: #64748b;"><i class="fa-solid fa-flag-checkered" style="font-size: 2rem;"></i><div style="font-size: 0.8rem; margin-top: 0.25rem;">Closed</div></div>';
+            }
+            return '<div style="text-align: center; color: #cbd5e1;"><i class="fa-solid fa-lock" style="font-size: 2rem;"></i></div>';
+        })()}
                         </div>
                         <button class="btn btn-success" ${report?.status !== 'Finalized' || plan.status === 'Completed' ? 'disabled' : ''} data-action="closeAuditPlan" data-id="${plan.id}" style="width: 100%;">
                             ${plan.status === 'Completed' ? 'Closed' : 'Close Audit'}
@@ -1413,28 +1422,28 @@ window.closeAuditPlan = function (planId) {
     const plan = state.auditPlans.find(p => p.id === planId);
     if (!plan) return;
 
-    if (confirm('Are you sure you want to close this audit? This represents the completion of the audit cycle and issuance of the certificate.')) {
+    if (confirm('Are you sure you want to close this audit? This marks the audit cycle as complete. The certification decision is recorded separately in Certificates.')) {
         plan.status = 'Completed';
-
-        // Auto-generate certificate if not already exists
-        const report = window.state.auditReports?.find(r => String(r.planId) === String(planId));
-        if (report && report.status === 'Finalized') {
-            // Check if certificate already exists
-            if (!window.state.certificates) window.state.certificates = [];
-            const existingCert = window.state.certificates.find(c => String(c.reportId) === String(report.id));
-
-            if (!existingCert && typeof window.generateCertificate === 'function') {
-                const newCert = window.generateCertificate(report.id);
-                if (newCert) {
-                    window.state.certificates.push(newCert);
-                    window.showNotification(`Certificate ${newCert.certificateNumber} generated successfully`, 'success');
-                }
-            }
-        }
 
         window.saveData();
         viewAuditPlan(planId);
         window.showNotification('Audit closed successfully.');
+
+        // Route to certification decision if the report warrants it — closing the
+        // audit does NOT itself issue/generate a certificate (ISO 17021-1 requires
+        // a separate, independent certification decision).
+        const report = window.state.auditReports?.find(r => String(r.planId) === String(planId));
+        const warrants = report && report.status === 'Finalized' &&
+            window.CONSTANTS?.RECOMMENDATIONS &&
+            [window.CONSTANTS.RECOMMENDATIONS.RECOMMEND, window.CONSTANTS.RECOMMENDATIONS.CONDITIONAL].includes(report.recommendation);
+
+        if (warrants) {
+            if (typeof window.openIssueCertificateModal === 'function') {
+                window.openIssueCertificateModal(report.id);
+            } else {
+                window.showNotification('Proceed to Certificates to record the decision', 'info');
+            }
+        }
     }
 };
 

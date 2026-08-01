@@ -64,7 +64,6 @@ function renderDashboardEnhanced() {
         let overdueNCRs = 0;
         let complianceScoreSum = 0;
         let complianceCount = 0;
-        const now30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
         auditReports.forEach(report => {
             const ncrs = getAllDashboardFindings(report);
@@ -76,11 +75,6 @@ function renderDashboardEnhanced() {
             minorNCRs += minor;
             openNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
             closedNCRs += ncrs.filter(n => n.status === 'Closed').length;
-
-            const reportDate = report.date ? new Date(report.date) : null;
-            if (reportDate && reportDate < now30DaysAgo) {
-                overdueNCRs += ncrs.filter(n => n.status === 'Open' || (!n.status || n.status === '')).length;
-            }
 
             const progress = report.checklistProgress || [];
             if (progress.length > 0) {
@@ -96,6 +90,18 @@ function renderDashboardEnhanced() {
                 complianceCount++;
             }
         });
+
+        // Overdue NCRs — computed from the live NCR register (window.state.ncrs),
+        // not from checklist findings: any non-closed/withdrawn record whose
+        // due date has passed.
+        const todayForOverdue = new Date();
+        todayForOverdue.setHours(0, 0, 0, 0);
+        overdueNCRs = (window.state.ncrs || []).filter(n => {
+            if (['Closed', 'Withdrawn'].includes(n.status)) return false;
+            if (!n.dueDate) return false;
+            const due = new Date(n.dueDate);
+            return !isNaN(due) && due < todayForOverdue;
+        }).length;
 
         const certificatesIssued = (window.state.certificates || []).length || completedAudits;
         const avgComplianceScore = complianceCount > 0 ? Math.round(complianceScoreSum / complianceCount) : 0;
@@ -275,7 +281,7 @@ function renderDashboardEnhanced() {
                             <i class="fa-solid fa-clock" style="font-size: 1.5rem;"></i>
                         </div>
                     </div>
-                    <div style="font-size: 0.75rem; opacity: 0.8;">${overdueNCRs > 0 ? 'Open > 30 days' : 'No overdue NCRs'}</div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;" title="past corrective-action due date">${overdueNCRs > 0 ? 'past corrective-action due date' : 'No overdue NCRs'}</div>
                 </div>
 
                 <!-- Certificates Issued -->
@@ -401,7 +407,7 @@ function renderDashboardEnhanced() {
                                 <div style="padding: 0.75rem; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 6px;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem; color: #991b1b;">
                                         <i class="fa-solid fa-fire"></i>
-                                        <strong>${overdueNCRs} NCR(s) OVERDUE</strong> — open more than 30 days
+                                        <strong>${overdueNCRs} NCR(s) OVERDUE</strong> — past corrective-action due date
                                     </div>
                                 </div>
                             ` : ''}

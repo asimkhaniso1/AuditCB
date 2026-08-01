@@ -272,16 +272,20 @@ window.openIssueCertificateModal = function (reportId) {
     let prefillStandard = '';
     let prefillScope = '';
     let _auditDate = '';
+    let linkedReport = null;
+    let linkedPlan = null;
 
     // Find report data
     if (reportId) {
         const report = state.auditReports.find(r => String(r.id) === String(reportId));
         if (report) {
+            linkedReport = report;
             prefillClient = report.client;
             _auditDate = report.date;
 
             // Try to find plan for accurate scope/standard
             const plan = state.auditPlans.find(p => p.client === report.client);
+            linkedPlan = plan || null;
             if (plan) {
                 prefillScope = plan.scope;
                 prefillStandard = plan.standard;
@@ -346,10 +350,29 @@ window.openIssueCertificateModal = function (reportId) {
                     <label>Decision Justification <span style="color: #dc2626;">*</span></label>
                     <textarea class="form-control" id="cert-justification" rows="3" placeholder="Document the basis for the certification decision, including review of audit findings, NC closure evidence, and overall system effectiveness..." required></textarea>
                 </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label>Certification Decision <span style="color: #dc2626;">*</span></label>
+                    <select class="form-control" id="cert-decision">
+                        ${['Granted', 'Maintained', 'Conditional', 'Suspended', 'Not Recommended', 'Withdrawn'].map(d =>
+        `<option value="${d}">${d}</option>`
+    ).join('')}
+                    </select>
+                </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin: 0;">
                         <label>Decision Maker (Competent Reviewer)</label>
-                        <input type="text" class="form-control" id="cert-reviewer" value="${state.currentUser?.name || 'Certification Manager'}" readonly>
+                        ${(() => {
+        const eligible = (state.users || state.auditors || []).filter(u =>
+            u.role === 'Certification Manager' || u.role === 'Admin'
+        );
+        if (eligible.length) {
+            const currentName = state.currentUser?.name || '';
+            return `<select class="form-control" id="cert-reviewer">
+                                ${eligible.map(u => `<option value="${window.UTILS.escapeHtml(u.name)}" data-role="${window.UTILS.escapeHtml(u.role)}" ${u.name === currentName ? 'selected' : ''}>${window.UTILS.escapeHtml(u.name)} (${window.UTILS.escapeHtml(u.role)})</option>`).join('')}
+                            </select>`;
+        }
+        return `<input type="text" class="form-control" id="cert-reviewer" value="${window.UTILS.escapeHtml(state.currentUser?.name || 'Certification Manager')}">`;
+    })()}
                     </div>
                     <div class="form-group" style="margin: 0;">
                         <label>Independent of Audit Team?</label>
@@ -426,8 +449,48 @@ window.openIssueCertificateModal = function (reportId) {
 
         const scope = Sanitizer.sanitizeText(document.getElementById('cert-scope').value);
         const justification = Sanitizer.sanitizeText(document.getElementById('cert-justification').value);
-        const reviewer = document.getElementById('cert-reviewer').value; // Readonly, safe
+        const reviewerEl = document.getElementById('cert-reviewer');
+        const reviewer = reviewerEl.value;
+        const reviewerRole = (reviewerEl.tagName === 'SELECT' && reviewerEl.selectedOptions[0])
+            ? (reviewerEl.selectedOptions[0].dataset.role || '')
+            : (state.currentUser?.name === reviewer ? (state.currentUser?.role || '') : '');
         const independent = document.getElementById('cert-independent').value;
+        const decision = document.getElementById('cert-decision').value;
+
+        // --- Independence enforcement (ISO 17021-1) ---
+        const auditTeamNames = new Set();
+        if (linkedReport?.leadAuditor) auditTeamNames.add(String(linkedReport.leadAuditor).trim());
+        if (linkedPlan?.leadAuditor) auditTeamNames.add(String(linkedPlan.leadAuditor).trim());
+        const teamList = linkedPlan?.auditTeam || linkedPlan?.audit_team || [];
+        (Array.isArray(teamList) ? teamList : []).forEach(m => {
+            const name = typeof m === 'string' ? m : (m?.name || m?.auditor);
+            if (name) auditTeamNames.add(String(name).trim());
+        });
+
+        const wasOnTeam = auditTeamNames.has(String(reviewer).trim());
+        const independenceViolation = wasOnTeam || independent === 'no';
+
+        let independenceOverride = null;
+        if (independenceViolation) {
+            const isAdmin = (typeof AuthManager !== 'undefined' && AuthManager.hasRole)
+                ? AuthManager.hasRole('Admin')
+                : (state.currentUser?.role === 'Admin');
+
+            if (!isAdmin) {
+                window.showNotification('Certification decision blocked: the decision maker must be independent of the audit team (ISO 17021-1). Only an Admin may override.', 'error');
+                return;
+            }
+
+            const reason = window.prompt('Independence rule would normally block this decision. Enter a reason to override (Admin only):');
+            if (!reason || !reason.trim()) {
+                window.showNotification('Override cancelled: a reason is required to issue this decision.', 'error');
+                return;
+            }
+            independenceOverride = {
+                by: state.currentUser?.name || 'Admin',
+                reason: Sanitizer.sanitizeText(reason.trim())
+            };
+        }
 
         // Capture Selected Sites
         const selectedSiteIndices = Array.from(document.querySelectorAll('#cert-sites-list input:checked')).map(input => parseInt(input.value, 10));
@@ -445,14 +508,17 @@ window.openIssueCertificateModal = function (reportId) {
             sitesCovered: sitesCovered,
             // ISO 17021-1 Decision Record
             decisionRecord: {
+                decision: decision,
                 justification: justification,
                 decisionMaker: reviewer,
+                role: reviewerRole,
                 independentOfAudit: independent === 'yes',
                 ncClosureVerified: ncVerified,
                 scopeVerified: scopeVerified,
-                decisionDate: new Date().toISOString().split('T')[0]
+                decisionDate: new Date().toISOString().split('T')[0],
+                ...(independenceOverride ? { independenceOverride } : {})
             },
-            history: [{ date: new Date().toISOString().split('T')[0], action: 'Initial Certification', user: reviewer }]
+            history: [{ date: new Date().toISOString().split('T')[0], action: `Decision: ${decision}`, user: reviewer }]
         };
 
         state.certifications.push(newCert);

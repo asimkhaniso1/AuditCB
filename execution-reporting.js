@@ -32,11 +32,22 @@
 
     // Build the list of revision-history rows to render on the cover page.
     // Does NOT mutate the report — pure read helper used by both the preview modal and PDF export.
-    // If the report has no recorded history yet, synthesize a single placeholder row so the
-    // table is never empty (draft reports show a "not yet issued" row, final reports show 1.0).
+    // Version bumps now happen ONLY at finalize/re-issue time (see ai-service.js
+    // finalizeAndPublish), recorded to report.issueLog[]. Legacy report.revisionHistory
+    // (from the old +0.1-per-export scheme) is still honored for older reports.
+    // If neither is present, synthesize a single placeholder row so the table is never
+    // empty (draft reports show a "not yet issued" row, final reports show 1.0).
     const getRevisionRows = (report, todayStr) => {
         if (Array.isArray(report.revisionHistory) && report.revisionHistory.length > 0) {
             return report.revisionHistory;
+        }
+        if (Array.isArray(report.issueLog) && report.issueLog.length > 0) {
+            return report.issueLog.map(entry => ({
+                ver: entry.version,
+                date: (entry.at ? new Date(entry.at).toLocaleDateString() : (report.date || todayStr)),
+                author: entry.by || report.leadAuditor || 'Lead Auditor',
+                desc: entry.action === 'reissued' ? 'Revised and re-issued' : 'Initial issue'
+            }));
         }
         const isFinal = report.reportStatus === 'final';
         return [{
@@ -48,41 +59,138 @@
     };
     window._getRevisionRows = getRevisionRows;
 
-    // Advance the report's revisionHistory when exporting a FINAL report.
-    // Called once per export while status === 'final'. Drafts never bump the version.
-    // Mutates report.revisionHistory in place and persists via window.saveData().
-    const bumpRevisionHistoryOnFinalExport = (report, todayStr) => {
-        if (report.reportStatus !== 'final') return;
-        if (!Array.isArray(report.revisionHistory)) report.revisionHistory = [];
-        if (report.revisionHistory.length === 0) {
-            report.revisionHistory.push({
-                ver: '1.0',
-                date: report.date || todayStr,
-                author: report.leadAuditor || 'Lead Auditor',
-                desc: 'Initial issue'
-            });
-        } else {
-            const last = report.revisionHistory[report.revisionHistory.length - 1];
-            const lastVer = parseFloat(last.ver) || 1.0;
-            report.revisionHistory.push({
-                ver: (lastVer + 0.1).toFixed(1),
-                date: todayStr,
-                author: report.leadAuditor || 'Lead Auditor',
-                desc: 'Revised and re-issued'
-            });
-        }
-        if (typeof window.saveData === 'function') window.saveData();
-    };
+    // Deprecated: version no longer bumps on export. Kept as a harmless no-op in case
+    // any other module still calls it. Versioning now lives in ai-service.js
+    // finalizeAndPublish, which appends to report.issueLog[] on finalize/re-issue only.
+    const bumpRevisionHistoryOnFinalExport = () => { /* no-op — see report.issueLog */ };
     window._bumpRevisionHistoryOnFinalExport = bumpRevisionHistoryOnFinalExport;
 
-    // Toggle a report between 'draft' and 'final'. Draft is default. Persists immediately
-    // and re-renders the preview modal so the status pill / watermark hint stay in sync.
+    // Roles permitted to finalize/re-issue or change report status. Mirrors the gate
+    // enforced inside ai-service.js finalizeAndPublish — kept in one place here so both
+    // the toggle button and the finalize action agree on who may act.
+    const REPORT_ISSUANCE_ROLES = ['Lead Auditor', 'Admin', 'Certification Manager'];
+    const hasIssuanceRole = () => {
+        try {
+            if (window.AuthManager && typeof window.AuthManager.hasRole === 'function') {
+                return !!window.AuthManager.hasRole(REPORT_ISSUANCE_ROLES);
+            }
+        } catch (_e) { /* fall through */ }
+        return true; // AuthManager not wired in this environment — fail open rather than lock out.
+    };
+
+    // Toggle a report's status. Only FINALIZE (ai-service.js finalizeAndPublish) may
+    // move a report INTO 'final' — that is the sole path that bumps version, writes
+    // issuedSnapshot, and clears the DRAFT watermark logic. This toggle may only revert
+    // a final report back to 'draft' (e.g. to correct something before re-issuing).
     window.toggleReportStatus = function () {
         const d = window._reportPreviewData;
         if (!d || !d.report) return;
-        d.report.reportStatus = (d.report.reportStatus === 'final') ? 'draft' : 'final';
+        if (!hasIssuanceRole()) {
+            window.showNotification && window.showNotification('You do not have permission to change report status.', 'error');
+            return;
+        }
+        if (d.report.reportStatus === 'final') {
+            if (!confirm('Revert this report to DRAFT? Re-issuing afterwards will require finalizing again.')) return;
+            d.report.reportStatus = 'draft';
+        } else {
+            window.showNotification && window.showNotification('Use "Finalize & Publish" to issue this report as FINAL.', 'info');
+            return;
+        }
         if (typeof window.saveData === 'function') window.saveData();
         window.showReportPreviewModal();
+    };
+
+    // ─── Finding Status editor (report.findingStatus[clause|department]) ──────
+    // Closes the dead read path in report-findings-ops.js findingLifecycle, which
+    // already reads d.report.findingStatus[key].status.
+    const FINDING_STATUS_OPTIONS = [
+        { value: 'open', label: 'Open' },
+        { value: 'corrected_during_audit', label: 'Corrected During Audit' },
+        { value: 'verified', label: 'Verified' },
+        { value: 'pending_verification', label: 'Pending Verification' },
+        { value: 'closed', label: 'Closed' },
+        { value: 'escalated', label: 'Escalated' }
+    ];
+    window._FINDING_STATUS_OPTIONS = FINDING_STATUS_OPTIONS;
+
+    window.updateFindingStatus = function (key, value) {
+        const d = window._reportPreviewData;
+        if (!d || !d.report || !key) return;
+        if (!d.report.findingStatus || typeof d.report.findingStatus !== 'object') d.report.findingStatus = {};
+        d.report.findingStatus[key] = {
+            status: value,
+            date: new Date().toISOString(),
+            by: (window.state && window.state.currentUser && window.state.currentUser.name) || d.report.leadAuditor || 'Unknown'
+        };
+        if (typeof window.saveData === 'function') window.saveData();
+    };
+
+    // ─── Technical Review block (report.technicalReview) ──────────────────────
+    // Structured replacement for the old contenteditable-only technicalReviewer
+    // string. Legacy report.technicalReviewer is still read as a fallback wherever
+    // technicalReview is absent (historical reports).
+    window.updateTechnicalReview = function (field, value) {
+        const d = window._reportPreviewData;
+        if (!d || !d.report || !field) return;
+        if (!d.report.technicalReview || typeof d.report.technicalReview !== 'object') {
+            d.report.technicalReview = { reviewer: d.report.technicalReviewer || '', outcome: '', date: '', notes: '' };
+        }
+        d.report.technicalReview[field] = value;
+        if (typeof window.saveData === 'function') window.saveData();
+    };
+
+    // Resolve the display values for the technical review block, honoring the legacy
+    // string field when the structured object hasn't been recorded yet.
+    const resolveTechnicalReview = (report) => {
+        if (report.technicalReview && typeof report.technicalReview === 'object') {
+            return {
+                reviewer: report.technicalReview.reviewer || '',
+                outcome: report.technicalReview.outcome || '',
+                date: report.technicalReview.date || '',
+                notes: report.technicalReview.notes || '',
+                isLegacy: false
+            };
+        }
+        if (report.technicalReviewer) {
+            return { reviewer: report.technicalReviewer, outcome: '', date: '', notes: '', isLegacy: true };
+        }
+        return { reviewer: '', outcome: '', date: '', notes: '', isLegacy: true };
+    };
+    window._resolveTechnicalReview = resolveTechnicalReview;
+
+    // ─── Recommendation single-source ──────────────────────────────────────────
+    // report.recommendation (manual radio) is authoritative whenever the auditor has
+    // set it. stats.recommendation (auto-derived from NC counts) is shown only as a
+    // small "system-derived" caption so the two never contradict on the printed page.
+    const resolveRecommendation = (report, stats) => {
+        const manual = report && report.recommendation;
+        const auto = stats && stats.recommendation;
+        return {
+            primary: manual || auto || 'Pending',
+            isManual: !!manual,
+            auto: auto || '',
+            showAutoCaption: !!manual && !!auto && manual !== auto
+        };
+    };
+    window._resolveRecommendation = resolveRecommendation;
+
+    // Detect whether a FINAL report's content has drifted since it was issued, so the
+    // preview + PDF can surface a "MODIFIED SINCE ISSUE" banner. Uses the cheap djb2
+    // fingerprint exposed by ai-service.js (window._reportContentHash).
+    window._isModifiedSinceIssue = function (d) {
+        try {
+            if (!d || !d.report || d.report.reportStatus !== 'final') return false;
+            const snap = d.report.issuedSnapshot;
+            if (!snap || !snap.contentHash || typeof window._reportContentHash !== 'function') return false;
+            const rs = d.stats && d.stats.rs;
+            const statsSummaryNow = rs ? {
+                majorNC: rs.majorNC, minorNC: rs.minorNC, observationCount: rs.observationCount,
+                ofiCount: rs.ofiCount, coveragePct: rs.coveragePct, conformityPct: rs.conformityPct,
+                recommendation: rs.recommendation
+            } : null;
+            const currentHash = window._reportContentHash(d.report, statsSummaryNow);
+            return currentHash !== snap.contentHash;
+        } catch (_e) { return false; }
     };
 
     window.generateAuditReport = async function (reportId) {
@@ -488,7 +596,12 @@
             // Blank/unrecognized ncrType on an NC item = pending classification, not silently "Minor".
             const sev = sevRaw === 'major' ? 'Major' : sevRaw === 'minor' ? 'Minor' : 'Minor †';
             const sevStyle = sevRaw === 'major' ? 'background:#fee2e2;color:#991b1b' : 'background:#fef3c7;color:#92400e';
-            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
+            // Key must match report-findings-ops.js buildFindingLifecycleSection exactly:
+            // raw item.clause (not the kbMatch-resolved display clause) + department.
+            const fsKey = String(item.clause || '') + '|' + String(item.department || '');
+            const fsCurrent = (d.report.findingStatus && d.report.findingStatus[fsKey] && d.report.findingStatus[fsKey].status) || 'open';
+            const fsSelect = `<select data-finding-status-key="${window.UTILS.escapeHtml(fsKey)}" onchange="window.updateFindingStatus(this.getAttribute('data-finding-status-key'), this.value)" style="width:100%;padding:5px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.78rem;background:white;">${FINDING_STATUS_OPTIONS.map(o => `<option value="${o.value}" ${o.value === fsCurrent ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`;
+            return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td><td style="padding:10px 14px;">${fsSelect}</td></tr>`;
         }).join('');
         const ncPendingFootnote = d.hydratedProgress.some(i => i.status === 'nc' && !i.ncrType) ? '<div style="margin-top:6px;font-size:0.75rem;color:#94a3b8;">† Pending classification — recorded as NC but severity not yet assigned; shown under Minor pending review.</div>' : '';
 
@@ -536,6 +649,7 @@
             .rp-edit:focus{border-color:#2563eb;background:#f8fafc;}
         </style>
         <div class="rp-modal">
+            ${window._isModifiedSinceIssue(d) ? `<div style="background:#dc2626;color:white;text-align:center;padding:10px 16px;font-weight:700;font-size:0.85rem;letter-spacing:0.3px;">&#9888; MODIFIED SINCE ISSUE — this final report has changed since it was last issued (v${d.report.issuedSnapshot && d.report.issuedSnapshot.version}). Re-issue via Finalize &amp; Publish before distributing.</div>` : ''}
             <div class="rp-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>
@@ -1362,8 +1476,8 @@
                     <div class="rp-sec-hdr" style="border-left-color:#dc2626;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.ncCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
-                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
-                            <tbody>${ncRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:33%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:10%;">Severity</th><th style="padding:10px 14px;text-align:left;width:32%;">Evidence & Remarks</th><th style="padding:10px 14px;text-align:left;width:15%;">Finding Status</th></tr></thead>
+                            <tbody>${ncRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
                         </table>
                         ${ncPendingFootnote}
                     </div>
@@ -1455,7 +1569,11 @@
                 <div class="rp-sec" id="sec-conclusion">
                     <div class="rp-sec-hdr" style="border-left-color:#4338ca;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">10</span>AUDIT CONCLUSION<span style="margin-left:auto;"><i class="fa-solid fa-pen" style="font-size:0.7rem;margin-right:8px;opacity:0.7;"></i><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
-                        <div style="margin-bottom:10px;"><strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;${d.report.recommendation === 'Recommended' ? 'background:#dcfce7;color:#166534;' : d.report.recommendation === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;'}">${d.report.recommendation || 'Pending'}</span></div>
+                        <div style="margin-bottom:10px;">${(function () {
+                            const rec = resolveRecommendation(d.report, d.stats);
+                            return '<strong style="color:#334155;">Recommendation:</strong> <span style="margin-left:6px;padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82rem;' + (rec.primary === 'Recommended' ? 'background:#dcfce7;color:#166534;' : rec.primary === 'Not Recommended' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + rec.primary + '</span>'
+                                + (rec.showAutoCaption ? ' <span style="margin-left:8px;font-size:0.72rem;color:#94a3b8;font-style:italic;">(system-derived: ' + rec.auto + ')</span>' : '');
+                        })()}</div>
                         ${(function () {
                             // Risk Assessment auto-callout
                             const ncClauses = (d.report.checklistProgress || [])
@@ -1485,10 +1603,21 @@
                             </div>
                             <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                                 <div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem;font-weight:600;">Technical Reviewer / Certification Manager</div>
-                                <div id="rp-reviewer-name" class="rp-edit" contenteditable="true" data-placeholder="Click to enter reviewer name" style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:0.5rem;min-height:22px;">${d.report.technicalReviewer || ''}</div>
-                                <div style="border-bottom:2px solid #1e293b;width:100%;margin:1.5rem 0 0.5rem;"></div>
+                                ${(function () {
+                                    const tr = resolveTechnicalReview(d.report);
+                                    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0.5rem;">
+                                        <input type="text" id="rp-tr-reviewer" value="${window.UTILS.escapeHtml(tr.reviewer)}" placeholder="Reviewer name" oninput="window.updateTechnicalReview('reviewer', this.value)" style="padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.9rem;font-weight:700;color:#1e293b;">
+                                        <select id="rp-tr-outcome" onchange="window.updateTechnicalReview('outcome', this.value)" style="padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.85rem;">
+                                            <option value="" ${!tr.outcome ? 'selected' : ''}>Outcome — pending</option>
+                                            <option value="Approved" ${tr.outcome === 'Approved' ? 'selected' : ''}>Approved</option>
+                                            <option value="Returned" ${tr.outcome === 'Returned' ? 'selected' : ''}>Returned</option>
+                                        </select>
+                                    </div>
+                                    <textarea id="rp-tr-notes" placeholder="Technical review notes (optional)" oninput="window.updateTechnicalReview('notes', this.value)" style="width:100%;min-height:44px;padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.82rem;color:#475569;resize:vertical;">${window.UTILS.escapeHtml(tr.notes)}</textarea>`;
+                                })()}
+                                <div style="border-bottom:2px solid #1e293b;width:100%;margin:1rem 0 0.5rem;"></div>
                                 <div style="font-size:0.8rem;color:#64748b;">Signature</div>
-                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <span id="rp-reviewer-date" contenteditable="true" class="rp-edit" style="font-weight:600;">${new Date().toLocaleDateString('en-GB')}</span></div>
+                                <div style="margin-top:1rem;font-size:0.85rem;color:#475569;">Date: <input type="date" id="rp-reviewer-date" value="${resolveTechnicalReview(d.report).date || ''}" oninput="window.updateTechnicalReview('date', this.value)" style="font-weight:600;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;"></div>
                             </div>
                         </div>
                         <div style="margin-top:1.5rem;padding:1rem;background:#f0f9ff;border-radius:8px;font-size:0.82rem;color:#0c4a6e;text-align:center;"><i class="fa-solid fa-shield-halved" style="margin-right:0.5rem;"></i>This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body.</div>
@@ -1503,7 +1632,7 @@
                             <thead><tr style="background:#f0fdfa;"><th style="padding:10px 14px;text-align:left;width:5%;">#</th><th style="padding:10px 14px;text-align:left;width:30%;">Recipient</th><th style="padding:10px 14px;text-align:left;width:25%;">Role</th><th style="padding:10px 14px;text-align:left;width:25%;">Organization</th><th style="padding:10px 14px;text-align:left;width:15%;">Format</th></tr></thead>
                             <tbody id="rp-distribution" class="rp-edit" contenteditable="true">
                                 <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">1</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.leadAuditor || 'Lead Auditor'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Lead Auditor</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Original</td></tr>
-                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.technicalReviewer || 'Technical Reviewer'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
+                                <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">2</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${resolveTechnicalReview(d.report).reviewer || 'Technical Reviewer'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Technical Reviewer</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
                                 <tr><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">3</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;font-weight:600;">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Client Representative</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.report.client}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Copy</td></tr>
                                 <tr style="background:#f8fafc;"><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">4</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Certification Records</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">File / Archive</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">${d.cbName || 'Certification Body'}</td><td style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">Archive</td></tr>
                             </tbody>
@@ -2209,17 +2338,18 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const d = window._reportPreviewData;
         if (!d) return;
         const en = window._reportSectionState || {};
-        // Report status ('draft'|'final') controls the DRAFT watermark and whether the
-        // revision history advances. Only FINAL exports append a new revision row.
+        // Report status ('draft'|'final') controls the DRAFT watermark. Version bumps no
+        // longer happen on export — only finalizeAndPublish (ai-service.js) bumps version,
+        // recorded to report.issueLog[].
         if (!d.report.reportStatus) d.report.reportStatus = 'draft';
-        window._bumpRevisionHistoryOnFinalExport(d.report, d.today);
         const revisionRows = window._getRevisionRows(d.report, d.today);
+        const technicalReviewForDist = resolveTechnicalReview(d.report);
         // Distribution list: capture the operator's edits to the contenteditable tbody,
         // sanitized to strip anything but simple table/text markup, falling back to the
         // original default rows if the region was never touched (or was cleared out).
         const defaultDistributionRows =
             '<tr><td>1</td><td style="font-weight:600;">' + (d.report.leadAuditor || 'Lead Auditor') + '</td><td>Lead Auditor</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Original</td></tr>'
-            + '<tr><td>2</td><td style="font-weight:600;">' + (d.report.technicalReviewer || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
+            + '<tr><td>2</td><td style="font-weight:600;">' + (technicalReviewForDist.reviewer || 'Technical Reviewer') + '</td><td>Technical Reviewer</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Copy</td></tr>'
             + '<tr><td>3</td><td style="font-weight:600;">' + d.report.client + '</td><td>Client Representative</td><td>' + d.report.client + '</td><td>Copy</td></tr>'
             + '<tr><td>4</td><td>Certification Records</td><td>File / Archive</td><td>' + (d.cbName || 'Certification Body') + '</td><td>Archive</td></tr>';
         let editedDistribution = document.getElementById('rp-distribution')?.innerHTML || '';
@@ -2261,9 +2391,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const editedEffComplaints = document.getElementById('rp-eff-complaints')?.innerText || d.report.effComplaints || 'Implemented and effective; conforms to the requirements of the standard.';
         const editedEffMarks = document.getElementById('rp-eff-marks')?.innerText || d.report.effMarks || (isInitialOrStage ? 'Not applicable — initial certification audit.' : 'Usage verified as conforming to CB rules.');
         const editedEffLegal = document.getElementById('rp-eff-legal')?.innerText || d.report.effLegal || 'Implemented and effective; conforms to the requirements of the standard.';
-        const editedReviewerName = document.getElementById('rp-reviewer-name')?.innerText || d.report.technicalReviewer || '';
+        const technicalReview = resolveTechnicalReview(d.report);
+        const editedReviewerName = technicalReview.reviewer || '';
         const editedSigDate = document.getElementById('rp-sig-date')?.innerText || new Date().toLocaleDateString('en-GB');
-        const editedReviewerDate = document.getElementById('rp-reviewer-date')?.innerText || '';
+        const editedReviewerDate = document.getElementById('rp-reviewer-date')?.value || technicalReview.date || '';
+        const modifiedSinceIssue = window._isModifiedSinceIssue(d);
         const editedProgS1 = document.getElementById('rp-prog-s1')?.innerText || '';
         const editedProgS2 = document.getElementById('rp-prog-s2')?.innerText || '';
         const editedProgSv1 = document.getElementById('rp-prog-sv1')?.innerText || '';
@@ -2419,7 +2551,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const sev = sevRaw2 === 'major' ? 'Major' : sevRaw2 === 'minor' ? 'Minor' : 'Minor †';
             const sevBg = sevRaw2 === 'major' ? '#fee2e2' : '#fef3c7';
             const sevFg = sevRaw2 === 'major' ? '#991b1b' : '#92400e';
-            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
+            const fsKey2 = String(item.clause || '') + '|' + String(item.department || '');
+            const fsEntry = d.report.findingStatus && d.report.findingStatus[fsKey2];
+            const fsLabelMap = { open: 'Open', corrected_during_audit: 'Corrected During Audit', verified: 'Verified', pending_verification: 'Pending Verification', closed: 'Closed', escalated: 'Escalated' };
+            const fsBadge = fsEntry && fsEntry.status ? '<div style="margin-top:6px;"><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:0.7rem;font-weight:700;background:#eef2ff;color:#3730a3;">Status: ' + (fsLabelMap[fsEntry.status] || fsEntry.status) + '</span></div>' : '';
+            return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + fsBadge + '</td></tr>';
         }).join('');
 
         // OBS rows for PDF (Observations only)
@@ -2853,7 +2989,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + '</style></head><body>'
             + (d.report.reportStatus === 'draft'
                 ? '<div class="watermark"><span style="color:rgba(220,38,38,0.14);">DRAFT</span></div>'
-                : '<div class="watermark"><span>CONFIDENTIAL</span></div>')
+                : (modifiedSinceIssue
+                    ? '<div class="watermark"><span style="color:rgba(220,38,38,0.16);font-size:48pt;">MODIFIED SINCE ISSUE</span></div>'
+                    : '<div class="watermark"><span>CONFIDENTIAL</span></div>'))
+            + (modifiedSinceIssue ? '<div class="no-print" style="position:sticky;top:0;left:0;right:0;background:#dc2626;color:white;text-align:center;padding:10px 16px;font-weight:700;font-size:0.85rem;letter-spacing:0.3px;z-index:1001;">&#9888; MODIFIED SINCE ISSUE — this final report has changed since it was last issued (v' + (d.report.issuedSnapshot && d.report.issuedSnapshot.version) + '). Re-issue via Finalize &amp; Publish before distributing.</div>' : '')
             + '<div class="rpt-hdr"><div class="rpt-hdr-left">' + (d.cbLogo ? '<img src="' + d.cbLogo + '" class="rpt-hdr-logo" alt="Logo">' : '<div class="rpt-hdr-logo-fallback"></div><span>' + (cbName || 'Certification Body') + '</span>') + '</div><div class="rpt-hdr-center"><div style="font-size:0.62rem;line-height:1.3;margin-bottom:2px;">' + standard + '</div><div style="font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">AUDIT REPORT</div></div><div class="rpt-hdr-right">' + d.report.client + '<br>Ref: ' + d.report.id + '</div></div>'
             + '<div class="rpt-ftr"><div class="rpt-ftr-left">Doc Ref: ' + (d.auditPlan ? window.UTILS.getPlanRef(d.auditPlan) : d.report.id) + '<br>' + (cbName || 'Certification Body') + '</div><div class="rpt-ftr-center">This document is confidential and intended solely for the audited organization.<br>Unauthorized copying or distribution is prohibited.</div><div class="rpt-ftr-right">' + d.today + '</div></div>'
             + '<div class="no-print" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;gap:8px;">'
@@ -3049,7 +3188,11 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '</tbody></table></div>' : '')
             // SECTION: AUDIT CONCLUSION & RECOMMENDATION
             + (secMap['conclusion'] ? '<div id="sec-conclusion" class="sh page-break" style="background:#eff6ff;border-left-color:#1d4ed8;">' + sBadge('conclusion') + 'AUDIT CONCLUSION &amp; RECOMMENDATION</div><div class="sb">'
-                + '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (d.report.recommendation === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : d.report.recommendation === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + (d.report.recommendation || 'Pending') + '</span></div>'
+                + (function () {
+                    const rec = resolveRecommendation(d.report, d.stats);
+                    return '<div style="margin-bottom:16px;"><strong style="color:#334155;">Certification Recommendation:</strong> <span style="margin-left:8px;padding:5px 18px;border-radius:20px;font-weight:700;font-size:0.88rem;' + (rec.primary === 'Recommended' ? 'background:#ecfdf5;color:#15803d;' : rec.primary === 'Not Recommended' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + rec.primary + '</span>'
+                        + (rec.showAutoCaption ? '<span style="margin-left:10px;font-size:0.74rem;color:#94a3b8;font-style:italic;">(system-derived: ' + rec.auto + ')</span>' : '') + '</div>';
+                })()
                 + '<div style="color:#334155;font-size:0.92rem;line-height:1.55;">' + formatRichText(editedConclusion) + '</div>'
                 + '<div style="padding:16px;background:#eff6ff;border-radius:10px;margin-top:16px;border-left:4px solid #1d4ed8;"><strong style="color:#1d4ed8;font-size:0.9rem;">Closing Meeting</strong><table class="info-tbl" style="margin-top:8px;"><tr><td style="width:20%;">Date</td><td>' + (d.report.closingMeeting?.date || '—') + '</td></tr><tr><td>Attendees</td><td>' + (function () { var att = d.report.closingMeeting?.attendees; if (!att) return 'N/A'; if (Array.isArray(att)) return att.map(function (a) { return typeof a === 'object' ? (a.name || '') + (a.role ? ' (' + a.role + ')' : '') : a; }).filter(Boolean).join(', ') || '—'; return String(att); })() + '</td></tr><tr><td>Summary</td><td>' + (fmtRemark(editedClosingSummary) || '—') + '</td></tr><tr><td>Unresolved Issues / Diverging Opinions</td><td>' + editedUnresolved + '</td></tr></table></div>'
                 + '<p style="font-style:italic;font-size:0.8rem;color:#64748b;margin-top:16px;">This audit was conducted through a sampling process of the available information. Consequently, nonconformities may exist which have not been identified within this report.</p>'
@@ -3060,7 +3203,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['signature'] ? '<div id="sec-signature" class="sh page-break" style="background:#f8fafc;border-left-color:#1e293b;">' + sBadge('signature') + 'SIGNATURE &amp; ATTESTATION</div><div class="sb">'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">'
                 + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Lead Auditor</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (d.auditPlan?.team?.[0] || d.report.leadAuditor || '') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedSigDate || d.today) + '</div></div>'
-                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || '____________________') + '</div><div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
+                + '<div style="padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><div style="font-size:0.8rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500;">Technical Reviewer / Certification Manager</div><div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">' + (editedReviewerName || (technicalReview.isLegacy && !editedReviewerName ? 'Not recorded' : '____________________')) + '</div>' + (technicalReview.outcome ? '<div style="font-size:0.82rem;font-weight:700;margin-bottom:6px;color:' + (technicalReview.outcome === 'Approved' ? '#15803d' : '#b91c1c') + ';">Outcome: ' + technicalReview.outcome + '</div>' : '') + (technicalReview.notes ? '<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;">' + window.UTILS.escapeHtml(technicalReview.notes) + '</div>' : '') + '<div style="border-bottom:2px solid #1e293b;width:100%;margin:24px 0 6px;"></div><div style="font-size:0.8rem;color:#64748b;">Signature</div><div style="margin-top:12px;font-size:0.85rem;color:#475569;">Date: ' + (editedReviewerDate || '____________________') + '</div></div>'
                 + '</div>'
                 + '<div style="margin-top:20px;padding:12px;background:#eff6ff;border-radius:8px;font-size:0.82rem;color:#475569;text-align:center;">This report is confidential and intended solely for the audited organization, the certification body, and the accreditation body. Unauthorized copying or distribution is prohibited.</div>'
                 + '</div>' : '')
@@ -3161,7 +3304,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     + '<div style="font-size:0.78rem;letter-spacing:0.18em;color:#64748b;text-transform:uppercase;font-weight:500;margin-bottom:10px;">Audit Completed</div>'
                     + '<div style="font-size:1.5rem;font-weight:700;color:#0f2a43;margin-bottom:6px;">' + d.report.client + '</div>'
                     + '<div style="font-size:0.9rem;color:#475569;margin-bottom:30px;">' + standard + '</div>'
-                    + '<div style="display:inline-block;padding:10px 26px;border:1px solid ' + d.stats.recColor + ';border-radius:6px;color:' + d.stats.recColor + ';font-weight:700;font-size:0.95rem;margin-bottom:34px;">' + d.stats.recommendation + '</div>'
+                    + (function () {
+                        const rec = resolveRecommendation(d.report, d.stats);
+                        const color = rec.isManual ? (rec.primary === 'Recommended' ? '#15803d' : rec.primary === 'Not Recommended' ? '#b91c1c' : '#b45309') : d.stats.recColor;
+                        return '<div style="display:inline-block;padding:10px 26px;border:1px solid ' + color + ';border-radius:6px;color:' + color + ';font-weight:700;font-size:0.95rem;margin-bottom:8px;">' + rec.primary + '</div>'
+                            + (rec.showAutoCaption ? '<div style="font-size:0.72rem;color:#94a3b8;font-style:italic;margin-bottom:26px;">(system-derived: ' + rec.auto + ')</div>' : '<div style="margin-bottom:26px;"></div>');
+                    })()
                     + '<table style="border-collapse:collapse;width:100%;max-width:460px;text-align:left;border-top:1px solid #e7ecf1;border-bottom:1px solid #e7ecf1;margin-bottom:32px;">'
                     + row('Audit Reference', String(d.report.id))
                     + row('Report Status', (d.report.reportStatus === 'final' ? 'Final — Issued' : 'Draft — not yet issued'))

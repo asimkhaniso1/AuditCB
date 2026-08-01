@@ -1665,6 +1665,10 @@ const SupabaseClient = {
                     coverage: report.coverage || null,
                     finding_status: report.findingStatus || null,
                     framework_data: report.frameworkData || null,
+                    // Report Governance V3 (ADD_REPORT_GOVERNANCE_V3.sql)
+                    technical_review: report.technicalReview || null,
+                    issued_snapshot: report.issuedSnapshot || null,
+                    issue_log: report.issueLog || null,
                     updated_at: new Date().toISOString()
                 };
             });
@@ -1708,6 +1712,10 @@ const SupabaseClient = {
             if (updateFields.coverage !== undefined) dbData.coverage = updateFields.coverage;
             if (updateFields.findingStatus !== undefined) dbData.finding_status = updateFields.findingStatus;
             if (updateFields.frameworkData !== undefined) dbData.framework_data = updateFields.frameworkData;
+            // Report Governance V3 (ADD_REPORT_GOVERNANCE_V3.sql)
+            if (updateFields.technicalReview !== undefined) dbData.technical_review = updateFields.technicalReview;
+            if (updateFields.issuedSnapshot !== undefined) dbData.issued_snapshot = updateFields.issuedSnapshot;
+            if (updateFields.issueLog !== undefined) dbData.issue_log = updateFields.issueLog;
 
             const { error } = await this.client
                 .from('audit_reports')
@@ -1854,6 +1862,10 @@ const SupabaseClient = {
                     coverage: report.coverage || fullData.coverage || null,
                     findingStatus: report.finding_status || fullData.findingStatus || null,
                     frameworkData: report.framework_data || fullData.frameworkData || null,
+                    // Report Governance V3 (ADD_REPORT_GOVERNANCE_V3.sql)
+                    technicalReview: report.technical_review || fullData.technicalReview || null,
+                    issuedSnapshot: report.issued_snapshot || fullData.issuedSnapshot || null,
+                    issueLog: report.issue_log || fullData.issueLog || null,
                 };
 
                 const existing = localReports.find(r => String(r.id) === String(report.id));

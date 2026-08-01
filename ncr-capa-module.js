@@ -20,6 +20,105 @@ if (!window.state.capaAnalytics) {
 }
 
 // --------------------------------------------
+// CAR STATUS VOCABULARY (Governance V3)
+// Extended lifecycle for corrective action records.
+// Legacy 4-state vocabulary (Open, In Progress, Verification, Closed)
+// continues to drive `ncr.status`; `carStatus` is a richer, parallel
+// lifecycle field consumed by report-risk-capa / report-findings-ops.
+// --------------------------------------------
+const CAR_STATUSES = [
+    'Draft',
+    'Correction Pending',
+    'RCA Pending',
+    'Plan Pending',
+    'Approved',
+    'In Progress',
+    'Evidence Submitted',
+    'Verification Pending',
+    'Effective',
+    'Ineffective',
+    'Closed',
+    'Reopened',
+    'Withdrawn'
+];
+
+// Map legacy 4-state `status` values onto the extended CAR vocabulary.
+// Anything not in the legacy set passes through unchanged.
+function normalizeCarStatus(s) {
+    if (s === 'Open') return 'Correction Pending';
+    if (s === 'Verification') return 'Verification Pending';
+    return s;
+}
+
+// Reverse mapping: extended carStatus -> legacy 4-state `status` (+ Withdrawn).
+// Keeps every existing open/overdue/filter/analytics code path (which reads
+// ncr.status) working unchanged while carStatus carries the richer lifecycle.
+function legacyStatusFromCar(carStatus) {
+    switch (carStatus) {
+        case 'Withdrawn': return 'Withdrawn';
+        case 'Effective':
+        case 'Closed': return 'Closed';
+        case 'Verification Pending': return 'Verification';
+        case 'Draft':
+        case 'Correction Pending': return 'Open';
+        // RCA Pending, Plan Pending, Approved, In Progress, Evidence Submitted,
+        // Ineffective, Reopened all read as "In Progress" in the legacy pipeline.
+        default: return 'In Progress';
+    }
+}
+
+// Auto-transition rule (task item 2): the furthest CAPA field actually
+// recorded on the NCR determines the CAR status. Order matters — later
+// checks represent a more advanced stage and win.
+function computeAutoCarStatus(ncr) {
+    if (ncr.capaImplementedDate) return 'Verification Pending';
+    if (ncr.correctiveAction) return 'In Progress';
+    if (ncr.rootCause) return 'Plan Pending';
+    if (ncr.correction) return 'RCA Pending';
+    return 'Correction Pending';
+}
+
+// Linear "happy path" stages used to decide whether a manually-selected
+// carStatus should be auto-advanced by newly recorded CAPA fields. Non-linear
+// states (Withdrawn, Effective, Ineffective, Closed, Reopened) are always
+// respected as manual/explicit choices and never auto-bumped.
+const CAR_PROGRESSION = ['Draft', 'Correction Pending', 'RCA Pending', 'Plan Pending', 'Approved', 'In Progress', 'Evidence Submitted', 'Verification Pending'];
+function bumpCarStatus(selected, autoStatus) {
+    const si = CAR_PROGRESSION.indexOf(selected);
+    const ai = CAR_PROGRESSION.indexOf(autoStatus);
+    if (si === -1 || ai === -1) return selected;
+    return ai > si ? autoStatus : selected;
+}
+
+// Render <option> elements for the extended CAR status vocabulary, grouped
+// into sensible stages.
+function carStatusOptionsHTML(selected) {
+    const groups = [
+        { label: 'Intake', values: ['Draft', 'Correction Pending'] },
+        { label: 'Root Cause & Planning', values: ['RCA Pending', 'Plan Pending', 'Approved'] },
+        { label: 'Implementation', values: ['In Progress', 'Evidence Submitted'] },
+        { label: 'Verification', values: ['Verification Pending', 'Effective', 'Ineffective'] },
+        { label: 'Closure', values: ['Closed', 'Reopened', 'Withdrawn'] }
+    ];
+    return groups.map(g => `<optgroup label="${g.label}">${g.values.map(s =>
+        `<option value="${s}" ${selected === s ? 'selected' : ''}>${s}</option>`
+    ).join('')}</optgroup>`).join('');
+}
+
+window.NCRModule = window.NCRModule || {};
+window.NCRModule.CAR_STATUSES = CAR_STATUSES;
+window.NCRModule.normalizeCarStatus = normalizeCarStatus;
+window.NCRModule.legacyStatusFromCar = legacyStatusFromCar;
+window.NCRModule.computeAutoCarStatus = computeAutoCarStatus;
+window.normalizeCarStatus = normalizeCarStatus;
+
+// Helper: is this NCR excluded from active counts/views (withdrawn by checklist auto-sync)?
+function isWithdrawnNCR(n) {
+    return n && n.status === 'Withdrawn';
+}
+window.isWithdrawnNCR = isWithdrawnNCR;
+
+// --------------------------------------------
 // DATA SYNCHRONIZATION (Supabase)
 // --------------------------------------------
 
@@ -62,6 +161,7 @@ window.fetchNCRs = async function () {
             verifiedBy: row.verified_by,
             verifiedDate: row.verified_date,
             effectiveness: row.effectiveness,
+            carStatus: row.car_status,
             evidence: row.evidence || []
         }));
 
@@ -109,6 +209,7 @@ async function persistNCR(ncr) {
         verified_by: ncr.verifiedBy,
         verified_date: toNullable(ncr.verifiedDate),   // DATE column
         effectiveness: ncr.effectiveness,
+        car_status: ncr.carStatus || null,
         evidence: ncr.evidence || []
     };
 
@@ -255,6 +356,10 @@ function getNCRRegisterHTML() {
         ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
+    // Default register view excludes Withdrawn records (still inspectable via the
+    // Status filter dropdown, which offers an explicit "Withdrawn" option).
+    ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
+
     return `
         <div class="fade-in">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -302,6 +407,7 @@ function getNCRRegisterHTML() {
                             <option value="In Progress">In Progress</option>
                             <option value="Verification">Verification</option>
                             <option value="Closed">Closed</option>
+                            <option value="Withdrawn">Withdrawn</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin: 0;">
@@ -343,9 +449,11 @@ function renderNCRTable(ncrs) {
             </thead>
             <tbody>
                 ${ncrs.map(ncr => {
-        const dueDate = new Date(ncr.dueDate);
-        const isOverdue = ncr.status !== 'Closed' && dueDate < today;
-        const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+        const hasDueDate = !!ncr.dueDate;
+        const dueDate = hasDueDate ? new Date(ncr.dueDate) : null;
+        // Missing due date is never "overdue" — it's flagged separately below.
+        const isOverdue = hasDueDate && ncr.status !== 'Closed' && !isWithdrawnNCR(ncr) && dueDate < today;
+        const daysDiff = hasDueDate ? Math.floor((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
 
         return `
                         <tr style="${isOverdue ? 'background: #fef2f2;' : ''}">
@@ -366,9 +474,10 @@ function renderNCRTable(ncrs) {
                                 ${window.UTILS.escapeHtml(ncr.description || '')}
                             </td>
                             <td>
-                                ${ncr.dueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}
-                                ${isOverdue ? '<br><span style="color: #dc2626; font-size: 0.75rem; font-weight: bold;">⚠️ OVERDUE</span>' :
-                daysDiff <= 7 && ncr.status !== 'Closed' ? '<br><span style="color: #f59e0b; font-size: 0.75rem;">⏰ Due Soon</span>' : ''}
+                                ${hasDueDate ? window.UTILS.formatDate(ncr.dueDate) : '-'}
+                                ${!hasDueDate ? '<br><span style="color: #6b7280; font-size: 0.75rem; font-weight: bold;">No due date</span>' :
+                isOverdue ? '<br><span style="color: #dc2626; font-size: 0.75rem; font-weight: bold;">⚠️ OVERDUE</span>' :
+                    daysDiff <= 7 && ncr.status !== 'Closed' ? '<br><span style="color: #f59e0b; font-size: 0.75rem;">⏰ Due Soon</span>' : ''}
                             </td>
                             <td>
                                 <span class="badge" style="background: ${ncr.status === 'Closed' ? '#059669' :
@@ -388,11 +497,11 @@ function renderNCRTable(ncrs) {
                                 <button class="btn btn-sm btn-icon" data-action="deleteNCR" data-id="${ncr.id}" title="Delete" aria-label="Delete">
                                     <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
                                 </button>
-                                ${ncr.status === 'Open' ? `
+                                ${ncr.status === 'Open' || ncr.carStatus === 'Ineffective' || ncr.carStatus === 'Reopened' ? `
                                 <button class="btn btn-sm" style="background: #10b981; color: white; margin-left: 0.25rem;" data-action="openAddCAPAModal" data-id="${ncr.id}" title="Add CAPA" aria-label="Add">
                                     <i class="fa-solid fa-plus" style="margin-right: 0.25rem;"></i>CAPA
                                 </button>` : ''}
-                                ${ncr.status === 'In Progress' && ncr.capaImplementedDate ? `
+                                ${(ncr.status === 'In Progress' || ncr.status === 'Verification') && ncr.capaImplementedDate ? `
                                 <button class="btn btn-sm" style="background: #3b82f6; color: white; margin-left: 0.25rem;" data-action="verifyCAPA" data-id="${ncr.id}" title="Verify CAPA" aria-label="Confirm">
                                     <i class="fa-solid fa-check"></i> Verify
                                 </button>` : ''}
@@ -420,6 +529,9 @@ function filterNCRs() {
     }
 
     let filtered = ncrs.filter(ncr => {
+        // Withdrawn records are hidden from the default ("all") view — they're
+        // still inspectable by explicitly selecting the "Withdrawn" status filter.
+        if (status === 'all' && isWithdrawnNCR(ncr)) return false;
         if (level !== 'all' && ncr.level !== level) return false;
         if (severity !== 'all' && ncr.severity !== severity) return false;
         if (status !== 'all' && ncr.status !== status) return false;
@@ -586,6 +698,9 @@ function getCAPATrackerHTML() {
         ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
+    // CAPA Tracker is a default list view — Withdrawn NCRs no longer require action.
+    ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
+
     const showClosed = window.state.showClosedCAPAs || false;
     if (!showClosed) {
         ncrs = ncrs.filter(n => n.status !== 'Closed');
@@ -658,8 +773,9 @@ function getVerificationHTML() {
         ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
 
-    // Filter for items ready for verification
-    const pendingReview = ncrs.filter(n => n.status === 'Verification' || (n.capaImplementedDate && !n.verifiedDate && n.status === 'In Progress'));
+    // Filter for items ready for verification (Withdrawn records never need verification)
+    const pendingReview = ncrs.filter(n => !isWithdrawnNCR(n) &&
+        (n.status === 'Verification' || (n.capaImplementedDate && !n.verifiedDate && n.status === 'In Progress')));
 
     return `
         <div class="fade-in">
@@ -713,6 +829,8 @@ function getAnalyticsHTML() {
     if (window.state.ncrContextClientId) {
         ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
     }
+    // Analytics exclude Withdrawn NCRs entirely
+    ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
 
     const total = ncrs.length;
     const open = ncrs.filter(n => n.status === 'Open').length;
@@ -720,6 +838,7 @@ function getAnalyticsHTML() {
     const verification = ncrs.filter(n => n.status === 'Verification').length;
     const closed = ncrs.filter(n => n.status === 'Closed').length;
     const today = new Date();
+    // Overdue uses dueDate strictly — missing due dates never count as overdue
     const overdue = ncrs.filter(n => n.status !== 'Closed' && n.dueDate && new Date(n.dueDate) < today).length;
     const effective = ncrs.filter(n => n.effectiveness === 'Effective').length;
     const effectivenessRate = closed > 0 ? Math.round((effective / closed) * 100) : 0;
@@ -860,6 +979,7 @@ function initNCRAnalyticsCharts() {
         if (window.state.ncrContextClientId) {
             ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
         }
+        ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
         const major = ncrs.filter(n => (n.severity || '').toLowerCase() === 'major').length;
         const minor = ncrs.filter(n => (n.severity || '').toLowerCase() === 'minor').length;
         const obs = ncrs.filter(n => {
@@ -896,6 +1016,7 @@ function initNCRAnalyticsCharts() {
         if (window.state.ncrContextClientId) {
             ncrs = ncrs.filter(n => String(n.clientId) === String(window.state.ncrContextClientId));
         }
+        ncrs = ncrs.filter(n => !isWithdrawnNCR(n));
         const open = ncrs.filter(n => n.status === 'Open').length;
         const inProg = ncrs.filter(n => n.status === 'In Progress').length;
         const verif = ncrs.filter(n => n.status === 'Verification').length;
@@ -930,13 +1051,15 @@ window.initNCRAnalyticsCharts = initNCRAnalyticsCharts;
 // --------------------------------------------
 
 function updateNCRAnalytics() {
-    const ncrs = window.state.ncrs || [];
+    // KPI/analytics counts exclude Withdrawn NCRs entirely
+    const ncrs = (window.state.ncrs || []).filter(n => !isWithdrawnNCR(n));
     const today = new Date();
 
     window.state.capaAnalytics = {
         totalNCRs: ncrs.length,
         openNCRs: ncrs.filter(n => n.status !== 'Closed').length,
-        overdueNCRs: ncrs.filter(n => n.status !== 'Closed' && new Date(n.dueDate) < today).length,
+        // Overdue uses dueDate strictly — missing due dates never count as overdue
+        overdueNCRs: ncrs.filter(n => n.status !== 'Closed' && n.dueDate && new Date(n.dueDate) < today).length,
         effectivenessRate: ncrs.length > 0 ? Math.round((ncrs.filter(n => n.effectiveness === 'Effective').length / ncrs.length) * 100) : 0,
     };
 }
@@ -1117,11 +1240,9 @@ window.editNCR = function (ncrId) {
                 </div>
                 <div class="form-group"><label>Status</label>
                     <select id="edit-status" class="form-control">
-                        <option value="Open" ${ncr.status === 'Open' ? 'selected' : ''}>Open</option>
-                        <option value="In Progress" ${ncr.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                        <option value="Verification" ${ncr.status === 'Verification' ? 'selected' : ''}>Verification</option>
-                        <option value="Closed" ${ncr.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                        ${carStatusOptionsHTML(ncr.carStatus === 'Ineffective' ? 'Reopened' : (ncr.carStatus || normalizeCarStatus(ncr.status)))}
                     </select>
+                    ${ncr.carStatus === 'Ineffective' ? '<small style="color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation"></i> Prior verification was Not Effective — this NCR reopens with a new action plan required.</small>' : ''}
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -1140,7 +1261,8 @@ window.editNCR = function (ncrId) {
         ncr.standard = document.getElementById('edit-standard').value;
         ncr.clause = document.getElementById('edit-clause').value;
         ncr.severity = document.getElementById('edit-severity').value;
-        ncr.status = document.getElementById('edit-status').value;
+        ncr.carStatus = document.getElementById('edit-status').value;
+        ncr.status = legacyStatusFromCar(ncr.carStatus);
         ncr.dueDate = document.getElementById('edit-due-date').value;
         ncr.source = document.getElementById('edit-source').value;
         await persistNCR(ncr);
@@ -1183,12 +1305,17 @@ window.openAddCAPAModal = function (ncrId) {
 
     document.getElementById('modal-save').style.display = 'block';
     document.getElementById('modal-save').onclick = async () => {
+        // If this CAPA follows a "Not Effective" verification, this submission
+        // is the required new action plan — clear the Ineffective flag first.
+        if (ncr.carStatus === 'Ineffective') ncr.carStatus = 'Reopened';
         ncr.correction = document.getElementById('capa-corr').value;
         ncr.rootCause = document.getElementById('capa-rc').value;
         ncr.correctiveAction = document.getElementById('capa-ca').value;
         ncr.capaResponsible = document.getElementById('capa-responsible').value;
         ncr.dueDate = document.getElementById('capa-target-date').value;
-        ncr.status = 'In Progress';
+        // Auto-transition CAR status from whichever CAPA fields were actually recorded
+        ncr.carStatus = computeAutoCarStatus(ncr);
+        ncr.status = legacyStatusFromCar(ncr.carStatus);
         await persistNCR(ncr);
         window.closeModal();
         renderNCRCAPAModuleContent(window.state.ncrContextClientId);
@@ -1274,7 +1401,7 @@ window.printNCRRegister = function () {
 
 
 window.verifyCAPA = function (ncrId) {
-    const ncr = window.state.ncrs.find(n => n.id === ncrId);
+    const ncr = window.state.ncrs.find(n => String(n.id) === String(ncrId));
     if (!ncr) return;
 
     document.getElementById('modal-title').textContent = 'Verify CAPA';
@@ -1291,8 +1418,21 @@ window.verifyCAPA = function (ncrId) {
     document.getElementById('modal-save').onclick = async () => {
         ncr.verificationMethod = document.getElementById('ver-method').value;
         ncr.effectiveness = document.getElementById('ver-eff').value;
-        if (ncr.effectiveness === 'Effective') ncr.status = 'Closed';
+        ncr.verifiedBy = window.state.currentUser?.name || 'Auditor';
         ncr.verifiedDate = new Date().toISOString().split('T')[0];
+
+        if (ncr.effectiveness === 'Effective') {
+            ncr.status = 'Closed';
+            ncr.carStatus = 'Closed';
+        } else {
+            // Not Effective: the NCR stays open-equivalent (status is left as-is,
+            // NOT bumped to Closed) — this is no longer a silent dead-end. The
+            // carStatus flags Ineffective; editNCR/openAddCAPAModal auto-set
+            // "Reopened" the next time this record is touched, once a new
+            // action plan is recorded.
+            ncr.carStatus = 'Ineffective';
+            window.showNotification('CAPA verified as Not Effective — a new corrective action plan is required for NCR-' + String(ncr.id).padStart(3, '0') + '.', 'warning');
+        }
 
         await persistNCR(ncr);
         window.closeModal();
@@ -1328,25 +1468,28 @@ window.updateCAPAProgress = function (ncrId) {
             </div>
             <div class="form-group"><label>Status</label>
                 <select id="prog-status" class="form-control">
-                    <option value="Open" ${ncr.status === 'Open' ? 'selected' : ''}>Open</option>
-                    <option value="In Progress" ${ncr.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                    <option value="Verification" ${ncr.status === 'Verification' ? 'selected' : ''}>Ready for Verification</option>
-                    <option value="Closed" ${ncr.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                    ${carStatusOptionsHTML(ncr.carStatus === 'Ineffective' ? 'Reopened' : (ncr.carStatus || normalizeCarStatus(ncr.status)))}
                 </select>
+                ${ncr.carStatus === 'Ineffective' ? '<small style="color: var(--danger-color);"><i class="fa-solid fa-triangle-exclamation"></i> Prior verification was Not Effective — a new action plan is required.</small>' : ''}
             </div>
         </form>
     `;
     document.getElementById('modal-save').style.display = 'block';
     document.getElementById('modal-save').onclick = async () => {
+        // If this update follows a "Not Effective" verification, treat it as
+        // the required new action plan and clear the Ineffective flag.
+        if (ncr.carStatus === 'Ineffective') ncr.carStatus = 'Reopened';
         ncr.rootCause = document.getElementById('prog-rc').value;
         ncr.correctiveAction = document.getElementById('prog-ca').value;
         ncr.capaResponsible = document.getElementById('prog-resp').value;
         ncr.capaImplementedDate = document.getElementById('prog-impl-date').value;
-        ncr.status = document.getElementById('prog-status').value;
-        // Auto-transition: if implementation date set and status is still "In Progress", move to Verification
-        if (ncr.capaImplementedDate && ncr.status === 'In Progress') {
-            ncr.status = 'Verification';
-        }
+        const selectedCar = document.getElementById('prog-status').value;
+        // Auto-transition (replaces old capaImplementedDate->Verification bump):
+        // the furthest CAPA field actually recorded auto-advances the CAR
+        // status, but never regresses a further-along manual selection.
+        const autoCar = computeAutoCarStatus(ncr);
+        ncr.carStatus = bumpCarStatus(selectedCar, autoCar);
+        ncr.status = legacyStatusFromCar(ncr.carStatus);
         await persistNCR(ncr);
         window.closeModal();
         renderNCRCAPAModuleContent(window.state.ncrContextClientId);

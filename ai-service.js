@@ -945,20 +945,138 @@ window.AI_SERVICE = AI_SERVICE;
 // ============================================
 // Moved from smart-workflow-helpers.js for single-file AI logic
 
+// ─── Cheap content fingerprint for issued-report drift detection ──────────────
+// djb2 over a stable JSON serialization of findings + stats. Not cryptographic —
+// good enough to flag "this report changed since it was issued" so exports can
+// warn the operator to re-issue. Shared with execution-reporting.js via
+// window._reportContentHash (loaded after this file, but both are only invoked
+// at user-interaction time, well after both scripts have executed).
+function _djb2Hash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) + h) + str.charCodeAt(i);
+        h = h & 0xFFFFFFFF;
+    }
+    return (h >>> 0).toString(16);
+}
+window._reportContentHash = function (report, statsSummary) {
+    try {
+        const findings = (report.checklistProgress || [])
+            .filter(i => i && i.status === 'nc')
+            .map(i => ({ clause: i.clause, ncrType: i.ncrType, comment: i.comment }));
+        const payload = JSON.stringify({
+            findings,
+            ncrs: report.ncrs || [],
+            statsSummary: statsSummary || null
+        });
+        return _djb2Hash(payload);
+    } catch (e) { return '0'; }
+};
+
+// Roles permitted to finalize/re-issue a report. Enforced here (not just at the
+// button-visibility level) so finalizeAndPublish can't be bypassed by calling it
+// directly.
+const REPORT_ISSUANCE_ROLES = ['Lead Auditor', 'Admin', 'Certification Manager'];
+function _hasReportIssuanceRole() {
+    try {
+        if (window.AuthManager && typeof window.AuthManager.hasRole === 'function') {
+            return !!window.AuthManager.hasRole(REPORT_ISSUANCE_ROLES);
+        }
+    } catch (e) { /* fall through */ }
+    return true; // AuthManager not wired in this environment — fail open rather than lock out.
+}
+
 // 1. Finalize & Publish (One-Click Workflow)
 window.finalizeAndPublish = function (reportId) {
     const report = window.DataService.findAuditReport(reportId);
     if (!report) return;
+
+    if (!_hasReportIssuanceRole()) {
+        window.showNotification && window.showNotification('You do not have permission to finalize this report.', 'error');
+        return;
+    }
+
+    // ─── Issuance gate: hard blockers stop finalize outright; soft warnings need
+    // an explicit confirm before proceeding ───
+    const plan = (window.state && window.state.auditPlans || []).find(p => String(p.id) === String(report.planId));
+    const blockers = [];
+    const warnings = [];
+
+    const scopeText = report.scope || report.auditScope || (plan && (plan.auditObjectives || plan.scope || plan.auditCriteria));
+    if (!scopeText) blockers.push('Audit scope/criteria is not recorded on the report or linked audit plan.');
+
+    if (!report.leadAuditor) blockers.push('Lead auditor is not set on the report.');
+
+    let rs = null;
+    try {
+        if (window.ReportStats && typeof window.ReportStats.build === 'function') {
+            const hydratedProgress = report.checklistProgress || [];
+            const client = (window.state && window.state.clients || []).find(c => String(c.id) === String(report.clientId));
+            rs = window.ReportStats.build({ report, hydratedProgress, auditPlan: plan, client });
+        }
+    } catch (e) { console.error('ReportStats.build failed during finalize gate:', e); }
+
+    const reconciliation = (rs && Array.isArray(rs.reconciliation)) ? rs.reconciliation : [];
+    const hasPendingClassification = reconciliation.some(r => r.code === 'pending_classification')
+        || (report.checklistProgress || []).some(i => i.status === 'nc' && !i.ncrType);
+    if (hasPendingClassification) blockers.push('One or more findings are still pending severity classification.');
+
+    // 'coverage_gap' is downgraded to a warning per spec; every other reconciliation
+    // code is treated as error-level and blocks finalize.
+    reconciliation.forEach(r => {
+        if (r.code === 'coverage_gap') return;
+        blockers.push('Data quality: ' + (r.message || r.code));
+    });
+
+    const coverageGap = reconciliation.find(r => r.code === 'coverage_gap');
+    if (coverageGap) warnings.push(coverageGap.message || 'Audit coverage is incomplete.');
+
+    const auditTypeStr = String((plan && plan.auditType) || report.auditType || '').toLowerCase();
+    const isCertificationType = /stage|surveillance|recert/i.test(auditTypeStr);
+    const reviewOutcome = report.technicalReview && report.technicalReview.outcome;
+    if (isCertificationType && reviewOutcome !== 'Approved') {
+        warnings.push('Technical review outcome is not "Approved" for this certification-type audit.');
+    }
+
+    if (blockers.length) {
+        alert('This report cannot be finalized yet:\n\n- ' + blockers.join('\n- '));
+        return;
+    }
+    if (warnings.length) {
+        const proceed = confirm('The following issues were found but do not block finalization:\n\n- ' + warnings.join('\n- ') + '\n\nFinalize anyway?');
+        if (!proceed) return;
+    }
 
     if (!confirm('Are you sure you want to finalize and publish this report? This will lock the audit.')) return;
 
     // Save current state first
     window.saveChecklist(reportId);
 
+    // ─── Versioning: bump ONLY here, on finalize/re-issue, authored by the ACTUAL
+    // current user (not report.leadAuditor). Replaces the old +0.1-per-export scheme
+    // that lived in execution-reporting.js. ───
+    const issuerName = (window.state && window.state.currentUser && window.state.currentUser.name) || 'Unknown User';
+    const nowIso = new Date().toISOString();
+    if (!Array.isArray(report.issueLog)) report.issueLog = [];
+    const isReissue = report.issueLog.length > 0;
+    const lastVer = isReissue ? (parseFloat(report.issueLog[report.issueLog.length - 1].version) || 1.0) : 0;
+    const newVersion = isReissue ? (lastVer + 0.1).toFixed(1) : '1.0';
+    report.issueLog.push({ version: newVersion, at: nowIso, by: issuerName, action: isReissue ? 'reissued' : 'issued' });
+
+    const statsSummary = rs ? {
+        majorNC: rs.majorNC, minorNC: rs.minorNC, observationCount: rs.observationCount,
+        ofiCount: rs.ofiCount, coveragePct: rs.coveragePct, conformityPct: rs.conformityPct,
+        recommendation: rs.recommendation
+    } : null;
+    const contentHash = window._reportContentHash(report, statsSummary);
+    report.issuedSnapshot = { version: newVersion, issuedAt: nowIso, issuedBy: issuerName, statsSummary, contentHash };
+    // Finalize is the ONLY path that clears the draft/watermark state.
+    report.reportStatus = 'final';
+
     // Update status to FINALIZED directly
     report.status = window.CONSTANTS.STATUS.FINALIZED;
-    report.finalizedAt = new Date().toISOString();
-    report.finalizedBy = window.state.currentUser?.name || 'Lead Auditor';
+    report.finalizedAt = nowIso;
+    report.finalizedBy = issuerName;
 
     // Persist to Database
     (async () => {
@@ -967,6 +1085,7 @@ window.finalizeAndPublish = function (reportId) {
                 status: report.status,
                 data: report
             });
+            if (typeof window.saveData === 'function') window.saveData();
             window.showNotification('Audit Report successfully finalized and published!', 'success');
 
             // Redirect to list after short delay
