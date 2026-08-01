@@ -1660,6 +1660,11 @@ const SupabaseClient = {
                     closing_meeting: report.closingMeeting || {},
                     checklist_progress: report.checklistProgress || [],
                     custom_items: report.customItems || [],
+                    distribution: report.distribution || null,
+                    sampling: report.sampling || null,
+                    coverage: report.coverage || null,
+                    finding_status: report.findingStatus || null,
+                    framework_data: report.frameworkData || null,
                     updated_at: new Date().toISOString()
                 };
             });
@@ -1698,6 +1703,11 @@ const SupabaseClient = {
             if (updateFields.status !== undefined) dbData.status = updateFields.status;
             if (updateFields.conclusion !== undefined) dbData.conclusion = updateFields.conclusion;
             if (updateFields.recommendation !== undefined) dbData.recommendation = updateFields.recommendation;
+            if (updateFields.distribution !== undefined) dbData.distribution = updateFields.distribution;
+            if (updateFields.sampling !== undefined) dbData.sampling = updateFields.sampling;
+            if (updateFields.coverage !== undefined) dbData.coverage = updateFields.coverage;
+            if (updateFields.findingStatus !== undefined) dbData.finding_status = updateFields.findingStatus;
+            if (updateFields.frameworkData !== undefined) dbData.framework_data = updateFields.frameworkData;
 
             const { error } = await this.client
                 .from('audit_reports')
@@ -1839,6 +1849,11 @@ const SupabaseClient = {
                     openingMeeting: report.opening_meeting || fullData.openingMeeting || {},
                     closingMeeting: report.closing_meeting || fullData.closingMeeting || {},
                     ncrs: report.ncrs || fullData.ncrs || [],
+                    distribution: report.distribution || fullData.distribution || null,
+                    sampling: report.sampling || fullData.sampling || null,
+                    coverage: report.coverage || fullData.coverage || null,
+                    findingStatus: report.finding_status || fullData.findingStatus || null,
+                    frameworkData: report.framework_data || fullData.frameworkData || null,
                 };
 
                 const existing = localReports.find(r => String(r.id) === String(report.id));

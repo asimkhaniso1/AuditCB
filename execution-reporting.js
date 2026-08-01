@@ -382,10 +382,15 @@
         ]
             .concat((window.ReportExecutive && window.ReportExecutive.sectionsPreviewToggles) ? window.ReportExecutive.sectionsPreviewToggles() : [])
             .concat((window.ReportScoring && window.ReportScoring.sectionsPreviewToggles) ? window.ReportScoring.sectionsPreviewToggles() : [])
-            .concat((window.ReportRisk && window.ReportRisk.sectionsPreviewToggles) ? window.ReportRisk.sectionsPreviewToggles() : []);
+            .concat((window.ReportRisk && window.ReportRisk.sectionsPreviewToggles) ? window.ReportRisk.sectionsPreviewToggles() : [])
+            .concat((window.ReportOperational && window.ReportOperational.sectionsPreviewToggles) ? window.ReportOperational.sectionsPreviewToggles() : [])
+            .concat((window.ReportFindingsOps && window.ReportFindingsOps.sectionsPreviewToggles) ? window.ReportFindingsOps.sectionsPreviewToggles() : [])
+            .concat((window.ReportFrameworks && window.ReportFrameworks.sectionsPreviewToggles) ? window.ReportFrameworks.sectionsPreviewToggles() : []);
 
+        // Sections whose preview toggle starts unchecked (opt-in annexes).
+        const DEFAULT_OFF = ['carForms'];
         window._reportSectionState = {};
-        sections.forEach(s => { window._reportSectionState[s.id] = !s.hide; });
+        sections.forEach(s => { window._reportSectionState[s.id] = !s.hide && DEFAULT_OFF.indexOf(s.id) < 0; });
 
         // ─── Audit Programme (3-year certification cycle) — preview data ──
         const pvStandard = d.report.standard || d.auditPlan?.standard || 'ISO Standard';
@@ -2600,13 +2605,22 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         const secMapRef = { map: {}, badge: function () { return ''; } };
         const MODULE_PLACEMENT = {
             'exec-summary': 'front', 'exec-dashboard': 'front', 'exec-insights': 'front',
-            'evidence-intel': 'appendix'
+            'evidence-intel': 'appendix',
+            // Universal Audit Framework v2.0 — operational analytics (management tier)
+            'opsCoverage': 'analysis', 'opsAttendance': 'analysis', 'opsSampling': 'analysis',
+            'opsHeatmap': 'analysis', 'reqMatrix': 'analysis', 'findingLifecycle': 'analysis',
+            // …and auditor-facing annexes
+            'opsDistribution': 'appendix', 'evidenceTrace': 'appendix',
+            'carForms': 'appendix', 'fwPack': 'appendix'
         };
         const allModuleSections = []
             .concat(
                 (window.ReportExecutive && window.ReportExecutive.sections) ? window.ReportExecutive.sections(d) : [],
                 (window.ReportScoring && window.ReportScoring.sections) ? window.ReportScoring.sections(d) : [],
-                (window.ReportRisk && window.ReportRisk.sections) ? window.ReportRisk.sections(d) : []
+                (window.ReportRisk && window.ReportRisk.sections) ? window.ReportRisk.sections(d) : [],
+                (window.ReportOperational && window.ReportOperational.sections) ? window.ReportOperational.sections(d) : [],
+                (window.ReportFindingsOps && window.ReportFindingsOps.sections) ? window.ReportFindingsOps.sections(d) : [],
+                (window.ReportFrameworks && window.ReportFrameworks.sections) ? window.ReportFrameworks.sections(d) : []
             )
             .filter(function (s) { return s && s.bodyHtml && en[s.key] !== false; });
         // Preserve the intended reading order within the executive briefing tier.
@@ -2659,7 +2673,12 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             'conformance': '#15803d', 'audit-trails': '#15803d', 'prev-findings': '#15803d',
             'evidence-intel': '#15803d', 'evidence': '#15803d',
             'conclusion': '#0f2a43', 'signature': '#0f2a43',
-            'distribution': '#64748b', 'annexures': '#64748b'
+            'distribution': '#64748b', 'annexures': '#64748b',
+            // Universal Audit Framework v2.0 — Management=slate, Findings=red, Annex=neutral
+            'opsCoverage': '#475569', 'opsAttendance': '#475569', 'opsSampling': '#475569',
+            'opsHeatmap': '#475569', 'reqMatrix': '#475569',
+            'findingLifecycle': '#b91c1c', 'carForms': '#b91c1c',
+            'evidenceTrace': '#15803d', 'opsDistribution': '#64748b', 'fwPack': '#0f2a43'
         };
         sectionDefs.forEach(function (s) { if (SECTION_CATEGORY_COLOR[s.key]) s.color = SECTION_CATEGORY_COLOR[s.key]; });
         const secMap = {};
