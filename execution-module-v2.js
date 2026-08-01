@@ -301,8 +301,9 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                                  <div>
                                      <label style="font-size: 0.8rem;">Severity</label>
                                      <div style="display: flex; gap: 5px;">
-                                         <select id="ncr-type-${uniqueId}" class="form-control form-control-sm">
-                                             <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${!saved.ncrType || saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation (OBS)</option>
+                                         <select id="ncr-type-${uniqueId}" class="form-control form-control-sm" style="${!saved.ncrType || saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'border-color: var(--warning-color, #f59e0b); box-shadow: 0 0 0 1px var(--warning-color, #f59e0b);' : ''}">
+                                             <option value="${window.CONSTANTS.NCR_TYPES.PENDING}" ${!saved.ncrType || saved.ncrType === window.CONSTANTS.NCR_TYPES.PENDING ? 'selected' : ''}>— Select classification —</option>
+                                             <option value="${window.CONSTANTS.NCR_TYPES.OBSERVATION}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OBSERVATION ? 'selected' : ''}>Observation (OBS)</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.OFI}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.OFI ? 'selected' : ''}>Opportunity for Improvement (OFI)</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.MINOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MINOR ? 'selected' : ''}>Minor NC</option>
                                              <option value="${window.CONSTANTS.NCR_TYPES.MAJOR}" ${saved.ncrType === window.CONSTANTS.NCR_TYPES.MAJOR ? 'selected' : ''}>Major NC</option>
@@ -854,7 +855,10 @@ function renderExecutionTab(report, tabName, contextData = {}) {
 
             const isReadyToSubmit = allFindings.length === 0 || allFindings.every(f => f.type !== 'pending');
             const currentUserRole = window.state.currentUser?.role || 'Auditor';
-            const canOneClickFinalize = ['Lead Auditor', 'Admin', 'Certification Manager', 'Manager'].includes(currentUserRole);
+            const finalizeRoles = ['Lead Auditor', 'Admin', 'Certification Manager'];
+            const canOneClickFinalize = (typeof window.AuthManager?.hasRole === 'function')
+                ? finalizeRoles.some(r => window.AuthManager.hasRole(r))
+                : finalizeRoles.some(r => String(currentUserRole).toLowerCase() === r.toLowerCase());
 
             let primaryActionBtn;
 
@@ -1615,7 +1619,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 const comment = Sanitizer.sanitizeText(document.getElementById('comment-' + uniqueId)?.value || '');
                 const ncrDesc = Sanitizer.sanitizeText(document.getElementById('ncr-desc-' + uniqueId)?.value || '');
                 const transcript = Sanitizer.sanitizeText(document.getElementById('ncr-transcript-' + uniqueId)?.value || '');
-                const ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
+                let ncrType = document.getElementById('ncr-type-' + uniqueId)?.value || '';
+                // Contradictory-data guard: only persist a classification when the
+                // item is actually marked NC; clear stale classification otherwise.
+                if (status !== 'nc') {
+                    ncrType = '';
+                }
 
                 // Get all evidence images from thumbnail strip
                 const previewDiv = document.getElementById('evidence-preview-' + uniqueId);
@@ -1831,7 +1840,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
         // ── Sync checklist NC items → NCR & CAPA Register ──
         // ISO 17021-1 requires NCRs to flow into the formal CAPA lifecycle
         try {
-            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc');
+            // Only Major/Minor NCs get a formal CAPA register record — Observations,
+            // OFIs, and pending_classification items need no corrective action
+            // (see ncr-capa-module.js:539) and must never be written to state.ncrs/audit_ncrs.
+            const isRegisterSeverity = (t) => ['major', 'minor'].includes(String(t || '').toLowerCase());
+            const ncItems = (report.checklistProgress || []).filter(p => p.status === 'nc' && isRegisterSeverity(p.ncrType));
             if (!window.state.ncrs) window.state.ncrs = [];
             const assignedChecklists = [];
             // Resolve client by name first, then by ID as fallback
@@ -1842,7 +1855,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 assignedChecklists.push(...client.data.assignedChecklists);
             }
 
-            // Track which sourceKeys are still active NC
+            const persist = (rec) => {
+                if (typeof persistNCR === 'function') persistNCR(rec).catch(e => console.warn('NCR sync persist error:', e));
+                else if (window.persistNCR) window.persistNCR(rec).catch(e => console.warn('NCR sync persist error:', e));
+            };
+
+            // Track which sourceKeys are still active major/minor NC
             const activeSourceKeys = new Set();
 
             ncItems.forEach(item => {
@@ -1853,10 +1871,28 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 // Check if already synced
                 const existing = window.state.ncrs.find(n => n._sourceKey === sourceKey);
                 if (existing) {
-                    // Update severity/description if changed
-                    existing.severity = item.ncrType || 'Observation';
-                    existing.description = item.ncrDescription || item.comment || existing.description;
-                    return;
+                    // Legacy records created by the old buggy behavior (severity was
+                    // Observation/OFI) are no longer valid register entries — withdraw
+                    // them and create a fresh Major/Minor record instead.
+                    const legacySeverity = !isRegisterSeverity(existing.severity);
+                    if (legacySeverity) {
+                        existing.status = 'Withdrawn';
+                        persist(existing);
+                    } else {
+                        // Update severity/description/dueDate if changed
+                        const newSeverity = item.ncrType || existing.severity;
+                        if (String(newSeverity).toLowerCase() !== String(existing.severity).toLowerCase()) {
+                            const today = new Date();
+                            const due = new Date(today);
+                            due.setDate(today.getDate() + (String(newSeverity).toLowerCase() === 'major' ? 90 : 30));
+                            existing.dueDate = due.toISOString().split('T')[0];
+                        }
+                        existing.severity = newSeverity;
+                        existing.description = item.ncrDescription || item.comment || existing.description;
+                        existing.status = existing.status === 'Withdrawn' ? 'Open' : existing.status;
+                        persist(existing);
+                        return;
+                    }
                 }
 
                 // Resolve clause text
@@ -1872,6 +1908,12 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     }
                 }
 
+                // Severity-based default due date (matches ncr-capa-module.js:1015-1026)
+                const severity = item.ncrType || 'Minor';
+                const today = new Date();
+                const due = new Date(today);
+                due.setDate(today.getDate() + (String(severity).toLowerCase() === 'major' ? 90 : 30));
+
                 // Create new NCR record
                 const ncrRecord = {
                     _sourceKey: sourceKey,
@@ -1882,11 +1924,11 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                     source: 'checklist',
                     standard: report.standard || '',
                     clause: clauseText,
-                    severity: item.ncrType || 'Observation',
+                    severity: severity,
                     description: item.ncrDescription || item.comment || 'Non-conformity identified during audit',
                     raisedBy: report.auditor || 'Auditor',
                     raisedDate: new Date().toISOString().split('T')[0],
-                    dueDate: null,                           // null for DATE column
+                    dueDate: due.toISOString().split('T')[0],
                     status: 'Open',
                     correction: '',
                     rootCause: '',
@@ -1897,17 +1939,21 @@ function renderExecutionTab(report, tabName, contextData = {}) {
                 window.state.ncrs.push(ncrRecord);
 
                 // Persist to Supabase async (fire-and-forget)
-                if (typeof persistNCR === 'function') {
-                    persistNCR(ncrRecord).catch(e => console.warn('NCR sync persist error:', e));
-                } else if (window.persistNCR) {
-                    window.persistNCR(ncrRecord).catch(e => console.warn('NCR sync persist error:', e));
-                }
+                persist(ncrRecord);
             });
 
-            // Remove register entries for items no longer marked NC
-            window.state.ncrs = window.state.ncrs.filter(n => {
-                if (!n._sourceKey || !n._sourceKey.startsWith(`exec-${reportId}-`)) return true;
-                return activeSourceKeys.has(n._sourceKey);
+            // Items that are no longer Major/Minor NC (downgraded, cleared, or
+            // reclassified to Observation/OFI/pending) get their register record
+            // marked Withdrawn — both locally and via the existing save/persist
+            // path — instead of being hard-deleted, which previously left orphaned
+            // rows in Supabase. Consumers of state.ncrs (e.g. open-count/overdue
+            // widgets) must exclude status:'Withdrawn'.
+            window.state.ncrs.forEach(n => {
+                if (!n._sourceKey || !n._sourceKey.startsWith(`exec-${reportId}-`)) return;
+                if (!activeSourceKeys.has(n._sourceKey) && n.status !== 'Withdrawn') {
+                    n.status = 'Withdrawn';
+                    persist(n);
+                }
             });
 
             if (typeof updateNCRAnalytics === 'function') updateNCRAnalytics();

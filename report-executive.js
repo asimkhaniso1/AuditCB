@@ -108,10 +108,11 @@
         return t === 'observation' || t === 'ofi';
     });
 
+    const UNASSIGNED_LABEL = 'Unassigned / Cross-functional';
     const getDepartments = (d) => {
         const depts = {};
         safeArr(d && d.hydratedProgress).forEach(item => {
-            const dept = (item.department && String(item.department).trim()) || 'General';
+            const dept = (item.department && String(item.department).trim()) || UNASSIGNED_LABEL;
             if (!depts[dept]) depts[dept] = { total: 0, conform: 0, nc: 0, major: 0, minor: 0, hasEvidence: 0 };
             depts[dept].total++;
             if (item.status === 'conform') depts[dept].conform++;
@@ -229,7 +230,7 @@ Return ONLY the raw JSON object, no markdown fences.`;
         const deptEntries = Object.entries(depts);
 
         const strengths = [];
-        const conformPct = stats.applicableCount ? Math.round((stats.conformCount / stats.applicableCount) * 100) : 0;
+        const conformPct = computeConformPct(d, stats) ?? 0;
         if (conformPct >= 70) strengths.push(`Strong overall conformity across assessed clauses (${conformPct}% of applicable items conforming).`);
         deptEntries.filter(([, v]) => v.total > 0 && v.nc === 0).slice(0, 3).forEach(([name]) => strengths.push(`${name} demonstrated full conformity during this audit.`));
         if (!strengths.length) strengths.push('No specific department-level strengths could be isolated from available data.');
@@ -305,6 +306,7 @@ ${briefHtml}
   <div class="b4-glance-item">
     <div class="b4-eyebrow">Conformity Score</div>
     <div class="b4-glance-value">${g.conformPct != null ? g.conformPct + '%' : '—'}</div>
+    ${g.coveragePct != null ? `<div class="b4-caption">${g.coveragePct}% coverage</div>` : ''}
   </div>
   <div class="b4-glance-item">
     <div class="b4-eyebrow">Recommendation</div>
@@ -372,12 +374,46 @@ ${data.forwardOutlook ? `
 <p class="b4-body" style="margin:0;">${esc(data.forwardOutlook)}</p>` : ''}`;
     }
 
+    // Prefers the canonical window.ReportStats conformityPct (blank-status
+    // excluded, advisories treated as conforming-with-comment) when the module
+    // is available; falls back to conform+advisories over assessed, blank-excluded.
+    function computeConformPct(d, stats) {
+        try {
+            if (window.ReportStats && typeof window.ReportStats.build === 'function') {
+                const ds = window.ReportStats.build(d || {});
+                if (ds && ds.conformityPct != null) return ds.conformityPct;
+            }
+        } catch (_e) { /* fall through to legacy calc */ }
+        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na');
+        if (!items.length) return null;
+        const conform = items.filter(i => i.status === 'conform').length;
+        const advisories = items.filter(i => i.status === 'nc' && ['observation', 'ofi'].includes((i.ncrType || '').toLowerCase())).length;
+        return Math.round(((conform + advisories) / items.length) * 100);
+    }
+
+    // Coverage: assessed applicable items / total applicable items (blank-status
+    // items reduce coverage; 'na' items are excluded from both sides).
+    function computeCoveragePct(d) {
+        try {
+            if (window.ReportStats && typeof window.ReportStats.build === 'function') {
+                const ds = window.ReportStats.build(d || {});
+                if (ds && ds.coveragePct != null) return ds.coveragePct;
+            }
+        } catch (_e) { /* fall through */ }
+        const all = safeArr(d && d.hydratedProgress).filter(i => i.status !== 'na');
+        if (!all.length) return null;
+        const assessed = all.filter(i => !!i.status).length;
+        return Math.round((assessed / all.length) * 100);
+    }
+
     function buildGlance(d, data) {
         const stats = getStats(d);
-        const conformPct = stats.applicableCount ? Math.round((stats.conformCount / stats.applicableCount) * 100) : null;
+        const conformPct = computeConformPct(d, stats);
+        const coveragePct = computeCoveragePct(d);
         const recShort = (stats.recommendation || data.recommendation || '').split(/[.;]/)[0].trim().substring(0, 40);
         return {
             conformPct,
+            coveragePct,
             majorNC: stats.majorNC || 0,
             minorNC: stats.minorNC || 0,
             recommendationShort: recShort
@@ -546,7 +582,8 @@ ${data.forwardOutlook ? `
     const DOC_REVIEW_RX = /\b(document|procedure|record|policy|manual|register|log|form|report|certificate)s?\b.{0,20}\b(review|reviewed|verified|checked|examined|inspected|sighted|seen)\b|\b(review|reviewed|verified|checked|examined)\b.{0,20}\b(document|procedure|record|policy|manual|register|log|form|report|certificate)s?\b/i;
 
     function computeEvidenceIntel(d) {
-        const items = safeArr(d && d.hydratedProgress).filter(i => i.status !== 'na');
+        // Exclude both 'na' and blank/not-assessed items from the applicable set.
+        const items = safeArr(d && d.hydratedProgress).filter(i => i.status && i.status !== 'na');
         const total = items.length;
         let withEvidence = 0;
         let totalPhotos = 0;
@@ -592,8 +629,10 @@ ${data.forwardOutlook ? `
                     timestamp: item.timestamp || item.capturedAt || item.date || null
                 });
             } else {
-                // "findings with no evidence" — prioritize NC items, but also flag conform items lacking evidence
-                const hasFinding = item.status === 'nc' || !!(item.comment && item.comment.trim());
+                // "findings with no evidence" — only genuine non-conformities are
+                // findings; a conforming item with a comment is a noted remark,
+                // not a finding, and must not appear in this table.
+                const hasFinding = item.status === 'nc';
                 if (hasFinding) {
                     missingEvidence.push({
                         clause: clauseLabel(item),

@@ -174,15 +174,30 @@
     };
 
     // ── Core scoring ──────────────────────────────────────────────────────────
+    // Advisory items (status 'nc' + ncrType observation/ofi) are excluded from
+    // the blank-status bucket, count as applicable, and count as
+    // conforming-equivalent for the compliance score (they don't reduce it) —
+    // but they are NOT counted in `conforming` itself so callers that need the
+    // literal conform count still get it. `applicable` excludes both 'na' AND
+    // blank/missing status (not-assessed items are neither applicable-assessed
+    // nor conforming/NC).
+    function isAdvisory(i) {
+        if (i?.status !== 'nc') return false;
+        const t = (i?.ncrType || '').toLowerCase();
+        return t === 'observation' || t === 'ofi';
+    }
     function scoreItems(items) {
         const total = items.length;
-        const applicable = items.filter((i) => i?.status !== 'na');
+        const applicable = items.filter((i) => i?.status && i.status !== 'na');
         const conforming = items.filter((i) => i?.status === 'conform');
+        const advisories = applicable.filter(isAdvisory);
         const majors = items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'major');
         const minors = items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'minor');
         const withEvidence = items.filter((i) => i?.evidenceImage || (Array.isArray(i?.evidenceImages) && i.evidenceImages.length > 0));
 
-        const complianceScore = pct(conforming.length, applicable.length);
+        // Advisories are conforming-equivalent for the compliance score (they
+        // do not reduce it) without being double counted as literal conforms.
+        const complianceScore = pct(conforming.length + advisories.length, applicable.length);
         // Risk score: start at 100, penalize per major/minor NC (heavier for majors), floor at 0.
         const riskPenalty = majors.length * 12 + minors.length * 5;
         const riskScore = clamp(100 - riskPenalty, 0, 100);
@@ -199,13 +214,14 @@
         items.forEach((item) => {
             const theme = themeForClause(item?.clause, family);
             if (!theme || !agg[theme]) return;
-            if (item?.status === 'na') return;
+            if (!item?.status || item.status === 'na') return; // blank/not-assessed and na both excluded
             agg[theme].applicable++;
             if (item?.status === 'conform') agg[theme].conforming++;
             if (item?.status === 'nc') {
                 const t = (item?.ncrType || '').toLowerCase();
                 if (t === 'major') agg[theme].majors++;
                 else if (t === 'minor') agg[theme].minors++;
+                else if (t === 'observation' || t === 'ofi') agg[theme].conforming++; // advisory: conforming-equivalent, doesn't reduce theme score
             }
         });
 
@@ -270,8 +286,12 @@
         });
         return Object.values(byDept).map((d) => {
             const s = scoreItems(d.items);
-            const ncCount = d.items.filter((i) => i?.status === 'nc').length;
+            // ncCount = real non-conformities only (majors + minors) — advisories
+            // and pending-classification items are not "NCs" for risk purposes.
             const majors = d.items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'major').length;
+            const minors = d.items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'minor').length;
+            const ncCount = majors + minors;
+            const advisories = d.items.filter(isAdvisory).length;
             let riskLevel = 'Low';
             if (majors > 0) riskLevel = 'High';
             else if (ncCount > 2) riskLevel = 'Medium';
@@ -286,9 +306,14 @@
                 n,
                 insufficientSample,
                 maturity: maturityScore,
+                // `findings` kept as the total item count (existing consumers may
+                // rely on this semantic); real findings + advisories are broken
+                // out separately below for displays that need the true split.
                 findings: d.items.length,
                 ncCount,
                 majors,
+                minors,
+                advisories,
                 riskLevel,
                 needsAttention: majors > 0 || (score != null && score < 60)
             };
@@ -312,17 +337,17 @@
         const byClause = {};
         items.forEach((item) => {
             const clause = item?.clause || 'General';
-            if (!byClause[clause]) byClause[clause] = { clause, total: 0, conform: 0, nc: 0, major: 0, minor: 0, title: item?.kbMatch?.title || '', items: [] };
+            if (!byClause[clause]) byClause[clause] = { clause, total: 0, conform: 0, nc: 0, major: 0, minor: 0, advisories: 0, title: item?.kbMatch?.title || '', items: [] };
             const row = byClause[clause];
             row.items.push(item);
-            if (item?.status === 'na') return;
+            if (!item?.status || item.status === 'na') return; // blank/not-assessed and na excluded from row totals
             row.total++;
             if (item?.status === 'conform') row.conform++;
             if (item?.status === 'nc') {
-                row.nc++;
                 const t = (item?.ncrType || '').toLowerCase();
-                if (t === 'major') row.major++;
-                if (t === 'minor') row.minor++;
+                if (t === 'major') { row.nc++; row.major++; }
+                else if (t === 'minor') { row.nc++; row.minor++; }
+                else if (t === 'observation' || t === 'ofi') { row.advisories++; } // advisory in its own column, not counted as nc
             }
         });
         const rows = Object.values(byClause);
@@ -347,7 +372,7 @@
             if (prevReport) {
                 const prevFailedClauses = new Set(
                     (prevReport.checklistProgress || [])
-                        .filter((p) => p?.status === 'nc')
+                        .filter((p) => p?.status === 'nc' && ['major', 'minor'].includes((p?.ncrType || '').toLowerCase()))
                         .map((p) => p?.clause)
                         .filter(Boolean)
                 );
@@ -461,8 +486,8 @@
             if (pool.some((p) => p.clause === r.clause)) return; // already represented via a major/minor row
             pool.push({ title: `Clause ${r.clause}${r.title ? ' — ' + r.title : ''} (recurring from previous audit)`, level: 'Recurring', clause: r.clause });
         });
-        items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'observation')
-            .forEach((i) => pool.push({ title: label(i, 'Observation'), level: 'Observation', clause: i?.clause }));
+        // Majors/minors (and recurring clauses already backed by one) only —
+        // observations/OFIs are advisory, not risks, and must not pad this list.
         return { list: pool.slice(0, 5).map((p) => ({ title: p.title, level: p.level })), total: pool.length };
     }
 
@@ -539,8 +564,8 @@
     }
 
     function capaProgressFromItems(items, ncrs) {
-        const capaItems = (items || []).filter((i) => i?.status === 'nc' && !!i?.caDueDate);
-        const capaNcrs = (ncrs || []).filter((n) => !!n?.caDueDate);
+        const capaItems = (items || []).filter((i) => i?.status === 'nc' && ['major', 'minor'].includes((i?.ncrType || '').toLowerCase()) && !!i?.caDueDate);
+        const capaNcrs = (ncrs || []).filter((n) => !!n?.caDueDate && (!n?.type || ['major', 'minor'].includes(String(n.type).toLowerCase())));
         const total = capaItems.length + capaNcrs.length;
         if (total === 0) return null; // no CAPA data — omit card gracefully
         const closed = capaItems.filter((i) => !!i?.caClosed).length + capaNcrs.filter((n) => !!n?.caClosed).length;
@@ -665,10 +690,22 @@
         const trends = computeTrends(report, allReports, family);
 
         const stats = d?.stats || {};
-        const majorNC = stats.majorNC ?? items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'major').length;
-        const minorNC = stats.minorNC ?? items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'minor').length;
-        const obsCount = items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'observation').length;
-        const ofiCount = items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'ofi').length;
+        // Prefer the canonical ReportStats dataset for these headline counts when
+        // available so this module never disagrees with the shared source of truth.
+        let statsDataset = null;
+        try {
+            if (global.ReportStats && typeof global.ReportStats.build === 'function') {
+                statsDataset = global.ReportStats.build(d || {});
+            }
+        } catch (_e) { statsDataset = null; }
+        const majorNC = statsDataset ? statsDataset.resultCounts.majorNC
+            : (stats.majorNC ?? items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'major').length);
+        const minorNC = statsDataset ? statsDataset.resultCounts.minorNC
+            : (stats.minorNC ?? items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'minor').length);
+        const obsCount = statsDataset ? statsDataset.advisories.observation
+            : items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'observation').length;
+        const ofiCount = statsDataset ? statsDataset.advisories.ofi
+            : items.filter((i) => i?.status === 'nc' && (i?.ncrType || '').toLowerCase() === 'ofi').length;
         const capaProgress = capaProgressFromItems(items, report.ncrs);
 
         const risksBuilt = buildTop5Risks(items, clauseIntel);

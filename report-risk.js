@@ -165,6 +165,13 @@
         };
     }
 
+    // Dedupe key for "same underlying issue" — same clause + department, so a
+    // manual NCR entry describing the same checklist finding doesn't show up
+    // as a second, unrelated register row.
+    function findingDedupeKey(clause, department) {
+        return String(clause || '').trim().toLowerCase() + '|' + String(department || '').trim().toLowerCase();
+    }
+
     function collectFindings(d) {
         // Prefer the hydrated items (they carry resolved kbMatch/evidence); fall back to
         // the raw stored progress so this still works if hydration was skipped.
@@ -172,17 +179,31 @@
         var checklist = hydrated.length ? hydrated : ((d && d.report && d.report.checklistProgress) || []);
         var ncrs = (d && d.report && d.report.ncrs) || [];
         var out = [];
+        var seenKeys = {};
         checklist.forEach(function (item, i) {
             if (!item) return;
             var status = (item.status || '').toLowerCase();
             var ncrType = (item.ncrType || '').toLowerCase();
-            if (status === 'nc' && ncrType && ncrType !== 'observation' && ncrType !== 'ofi') {
-                out.push(normalizeFinding(item, 'checklist', i));
+            // Only real major/minor non-conformities are "findings" here —
+            // observations, OFIs, and unclassified 'nc' items are excluded.
+            if (status === 'nc' && (ncrType === 'major' || ncrType === 'minor')) {
+                var f = normalizeFinding(item, 'checklist', i);
+                seenKeys[findingDedupeKey(f.clause, f.department)] = true;
+                out.push(f);
             }
         });
         ncrs.forEach(function (ncr, i) {
             if (!ncr) return;
-            out.push(normalizeFinding(ncr, 'ncr', i));
+            var type = (ncr.ncrType || ncr.type || '').toLowerCase();
+            // report.ncrs entries: major/minor only, and skip anything that
+            // duplicates a checklist finding already collected for the same
+            // clause + department (one issue, one register row).
+            if (type !== 'major' && type !== 'minor') return;
+            var f = normalizeFinding(ncr, 'ncr', i);
+            var key = findingDedupeKey(f.clause, f.department);
+            if (seenKeys[key]) return;
+            seenKeys[key] = true;
+            out.push(f);
         });
         return out;
     }
@@ -216,11 +237,19 @@
             if (startTime !== null) startTime -= 7 * 86400000;
             if (endTime !== null) endTime += 7 * 86400000;
 
+            // Register severity strings are 'Major'/'Minor'/'Observation' (capitalized,
+            // and ofi may hide in lowercase) — only Major/Minor records belong on the
+            // risk/CAPA views this data feeds, case-insensitive.
+            var SEVERITY_RX = /^major|minor$/i;
+            function isMajorMinorRecord(n) {
+                return SEVERITY_RX.test(String((n && (n.severity || n.type)) || '').trim());
+            }
+
             var matched = [];
             var matchedIds = {};
 
             ncrs.forEach(function (n) {
-                if (!n) return;
+                if (!n || !isMajorMinorRecord(n)) return;
                 if (planId != null && n.auditId != null && String(n.auditId) === String(planId)) {
                     matched.push(n);
                     if (n.id != null) matchedIds[String(n.id)] = true;
@@ -228,7 +257,7 @@
             });
 
             ncrs.forEach(function (n) {
-                if (!n) return;
+                if (!n || !isMajorMinorRecord(n)) return;
                 if (n.id != null && matchedIds[String(n.id)]) return;
                 if (clientId == null || n.clientId == null || String(n.clientId) !== String(clientId)) return;
                 if (!n.clause || !findingClauses[String(n.clause).trim()]) return;
@@ -266,24 +295,30 @@
 
     // ─── scoreFinding ───────────────────────────────────────────────────────
 
+    // scoreFinding only scores real major/minor non-conformities. Callers MUST
+    // filter out null results (an observation/OFI/unclassified finding has no
+    // business being on the risk heatmap or risk register).
     function scoreFinding(finding) {
         finding = finding || {};
         var text = String(finding.text || finding.comment || '').toLowerCase();
         var clause = finding.clause || finding.clauseRef || '';
-        var ncrType = String(finding.ncrType || finding.type || 'Minor');
+        var ncrType = String(finding.ncrType || finding.type || '');
+        var isMajor = /^major$/i.test(ncrType);
+        var isMinor = /^minor$/i.test(ncrType);
+        if (!isMajor && !isMinor) return null;
         var theme = clauseTheme(clause);
 
         // Likelihood (1-5): base by severity, then adjust for systemic/recurrence wording.
-        var likelihood = /major/i.test(ncrType) ? 4 : /minor/i.test(ncrType) ? 3 : 2;
+        var likelihood = isMajor ? 4 : 3;
         var systemicHints = /(multiple|repeated|recurring|no process|no procedure|not implemented|systemic|widespread|several instances)/i;
         if (systemicHints.test(text)) likelihood = Math.min(5, likelihood + 1);
         if (finding.isRepeat) likelihood = Math.min(5, likelihood + 1);
         likelihood = Math.max(1, Math.min(5, likelihood));
 
         // Impact (1-5): base by severity, adjusted by clause theme weight.
-        var impact = /major/i.test(ncrType) ? 4 : /minor/i.test(ncrType) ? 2 : 1;
+        var impact = isMajor ? 4 : 2;
         impact = Math.max(1, Math.min(5, impact + (theme.impactBoost || 0)));
-        if (/major/i.test(ncrType) && (theme.impactBoost || 0) >= 2) impact = 5;
+        if (isMajor && (theme.impactBoost || 0) >= 2) impact = 5;
 
         var score = likelihood * impact;
         var residualRisk = score <= 4 ? 'Low' : score <= 9 ? 'Medium' : score <= 15 ? 'High' : 'Critical';
@@ -363,11 +398,15 @@
         var repeatedRefs = {};
         repeatInfo.repeated.forEach(function (f) { repeatedRefs[f.ref] = true; });
 
+        // collectFindings() already restricts to major/minor, but scoreFinding()
+        // is defensive and returns null for anything else — filter those out so
+        // a null-scored entry can never reach the heatmap/register/action plan.
         var scoredFindings = rawFindings.map(function (f) {
             f.isRepeat = !!repeatedRefs[f.ref];
             var scored = scoreFinding(f);
+            if (!scored) return null;
             return Object.assign({}, f, scored);
-        });
+        }).filter(Boolean);
 
         // Join to the live NCR/CAPA register and attach the best-matching real
         // record (by clause) to each scored finding as f.capaRecord, so the

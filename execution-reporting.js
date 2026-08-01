@@ -188,18 +188,28 @@
         const ncItems = hydratedProgress.filter(i => i.status === 'nc');
         const conformityItems = hydratedProgress.filter(i => i.status === 'conform');
         const naItems = hydratedProgress.filter(i => i.status === 'na');
+        // Blank/undefined status = not yet assessed (counts against coverage, excluded from conformity)
+        const notAssessedItems = hydratedProgress.filter(i => !i.status);
         const majorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'major').length;
         const minorNC = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'minor').length;
         const observationCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'observation').length;
         const ofiCount = ncItems.filter(i => (i.ncrType || '').toLowerCase() === 'ofi').length;
-        // Actual NC count = only major + minor (excludes observations & OFIs)
-        const actualNCCount = majorNC + minorNC;
-        // OBS/OFI combined count
+        // NC items with no ncrType classified yet (neither major/minor/observation/ofi)
+        const pendingClassificationCount = ncItems.filter(i => {
+            const t = (i.ncrType || '').toLowerCase();
+            return t !== 'major' && t !== 'minor' && t !== 'observation' && t !== 'ofi';
+        }).length;
+        // Actual NC count = major + minor + pending classification (excludes observations & OFIs,
+        // which are advisories and must never inflate the NC/conformity math)
+        const actualNCCount = majorNC + minorNC + pendingClassificationCount;
+        // OBS/OFI combined count (advisories — do not reduce conformity)
         const obsOfiCount = observationCount + ofiCount;
 
-        // NC breakdown by clause group (for bar chart)
+        // NC breakdown by clause group (for bar chart) — majors/minors only, advisories excluded
         const ncByClause = {};
         ncItems.forEach(item => {
+            const t = (item.ncrType || '').toLowerCase();
+            if (t !== 'major' && t !== 'minor') return;
             const g = (item.clause || '').split('.')[0] || '?';
             ncByClause[g] = (ncByClause[g] || 0) + 1;
         });
@@ -254,7 +264,33 @@
         let recommendation, recColor;
         if (majorNC > 0) { recommendation = 'Conditional Recommendation'; recColor = '#d97706'; }
         else { recommendation = 'Recommended for Certification'; recColor = '#16a34a'; }
-        const stats = { totalItems, ncCount: ncItems.length, actualNCCount, conformCount: conformityItems.length, naCount: naItems.length, majorNC, minorNC, observationCount, ofiCount, obsOfiCount, ncByClause, applicableCount, auditStatus, statusColor, recommendation, recColor };
+
+        // Preferred: shared ReportStats module (single source of truth across all report agents).
+        // Legacy fallback: compute the same corrected semantics inline if the module isn't loaded.
+        const rs = (window.ReportStats && typeof window.ReportStats.build === 'function')
+            ? window.ReportStats.build({ report, hydratedProgress, auditPlan, client })
+            : null;
+
+        const assessedCount = conformityItems.length + actualNCCount + obsOfiCount;
+        const notAssessedCount = rs ? rs.resultCounts.notAssessed : notAssessedItems.length;
+        const coveragePct = rs ? rs.coveragePct
+            : (applicableCount > 0 ? Math.round((assessedCount / applicableCount) * 100) : null);
+        const conformityDenom = conformityItems.length + actualNCCount;
+        const conformityPct = rs ? rs.conformityPct
+            : (conformityDenom > 0 ? Math.round((conformityItems.length / conformityDenom) * 100) : null);
+
+        // `ncCount` = majors + minors + pending classification ONLY (never inflated by obs/ofi).
+        // `advisoryCount` tracks observations + OFIs separately so downstream UI never conflates them.
+        const stats = {
+            totalItems, ncCount: actualNCCount, actualNCCount,
+            conformCount: conformityItems.length, naCount: naItems.length,
+            majorNC, minorNC, pendingClassificationCount,
+            observationCount, ofiCount, obsOfiCount, advisoryCount: obsOfiCount,
+            notAssessedCount, ncByClause, applicableCount, assessedCount,
+            coveragePct, conformityPct,
+            auditStatus, statusColor, recommendation, recColor,
+            rs
+        };
 
         // QR Code: links to a self-contained, non-confidential Report Card page (#verify hash route).
         // Scanning opens the app at that hash, which renders the card without exposing scope, findings, or personal data.
@@ -353,6 +389,16 @@
         const d = window._reportPreviewData;
         if (!d) return;
 
+        // Risk/maturity dashboard: weight majors higher than minors so a single Major NC
+        // can't be masked by an otherwise-clean checklist. ncCount here is already
+        // major+minor+pending (advisories excluded) per the stats fix above.
+        const _majorNC = d.stats.majorNC || 0;
+        const _ncCount = d.stats.ncCount || 0;
+        const _riskLevel = (_majorNC > 0 || _ncCount > 3) ? 'HIGH' : (_ncCount > 0 ? 'MEDIUM' : 'LOW');
+        const _riskColor = _riskLevel === 'HIGH' ? '#ef4444' : _riskLevel === 'MEDIUM' ? '#f59e0b' : '#10b981';
+        const _maturityStars = (_majorNC > 0) ? '⭐⭐' : (_ncCount === 0 ? '⭐⭐⭐⭐⭐' : _ncCount <= 2 ? '⭐⭐⭐⭐' : _ncCount <= 5 ? '⭐⭐⭐' : '⭐⭐');
+        const _maturityLabel = (_majorNC > 0) ? 'Early Stage' : (_ncCount === 0 ? 'Excellent' : _ncCount <= 2 ? 'Good' : _ncCount <= 5 ? 'Developing' : 'Early Stage');
+
         // Remove existing overlay
         const existing = document.getElementById('report-preview-overlay');
         if (existing) existing.remove();
@@ -434,14 +480,17 @@
             return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${imgs.map(url => `<img src="${url}" style="height:50px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;" data-action="open" data-arg1="${url}" data-arg2="_blank">`).join('')}</div>`;
         };
 
-        const ncRows = d.hydratedProgress.filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').map((item, idx) => {
+        const ncRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            const sev = item.ncrType || 'NC';
-            const sevStyle = sev === 'Major' ? 'background:#fee2e2;color:#991b1b' : 'background:#fef3c7;color:#92400e';
+            const sevRaw = (item.ncrType || '').toLowerCase();
+            // Blank/unrecognized ncrType on an NC item = pending classification, not silently "Minor".
+            const sev = sevRaw === 'major' ? 'Major' : sevRaw === 'minor' ? 'Minor' : 'Minor †';
+            const sevStyle = sevRaw === 'major' ? 'background:#fee2e2;color:#991b1b' : 'background:#fef3c7;color:#92400e';
             return `<tr style="background:${idx % 2 ? '#f8fafc' : 'white'};"><td style="padding:10px 14px;font-weight:700;">${clause}</td><td style="padding:10px 14px;">${title ? '<strong>' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.82rem;">' + (req || '').substring(0, 180) + (req && req.length > 180 ? '...' : '') + '</div>' : req}</td><td style="padding:10px 14px;"><span style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;${sevStyle};">${sev}</span></td><td style="padding:10px 14px;color:#334155;">${fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>'}${renderEvThumbs(item)}</td></tr>`;
         }).join('');
+        const ncPendingFootnote = d.hydratedProgress.some(i => i.status === 'nc' && !i.ncrType) ? '<div style="margin-top:6px;font-size:0.75rem;color:#94a3b8;">† Pending classification — recorded as NC but severity not yet assigned; shown under Minor pending review.</div>' : '';
 
         // OBS rows (Observations only)
         const obsOnlyRows = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() === 'observation').map((item, idx) => {
@@ -708,10 +757,10 @@
                             <!-- Risk & Compliance Dashboard -->
                             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
                                 <!-- Overall Risk Score -->
-                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid ${d.stats.ncCount === 0 ? '#10b981' : d.stats.ncCount <= 2 ? '#f59e0b' : '#ef4444'};">
+                                <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid ${_riskColor};">
                                     <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Risk Level</div>
-                                    <div style="font-size:1.8rem;font-weight:800;color:${d.stats.ncCount === 0 ? '#10b981' : d.stats.ncCount <= 2 ? '#f59e0b' : '#ef4444'};">
-                                        ${d.stats.ncCount === 0 ? 'LOW' : d.stats.ncCount <= 2 ? 'MEDIUM' : 'HIGH'}
+                                    <div style="font-size:1.8rem;font-weight:800;color:${_riskColor};">
+                                        ${_riskLevel}
                                     </div>
                                     <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${d.stats.ncCount} NC Found</div>
                                 </div>
@@ -729,9 +778,9 @@
                                 <div style="text-align:center;padding:1rem;background:white;border-radius:10px;border-left:4px solid #8b5cf6;">
                                     <div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:0.5rem;">Maturity</div>
                                     <div style="font-size:1.8rem;font-weight:800;color:#8b5cf6;">
-                                        ${d.stats.ncCount === 0 ? '⭐⭐⭐⭐⭐' : d.stats.ncCount <= 2 ? '⭐⭐⭐⭐' : d.stats.ncCount <= 5 ? '⭐⭐⭐' : '⭐⭐'}
+                                        ${_maturityStars}
                                     </div>
-                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${d.stats.ncCount === 0 ? 'Excellent' : d.stats.ncCount <= 2 ? 'Good' : d.stats.ncCount <= 5 ? 'Developing' : 'Early Stage'}</div>
+                                    <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">${_maturityLabel}</div>
                                 </div>
                             </div>
                             
@@ -1269,17 +1318,17 @@
                             }
                             // Extract NCs from previous report
                             const prevNCs = (prevReport.checklistProgress || [])
-                                .filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi');
+                                .filter(p => p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi');
                             const prevNCRs = prevReport.ncrs || [];
                             if (prevNCs.length === 0 && prevNCRs.length === 0) {
                                 return '<div style="padding:12px;background:#f0fdf4;border-radius:8px;color:#166534;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><strong>Previous Audit (' + (prevReport.date || '—') + '):</strong> No non-conformities were raised. Certification was recommended.</div>' + prevFindingsNarrative;
                             }
                             let rows = '';
                             prevNCs.forEach(function (nc, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (nc.ncrType === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
                             });
                             prevNCRs.forEach(function (ncr, i) {
-                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (ncr.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
+                                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td contenteditable="true" style="cursor:text;min-width:150px;">Verified closed — corrective action implemented</td></tr>';
                             });
                             return '<div style="margin-bottom:12px;padding:10px 14px;background:#eef2ff;border-radius:8px;font-size:0.88rem;color:#3730a3;"><i class="fa-solid fa-clock-rotate-left" style="margin-right:6px;"></i><strong>Previous Audit:</strong> ' + (prevReport.date || '—') + ' | ' + (prevReport.standard || d.report.standard || '') + ' | ' + (prevNCs.length + prevNCRs.length) + ' NC(s) raised</div>'
                                 + '<table style="width:100%;font-size:0.84rem;border-collapse:collapse;"><thead><tr style="background:#eef2ff;"><th style="padding:10px 14px;text-align:left;width:12%;">Ref</th><th style="padding:10px 14px;text-align:left;width:20%;">Clause</th><th style="padding:10px 14px;text-align:left;width:12%;">Type</th><th style="padding:10px 14px;text-align:left;width:56%;">Follow-up Status (click to edit)</th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -1310,45 +1359,63 @@
                 </div>` : ''}
                 <!-- 7: Findings -->
                 <div class="rp-sec" id="sec-findings">
-                    <div class="rp-sec-hdr" style="border-left-color:#dc2626;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.majorNC + d.stats.minorNC})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
+                    <div class="rp-sec-hdr" style="border-left-color:#dc2626;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">7</span>FINDING DETAILS (${d.stats.ncCount})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body" style="padding:0;">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;width:12%;">Clause</th><th style="padding:10px 14px;text-align:left;width:40%;">ISO Requirement</th><th style="padding:10px 14px;text-align:left;width:12%;">Severity</th><th style="padding:10px 14px;text-align:left;width:40%;">Evidence & Remarks</th></tr></thead>
                             <tbody>${ncRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No non-conformities found</td></tr>'}</tbody>
                         </table>
+                        ${ncPendingFootnote}
                     </div>
                 </div>
                 ${(d.report.ncrs || []).length > 0 ? `
                 <!-- 7: NCRs -->
                 <div class="rp-sec" id="sec-ncrs">
                     <div class="rp-sec-hdr" style="border-left-color:#ea580c;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">8</span>NCR REGISTER (${d.report.ncrs.length})<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
-                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + (ncr.type === 'Major' ? '#dc2626' : '#f59e0b') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.85rem;"><strong>' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.8rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
+                    <div class="rp-sec-body">${d.report.ncrs.map(ncr => '<div style="padding:10px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#dc2626' : '#f59e0b') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 6px 6px 0;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.85rem;"><strong>' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.8rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.85rem;margin-top:4px;">' + (ncr.description || '') + '</div></div>').join('')}</div>
                 </div>` : ''}
                 <!-- Corrective Action Requirements -->
-                ${(d.stats.majorNC + d.stats.minorNC) > 0 ? `
+                ${(d.stats.ncCount) > 0 ? `
                 <div class="rp-sec" id="sec-corrective">
                     <div class="rp-sec-hdr" style="border-left-color:#be185d;" data-action="toggleNextCollapsed"><span style="background:rgba(255,255,255,0.2);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;">9</span>CORRECTIVE ACTION REQUIREMENTS<span style="margin-left:auto;"><i class="fa-solid fa-chevron-down"></i></span></div>
                     <div class="rp-sec-body">
                         <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
                             <thead><tr style="background:#fdf2f8;"><th style="padding:10px 14px;text-align:left;width:10%;">NC Ref</th><th style="padding:10px 14px;text-align:left;width:10%;">Clause</th><th style="padding:10px 14px;text-align:left;width:10%;">Type</th><th style="padding:10px 14px;text-align:left;width:35%;">Corrective Action Required</th><th style="padding:10px 14px;text-align:left;width:15%;">Due Date</th><th style="padding:10px 14px;text-align:left;width:20%;">Verification Method</th></tr></thead>
                             <tbody>${(() => {
-                    const ncItems = (d.report.checklistProgress || []).filter(p => p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi');
-                    const ncrItems = d.report.ncrs || [];
-                    const allNCs = [...ncItems.map((item, i) => ({
-                        ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1),
-                        clause: item.clauseRef || item.clause || item.id,
-                        type: item.ncrType || item.severity || 'Minor',
-                        desc: item.ncrDescription || item.comment || item.requirement || '',
-                        dueDate: item.ncrType === 'Major' ? (() => { const dt = new Date(); dt.setDate(dt.getDate() + 30); return dt.toISOString().split('T')[0]; })() : (() => { const dt = new Date(); dt.setDate(dt.getDate() + 90); return dt.toISOString().split('T')[0]; })()
-                    })), ...ncrItems.map((ncr, i) => ({
-                        ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1),
-                        clause: ncr.clause || '',
-                        type: ncr.type || 'Minor',
-                        desc: ncr.description || '',
-                        dueDate: ncr.type === 'Major' ? (() => { const dt = new Date(); dt.setDate(dt.getDate() + 30); return dt.toISOString().split('T')[0]; })() : (() => { const dt = new Date(); dt.setDate(dt.getDate() + 90); return dt.toISOString().split('T')[0]; })()
-                    }))];
+                    const dueFromType = (typ) => { const t = (typ || '').toLowerCase(); const dt = new Date(); dt.setDate(dt.getDate() + (t === 'major' ? 30 : 90)); return dt.toISOString().split('T')[0]; };
+                    let allNCs;
+                    if (d.stats.rs && Array.isArray(d.stats.rs.uniqueFindings)) {
+                        // Shared numbering (F-01, F-02, ...) so this table agrees with the Findings
+                        // section and risk sections — no independent, conflicting ref sequence.
+                        allNCs = d.stats.rs.uniqueFindings
+                            .filter(f => (f.severity || '').toLowerCase() !== 'observation' && (f.severity || '').toLowerCase() !== 'ofi')
+                            .map(f => ({
+                                ref: f.id,
+                                clause: f.clause || '',
+                                type: f.severity || 'Minor',
+                                desc: f.comment || f.statement || '',
+                                dueDate: f.caDueDate || dueFromType(f.severity)
+                            }));
+                    } else {
+                        // Legacy fallback: union checklist NC items + report.ncrs with independent numbering.
+                        const ncItems = (d.report.checklistProgress || []).filter(p => p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi');
+                        const ncrItems = d.report.ncrs || [];
+                        allNCs = [...ncItems.map((item, i) => ({
+                            ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1),
+                            clause: item.clauseRef || item.clause || item.id,
+                            type: item.ncrType || item.severity || 'Minor',
+                            desc: item.ncrDescription || item.comment || item.requirement || '',
+                            dueDate: item.caDueDate || dueFromType(item.ncrType)
+                        })), ...ncrItems.map((ncr, i) => ({
+                            ref: 'NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1),
+                            clause: ncr.clause || '',
+                            type: ncr.type || 'Minor',
+                            desc: ncr.description || '',
+                            dueDate: ncr.caDueDate || dueFromType(ncr.type)
+                        }))];
+                    }
                     if (allNCs.length === 0) return '<tr><td colspan="6" style="padding:20px;text-align:center;color:#94a3b8;">No corrective actions required</td></tr>';
-                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + nc.clause + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + (nc.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
+                    return allNCs.map(nc => '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;font-family:monospace;color:#be185d;">' + nc.ref + '</td><td style="padding:10px 14px;">' + nc.clause + '</td><td style="padding:10px 14px;"><span style="padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;' + ((nc.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + nc.type + '</span></td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Root cause analysis and corrective action required for: ' + (nc.desc || '').substring(0, 120) + '</td><td style="padding:10px 14px;font-weight:600;color:#be185d;">' + nc.dueDate + '</td><td style="padding:10px 14px;" contenteditable="true" class="rp-edit">Document review & follow-up audit</td></tr>').join('');
                 })()}</tbody>
                         </table>
                         <div style="margin-top:1rem;padding:0.75rem;background:#fef2f8;border-radius:8px;font-size:0.82rem;color:#9d174d;"><i class="fa-solid fa-clock" style="margin-right:0.4rem;"></i><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>
@@ -1453,7 +1520,7 @@
                             <div style="margin-bottom:12px;">• Standard: ${d.report.standard || 'ISO Standard'}</div>
                             <div style="font-weight:600;margin-bottom:8px;">Annexure B — Checklist Summary</div>
                             <div style="margin-bottom:6px;">• Total Items Audited: ${d.stats.totalItems}</div>
-                            <div style="margin-bottom:6px;">• Conforming: ${d.stats.conformCount} | NC: ${d.stats.majorNC + d.stats.minorNC} | Observations: ${d.stats.observationCount} | OFI: ${d.stats.ofiCount}</div>
+                            <div style="margin-bottom:6px;">• Conforming: ${d.stats.conformCount} | NC: ${d.stats.ncCount} | Observations: ${d.stats.observationCount} | OFI: ${d.stats.ofiCount}</div>
                             <div style="margin-bottom:12px;">• N/A Items: ${d.stats.naCount}</div>
                             <div style="font-weight:600;margin-bottom:8px;">Annexure C — Additional Documents</div>
                             <div style="color:#94a3b8;font-style:italic;">Click to add any additional supporting documents, certificates, or reference materials</div>
@@ -1487,8 +1554,8 @@
                     new Chart(pieCtx.getContext('2d'), {
                         type: 'doughnut',
                         data: {
-                            labels: ['Conforming', 'Non-Conformity', 'Observation'],
-                            datasets: [{ data: [d.stats.conformCount, d.stats.ncCount, d.stats.observationCount], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'], borderWidth: 0 }]
+                            labels: ['Conforming', 'Non-Conformity', 'Observations/OFI', 'Not Assessed', 'N/A'],
+                            datasets: [{ data: [d.stats.conformCount, d.stats.ncCount, d.stats.obsOfiCount, d.stats.notAssessedCount, d.stats.naCount], backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#94a3b8', '#cbd5e1'], borderWidth: 0 }]
                         },
                         options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } } }
                     });
@@ -1514,9 +1581,10 @@
                         const mainClause = clause.split('.')[0];
                         if (!clauseData[mainClause]) clauseData[mainClause] = { major: 0, minor: 0, obs: 0, ok: 0 };
                         if (item.status === 'nc') {
-                            if (item.ncrType === 'Major') clauseData[mainClause].major++;
-                            else if (item.ncrType === 'Minor') clauseData[mainClause].minor++;
-                            else clauseData[mainClause].obs++;
+                            const t = (item.ncrType || '').toLowerCase();
+                            if (t === 'major') clauseData[mainClause].major++;
+                            else if (t === 'minor' || !t) clauseData[mainClause].minor++; // pending classification counted as minor here
+                            else if (t === 'observation' || t === 'ofi') clauseData[mainClause].obs++;
                         } else if (item.status === 'conform') {
                             clauseData[mainClause].ok++;
                         }
@@ -1954,7 +2022,7 @@
             // Step 3: Generate AI-powered conclusion
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Generating conclusion...';
             try {
-                const ncTotal = d.stats.majorNC + d.stats.minorNC;
+                const ncTotal = d.stats.ncCount;
                 const obsTotal = d.stats.observationCount + d.stats.ofiCount;
                 const _conformRate = d.stats.complianceScore;
                 const conclusionPrompt = `You are a Senior Lead Auditor at a top-tier Certification Body. Write a formal audit conclusion (150-200 words) for the following audit:
@@ -2000,8 +2068,10 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 const items = d.hydratedProgress.filter(i => i.status !== 'pending');
                 findingsBody.innerHTML = items.map((item, idx) => {
                     const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
-                    const sev = item.status === 'nc' ? (item.ncrType || 'NC') : item.status === 'observation' ? 'OBS' : 'OK';
-                    const sevColor = sev === 'Major' ? '#dc2626' : sev === 'Minor' ? '#f59e0b' : sev === 'OBS' ? '#3b82f6' : '#10b981';
+                    const sevRaw = item.status === 'nc' ? (item.ncrType || 'NC') : item.status === 'observation' ? 'OBS' : 'OK';
+                    const sev = sevRaw;
+                    const sevLc = String(sevRaw).toLowerCase();
+                    const sevColor = sevLc === 'major' ? '#dc2626' : (sevLc === 'minor' || sevLc === 'nc') ? '#f59e0b' : sevLc === 'obs' ? '#3b82f6' : '#10b981';
                     return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:8px 12px;font-weight:600;">' + clause + '</td><td style="padding:8px 12px;text-align:center;"><span style="padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;color:' + sevColor + ';">' + sev + '</span></td><td style="padding:8px 12px;color:#334155;font-size:0.88rem;line-height:1.6;">' + (fmtRemark(item.comment) || '-') + '</td></tr>';
                 }).join('');
             }
@@ -2341,13 +2411,14 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             let extra = imgs.length > 2 ? ' <span style="font-size:0.75rem;color:#64748b;">(+' + (imgs.length - 2) + ' more)</span>' : '';
             return '<div class="ev-inline">' + limited.map(function (url) { return '<a href="' + url + '" target="_blank"><img src="' + url + '" style="height:80px;max-width:140px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;"></a>'; }).join('') + extra + '</div>';
         };
-        const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && i.ncrType && i.ncrType.toLowerCase() !== 'observation' && i.ncrType.toLowerCase() !== 'ofi').map((item, idx) => {
+        const ncRowsHtml = d.hydratedProgress.filter(i => i.status === 'nc' && (i.ncrType || '').toLowerCase() !== 'observation' && (i.ncrType || '').toLowerCase() !== 'ofi').map((item, idx) => {
             const clause = item.kbMatch ? item.kbMatch.clause : item.clause;
             const title = item.kbMatch ? item.kbMatch.title : '';
             const req = (item.kbMatch && item.kbMatch.requirement) ? item.kbMatch.requirement : (item.requirement || item.description || item.text || '');
-            const sev = item.ncrType || 'NC';
-            const sevBg = sev === 'Major' ? '#fee2e2' : '#fef3c7';
-            const sevFg = sev === 'Major' ? '#991b1b' : '#92400e';
+            const sevRaw2 = (item.ncrType || '').toLowerCase();
+            const sev = sevRaw2 === 'major' ? 'Major' : sevRaw2 === 'minor' ? 'Minor' : 'Minor †';
+            const sevBg = sevRaw2 === 'major' ? '#fee2e2' : '#fef3c7';
+            const sevFg = sevRaw2 === 'major' ? '#991b1b' : '#92400e';
             return '<tr style="background:' + (idx % 2 ? '#f8fafc' : 'white') + ';"><td style="padding:12px 14px;font-weight:700;white-space:nowrap;">' + clause + '</td><td style="padding:12px 14px;">' + (title ? '<strong style="color:#1e293b;">' + title + '</strong><div style="margin-top:4px;color:#475569;font-size:0.85em;line-height:1.6;">' + req + '</div>' : req) + '</td><td style="padding:12px 14px;text-align:center;"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + sevBg + ';color:' + sevFg + ';">' + sev + '</span></td><td style="padding:12px 14px;color:#334155;line-height:1.6;">' + (fmtRemark(item.comment) || '<span style="color:#94a3b8;">No remarks recorded.</span>') + renderEvThumbsPdf(item) + '</td></tr>';
         }).join('');
 
@@ -2506,7 +2577,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
         }, 0) + (d.report.ncrs || []).filter(function (n) { return n.evidenceImage; }).length;
         const hasEvidence = evidenceItemsCount > 0;
         const hasNcrs = (d.report.ncrs || []).length > 0;
-        const hasCorrective = (d.stats.majorNC + d.stats.minorNC) > 0;
+        const hasCorrective = (d.stats.ncCount) > 0;
         // auditTypeStr / isSurveillanceOrRecert / isInitialOrStage computed earlier in this
         // function (see editedPrevFindings block) — reused here for section presence.
         // Previous-findings follow-up rows, sourced from the prior audit report for this client (if any).
@@ -2518,15 +2589,15 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             const prevReport = prevReports[0];
             if (!prevReport) return '';
             const prevNCs = (prevReport.checklistProgress || [])
-                .filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; });
+                .filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; });
             const prevNCRs = prevReport.ncrs || [];
             if (prevNCs.length === 0 && prevNCRs.length === 0) return '';
             let rows = '';
             prevNCs.forEach(function (nc, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (nc.ncrType === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (i + 1) + '</td><td>' + (nc.clauseRef || nc.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((nc.ncrType || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (nc.ncrType || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
             });
             prevNCRs.forEach(function (ncr, i) {
-                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + (ncr.type === 'Major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
+                rows += '<tr><td style="font-family:monospace;font-weight:600;color:#6366f1;">PREV-' + (prevNCs.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:600;' + ((ncr.type || '').toLowerCase() === 'major' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;') + '">' + (ncr.type || 'Minor') + '</span></td><td>Verified closed — corrective action implemented</td></tr>';
             });
             return rows;
         })();
@@ -2909,9 +2980,16 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             + (secMap['charts'] ? '<div id="sec-charts" class="sh page-break" style="background:#eff6ff;border-left-color:#1d4ed8;">' + sBadge('charts') + 'ANALYTICS DASHBOARD</div><div class="sb">'
                 + '<div class="stat-grid">'
                 + '<div class="stat-box" style="background:' + d.stats.statusColor + '14;border-color:' + d.stats.statusColor + ';"><div class="stat-val" style="font-size:0.95rem;line-height:1.25;color:' + d.stats.statusColor + ';">' + d.stats.auditStatus + '</div><div class="stat-lbl">Certification Status</div></div>'
-                + '<div class="stat-box" style="background:#fffbeb;border-color:#b45309;"><div class="stat-val" style="color:#b45309;">' + d.stats.minorNC + '</div><div class="stat-lbl">Minor NC</div></div>'
+                + '<div class="stat-box" style="background:#fef2f2;border-color:#dc2626;"><div class="stat-val" style="color:#dc2626;">' + d.stats.majorNC + '</div><div class="stat-lbl">Major NC</div></div>'
+                + '<div class="stat-box" style="background:#fffbeb;border-color:#b45309;"><div class="stat-val" style="color:#b45309;">' + d.stats.minorNC + (d.stats.pendingClassificationCount ? ' †' : '') + '</div><div class="stat-lbl">Minor NC</div></div>'
                 + '<div class="stat-box" style="background:#eff6ff;border-color:#1d4ed8;"><div class="stat-val" style="color:#1d4ed8;">' + d.stats.observationCount + '</div><div class="stat-lbl">Observations</div></div>'
-                + '<div class="stat-box" style="background:#f1f5f9;border-color:#475569;"><div class="stat-val" style="color:#475569;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div></div>'
+                + '<div class="stat-box" style="background:#f1f5f9;border-color:#475569;"><div class="stat-val" style="color:#475569;">' + d.stats.ofiCount + '</div><div class="stat-lbl">OFI</div></div>'
+                + '<div class="stat-box" style="background:#f8fafc;border-color:#94a3b8;"><div class="stat-val" style="color:#64748b;">' + d.stats.notAssessedCount + '</div><div class="stat-lbl">Not Assessed</div></div></div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">'
+                + '<div class="stat-box" style="background:#ecfdf5;border-color:#059669;"><div class="stat-val" style="color:#059669;">' + (d.stats.coveragePct === null || d.stats.coveragePct === undefined ? '—' : d.stats.coveragePct + '%') + '</div><div class="stat-lbl">Audit Coverage %</div></div>'
+                + '<div class="stat-box" style="background:#eef2ff;border-color:#4338ca;"><div class="stat-val" style="color:#4338ca;">' + (d.stats.conformityPct === null || d.stats.conformityPct === undefined ? '—' : d.stats.conformityPct + '%') + '</div><div class="stat-lbl">Conformity %</div></div></div>'
+                + '<div style="font-size:0.76rem;color:#64748b;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px;">' + (d.stats.rs?.methodologyNote || 'Coverage = items assessed (conform + NC + advisories) ÷ applicable items (excludes N/A). Conformity = conform ÷ (conform + NC); observations and OFIs are advisories and do not reduce conformity.') + '</div>'
+                + (d.stats.rs?.reconciliation?.length ? '<div class="b4-card b4-callout b4-callout--warn" style="margin-bottom:16px;"><strong style="display:block;margin-bottom:4px;">Data Quality Notes</strong><ul style="margin:0;padding-left:18px;">' + d.stats.rs.reconciliation.map(function (r) { return '<li>' + (r.message || r.code || '') + '</li>'; }).join('') + '</ul></div>' : '')
                 + '<div class="chart-grid"><div class="chart-box"><div class="chart-title">Findings Breakdown</div><canvas id="chart-doughnut"></canvas></div>'
                 + '<div class="chart-box"><div class="chart-title">NC by Clause Section</div><canvas id="chart-clause"></canvas></div></div>'
                 + '<div class="chart-grid" style="grid-template-columns:1fr;margin-top:16px;"><div class="chart-box"><div class="chart-title">Area Performance</div><canvas id="chart-area"></canvas></div></div>'
@@ -2941,7 +3019,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // SECTION: FINDING DETAILS
             + (secMap['findings'] ? '<div id="sec-findings" class="sh page-break" style="background:#fef2f2;border-left-color:#b91c1c;">' + sBadge('findings') + 'FINDING DETAILS</div><div class="sb" style="padding:0;"><table class="f-tbl"><thead><tr><th style="width:10%;">Clause</th><th style="width:30%;">ISO Requirement</th><th style="width:12%;text-align:center;">Severity</th><th style="width:48%;">Evidence &amp; Remarks</th></tr></thead><tbody>' + (ncRowsHtml || '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No findings recorded.</td></tr>') + '</tbody></table></div>' : '')
             // SECTION: NCR REGISTER
-            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + (ncr.type === 'Major' ? '#b91c1c' : '#b45309') + ';background:' + (ncr.type === 'Major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
+            + (secMap['ncrs'] ? '<div id="sec-ncrs" class="sh page-break" style="background:#fff7ed;border-left-color:#b91c1c;">' + sBadge('ncrs') + 'NCR REGISTER</div><div class="sb">' + d.report.ncrs.map(ncr => '<div style="padding:14px 18px;border-left:4px solid ' + ((ncr.type || '').toLowerCase() === 'major' ? '#b91c1c' : '#b45309') + ';background:' + ((ncr.type || '').toLowerCase() === 'major' ? '#fef2f2' : '#fffbeb') + ';border-radius:0 8px 8px 0;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:0.95rem;">' + ncr.type + ' — Clause ' + ncr.clause + '</strong><span style="color:#64748b;font-size:0.82rem;">' + (ncr.createdAt ? new Date(ncr.createdAt).toLocaleDateString() : '') + '</span></div><div style="color:#334155;font-size:0.9rem;margin-top:8px;line-height:1.7;">' + fmtRemark(ncr.description) + '</div>' + (ncr.evidenceImage ? '<div style="margin-top:8px;"><img src="' + ncr.evidenceImage + '" style="max-height:120px;border-radius:6px;border:1px solid #e2e8f0;"></div>' : '') + '</div>').join('') + '</div>' : '')
 
             // SECTION: CORRECTIVE ACTION REQUIREMENTS
             + (secMap['corrective'] ? '<div id="sec-corrective" class="sh page-break" style="background:#f8fafc;border-left-color:#be185d;">' + sBadge('corrective') + 'CORRECTIVE ACTION REQUIREMENTS</div><div class="sb">'
@@ -2951,8 +3029,8 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                     // end date) and stored as item.caDueDate / ncr.caDueDate. Reuse that stored value
                     // here so regenerating the PDF does not shift due dates. Fall back to computing
                     // from today only for legacy records that predate persistence.
-                    var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + (typ === 'Major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
-                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && p.ncrType && p.ncrType.toLowerCase() !== 'observation' && p.ncrType.toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typ = item.ncrType || 'Minor'; var dueStr = item.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typ === 'Major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typ = ncr.type || 'Minor'; var dueStr = ncr.caDueDate || fallbackDue(typ); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typ === 'Major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
+                    var fallbackDue = function (typ) { var due = new Date(); due.setDate(due.getDate() + ((typ || '').toLowerCase() === 'major' ? 30 : 90)); return due.toISOString().split('T')[0]; };
+                    var ncItems = (d.report.checklistProgress || []).filter(function (p) { return p.status === 'nc' && (p.ncrType || '').toLowerCase() !== 'observation' && (p.ncrType || '').toLowerCase() !== 'ofi'; }); var ncrItems = d.report.ncrs || []; var rows = ''; ncItems.forEach(function (item, i) { var typRaw = (item.ncrType || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : typRaw === 'minor' ? 'Minor' : 'Minor †'; var dueStr = item.caDueDate || fallbackDue(item.ncrType); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (i + 1) + '</td><td>' + (item.clauseRef || item.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); ncrItems.forEach(function (ncr, i) { var typRaw = (ncr.type || '').toLowerCase(); var typ = typRaw === 'major' ? 'Major' : (ncr.type || 'Minor'); var dueStr = ncr.caDueDate || fallbackDue(ncr.type); rows += '<tr><td style="font-family:monospace;font-weight:500;color:#475569;white-space:nowrap;">NCR-' + String(d.report.id).substring(0, 6) + '-' + (ncItems.length + i + 1) + '</td><td>' + (ncr.clause || '') + '</td><td><span style="padding:2px 8px;border-radius:12px;font-size:0.78rem;font-weight:500;' + (typRaw === 'major' ? 'background:#fef2f2;color:#b91c1c;' : 'background:#fffbeb;color:#b45309;') + '">' + typ + '</span></td><td>Root cause analysis and corrective action required</td><td style="font-weight:500;color:#475569;white-space:nowrap;">' + dueStr + '</td><td>Document review & follow-up</td></tr>'; }); return rows; })()
                 + '</tbody></table>'
                 + '<div style="margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px;font-size:0.82rem;color:#475569;"><strong>Timeframes:</strong> Major NC — 30 days | Minor NC — 90 days from report issuance</div>'
                 + '</div>' : '')
@@ -3000,7 +3078,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
                 + '<div style="margin-bottom:12px;">• Standard: ' + standard + '</div>'
                 + '<div style="font-weight:700;margin-bottom:6px;">Annexure B — Checklist Summary</div>'
                 + '<div style="margin-bottom:4px;">• Total Items Audited: ' + d.stats.totalItems + '</div>'
-                + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.majorNC + d.stats.minorNC) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
+                + '<div style="margin-bottom:4px;">• Conforming: ' + d.stats.conformCount + ' | NC: ' + (d.stats.ncCount) + ' | Observations: ' + d.stats.observationCount + ' | OFI: ' + d.stats.ofiCount + '</div>'
                 + '<div style="margin-bottom:12px;">• N/A Items: ' + d.stats.naCount + '</div>'
                 + '</div></div>' : '')
             // TIER 3: auditor-facing evidence analytics, ahead of the photo appendix
@@ -3104,7 +3182,7 @@ Return ONLY the conclusion text, no JSON, no formatting.`;
             // any chart is constructed so per-config font objects only vary size.
             + 'if(window.Chart&&Chart.defaults){Chart.defaults.font.family="Inter, Segoe UI, Helvetica, Arial, sans-serif";Chart.defaults.font.size=9;Chart.defaults.color="#475569";}'
             + 'var c1=document.getElementById("chart-doughnut");'
-            + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + '],backgroundColor:["#15803d","#b45309","#b91c1c","#1d4ed8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
+            + 'if(c1)new Chart(c1,{type:"doughnut",data:{labels:["Conformity","Minor NC","Major NC","Observations","OFI","Not Assessed"],datasets:[{data:[' + d.stats.conformCount + ',' + d.stats.minorNC + ',' + d.stats.majorNC + ',' + d.stats.observationCount + ',' + d.stats.ofiCount + ',' + d.stats.notAssessedCount + '],backgroundColor:["#15803d","#b45309","#b91c1c","#1d4ed8","#0891b2","#94a3b8"],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}});'
             + 'var c2=document.getElementById("chart-clause");'
             + 'if(c2)new Chart(c2,{type:"bar",data:{labels:' + JSON.stringify(clauseLabels.map(l => 'Clause ' + l)) + ',datasets:[{label:"NCs",data:' + JSON.stringify(clauseValues) + ',backgroundColor:"#1d4ed8",borderRadius:4}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});'
             + 'var c3=document.getElementById("chart-findings");'
